@@ -776,8 +776,6 @@ Section trace_proof.
     iIntros (Hneq Hextract Hconn) "Hres".
     rewrite /initialized_trace_resources.
     rewrite lookup_insert_ne; last done.
-    iAssert (initialized_trace_resources  (lt ++ [le]) T sa' γmname res mstate) 
-      with "[Hres]" as "Hres"; last iFrame.
     by iApply (initialized_trace_resources_neq1 sa sa' c with "[][][][$Hres]"). 
   Qed.
 
@@ -890,9 +888,23 @@ Section trace_proof.
     iIntros (Hneq Hextract Hconn_le Hconn_op) "Hres".
     rewrite /initialized_trace_resources.
     rewrite lookup_insert_ne; last done.
-    iAssert (initialized_trace_resources  (lt ++ [le]) (T ++ [[op]]) sa' γmname res mstate) 
-      with "[Hres]" as "Hres"; last iFrame.
     by iApply (initialized_trace_resources_neq3 sa sa' with "[][][][]"). 
+  Qed.
+
+  Lemma initialized_trace_resources_neq6 (sa sa' : socket_address) c le lt T1 T2 trans op
+  γmname mstate p (res : RU_resources Mdl Σ) :
+    ⌜sa ≠ sa'⌝ -∗
+    ⌜extract c = Some #sa⌝ -∗
+    ⌜connOfEvent le = Some c⌝ -∗
+    ⌜connOfOp op = c⌝ -∗
+    ⌜(∃ op : operation, op ∈ trans ∧ last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false)⌝ -∗
+    initialized_trace_resources lt (T1 ++ trans :: T2) sa' γmname res mstate -∗
+    initialized_trace_resources (lt ++ [le]) (T1 ++ (trans ++ [op]) :: T2) sa' γmname res (<[sa:=p]> mstate).
+  Proof.
+    iIntros (Hneq Hextract Hconn_le Hconn_op Hop) "Hres".
+    rewrite /initialized_trace_resources.
+    rewrite lookup_insert_ne; last done.
+    iApply (initialized_trace_resources_neq4 sa sa'); try done. 
   Qed.
 
   Lemma client_trace_state_resources_neq1 (sa sa' : socket_address) T op c le lt 
@@ -982,6 +994,25 @@ Section trace_proof.
       by apply (unnitialized_trace_resources_neq2 sa sa' lt c).
     - iRight.
       by iApply (initialized_trace_resources_neq5 sa sa' c with "[][][][][$]").
+  Qed.
+
+  Lemma client_trace_state_resources_neq6 (sa sa' : socket_address) c le lt T1 T2 trans op
+  γstate γmname mstate mname p (res : RU_resources Mdl Σ) :
+    ⌜sa ≠ sa'⌝ -∗
+    ⌜extract c = Some #sa⌝ -∗
+    ⌜connOfEvent le = Some c⌝ -∗
+    ⌜connOfOp op = c⌝ -∗
+    ⌜(∃ op : operation, op ∈ trans ∧ last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false)⌝ -∗
+    client_trace_state_resources lt (T1 ++ trans :: T2) sa' γstate γmname res mstate mname -∗
+    client_trace_state_resources (lt ++ [le]) (T1 ++ (trans ++ [op]) :: T2) sa' γstate γmname res (<[sa:=p]> mstate) mname.
+  Proof.
+    iIntros (Hneq Hextract Hconn_le Hconn_op Hop) "Hres".
+    iDestruct "Hres" as "[%Hres|Hres]".
+    - iLeft.
+      iPureIntro.
+      by apply (unnitialized_trace_resources_neq2 sa sa' lt c).
+    - iRight.
+      iApply (initialized_trace_resources_neq6 sa sa' c with "[][][][][]"); try done.
   Qed.
 
   Lemma trace_state_resources_read_lin1 (clients : gset socket_address) (c : val) (tag : string) (lt : list val) (T : list transaction)
@@ -1359,6 +1390,244 @@ Section trace_proof.
       iModIntro.
       iIntros (sa'' Hsa''_in) "Hres".
       iApply (client_trace_state_resources_neq4 sa sa'' T1 T2 trans (Wr (tag, c) k v) c with "[][][][]"); try done.
+      iPureIntro; set_solver.
+  Qed.
+
+  Lemma trace_state_resources_commit_lin1 (clients : gset socket_address) (c : val) (tag : string) (lt : list val) (T : list transaction)
+  (sa : socket_address) (s : gset Key) (γ γmstate γmname : gname) (res : RU_resources Mdl Σ) (b : bool)
+  (mc : gmap Key (option val)) (mstate : gmap socket_address (local_state * option val)) 
+  (mname : gmap socket_address (gname * val)) (m : gmap Key (option val)) :
+    ⌜dom mc = s⌝ -∗
+    ⌜valid_sequence lt⌝ -∗
+    ⌜mstate !! sa = Some (Active s, Some c)⌝ -∗ 
+    ⌜extract c = Some #sa⌝ -∗ 
+    ⌜clients = {[sa]} ∪ clients ∖ {[sa]}⌝ -∗
+    ⌜¬ (∃ trans, trans ∈ T ∧ (∃ op' : operation,
+      op' ∈ trans ∧ last trans = Some op' ∧ connOfOp op' = c ∧ isCmOp op' = false))⌝ -∗
+    ⌜∃ e, e ∈ lt ++ [(#tag, (c, (#"CmLin", #b)))%V] ∧ connOfEvent e = Some c ∧ is_in_lin_event e⌝ -∗
+    ([∗ map] k↦x ∈ mc, ∃ (sa0 : socket_address) (γ0 : gname), ghost_map_elem γmname sa0 DfracDiscarded (γ0, c) ∗ 
+    ⌜extract c = Some #sa0⌝ ∗ (⌜k ∈ KVS_keys⌝ → ghost_map_elem γ0 k (DfracOwn 1%Qp) x) ∗ ⌜sa0 ∈ clients⌝) -∗
+    ghost_map_elem γmname sa DfracDiscarded (γ, c) -∗ 
+    ghost_map_auth γmstate 1 (<[sa:=(CanStart, Some c)]> mstate) -∗ 
+    ghost_map_auth γmname 1 mname -∗
+    ghost_map_auth γ 1 m -∗
+    ([∗ set] y ∈ (clients ∖ {[sa]}), client_trace_state_resources lt T y γmstate γmname res mstate mname) -∗
+    active_trace_resources lt T (Active s) c γ m -∗
+    trace_state_resources (lt ++ [(#tag, (c, (#"CmLin", #b)))%V]) (T ++ [[Cm (tag, c) b]]) γmstate γmname clients res.
+  Proof.
+    iIntros (Hdom_eq Hvalid_seq Hlookup Hextract Heq_sa_clients Hdec) 
+      "#Hinit_in Hkeys_conn #Hsa_pointer Hmap_mstate Hmap_mname Hmap_m Hdisj_trace_res Htrace_res".
+    iExists (<[sa:=(CanStart, Some c)]> mstate). 
+    iFrame.
+    iExists mname.
+    iFrame.
+    rewrite {3} Heq_sa_clients.
+    rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
+    iSplitR "Hdisj_trace_res".
+    - rewrite big_sepS_singleton.
+      iRight.
+      iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & 
+      %Heq_act & -> & %Hopen_start & Hkeys & %Hlatest_keys)". 
+      iExists CanStart, c, γ, m.
+      rewrite lookup_insert.
+      do 2 (iSplit; first by iPureIntro).
+      iFrame "∗#".
+      iLeft.
+      iSplit; first done.
+      iSplit.
+      {
+        iPureIntro.
+        eapply commit_closed_valid_seq;
+          rewrite /is_cm_lin_event; set_solver. 
+      }
+      iSplit.
+      {
+        iPureIntro.
+        intros (trans & (op & Hop_in & Hop_last & Hop_conn & Hop_cm)).
+        rewrite elem_of_app in Hop_in.
+        destruct Hop_in as [Hop_in|Hop_in].
+        - apply Hdec.
+          exists trans.
+          pose proof (last_Some_elem_of _ _ Hop_last) as Hop_in'.
+          split; first done.
+          exists op.
+          split_and!; try done.
+          rewrite /isCmOp.
+          rewrite /is_cm_op in Hop_cm.
+          destruct op; set_solver.
+        - assert (trans = [Cm (tag, c) b]) as ->; first set_solver.
+          simpl in Hop_last.
+          rewrite /is_cm_op in Hop_cm.
+          set_solver.
+      }
+      assert (KVS_keys = (domain ∩ KVS_keys) ∪ (KVS_keys ∖ (domain ∩ KVS_keys))) as Heq_keys.
+      {
+        apply union_difference_L.
+        set_solver.
+      }
+      rewrite {4} Heq_keys.
+      rewrite big_sepS_union; last set_solver.
+      iFrame.
+      iAssert ([∗ map] k↦x ∈ mc, ⌜k ∈ KVS_keys⌝ → ∃ ov, ghost_map_elem γ k (DfracOwn 1%Qp) ov)%I 
+        with "[Hkeys_conn]" as "Hkeys_conn".
+      {
+        iApply (big_sepM_wand with "[$Hkeys_conn]").
+        iApply big_sepM_intro.
+        iModIntro.
+        iIntros (key x Hk_in) "(%sa' & %γ' & #Hsa''_pointer & %Hsa'_extract & Hkey & %Hsa'_cli) Hkey_in".
+        iExists x.
+        destruct (decide (sa = sa')) as [<- | Hfalse]; last set_solver.
+        iDestruct (ghost_map_elem_agree sa γmname _ _ (γ, c) (γ', c) with "[$Hsa_pointer][$Hsa''_pointer]")
+          as "%Heq_pair".
+        assert (γ = γ') as <-; first set_solver.
+        by iApply "Hkey".
+      }
+      rewrite big_sepM_dom.
+      assert (dom mc = domain) as ->; first set_solver.
+      assert (domain = (domain ∩ KVS_keys) ∪ (domain ∖ (domain ∩ KVS_keys))) as Heq_keys_dom.
+      {
+        apply union_difference_L.
+        set_solver.
+      }
+      rewrite {1} Heq_keys_dom.
+      rewrite big_sepS_union; last set_solver.
+      iDestruct "Hkeys_conn" as "(Hkeys_conn & _)".
+      iApply (big_sepS_wand with "[$Hkeys_conn]").
+      iApply big_sepS_intro.
+      iModIntro.
+      iIntros (k' Hk'_in) "Himp".
+      iApply "Himp".
+      iPureIntro; set_solver.
+    - iApply (big_sepS_wand with "[$Hdisj_trace_res]"). 
+      iApply big_sepS_intro.
+      iModIntro.
+      iIntros (sa'' Hsa''_in) "Hres".
+      iApply (client_trace_state_resources_neq5 sa sa'' with "[][][][][$]"); try done.
+      iPureIntro; set_solver.
+  Qed.
+
+  Lemma trace_state_resources_commit_lin2 (clients : gset socket_address) (c : val) (tag : string) (lt : list val) (T1 T2 : list transaction)
+  (trans : transaction) (sa : socket_address) (s : gset Key) (γ γmstate γmname : gname) (res : RU_resources Mdl Σ) (b : bool)
+  (mc : gmap Key (option val)) (mstate : gmap socket_address (local_state * option val)) 
+  (mname : gmap socket_address (gname * val)) (m : gmap Key (option val)) :
+    ⌜dom mc = s⌝ -∗
+    ⌜valid_sequence lt⌝ -∗
+    ⌜valid_transactions (T1 ++ trans :: T2) ⌝ -∗
+    ⌜mstate !! sa = Some (Active s, Some c)⌝ -∗ 
+    ⌜extract c = Some #sa⌝ -∗ 
+    ⌜clients = {[sa]} ∪ clients ∖ {[sa]}⌝ -∗
+    ⌜∃ op, op ∈ trans ∧ last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false⌝ -∗
+    ⌜∃ e, e ∈ lt ++ [(#tag, (c, (#"CmLin", #b)))%V] ∧ connOfEvent e = Some c ∧ is_in_lin_event e⌝ -∗
+    ([∗ map] k↦x ∈ mc, ∃ (sa0 : socket_address) (γ0 : gname), ghost_map_elem γmname sa0 DfracDiscarded (γ0, c) ∗ 
+    ⌜extract c = Some #sa0⌝ ∗ (⌜k ∈ KVS_keys⌝ → ghost_map_elem γ0 k (DfracOwn 1%Qp) x) ∗ ⌜sa0 ∈ clients⌝) -∗
+    ghost_map_elem γmname sa DfracDiscarded (γ, c) -∗ 
+    ghost_map_auth γmstate 1 (<[sa:=(CanStart, Some c)]> mstate) -∗ 
+    ghost_map_auth γmname 1 mname -∗
+    ghost_map_auth γ 1 m -∗
+    ([∗ set] y ∈ (clients ∖ {[sa]}), client_trace_state_resources lt (T1 ++ trans :: T2) y γmstate γmname res mstate mname) -∗
+    active_trace_resources lt (T1 ++ trans :: T2) (Active s) c γ m -∗
+    trace_state_resources (lt ++ [(#tag, (c, (#"CmLin", #b)))%V]) (T1 ++ (trans ++ [Cm (tag, c) b]) :: T2) γmstate γmname clients res.
+  Proof.
+    iIntros (Hdom_eq Hvalid_seq Hvalid_trans Hlookup Hextract Heq_sa_clients Hop) 
+      "#Hinit_in Hkeys_conn #Hsa_pointer Hmap_mstate Hmap_mname Hmap_m Hdisj_trace_res Htrace_res".
+    iExists (<[sa:=(CanStart, Some c)]> mstate). 
+    iFrame.
+    iExists mname.
+    iFrame.
+    rewrite {3} Heq_sa_clients.
+    rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
+    iSplitR "Hdisj_trace_res".
+    - rewrite big_sepS_singleton.
+      iRight.
+      iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & 
+      %Heq_act & -> & %Hopen_start & Hkeys & %Hlatest_keys)". 
+      iExists CanStart, c, γ, m.
+      rewrite lookup_insert.
+      do 2 (iSplit; first by iPureIntro).
+      iFrame "∗#".
+      iLeft.
+      iSplit; first done.
+      iSplit.
+      {
+        iPureIntro.
+        eapply commit_closed_valid_seq;
+          rewrite /is_cm_lin_event; set_solver. 
+      }
+      iSplit.
+      {
+        iPureIntro.
+        intros (t & op' & Hop'_in & Hop'_last & Hop'_conn & Hop'_cm).
+        rewrite elem_of_app in Hop'_in.
+        destruct Hop'_in as [Hop'_in | Hop'_in].
+        - exfalso.
+          eapply (two_trans_implies_false_app_cons T1 T2 trans); try done.
+          exists t.
+          split; first set_solver.
+          exists op'.
+          split_and!; try done.
+          + by apply last_Some_elem_of.
+          + rewrite /isCmOp. 
+            rewrite /is_cm_op in Hop'_cm.
+            destruct op'; set_solver.
+        - rewrite elem_of_cons in Hop'_in.
+          destruct Hop'_in as [-> | Hop'_in].
+          + rewrite last_snoc in Hop'_last.
+            rewrite /is_cm_op in Hop'_cm.
+            set_solver.
+          + exfalso.
+            eapply (two_trans_implies_false_app_cons T1 T2 trans); try done.
+            exists t.
+            split; first set_solver.
+            exists op'.
+            split_and!; try done.
+            * by apply last_Some_elem_of.
+            * rewrite /isCmOp. 
+              rewrite /is_cm_op in Hop'_cm.
+              destruct op'; set_solver.
+      }
+      assert (KVS_keys = (domain ∩ KVS_keys) ∪ (KVS_keys ∖ (domain ∩ KVS_keys))) as Heq_keys.
+      {
+        apply union_difference_L.
+        set_solver.
+      }
+      rewrite {4} Heq_keys.
+      rewrite big_sepS_union; last set_solver.
+      iFrame.
+      iAssert ([∗ map] k↦x ∈ mc, ⌜k ∈ KVS_keys⌝ → ∃ ov, ghost_map_elem γ k (DfracOwn 1%Qp) ov)%I 
+        with "[Hkeys_conn]" as "Hkeys_conn".
+      {
+        iApply (big_sepM_wand with "[$Hkeys_conn]").
+        iApply big_sepM_intro.
+        iModIntro.
+        iIntros (key x Hk_in) "(%sa' & %γ' & #Hsa''_pointer & %Hsa'_extract & Hkey & %Hsa'_cli) Hkey_in".
+        iExists x.
+        destruct (decide (sa = sa')) as [<- | Hfalse]; last set_solver.
+        iDestruct (ghost_map_elem_agree sa γmname _ _ (γ, c) (γ', c) with "[$Hsa_pointer][$Hsa''_pointer]")
+          as "%Heq_pair".
+        assert (γ = γ') as <-; first set_solver.
+        by iApply "Hkey".
+      }
+      rewrite big_sepM_dom.
+      assert (dom mc = domain) as ->; first set_solver.
+      assert (domain = (domain ∩ KVS_keys) ∪ (domain ∖ (domain ∩ KVS_keys))) as Heq_keys_dom.
+      {
+        apply union_difference_L.
+        set_solver.
+      }
+      rewrite {1} Heq_keys_dom.
+      rewrite big_sepS_union; last set_solver.
+      iDestruct "Hkeys_conn" as "(Hkeys_conn & _)".
+      iApply (big_sepS_wand with "[$Hkeys_conn]").
+      iApply big_sepS_intro.
+      iModIntro.
+      iIntros (k' Hk'_in) "Himp".
+      iApply "Himp".
+      iPureIntro; set_solver.
+    - iApply (big_sepS_wand with "[$Hdisj_trace_res]"). 
+      iApply big_sepS_intro.
+      iModIntro.
+      iIntros (sa'' Hsa''_in) "Hres".
+      iApply (client_trace_state_resources_neq6 sa sa'' with "[][][][][][$]"); try done.
       iPureIntro; set_solver.
   Qed.
 
@@ -2906,7 +3175,15 @@ Section trace_proof.
                      --- rewrite /is_cm_lin_event.
                          set_solver.
                      --- by exists t'.
-                  ** admit.
+                  ** iApply (trace_state_resources_commit_lin2 clients c tag1 lt' T1 T2 trans sa 
+                       s γ γmstate γmname res b mc mstate mname m' with 
+                       "[//][//][//][//][//][//][//][][$Hkeys_conn2][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
+                       [$Hmap_m][$Hdisj_trace_res][$Htrace_res]").
+                     iPureIntro.
+                     destruct Hinit as (e & Hin'' & Hconn'' & Hevent'').
+                     exists e.
+                     split_and!; try done.
+                     apply elem_of_app; eauto.
       - iExists (T' ++ [[Cm (tag1, c) b]]).
         iSplit.
         + iPureIntro.
@@ -2947,109 +3224,15 @@ Section trace_proof.
                      --- rewrite /is_cm_lin_event.
                          set_solver.
                      --- by exists t'.
-                  ** 
-                  {
-                    iExists (<[sa:=(CanStart, Some c)]> mstate). 
-                    iFrame.
-                    iExists mname.
-                    iFrame.
-                    rewrite {4} Heq_sa_clients.
-                    rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
-                    iSplitR "Hdisj_trace_res".
-                    - rewrite big_sepS_singleton.
-                      iRight.
-                      iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & 
-                      %Heq_act & -> & %Hopen_start & Hkeys & %Hlatest_keys)". 
-                      iExists CanStart, c, γ, m'.
-                      rewrite lookup_insert.
-                      do 2 (iSplit; first by iPureIntro).
-                      iFrame "∗#".
-                      iSplit; first iPureIntro; first set_solver.
-                      iLeft.
-                      rewrite /inactive_trace_resources.
-                      iSplit; first done.
-                      iSplit.
-                      {
-                        iPureIntro.
-                        intros e_st Hst_in Hst_conn Hst_event.
-                        rewrite elem_of_app in Hst_in.
-                        destruct Hst_in as [Hst_in | Hfalse]; 
-                          last rewrite /is_st_lin_event in Hst_event; last set_solver.
-                        destruct Hvalid_seq' as (_ & _ & _ & Hvalid_seq' & _).
-                        specialize (Hvalid_seq' e_st c Hst_in Hst_conn Hst_event).
-                        destruct Hvalid_seq' as [Hlater_com|Hno_later'].
-                        - admit.
-                        - exists (#tag1, (c, (#"CmLin", #b)))%V.
-                          split_and!; try done.
-                          + rewrite /is_cm_lin_event; set_solver.
-                          + admit.
-                          + admit.
-                      }
-                      iSplit.
-                      {
-                        iPureIntro.
-                        intros (trans & (op & Hop_in & Hop_last & Hop_conn & Hop_cm)).
-                        rewrite elem_of_app in Hop_in.
-                        destruct Hop_in as [Hop_in|Hop_in].
-                        - apply Hdec.
-                          exists trans.
-                          pose proof (last_Some_elem_of _ _ Hop_last) as Hop_in'.
-                          split; first done.
-                          exists op.
-                          split_and!; try done.
-                          rewrite /isCmOp.
-                          rewrite /is_cm_op in Hop_cm.
-                          destruct op; set_solver.
-                        - assert (trans = [Cm (tag1, c) b]) as ->; first set_solver.
-                          simpl in Hop_last.
-                          rewrite /is_cm_op in Hop_cm.
-                          set_solver.
-                      }
-                      assert (KVS_keys = (domain ∩ KVS_keys) ∪ (KVS_keys ∖ (domain ∩ KVS_keys))) as Heq_keys.
-                      {
-                        apply union_difference_L.
-                        set_solver.
-                      }
-                      rewrite {4} Heq_keys.
-                      rewrite big_sepS_union; last set_solver.
-                      iFrame.
-                      iAssert ([∗ map] k↦x ∈ mc, ⌜k ∈ KVS_keys⌝ → ∃ ov, ghost_map_elem γ k (DfracOwn 1%Qp) ov)%I 
-                        with "[Hkeys_conn2]" as "Hkeys_conn2".
-                      {
-                        iApply (big_sepM_wand with "[$Hkeys_conn2]").
-                        iApply big_sepM_intro.
-                        iModIntro.
-                        iIntros (k x Hk_in) "(%sa' & %γ' & #Hsa''_pointer & %Hsa'_extract & Hkey & %Hsa'_cli) Hkey_in".
-                        iExists x.
-                        destruct (decide (sa = sa')) as [<- | Hfalse]; last set_solver.
-                        iDestruct (ghost_map_elem_agree sa γmname _ _ (γ, c) (γ', c) with "[$Hsa_pointer][$Hsa''_pointer]")
-                          as "%Heq_pair".
-                        assert (γ = γ') as <-; first set_solver.
-                        by iApply "Hkey".
-                      }
-                      rewrite big_sepM_dom.
-                      assert (dom mc = domain) as ->; first set_solver.
-                      assert (domain = (domain ∩ KVS_keys) ∪ (domain ∖ (domain ∩ KVS_keys))) as Heq_keys_dom.
-                      {
-                        apply union_difference_L.
-                        set_solver.
-                      }
-                      rewrite {1} Heq_keys_dom.
-                      rewrite big_sepS_union; last set_solver.
-                      iDestruct "Hkeys_conn2" as "(Hkeys_conn2 & _)".
-                      iApply (big_sepS_wand with "[$Hkeys_conn2]").
-                      iApply big_sepS_intro.
-                      iModIntro.
-                      iIntros (k' Hk'_in) "Himp".
-                      iApply "Himp".
-                      iPureIntro; set_solver.
-                    - iApply (big_sepS_wand with "[$Hdisj_trace_res]"). 
-                      iApply big_sepS_intro.
-                      iModIntro.
-                      iIntros (sa'' Hsa''_in) "Hres".
-                      iApply (client_trace_state_resources_neq5 sa sa'' with "[][][][][$]"); try done.
-                      iPureIntro; set_solver.
-                  } 
+                  ** iApply (trace_state_resources_commit_lin1 clients c tag1 lt' T' sa 
+                       s γ γmstate γmname res b mc mstate mname m' with 
+                       "[//][//][//][//][//][//][][$Hkeys_conn2][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
+                       [$Hmap_m][$Hdisj_trace_res][$Htrace_res]").
+                     iPureIntro.
+                     destruct Hinit as (e & Hin'' & Hconn'' & Hevent'').
+                     exists e.
+                     split_and!; try done.
+                     apply elem_of_app; eauto.
     }
     iMod ("Hshift" with "[Hkeys1 Hkeys2 Hstate_pr Hstate]").
     {
@@ -3105,7 +3288,7 @@ Section trace_proof.
     }
     iModIntro.
     by wp_pures.
-  Admitted.
+  Qed.
 
   (** Main theorem  *)
 

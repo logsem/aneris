@@ -873,6 +873,27 @@ Proof.
   set_solver.
 Qed.
 
+Lemma commit_closed_valid_seq lt le c :
+  valid_sequence lt →
+  is_cm_lin_event le →
+  connOfEvent le = Some c →
+  commit_closed c (lt ++ [le]).
+Proof.
+  (* intros e_st Hst_in Hst_conn Hst_event.
+  rewrite elem_of_app in Hst_in.
+  destruct Hst_in as [Hst_in | Hfalse]; 
+    last rewrite /is_st_lin_event in Hst_event; last set_solver.
+  destruct Hvalid_seq' as (_ & _ & _ & Hvalid_seq' & _).
+  specialize (Hvalid_seq' e_st c Hst_in Hst_conn Hst_event).
+  destruct Hvalid_seq' as [Hlater_com|Hno_later'].
+  - admit.
+  - exists (#tag1, (c, (#"CmLin", #b)))%V.
+    split_and!; try done.
+    + rewrite /is_cm_lin_event; set_solver.
+    + admit.
+    + admit. *)
+Admitted.
+
 Lemma lin_trace_valid : 
   ∀ (tag : string) (e : val) (t lt : list val), 
     ((is_pre_event e ∧ tagOfEvent e = Some tag ∧ tag ∉ tags t) ∨
