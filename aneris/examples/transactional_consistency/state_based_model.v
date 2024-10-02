@@ -648,7 +648,7 @@ Proof.
         set_solver.
 Qed.
 
-Lemma later_commit_impl c e_st lt e tag: 
+Lemma later_commit_imp1 c e_st lt e tag: 
   tagOfEvent e = Some tag →
   is_st_lin_event e →
   (¬∃ e', e' ∈ lt ∧ tagOfEvent e' = Some tag) →
@@ -807,11 +807,10 @@ Definition open_start (c : val) (ltrace tail : list val) : Prop :=
 Lemma prior_start_imp le c e lt tag :
   tagOfEvent le = Some tag →
   ¬(∃ e : val, e ∈ lt ∧ tagOfEvent e = Some tag) →
-  (¬is_cm_lin_event le) →
   prior_start c e lt →
   prior_start c e (lt ++ [le]).
 Proof.
-  intros Htag Hnot1 Hnot2 (e_st & Hconn & Hstart & Hrel & Hnot').
+  intros Htag Hnot (e_st & Hconn & Hstart & Hrel & Hnot').
   exists e_st.
   do 2 (split; first done).
   split; first by apply rel_list_imp.
@@ -820,20 +819,21 @@ Proof.
   exists e_cm.
   do 2 (split; first done).
   split.
-  - apply rel_list_last_neq in Hrel1; first done.
-    by intros ->.
+  - admit.
+    (* apply rel_list_last_neq in Hrel1; first done.
+    by intros ->. *)
   - subst.
     apply rel_list_last_neq in Hrel2; first done.
     intros ->.
     destruct Hrel as (i & j & _ & _ & Hlookup_j).
-    apply Hnot1.
+    apply Hnot.
     exists e.
     split; last done.
     apply elem_of_list_lookup.
     by exists j.
-Qed.
+Admitted.
 
-Lemma later_commit_imp c lt le le' :
+Lemma later_commit_imp2 c lt le le' :
   (is_wr_lin_event le ∨ is_rd_lin_event le ∨ is_in_lin_event le) →
   later_commit c le' lt →
   later_commit c le' (lt ++ [le]).
@@ -873,26 +873,87 @@ Proof.
   set_solver.
 Qed.
 
-Lemma commit_closed_valid_seq lt le c :
+Lemma later_commit_imp3 c lt le le' tag :
+  tagOfEvent le = Some tag →
+  ¬(∃ e : val, e ∈ lt ∧ tagOfEvent e = Some tag) →
+  is_cm_lin_event le →
+  later_commit c le' lt →
+  later_commit c le' (lt ++ [le]).
+Proof.
+  intros Htag Hnot_in Hevent (le_cm & Hcm_conn & Hcm_event & Hcm_rel & Hcm_imp).
+  exists le_cm.
+  split_and!; try done; first by apply rel_list_imp.
+  intros (e_st & He_st_conn & He_st_event & He_st_rel1 & He_st_rel2).
+  apply Hcm_imp.
+  exists e_st.
+  split_and!; try done.
+  - eapply rel_list_last_neq; try done.
+    rewrite /is_st_lin_event in He_st_event.
+    rewrite /is_cm_lin_event in Hevent.
+    set_solver.
+  - eapply rel_list_last_neq; try done.
+    intros ->.
+    apply Hnot_in.
+    exists le_cm; split; last done.
+    destruct Hcm_rel as (i & j & _ & _ & Hlookup_j).
+    by eapply elem_of_list_lookup_2.
+Qed.
+
+Lemma later_commit_imp4 c lt le le' tag :
+  tagOfEvent le = Some tag →
+  ¬(∃ e : val, e ∈ lt ∧ tagOfEvent e = Some tag) →
+  is_cm_lin_event le →
+  connOfEvent le = Some c →
+  connOfEvent le' = Some c →
+  no_later_start_or_commit c le' lt →
+  le' ∈ lt →
+  later_commit c le' (lt ++ [le]).
+Proof.
+  intros Htag Hnot_in Hevent Hconn1 Hconn2 Hin Hlater.
+  exists le.
+  rewrite /no_later_start_or_commit in Hlater.
+  split_and!; try done.
+  - apply elem_of_list_lookup_1 in Hlater. 
+    destruct Hlater as (i & Hlookup_i).
+    exists i, (length lt).
+    split_and!. 
+    + by eapply lookup_lt_Some.
+    + by eapply lookup_app_l_Some.
+    + apply lookup_snoc_Some. 
+      set_solver.
+  - intros (e_st & He_st_conn & He_st_event & He_st_rel1 & He_st_rel2).
+    assert (rel_list lt le' e_st) as He_st_rel3.
+    {
+      eapply rel_list_last_neq; try done.
+      intros ->.
+      rewrite /is_st_lin_event in He_st_event.
+      rewrite /is_cm_lin_event in Hevent.
+      set_solver.
+    }
+    apply Hin.
+    set_solver.
+Qed.
+
+Lemma commit_closed_valid_seq lt le c tag :
+  tagOfEvent le = Some tag →
+  ¬(∃ e : val, e ∈ lt ∧ tagOfEvent e = Some tag) →
   valid_sequence lt →
   is_cm_lin_event le →
   connOfEvent le = Some c →
   commit_closed c (lt ++ [le]).
 Proof.
-  (* intros e_st Hst_in Hst_conn Hst_event.
+  intros Htag Hnot_in Hvalid Hcm Hconn e_st Hst_in Hst_conn Hst_event.
   rewrite elem_of_app in Hst_in.
-  destruct Hst_in as [Hst_in | Hfalse]; 
-    last rewrite /is_st_lin_event in Hst_event; last set_solver.
-  destruct Hvalid_seq' as (_ & _ & _ & Hvalid_seq' & _).
-  specialize (Hvalid_seq' e_st c Hst_in Hst_conn Hst_event).
-  destruct Hvalid_seq' as [Hlater_com|Hno_later'].
-  - admit.
-  - exists (#tag1, (c, (#"CmLin", #b)))%V.
-    split_and!; try done.
-    + rewrite /is_cm_lin_event; set_solver.
-    + admit.
-    + admit. *)
-Admitted.
+  destruct Hst_in as [Hst_in | Hfalse].
+  - destruct Hvalid as (_ & _ & _ & Hvalid & _).
+    specialize (Hvalid e_st c Hst_in Hst_conn Hst_event).
+    destruct Hvalid as [Hlater_com|Hno_later].
+    + by eapply later_commit_imp3.
+    + by eapply later_commit_imp4. 
+  - rewrite /is_st_lin_event in Hst_event.
+    rewrite /is_cm_lin_event in Hcm.
+    set_solver.
+Qed.
 
 Lemma lin_trace_valid : 
   ∀ (tag : string) (e : val) (t lt : list val), 
@@ -1264,14 +1325,14 @@ Proof.
     destruct He_in as [He_in | He_in].
     + destruct (decide (c = c0)) as [<-|Hneq].
       * left.
-        apply (later_commit_impl _ _ _ _ tag); try done.
+        apply (later_commit_imp1 _ _ _ _ tag); try done.
         -- by exists tag, c.
         -- by apply Hstart.
       * destruct Hvalid_seq as (_ & _ & _ & Hvalid_seq & _).
         specialize (Hvalid_seq e_st c0 He_in He_conn He_event).
         destruct Hvalid_seq as [Hvalid_seq | Hvalid_seq].
         -- left.
-            apply (later_commit_impl _ _ _ _ tag); try done.
+            apply (later_commit_imp1 _ _ _ _ tag); try done.
             by exists tag, c.
         -- right.
            eapply no_later_start_or_commit_impl; try done.
@@ -1339,10 +1400,6 @@ Proof.
     + destruct Hvalid as (_ & _ & Hvalid & _).
       specialize (Hvalid e c' Hin Hconn Hevents).
       apply (prior_start_imp le c' e lt tag); try done.
-      intros (tag'' & c'' & b'' & ->).
-      rewrite /is_wr_lin_event /is_rd_lin_event in Hevent.
-      admit.
-      (* set_solver. *)
     + assert (e = le) as ->; first set_solver.
       destruct Hopen_start as (e_st & l & -> & _ & (tag' & ->) & Hnot').
       exists (#tag', (c, #"StLin"))%V.
@@ -1420,13 +1477,18 @@ Proof.
     destruct Hin as [Hin|Hin].
     + destruct (Hvalid e_st c' Hin Hconn Hstart) as [Hlater | Hno_later].
       * left.
-        rewrite /later_commit.
-        admit.
-        (* apply later_commit_imp; set_solver. *)
-      * right.
-        apply no_later_start_or_commit_wr_rd_imp; try done.
-        admit.
-        (* set_solver. *)
+        destruct Hevent as [Hevent|Hevent].
+        -- by eapply later_commit_imp3.
+        -- apply later_commit_imp2; set_solver.
+      * destruct (decide (c = c')) as [->|Hneq].
+        -- destruct Hevent as [Hevent|Hevent].
+           ++ left. 
+              eapply later_commit_imp4; try done.
+           ++ right.
+              apply no_later_start_or_commit_wr_rd_imp; try done.
+              set_solver.
+        -- right.
+           by eapply no_later_start_or_commit_impl.
     + assert (e_st = le) as ->; first set_solver.
       destruct Hstart as (tag'' & c'' & ->). 
       destruct Hevent as [Hevent|Hevent];
@@ -1477,8 +1539,7 @@ Proof.
           by rewrite last_snoc.
       * rewrite /is_in_lin_event; set_solver.
   - intros e c' Hin Hconn Hevent.
-    apply (prior_start_imp _ _ _ _ tag); 
-      rewrite /is_cm_lin_event; try set_solver.
+    apply (prior_start_imp _ _ _ _ tag); try done.
     rewrite elem_of_app in Hin.
     destruct Hin as [Hin|Hin]; first set_solver.
     rewrite /is_rd_lin_event /is_wr_lin_event /is_cm_lin_event in Hevent.
@@ -1489,7 +1550,7 @@ Proof.
       rewrite /is_st_lin_event in Hevent; last set_solver.
     destruct (Hvalid4 e_st c' Hin Hconn Hevent) as [Hlater | Hno_later].
     + left.
-      apply later_commit_imp; try done.
+      apply later_commit_imp2; try done.
       rewrite /is_in_lin_event; set_solver.
     + right.
       destruct (decide (c = c')) as [<-|Hneq].

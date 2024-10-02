@@ -1397,6 +1397,7 @@ Section trace_proof.
   (sa : socket_address) (s : gset Key) (γ γmstate γmname : gname) (res : RU_resources Mdl Σ) (b : bool)
   (mc : gmap Key (option val)) (mstate : gmap socket_address (local_state * option val)) 
   (mname : gmap socket_address (gname * val)) (m : gmap Key (option val)) :
+    ⌜¬(∃ e : val, e ∈ lt ∧ tagOfEvent e = Some tag)⌝ -∗
     ⌜dom mc = s⌝ -∗
     ⌜valid_sequence lt⌝ -∗
     ⌜mstate !! sa = Some (Active s, Some c)⌝ -∗ 
@@ -1415,7 +1416,7 @@ Section trace_proof.
     active_trace_resources lt T (Active s) c γ m -∗
     trace_state_resources (lt ++ [(#tag, (c, (#"CmLin", #b)))%V]) (T ++ [[Cm (tag, c) b]]) γmstate γmname clients res.
   Proof.
-    iIntros (Hdom_eq Hvalid_seq Hlookup Hextract Heq_sa_clients Hdec) 
+    iIntros (Hnot_in Hdom_eq Hvalid_seq Hlookup Hextract Heq_sa_clients Hdec) 
       "#Hinit_in Hkeys_conn #Hsa_pointer Hmap_mstate Hmap_mname Hmap_m Hdisj_trace_res Htrace_res".
     iExists (<[sa:=(CanStart, Some c)]> mstate). 
     iFrame.
@@ -1510,6 +1511,7 @@ Section trace_proof.
   (trans : transaction) (sa : socket_address) (s : gset Key) (γ γmstate γmname : gname) (res : RU_resources Mdl Σ) (b : bool)
   (mc : gmap Key (option val)) (mstate : gmap socket_address (local_state * option val)) 
   (mname : gmap socket_address (gname * val)) (m : gmap Key (option val)) :
+    ⌜¬(∃ e : val, e ∈ lt ∧ tagOfEvent e = Some tag)⌝ -∗
     ⌜dom mc = s⌝ -∗
     ⌜valid_sequence lt⌝ -∗
     ⌜valid_transactions (T1 ++ trans :: T2) ⌝ -∗
@@ -1528,7 +1530,7 @@ Section trace_proof.
     active_trace_resources lt (T1 ++ trans :: T2) (Active s) c γ m -∗
     trace_state_resources (lt ++ [(#tag, (c, (#"CmLin", #b)))%V]) (T1 ++ (trans ++ [Cm (tag, c) b]) :: T2) γmstate γmname clients res.
   Proof.
-    iIntros (Hdom_eq Hvalid_seq Hvalid_trans Hlookup Hextract Heq_sa_clients Hop) 
+    iIntros (Hnot_in Hdom_eq Hvalid_seq Hvalid_trans Hlookup Hextract Heq_sa_clients Hop) 
       "#Hinit_in Hkeys_conn #Hsa_pointer Hmap_mstate Hmap_mname Hmap_m Hdisj_trace_res Htrace_res".
     iExists (<[sa:=(CanStart, Some c)]> mstate). 
     iFrame.
@@ -3177,7 +3179,7 @@ Section trace_proof.
                      --- by exists t'.
                   ** iApply (trace_state_resources_commit_lin2 clients c tag1 lt' T1 T2 trans sa 
                        s γ γmstate γmname res b mc mstate mname m' with 
-                       "[//][//][//][//][//][//][//][][$Hkeys_conn2][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
+                       "[//][//][//][//][//][//][//][//][][$Hkeys_conn2][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
                        [$Hmap_m][$Hdisj_trace_res][$Htrace_res]").
                      iPureIntro.
                      destruct Hinit as (e & Hin'' & Hconn'' & Hevent'').
@@ -3226,7 +3228,7 @@ Section trace_proof.
                      --- by exists t'.
                   ** iApply (trace_state_resources_commit_lin1 clients c tag1 lt' T' sa 
                        s γ γmstate γmname res b mc mstate mname m' with 
-                       "[//][//][//][//][//][//][][$Hkeys_conn2][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
+                       "[//][//][//][//][//][//][//][][$Hkeys_conn2][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
                        [$Hmap_m][$Hdisj_trace_res][$Htrace_res]").
                      iPureIntro.
                      destruct Hinit as (e & Hin'' & Hconn'' & Hevent'').
