@@ -2,8 +2,9 @@ From iris.algebra Require Import auth gmap gset excl excl_auth.
 From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import locales_helpers comp_utils trace_lookup fairness.
 From trillium.fairness.heap_lang Require Import simulation_adequacy.
-From trillium.fairness.lawyer Require Import eo_fin sub_action_em action_model.
-From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_em obls_fairness_preservation obligations_am.
+From trillium.fairness.lawyer Require Import sub_action_em action_model.
+From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_em obls_fairness_preservation obligations_am obligations_fin_branch.
+From trillium.fairness.lawyer.examples.eo_fin Require Import eo_fin.
 
 
 Section ObligationsAdequacy.
@@ -55,8 +56,13 @@ Section ObligationsAdequacy.
       (@mtrans M).
 
   Lemma eofin_sim_rel_FB: rel_finitary eofin_sim_rel.
-  Proof using. Admitted.
-
+  Proof using.
+    clear. red. intros extr mtr [tp' σ'] oζ. 
+    simpl. rewrite /eofin_sim_rel. simpl.
+    rewrite /eofin_valid_evolution_step /eofin_st_rel. simpl.
+    apply OM_fin_branch. 
+  Qed. 
+    
   Theorem om_simulation_adequacy_model_trace Σ
         `{hPre: !heapGpreS Σ EM} (s: stuckness)
         (e1: expr) σ1 (s1: mstate M) p
