@@ -299,7 +299,9 @@ Section FiniteBranching.
       
   End FinParams.
 
-  Theorem OM_fin_branch_impl c δ
+  Theorem OM_fin_branch_impl
+    `{EqDecision (expr Λ)}
+    c δ
     (tp': list (language.expr Λ))
     (σ': language.state Λ)
     (oζ: olocale Λ):
@@ -317,17 +319,18 @@ Section FiniteBranching.
     setoid_rewrite <- elem_of_list_In.
     simpl in STEP. destruct oτ as [τ| ]; [| tauto].
     exists τ. simpl in STEP. destruct STEP as [STEP ->].
-    red in STEP. destruct STEP as (? & -> & TH_OWN). 
+    red in STEP. destruct STEP as (STEP & TRANS & -> & CORR). 
     split.
     { apply elem_of_elements.
-      admit. }
+      destruct c. apply locales_of_cfg_Some.      
+      replace l with (l, s).1 by done. by eapply locale_step_from_locale_src. }
     apply elem_of_list_In, in_map_iff. eexists. split; eauto.
     apply elem_of_list_In. apply NEXTS. split.
-    2: { simpl in H4. eauto. }
-    red in TIDS.
-    by rewrite TH_OWN.
+    { destruct CORR as [TH_OWN ?]. 
+      red in TIDS.
+      by rewrite TH_OWN. }
+    simpl in TRANS. eauto.
   Qed. 
-
     
 
   Theorem OM_fin_branch_impl c δ

@@ -41,20 +41,22 @@ Section ObligationsEM.
     rewrite TRANS. done. 
   Qed.
       
+  Definition obls_cfg_corr (σ: cfg Λ) (δ: mstate OM) :=
+      threads_own_obls σ δ /\ dom_phases_obls OP δ. 
+
   Definition obls_valid_evolution_step
     (σ1: cfg Λ) (oζ: olocale Λ) (σ2: cfg Λ)
     (δ1: mstate OM) (ℓ: mlabel OM) (δ2: mstate OM) :=
+      locale_step σ1 oζ σ2 /\
       mtrans δ1 ℓ δ2 /\
       oζ = Some ℓ /\
-      threads_own_obls σ2 δ2
+      (* obls_cfg_corr σ1 δ1 /\ *)
+      obls_cfg_corr σ2 δ2
   .
 
   Definition obls_si `{!ObligationsGS OP Σ}
     (σ: cfg Λ) (δ: mstate OM): iProp Σ :=
-      obls_msi _ δ ∗
-      ⌜ threads_own_obls σ δ ⌝ ∗
-      ⌜ dom_phases_obls OP δ ⌝
-  . 
+      obls_msi _ δ ∗ ⌜ obls_cfg_corr σ δ ⌝. 
 
   Definition obls_init_resource `{!ObligationsGS OP Σ}
     (δ: mstate OM) (_: unit): iProp Σ :=
@@ -101,10 +103,10 @@ Section ObligationsEM.
     iModIntro. iExists {| obls_pre := PRE; |}.
     iFrame.
     iPureIntro. 
-    red in INIT. destruct INIT as (?&?&?&?). set_solver.  
-  Qed.
-    
-
+    red in INIT. destruct INIT as (?&?&?&?).
+    red. rewrite /threads_own_obls /dom_phases_obls. set_solver. 
+  Qed.    
+  
   Definition ObligationsEM: ExecutionModel Λ OM :=
     {| 
       em_Σ := obls_Σ OP;

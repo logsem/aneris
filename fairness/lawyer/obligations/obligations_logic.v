@@ -54,7 +54,7 @@ Section ProgramLogic.
       (LE: exists π, ps_phases OP δ !! τ = Some π /\ phase_le π' π)
       :
       ⊢ OAM_st_interp_interim_step c c' δ τ n None -∗ (cp OP π' deg (H3 := oGS))==∗
-        ∃ δ', obls_si OP c' δ' (ObligationsGS0 := oGS) ∗ ⌜ om_trans OP δ τ δ' ⌝ ∗ ⌜ threads_own_obls _ c' δ' ⌝
+        ∃ δ', obls_si OP c' δ' (ObligationsGS0 := oGS) ∗ ⌜ om_trans OP δ τ δ' ⌝
     .
     Proof.
       iIntros "TI'' cp".
@@ -84,8 +84,7 @@ Section ProgramLogic.
       iPureIntro. split; [split| ]; auto.
       - eapply progress_step_dpo_pres; eauto.
         do 2 (eexists; split; eauto).
-      - split; [| done]. 
-        simpl. red. eexists. split; eauto.
+      - simpl. red. eexists. split; eauto.
         + eexists. split; eauto. eexists. split; eauto.
         + by right.
     Qed.
@@ -102,7 +101,7 @@ Section ProgramLogic.
           obls_si OP c' δ' (ObligationsGS0 := oGS) ∗
           obls OP τ (R0 ∖ R') (H3 := oGS) ∗ th_phase_ge OP τ π1 (H3 := oGS) ∗ 
           obls OP τ' (R0 ∩ R') (H3 := oGS) ∗ th_phase_ge OP τ' π2 (H3 := oGS) ∗
-          ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝ ∗ ⌜ om_trans OP δ τ δ' ⌝ ∗ ⌜ threads_own_obls _ c' δ' ⌝.
+          ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝ ∗ ⌜ om_trans OP δ τ δ' ⌝.
     Proof using.
       clear H1 H0 H. 
 
@@ -161,9 +160,7 @@ Section ProgramLogic.
         rewrite OBLS''. f_equal. set_solver.
       - red. rewrite OBLS'' PHASES''. f_equal.
         done. 
-      - split.
-        2: { red. rewrite LOCS'. rewrite OBLS''. set_solver. }
-        eexists. split; eauto.
+      - eexists. split; eauto.
         + eexists. split; eauto. eexists. split; eauto.
         + left. eauto.
     Qed.
@@ -207,24 +204,32 @@ Section ProgramLogic.
         th_phase_ge OP ζ π (H3 := oGS) -∗
         AMU E ζ obls_act P (aeGS := oGS).
     Proof using.
-      rewrite /AMU /AMU_impl /BMU. iIntros "BMU PH" (c c' δ) "TI'".      
-      iDestruct (th_phase_msi_ge with "[TI'] [$]") as %(π__max & PH & LE0).
-      { rewrite /AM_st_interp_interim.
-        simpl. iDestruct "TI'" as "((?&?&?)&?&?)". iFrame. }
+      rewrite /AMU /AMU_impl /BMU. iIntros "BMU PH" (c c' δ) "TI'".
+
+      rewrite /AM_st_interp_interim.
+      iDestruct "TI'" as "(MSI&%STEP&%FORK)". iFrame. 
+
+      iDestruct (th_phase_msi_ge with "[MSI] [$]") as %(π__max & PH & LE0).
+      { iDestruct "MSI" as "(?&?&?)". iFrame. }
+      (* { rewrite /AM_st_interp_interim. *)
+      (*   simpl. iDestruct "TI'" as "((?&?&?)&?&?)". iFrame. } *)
       iSpecialize ("BMU" with "[$]").
-      iSpecialize ("BMU" $! c c' δ 0 None with "[TI']").
+      iSpecialize ("BMU" $! c c' δ 0 None with "[MSI]").
       { rewrite /OAM_st_interp_interim_step /AM_st_interp_interim.
-        iDestruct "TI'" as "((MSI&%OBLS&%DPO)&%STEP&%NOFORK)".
+        iDestruct "MSI" as "(MSI&%OBLS&%DPO)".
         iExists _. iFrame. iPureIntro.
         repeat split; try done.
         by constructor. }
       iMod "BMU" as (n') "(TI'' & %BOUND' & P & (%ph & %deg & CP & %PH'))".
-      iMod (finish_obls_steps with "[$] [$]") as (?) "(SI & %STEP & %TH_OWN')".
+      iMod (finish_obls_steps with "[$] [$]") as (?) "(SI & %TRANS)".
       { lia. }
       { eexists. split; [apply PH| ].
         red. etrans; eauto. }
-      iModIntro. iExists δ', (Some ζ).
-      iFrame. iPureIntro. done. 
+      rewrite /obls_si. iDestruct "SI" as "(SI & %TH_OWN' & %DPO')". 
+      iModIntro. iExists δ', (Some ζ). iFrame. 
+      iFrame. iPureIntro. split; [done| ].
+      simpl. split; [| done]. red.
+      repeat split; auto. 
     Qed.
 
     Lemma BMU_AMU__f E ζ ζ' b (P : iProp Σ) π R0 R'
@@ -243,13 +248,14 @@ Section ProgramLogic.
     Proof using.
       clear H1 H0 H. 
       rewrite /AMU__f /AMU_impl /BMU. iIntros "BMU PH" (c c' δ) "TI'".
-      iDestruct (th_phase_msi_ge with "[TI'] [$]") as %(π__max & PH & LE0).
+      iDestruct "TI'" as "(MSI&%STEP&%FORK)". iFrame. 
+      iDestruct (th_phase_msi_ge with "[MSI] [$]") as %(π__max & PH & LE0).
       { rewrite /AM_st_interp_interim.
-        simpl. iDestruct "TI'" as "((?&?&?)&?&?)". iFrame. }
+        simpl. iDestruct "MSI" as "(?&?&?)". iFrame. }
       iSpecialize ("BMU" with "[$]").
-      iSpecialize ("BMU" $! c c' δ 0 (Some ζ') with "[TI']").
+      iSpecialize ("BMU" $! c c' δ 0 (Some ζ') with "[MSI]").
       { rewrite /OAM_st_interp_interim_step /AM_st_interp_interim.
-        iDestruct "TI'" as "((MSI&%OBLS&%DPO)&%STEP&%NOFORK)".
+        iDestruct "MSI" as "(MSI&%OBLS&%DPO)".
         iExists _. iFrame. iPureIntro.
         repeat split; try done.
         by constructor. }
@@ -257,9 +263,11 @@ Section ProgramLogic.
       iMod (finish_obls_steps_fork with "[$] [$] [$] [$]") as (?) "SI".
       { lia. }
       { done. }
-      iDestruct "SI" as (π1 π2) "(SI & OB1 & PH1 & OB2 & PH3 & ((%PH1 & %PH2) & %STEP & %TH_OWN'))".
-      iModIntro. iExists _, _. iFrame "P SI". iFrame.
-      iSplitR.
+      iDestruct "SI" as (π1 π2) "(SI & OB1 & PH1 & OB2 & PH3 & ((%PH1 & %PH2) & %TRANS))".
+      rewrite /obls_si. iDestruct "SI" as "(SI&%CORR')". iFrame.
+      iModIntro. iExists _, _. iFrame.
+      iSplitR; [done| ].
+      iSplitR. 
       2: { do 2 iExists _. iFrame. done. }
       simpl. Unshelve. 2: exact (Some ζ). done. 
     Qed.
