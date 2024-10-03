@@ -84,12 +84,28 @@ Section Model.
       (DEG_LE: opar_deg_lt δ' δ)
       (LOW_BOUND: n <= ps_exc_bound ps):
     let new_cps := ps_cps ps ∖ {[+ (π, δ) +]} ⊎ n *: {[+ (π, δ') +]} in
-    exchanges_cp ps θ (update_cps new_cps ps) π δ δ' n. 
+    exchanges_cp ps θ (update_cps new_cps ps) π δ δ' n.
+
+  Definition next_sig_id ps: SignalId :=
+    list_max (elements $ dom $ ps_sigs ps) + 1. 
+
+  Lemma next_sig_id_fresh ps:
+    next_sig_id ps ∉ dom (ps_sigs ps).
+  Proof using. 
+    rewrite /next_sig_id. 
+    intros IN. apply elem_of_elements, elem_of_list_In in IN.
+    eapply List.Forall_forall in IN.
+    2: { apply list_max_le. reflexivity. }
+    simpl in IN. 
+    clear -IN. 
+    assert (forall n, n + 1 <= n -> False) as C by lia.
+    by apply C in IN.
+  Qed.
       
   Inductive creates_signal: PS -> Locale -> PS -> Level -> Prop :=
-  | cs_step ps θ s l
-      (FRESH: s ∉ dom (ps_sigs ps))
+  | cs_step ps θ l
       (DOM: θ ∈ dom $ ps_obls ps):
+    let s := next_sig_id ps in
     let new_sigs := <[ s := (l, false) ]> (ps_sigs ps) in
     let cur_loc_obls := default ∅ (ps_obls ps !! θ) in
     let new_obls := <[ θ := cur_loc_obls ∪ {[ s ]} ]> (ps_obls ps) in

@@ -322,24 +322,13 @@ Section ObligationsRepr.
       ⊢ obls ζ R -∗ OU ζ (∃ sid, sgn sid l (Some false) ∗ obls ζ (R ∪ {[ sid ]})).
     Proof using.
       rewrite /OU /OU'. iIntros "OB %δ MSI".
-      set (sid := list_max (elements $ dom $ sig_map_repr $ ps_sigs OP δ) + 1).
+      set (sid := next_sig_id _ δ).
       iDestruct (obls_msi_exact with "[$] [$]") as %Rζ. 
       rewrite {1}/obls_msi. iDestruct "MSI" as "(?&SIGS&OBLS&?&?&?)".
       destruct δ. simpl. iFrame. simpl in *.
       iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _ _). 
       iRevert "SIGS OBLS". iFrame. iIntros "SIGS OBLS". simpl.
       rewrite !bi.sep_assoc. 
-
-      assert (sid ∉ dom ps_sigs) as FRESH.
-      { subst sid. 
-        rewrite dom_fmap_L.
-        intros IN. apply elem_of_elements, elem_of_list_In in IN.
-        eapply List.Forall_forall in IN.
-        2: { apply list_max_le. reflexivity. }
-        simpl in IN. 
-        clear -IN. 
-        assert (forall n, n + 1 <= n -> False) as C by lia.
-        by apply C in IN. }
 
       rewrite bi.sep_comm bi.sep_assoc.  
       iSplitL.
@@ -367,8 +356,9 @@ Section ObligationsRepr.
       2: eapply alloc_local_update.
       { rewrite /sig_map_repr. rewrite insert_empty fmap_insert. reflexivity. }
       2: done.
-      apply not_elem_of_dom. by rewrite dom_fmap.
-    Qed. 
+      apply not_elem_of_dom.
+      subst sid. rewrite dom_fmap_L. apply next_sig_id_fresh. 
+    Qed.
 
     (* TODO: do we need to generalize to "optional v" instead? *)
     Lemma OU_set_sig ζ R sid l v
