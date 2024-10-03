@@ -601,10 +601,11 @@ Section ObligationsRepr.
       :
       ⊢ obls_msi δ -∗ th_phase_ge ζ π -∗ obls ζ R0 ==∗ 
         ∃ δ' π1 π2, obls_msi δ' ∗ th_phase_ge ζ π1 ∗ th_phase_ge ζ' π2 ∗
-              obls ζ (R0 ∖ R') ∗ obls ζ' R' ∗
+              obls ζ (R0 ∖ R') ∗ obls ζ' (R0 ∩ R') ∗
               ⌜ forks_locale OP δ ζ δ' ζ' R' ⌝ ∗
               ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝. 
     Proof using.
+      clear H1 H0 H.
       iIntros "MSI PH OB".
       iDestruct (th_phase_msi_ge_strong with "[$] [$]") as "(MSI & %π0 & (PH & %PH & %PLE))".
       iDestruct (obls_msi_exact with "[$] [$]") as %OBLS. 
@@ -637,7 +638,8 @@ Section ObligationsRepr.
              rewrite (cmra_comm (◯ _) _). rewrite cmra_assoc cmra_comm.
              apply cmra_update_op; [reflexivity| ].
              apply auth_update_alloc.
-             rewrite /obls_map_repr. rewrite fmap_insert.
+             rewrite /obls_map_repr.
+             rewrite fmap_insert.
              apply alloc_singleton_local_update; [| done].
              apply not_elem_of_dom. rewrite dom_fmap dom_insert_L.
              rewrite not_elem_of_union not_elem_of_singleton. split.
@@ -646,7 +648,8 @@ Section ObligationsRepr.
         rewrite (cmra_comm (◯ _) _).
         apply auth_update.
         rewrite fmap_insert. apply singleton_local_update_any.
-        intros. apply exclusive_local_update. done.
+        intros. replace (R0 ∖ (R0 ∩ R')) with (R0 ∖ R') by set_solver. 
+        apply exclusive_local_update. done.
       - rewrite /th_phase_ge.
         rewrite !bi.sep_exist_l; iExists _.
         rewrite !bi.sep_assoc. iSplitL. 

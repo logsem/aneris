@@ -148,14 +148,16 @@ Section Model.
   Definition fork_right (π: Phase): Phase := ndot π 1. 
 
   Inductive forks_locale: PS -> Locale -> PS -> Locale -> gset SignalId -> Prop :=
-  | fl_step ps θ θ' π0 obls'
+  | fl_step ps θ θ' π0 obls_
       (LOC_PHASE: ps_phases ps !! θ = Some π0)
       (FRESH': θ' ∉ dom $ ps_phases ps)
       :
-      let new_obls := <[ θ' := obls']> $ <[ θ := (default ∅ (ps_obls ps !! θ)) ∖ obls' ]> $ ps_obls ps in
+      let cur_obls := default ∅ (ps_obls ps !! θ) in
+      let obls' := cur_obls ∩ obls_ in
+      let new_obls := <[ θ' := obls']> $ <[ θ := cur_obls ∖ obls' ]> $ ps_obls ps in
       let new_phases := <[ θ' := fork_right π0 ]> $ <[ θ := fork_left π0 ]> $ ps_phases ps in
       let ps' := update_phases new_phases $ update_obls new_obls ps in
-      forks_locale ps θ ps' θ' obls'.
+      forks_locale ps θ ps' θ' obls_.
 
   (* Definition phase_step ps1 (θ: Phase) ps2 := *)
   (*   (exists δ, burns_cp ps1 θ ps2 δ) \/ *)

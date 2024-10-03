@@ -100,7 +100,7 @@ Section ProgramLogic.
         ∃ δ' π1 π2,
           obls_si OP c' δ' (ObligationsGS0 := oGS) ∗
           obls OP τ (R0 ∖ R') (H3 := oGS) ∗ th_phase_ge OP τ π1 (H3 := oGS) ∗ 
-          obls OP τ' R' (H3 := oGS) ∗ th_phase_ge OP τ' π2 (H3 := oGS) ∗
+          obls OP τ' (R0 ∩ R') (H3 := oGS) ∗ th_phase_ge OP τ' π2 (H3 := oGS) ∗
           ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝ ∗ ⌜ om_trans OP δ τ δ' ⌝.
     Proof using.
       clear H1 H0 H. 
@@ -235,7 +235,7 @@ Section ProgramLogic.
         th_phase_ge OP ζ π (H3 := oGS) -∗
         AMU__f E ζ ζ' obls_act (P ∗ ∃ π1 π2, 
                      th_phase_ge OP ζ π1 (H3 := oGS) ∗ obls OP ζ (R0 ∖ R') (H3 := oGS) ∗
-                     th_phase_ge OP ζ' π2 (H3 := oGS) ∗ obls OP ζ' R' (H3 := oGS) ∗
+                     th_phase_ge OP ζ' π2 (H3 := oGS) ∗ obls OP ζ' (R0 ∩ R') (H3 := oGS) ∗
                      ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝
         ) (aeGS := oGS).
     Proof using.
