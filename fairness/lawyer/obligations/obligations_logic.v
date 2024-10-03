@@ -54,7 +54,7 @@ Section ProgramLogic.
       (LE: exists π, ps_phases OP δ !! τ = Some π /\ phase_le π' π)
       :
       ⊢ OAM_st_interp_interim_step c c' δ τ n None -∗ (cp OP π' deg (H3 := oGS))==∗
-        ∃ δ', obls_si OP c' δ' (ObligationsGS0 := oGS) ∗ ⌜ om_trans OP δ τ δ' ⌝
+        ∃ δ', obls_si OP c' δ' (ObligationsGS0 := oGS) ∗ ⌜ om_trans OP δ τ δ' ⌝ ∗ ⌜ threads_own_obls _ c' δ' ⌝
     .
     Proof.
       iIntros "TI'' cp".
@@ -84,7 +84,8 @@ Section ProgramLogic.
       iPureIntro. split; [split| ]; auto.
       - eapply progress_step_dpo_pres; eauto.
         do 2 (eexists; split; eauto).
-      - simpl. red. eexists. split; eauto.
+      - split; [| done]. 
+        simpl. red. eexists. split; eauto.
         + eexists. split; eauto. eexists. split; eauto.
         + by right.
     Qed.
@@ -101,7 +102,7 @@ Section ProgramLogic.
           obls_si OP c' δ' (ObligationsGS0 := oGS) ∗
           obls OP τ (R0 ∖ R') (H3 := oGS) ∗ th_phase_ge OP τ π1 (H3 := oGS) ∗ 
           obls OP τ' (R0 ∩ R') (H3 := oGS) ∗ th_phase_ge OP τ' π2 (H3 := oGS) ∗
-          ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝ ∗ ⌜ om_trans OP δ τ δ' ⌝.
+          ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝ ∗ ⌜ om_trans OP δ τ δ' ⌝ ∗ ⌜ threads_own_obls _ c' δ' ⌝.
     Proof using.
       clear H1 H0 H. 
 
@@ -160,7 +161,9 @@ Section ProgramLogic.
         rewrite OBLS''. f_equal. set_solver.
       - red. rewrite OBLS'' PHASES''. f_equal.
         done. 
-      - eexists. split; eauto.
+      - split.
+        2: { red. rewrite LOCS'. rewrite OBLS''. set_solver. }
+        eexists. split; eauto.
         + eexists. split; eauto. eexists. split; eauto.
         + left. eauto.
     Qed.
@@ -216,13 +219,12 @@ Section ProgramLogic.
         repeat split; try done.
         by constructor. }
       iMod "BMU" as (n') "(TI'' & %BOUND' & P & (%ph & %deg & CP & %PH'))".
-      iMod (finish_obls_steps with "[$] [$]") as (?) "[SI %STEP]".
+      iMod (finish_obls_steps with "[$] [$]") as (?) "(SI & %STEP & %TH_OWN')".
       { lia. }
       { eexists. split; [apply PH| ].
         red. etrans; eauto. }
       iModIntro. iExists δ', (Some ζ).
-      iFrame. iPureIntro.
-      simpl. done.
+      iFrame. iPureIntro. done. 
     Qed.
 
     Lemma BMU_AMU__f E ζ ζ' b (P : iProp Σ) π R0 R'
@@ -255,7 +257,7 @@ Section ProgramLogic.
       iMod (finish_obls_steps_fork with "[$] [$] [$] [$]") as (?) "SI".
       { lia. }
       { done. }
-      iDestruct "SI" as (π1 π2) "(SI & OB1 & PH1 & OB2 & PH3 & ((%PH1 & %PH2) & %STEP))".
+      iDestruct "SI" as (π1 π2) "(SI & OB1 & PH1 & OB2 & PH3 & ((%PH1 & %PH2) & %STEP & %TH_OWN'))".
       iModIntro. iExists _, _. iFrame "P SI". iFrame.
       iSplitR.
       2: { do 2 iExists _. iFrame. done. }

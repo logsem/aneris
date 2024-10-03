@@ -45,7 +45,8 @@ Section ObligationsEM.
     (σ1: cfg Λ) (oζ: olocale Λ) (σ2: cfg Λ)
     (δ1: mstate OM) (ℓ: mlabel OM) (δ2: mstate OM) :=
       mtrans δ1 ℓ δ2 /\
-      oζ = Some ℓ                
+      oζ = Some ℓ /\
+      threads_own_obls σ2 δ2
   .
 
   Definition obls_si `{!ObligationsGS OP Σ}
