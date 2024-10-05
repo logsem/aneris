@@ -1,27 +1,20 @@
 From iris.algebra Require Import auth gmap gset excl excl_auth.
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import locales_helpers comp_utils trace_lookup fairness.
+From trillium.fairness Require Import locales_helpers comp_utils trace_lookup fairness fin_branch.
 From trillium.fairness.heap_lang Require Import simulation_adequacy.
 From trillium.fairness.lawyer Require Import sub_action_em action_model.
 From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_em obls_fairness_preservation obligations_am obligations_fin_branch.
 From trillium.fairness.lawyer.examples.eo_fin Require Import eo_fin.
 
 
-Section ObligationsAdequacy.
+Section EOFinAdequacy.
 
-  Context {DegO LevelO: ofe}.
-  Context `{OfeDiscrete DegO} `{OfeDiscrete LevelO} `{@LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}.
-  Context {LIM_STEPS: nat}.
-
-  Let Degree := ofe_car DegO.
-  Let Level := ofe_car LevelO.
-
-  Context (OP: ObligationsParams Degree Level (locale heap_lang) LIM_STEPS).
-  Let OM := ObligationsModel OP.
-
+  Context (LIM: nat).
+  Let OP := EO_OP LIM. 
   Let ASEM := ObligationsASEM OP.
-  Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls OP τ ∅ (H3 := aGS)). 
-  Let M := AM2M (ObligationsAM OP).
+  Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls OP τ ∅ (H3 := aGS)).
+  Let OM := ObligationsModel OP. 
+  Let M := AM2M (ObligationsAM OP). 
   
   (* Definition ex_om_traces_match: extrace heap_lang -> obls_trace OP -> Prop := *)
   (*   traces_match *)
@@ -55,12 +48,24 @@ Section ObligationsAdequacy.
       locale_step
       (@mtrans M).
 
+  (* TODO: move? *)
+  Instance fin_ofe_lt n:
+    finite.Finite (Ofe {i : natO | i < n} sig_ofe_mixin).
+  Proof using.
+    unshelve eapply (@finite.surjective_finite {i : nat | i < n}).
+    { exact id. }
+    2: by apply _.
+    eapply (finitary.in_list_finite (seq 0 n)).
+    intros. apply elem_of_seq. lia.
+  Qed.  
+
   Lemma eofin_sim_rel_FB: rel_finitary eofin_sim_rel.
   Proof using.
     clear. red. intros extr mtr [tp' σ'] oζ. 
     simpl. rewrite /eofin_sim_rel. simpl.
     rewrite /eofin_valid_evolution_step /eofin_st_rel. simpl.
-    apply OM_fin_branch. 
+    apply list_approx_smaller_card. 
+    apply OM_fin_branch_impl; try by apply _.
   Qed. 
     
   Theorem om_simulation_adequacy_model_trace Σ
@@ -75,7 +80,7 @@ Section ObligationsAdequacy.
       eofin_om_traces_match extr omtr ∧
       trfirst omtr = s1.
   Proof using.
-    clear H1 H0 H. 
+    (* clear H1 H0 H.  *)
     intros (* FIN *) PREM.
 
     unshelve epose proof (@strong_simulation_adequacy_traces _ _ _ hPre s e1 σ1
@@ -93,7 +98,7 @@ Section ObligationsAdequacy.
     { simpl. intros ????[??]? STEP.
       red in STEP. simpl in STEP. destruct STEP as [STEP ->].
       destruct o; [| done].
-      simpl in STEP. by inversion STEP. }
+      simpl in STEP. red in STEP. apply STEP. }
     { simpl. intros ????[??]? STEP.
       red in STEP. simpl in STEP. destruct STEP as [STEP ->].
       destruct o; [| done].  
@@ -195,16 +200,6 @@ Section ObligationsAdequacy.
     eapply eofin_matching_traces_termination; eauto. 
   Qed.
 
-End ObligationsAdequacy.
-
-
-Section EOFinAdequacy.
-
-  Context (LIM: nat).
-  Let OP := EO_OP LIM. 
-  Let ASEM := ObligationsASEM OP.
-  Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls OP τ ∅ (H3 := aGS)). 
-  Let M := AM2M (ObligationsAM OP). 
 
   Let eofinΣ: gFunctors := #[
       GFunctor (excl_authR natO); 
@@ -220,7 +215,7 @@ Section EOFinAdequacy.
     σ1 N:
   ⊢
   rel_always_holds0 
-    (@eofin_sim_rel _ _ 10 (EO_OP LIM)) NotStuck
+    (@eofin_sim_rel) NotStuck
     (@state_interp heap_lang _ eofinΣ _)
     (λ _ : language.val heap_lang,
        @em_thread_post heap_lang _ _ eofinΣ
@@ -291,7 +286,7 @@ Section EOFinAdequacy.
     
     set (s1 := init_om_state (EO_OP LIM) (trfirst extr)). 
     
-    unshelve epose proof (simple_om_simulation_adequacy_terminate (EO_OP LIM) eofinΣ NotStuck
+    unshelve epose proof (simple_om_simulation_adequacy_terminate eofinΣ NotStuck
                   _ _ _ _
                   _ _ EX0) as FAIR_TERM; eauto.
     { exact tt. }

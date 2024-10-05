@@ -1,6 +1,6 @@
 From iris.algebra Require Import auth gmap gset excl excl_auth gmultiset.
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import locales_helpers comp_utils trace_lookup fairness.
+From trillium.fairness Require Import locales_helpers comp_utils trace_lookup fairness fin_branch.
 From trillium.fairness.lawyer Require Import sub_action_em action_model.
 From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_em obligations_am obls_fairness_preservation obls_utils.
 From stdpp Require Import finite. 
@@ -34,10 +34,6 @@ Section FiniteBranching.
   Lemma gset_prod_spec `{Countable K, Countable T} (k: gset K) (t: gset T):
     forall p, p ∈ gset_prod k t <-> p.1 ∈ k /\ p.2 ∈ t.
   Proof using. Admitted.
-
-  (* TODO: move *)
-  Definition list_approx {A: Type} (P: A -> Prop) :=
-    { l: list A | forall a, P a -> a ∈ l }. 
 
   Lemma burns_cp_next_states δ:
     list_approx (fun δ' => exists τ π d, burns_cp OP δ τ δ' π d). 
@@ -213,32 +209,6 @@ Section FiniteBranching.
         eapply e; eauto. 
     Qed.
 
-    Fixpoint list_approx_repeat {A : Type} (R: A -> A → Prop)
-      (APX: forall a, list_approx (R a))      
-      (n: nat)
-      (a: A)
-      :=
-      match n with
-      | 0 => [a]
-      | S n =>
-          let la := APX a in
-          flat_map (list_approx_repeat R APX n) (proj1_sig la)
-      end.
-
-    Lemma list_approx_repeat_spec {A} (R: A -> A -> Prop) APX n a:
-      forall b, relations.nsteps R n a b -> b ∈ list_approx_repeat R APX n a.
-    Proof using.
-      clear H1 H0 H. 
-      revert a. induction n.
-      { simpl. intros ??. rewrite nsteps_0. set_solver. }
-      intros ??. rewrite -rel_compose_nsteps_next'.       
-      intros (? & STEP & STEPS). 
-      apply IHn in STEPS. simpl.
-      apply elem_of_list_In. apply in_flat_map. eexists. split.
-      2: eapply elem_of_list_In; eauto.
-      destruct APX. simpl in *. apply elem_of_list_In. eauto.
-    Qed.
-
     (* TODO: move *)
     Instance nsteps_impl {A: Type}:
       Proper ((eq ==> eq ==> impl) ==> eq ==> (eq ==> eq ==> impl)) (@relations.nsteps A).
@@ -296,56 +266,38 @@ Section FiniteBranching.
         apply LOCS. subst ps'. destruct δ_. simpl in *.
         subst new_obls0. rewrite dom_insert. set_solver.
     Qed.
-      
+
+    (* TODO: rename *)
+    Theorem OM_fin_branch_impl
+      `{EqDecision (expr Λ)}
+      c δ
+      (tp': list (language.expr Λ))
+      (σ': language.state Λ)
+      (oζ: olocale Λ)
+      :
+      list_approx (fun '(δ', ℓ) =>
+           obls_ves_wrapper OP c oζ (tp', σ') δ ℓ δ' ∧
+           om_live_tids OP id locale_enabled (tp', σ') δ'). 
+    Proof using FINlvl FINdeg.
+      destruct (om_trans_approx δ (locales_of_cfg (tp', σ'))) as [nexts NEXTS].
+      exists (flat_map (fun τ => map (fun δ' => (δ', (obls_act, Some τ))) nexts) (elements $ locales_of_cfg c)).
+      intros [δ' [? oτ]] [STEP TIDS]. apply elem_of_list_In, in_flat_map.
+      setoid_rewrite <- elem_of_list_In.
+      simpl in STEP. destruct oτ as [τ| ]; [| tauto].
+      exists τ. simpl in STEP. destruct STEP as [STEP ->].
+      red in STEP. destruct STEP as (STEP & TRANS & -> & CORR). 
+      split.
+      { apply elem_of_elements.
+        destruct c. apply locales_of_cfg_Some.      
+        replace l with (l, s).1 by done. by eapply locale_step_from_locale_src. }
+      apply elem_of_list_In, in_map_iff. eexists. split; eauto.
+      apply elem_of_list_In. apply NEXTS. split.
+      { destruct CORR as [TH_OWN ?]. 
+        red in TIDS.
+        by rewrite TH_OWN. }
+      simpl in TRANS. eauto.
+    Qed. 
+    
   End FinParams.
-
-  Theorem OM_fin_branch_impl
-    `{EqDecision (expr Λ)}
-    c δ
-    (tp': list (language.expr Λ))
-    (σ': language.state Λ)
-    (oζ: olocale Λ):
-    exists nexts: list (ProgressState OP * (Action * option Locale)),
-      forall '(δ', ℓ),
-        obls_ves_wrapper OP c oζ (tp', σ') δ ℓ δ' ∧
-        om_live_tids OP id locale_enabled (tp', σ') δ' ->
-        (δ', ℓ) ∈ nexts.
-  Proof using.
-    assert (FINdeg: Finite Degree) by admit.
-    assert (FINlvl: Finite Level) by admit.
-    destruct (om_trans_approx _ _ δ (locales_of_cfg (tp', σ'))) as [nexts NEXTS].
-    exists (flat_map (fun τ => map (fun δ' => (δ', (obls_act, Some τ))) nexts) (elements $ locales_of_cfg c)).
-    intros [δ' [? oτ]] [STEP TIDS]. apply elem_of_list_In, in_flat_map.
-    setoid_rewrite <- elem_of_list_In.
-    simpl in STEP. destruct oτ as [τ| ]; [| tauto].
-    exists τ. simpl in STEP. destruct STEP as [STEP ->].
-    red in STEP. destruct STEP as (STEP & TRANS & -> & CORR). 
-    split.
-    { apply elem_of_elements.
-      destruct c. apply locales_of_cfg_Some.      
-      replace l with (l, s).1 by done. by eapply locale_step_from_locale_src. }
-    apply elem_of_list_In, in_map_iff. eexists. split; eauto.
-    apply elem_of_list_In. apply NEXTS. split.
-    { destruct CORR as [TH_OWN ?]. 
-      red in TIDS.
-      by rewrite TH_OWN. }
-    simpl in TRANS. eauto.
-  Qed. 
-    
-
-  Theorem OM_fin_branch_impl c δ
-    (tp': list (language.expr Λ))
-    (σ': language.state Λ)
-    (oζ: olocale Λ):
-  quantifiers.smaller_card
-    {'(δ', ℓ) : ProgressState OP * (Action * option Locale) | 
-      obls_ves_wrapper OP c oζ (tp', σ') δ ℓ δ' ∧
-      om_live_tids OP id locale_enabled (tp', σ') δ'} nat.
-  Proof using.
-    unshelve eapply finitary.finite_smaller_card_nat.
-    { admit. }
-    
-    
-  Admitted.     
 
 End FiniteBranching.
