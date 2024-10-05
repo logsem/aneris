@@ -254,8 +254,7 @@ Section EoFin.
       destruct (even_or_odd m) as [EVEN | ODD].
       - pose proof (Is_true_true_1 _ EVEN) as E.
         rewrite E.
-        assert (Nat.odd m = false) as O by admit.
-        rewrite O. 
+        pose proof (Nat.negb_even m) as O. rewrite E in O. simpl in O. rewrite -O. 
 
         iApply sswp_MU_wp; [done| ]. 
         iApply (wp_cmpxchg_suc with "[$]"); try done.
@@ -358,9 +357,6 @@ Section EoFin.
 
         iMod (thread_update _ _ _ (m + 2) with "EVEN [$]") as "[EVEN TH]". 
 
-        assert (forall n, Nat.even (n + 1) = Nat.odd n) by admit. 
-        assert (forall n, Nat.odd (n + 1) = Nat.even n) by admit.
-
         assert (S (B - (m + 2)) <= B - m) as LE.
         { destruct (Nat.even m); lia. }
         apply Nat.le_sum in LE as [? LE].
@@ -374,7 +370,8 @@ Section EoFin.
 
           iMod ("CLOS" with "[EVEN ODD SM L]") as "?".
           { rewrite /eofin_inv_inner. iNext. iExists (m + 1), smap.
-            rewrite H1 H2 E O. rewrite -Nat.add_assoc. rewrite Nat2Z.inj_add. 
+            rewrite even_plus1_negb odd_plus1_negb E -O. simpl. 
+            rewrite -Nat.add_assoc. rewrite Nat2Z.inj_add. 
             iFrame.
             rewrite Nat.min_l; [| done]. rewrite Nat.min_l; [| lia]. done. }
 
@@ -396,7 +393,8 @@ Section EoFin.
           iMod "COND" as "[% (%s' & %lm' & SM & SN & OBLS & %LVL')]".
           iMod ("CLOS" with "[EVEN ODD SM L]") as "?".
           { rewrite /eofin_inv_inner. iNext. iExists (m + 1), _.
-            rewrite H1 H2 E O. rewrite -Nat.add_assoc. rewrite Nat2Z.inj_add. 
+            rewrite even_plus1_negb odd_plus1_negb E -O. simpl. 
+            rewrite -Nat.add_assoc. rewrite Nat2Z.inj_add. 
             iFrame. rewrite -Nat.add_assoc. simpl. iFrame. }
           
           iModIntro.

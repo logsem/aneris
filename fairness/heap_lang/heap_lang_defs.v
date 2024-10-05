@@ -52,15 +52,16 @@ Section GeneralProperties.
   Lemma posts_of_empty_mapping  (e1 e: expr) v (tid : nat) (tp : list expr):
     tp !! tid = Some e ->
     to_val e = Some v ->
-    posts_of tp (
-        (* (λ (_ : val), 0%nat ↦M ∅) *)
-        (fun _ => em_thread_post 0%nat (em_GS0 := eGS))
-                   ::  (map (λ '(tnew, e), fork_post (locale_of tnew e)) (prefixes_from [e1] (drop (length [e1]) tp)))) -∗
-      (* tid ↦M ∅. *)
+    (* posts_of tp ( *)
+    (*     (fun _ => em_thread_post 0%nat (em_GS0 := eGS)) *)
+    (*                ::  (map (λ '(tnew, e), fork_post (locale_of tnew e)) (prefixes_from [e1] (drop (length [e1]) tp)))) *)
+    cur_posts tp e1 (fun _ => em_thread_post 0%nat (em_GS0 := eGS))
+      -∗
       em_thread_post tid (em_GS0 := eGS).
   Proof.
     intros Hsome Hval. simpl.
     
+    rewrite /cur_posts. 
     rewrite (big_sepL_elem_of (λ x, x.2 x.1) _ (v, (fun _ => em_thread_post tid)) _) //.
     apply elem_of_list_omap.
     exists (e, (fun _ => em_thread_post tid (em_GS0 := eGS))); split; last first.

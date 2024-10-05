@@ -210,6 +210,51 @@ Section EOFinAdequacy.
   Global Instance subG_eofinΣ {Σ}: subG eofinΣ Σ → EoFinPreG Σ.
   Proof. solve_inG. Qed.
 
+
+  (* TODO: move *)
+  Lemma om_live_tids_init e σ:
+      om_live_tids OP id locale_enabled ([e], σ) (init_om_state (EO_OP LIM) ([e], σ)).
+  Proof using. 
+    red. intros ?.
+    rewrite /has_obls. simpl. 
+    rewrite locales_of_cfg_simpl. simpl. rewrite union_empty_r_L.
+    rewrite gset_to_gmap_singleton. 
+    destruct (decide (ζ = 0)) as [-> | ?].
+    2: { simpl. simpl. rewrite lookup_singleton_ne; [| done]. done. }
+    by rewrite lookup_singleton.
+  Qed.
+
+  Lemma no_obls_live_tids
+          {Hinv: @heapGS eofinΣ M EM}
+          (oGS := @heap_fairnessGS eofinΣ _ _ Hinv)
+    (tp : list expr)
+  (σ : state)
+  (δ' : ProgressState OP)
+  ee
+  (TH_OWN : threads_own_obls OP (tp, σ) δ'):
+  gen_heap_interp (heap σ) -∗ obls_msi OP δ' (H3 := oGS) -∗
+  cur_posts tp ee (λ _ : val, obls OP 0 ∅ (H3 := oGS)) -∗
+  ⌜om_live_tids OP id locale_enabled (tp, σ) δ'⌝.
+  Proof using.
+    clear -Hinv TH_OWN.
+    iIntros "HEAP MSI POSTS".
+    rewrite /om_live_tids. iIntros (τ OBτ).
+    rewrite /locale_enabled.
+    red in OBτ.
+    destruct (ps_obls _ δ' !! τ) as [V| ] eqn:OB_; [| done].
+    simpl in OBτ.
+    red in TH_OWN. rewrite set_eq in TH_OWN. specialize (TH_OWN τ).
+    apply proj2 in TH_OWN. specialize (TH_OWN ltac:(eapply elem_of_dom; eauto)).
+    apply locales_of_cfg_Some in TH_OWN as [e Ee]. simpl in Ee.
+    iExists _. iSplit; [done| ].
+    destruct (language.to_val e) eqn:VALe; [| done].
+    apply from_locale_lookup in Ee.
+    iDestruct (posts_of_empty_mapping with "[POSTS]") as "foo"; eauto.
+    simpl.
+    iDestruct (obls_msi_exact with "MSI foo") as %?.
+    clear -OB_ OBτ H. rewrite OB_ in H. congruence.
+  Qed. 
+
   Lemma om_sim_RAH 
     {Hinv: @heapGS eofinΣ M EM}
     σ1 N:
@@ -233,41 +278,21 @@ Section EOFinAdequacy.
     iApply fupd_mask_intro_discard; [done| ].
     
     destruct extr.
-    { simpl in VALID_STEP. inversion VALID.
-      simpl in *. subst. simpl in *.
-      red in EX0. simpl in EX0. subst.
-      red in OM0. simpl in OM0. subst.
-      red in EX_FIN. simpl in EX_FIN. inversion EX_FIN. subst.
-      simpl in VALID. simpl.
+    { iPureIntro.  
+      simpl in VALID_STEP.
+      inversion VALID. subst. 
+      red in EX0, OM0. simpl in EX0, OM0. subst.
       rewrite /eofin_sim_rel. rewrite /valid_state_evolution_fairness /om_live_tids.
-      iSplit; [done| ]. simpl.
-      (* rewrite /eofin_st_rel /om_live_tids.  *)
-      iPureIntro. intros ?.
-      rewrite /has_obls. simpl. 
-      rewrite locales_of_cfg_simpl. simpl. rewrite union_empty_r_L.
-      rewrite gset_to_gmap_singleton. 
-      destruct (decide (ζ = 0)) as [-> | ?].
-      2: { simpl. simpl. rewrite lookup_singleton_ne; [| done]. done. }
-      by rewrite lookup_singleton. }
+      split; [done| ]. simpl. red.
+      apply om_live_tids_init. }
     simpl in VALID_STEP. inversion VALID. subst. simpl in *.
     red in EX_FIN. simpl in EX_FIN. subst. simpl.
     rewrite /eofin_sim_rel. iSplit.
     { simpl. iPureIntro. red. 
       destruct ℓ. done. }
-    simpl. rewrite /om_live_tids. iIntros (τ OBτ).
-    rewrite /locale_enabled.
-    red in OBτ. 
-    destruct (ps_obls _ δ' !! τ) as [V| ] eqn:OB_; rewrite OB_ in OBτ; [| done].
-    simpl in OBτ.
-    red in TH_OWN. rewrite set_eq in TH_OWN. specialize (TH_OWN τ).
-    apply proj2 in TH_OWN. specialize (TH_OWN ltac:(eapply elem_of_dom; eauto)).
-    apply locales_of_cfg_Some in TH_OWN as [e Ee]. simpl in Ee.
-    iExists _. iSplit; [done| ].
-    destruct (language.to_val e) eqn:VALe; [| done].
-    apply from_locale_lookup in Ee. 
-    iDestruct (posts_of_empty_mapping with "[POSTS]") as "foo"; eauto.
-    simpl. iDestruct (obls_msi_exact with "MSI [$]") as %?.
-    clear -OB_ OBτ H. rewrite OB_ in H. congruence.
+    simpl. rewrite /eofin_st_rel.
+
+    iApply (no_obls_live_tids with "[$] [$] [$]"). done.  
   Qed.
       
 

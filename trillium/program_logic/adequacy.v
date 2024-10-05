@@ -1485,6 +1485,11 @@ Proof.
   iModIntro; iIntros "[$ ?]"; done.
 Qed.
 
+Definition cur_posts `{irisG Λ M Σ} (tp: list (expr Λ)) e0 (Φ0: val Λ → iProp Σ): iProp Σ :=
+  posts_of tp (Φ0 :: ((λ '(tnew, e), fork_post (locale_of tnew e)) <$>
+                        prefixes_from [e0] (drop 1 tp))).
+
+
 Definition rel_always_holds0 `{irisG Λ M Σ}
   (ξ: execution_trace Λ → auxiliary_trace M → Prop)
   (s: stuckness)
@@ -1505,8 +1510,9 @@ Definition rel_always_holds0 `{irisG Λ M Σ}
     ⌜∀ e2 : expr Λ, s = NotStuck → e2 ∈ c.1 → not_stuck e2 c.2⌝ -∗
     ⌜locales_equiv [e1] (take (length [e1]) c.1)⌝ -∗
     stateI ex atr -∗
-    posts_of c.1 (Φ0 :: ((λ '(tnew, e), fork_post (locale_of tnew e)) <$>
-                            prefixes_from [e1] (drop (length [e1]) c.1)))
+    (* posts_of c.1 (Φ0 :: ((λ '(tnew, e), fork_post (locale_of tnew e)) <$> *)
+    (*                         prefixes_from [e1] (drop (length [e1]) c.1))) *)
+    cur_posts c.1 e1 Φ0
     ={⊤,∅}=∗ ⌜ξ ex atr⌝.
 
 Theorem wp_strong_adequacy Λ M Σ `{!invGpreS Σ}
