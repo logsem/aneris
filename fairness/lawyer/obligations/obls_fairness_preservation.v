@@ -9,20 +9,6 @@ Section Preservation.
   Context `{Countable Locale}. 
   Let OM := ObligationsModel OP. 
 
-  Definition has_obls (τ: Locale) (s: mstate OM) := default ∅ (ps_obls _ s !! τ) ≠ ∅. 
-
-  Definition obls_trace_fair := fair_by has_obls eq.
-
-  Definition obls_trace_valid := trace_valid (@mtrans OM).
-
-  Definition obls_trace := trace (mstate OM) (mlabel OM). 
-
-  Lemma obls_fair_trace_terminate (tr: obls_trace):
-    obls_trace_valid tr ->
-    (∀ τ, obls_trace_fair τ tr) ->
-    terminating_trace tr.
-  Proof. Admitted. 
-
   Context {So Lo: Type}.
   Context `{EqDecision Lo}. 
     
@@ -34,9 +20,9 @@ Section Preservation.
   Hypothesis (LIFT_INJ: Inj eq eq lift_locale). 
 
   Definition om_live_tids (c: So) (δ: mstate OM) :=
-    forall ζ, has_obls ζ δ -> out_lbl_prop (lift_locale ζ) c.
+    forall ζ, has_obls OP ζ δ -> out_lbl_prop (lift_locale ζ) c.
 
-  Definition out_om_traces_match: out_trace -> obls_trace -> Prop :=
+  Definition out_om_traces_match: out_trace -> obls_trace OP -> Prop :=
     traces_match
       (fun oℓ τ => oℓ = lift_locale τ)
       om_live_tids
@@ -45,10 +31,10 @@ Section Preservation.
 
   Definition out_fair := fair_by out_lbl_prop eq. 
 
-  Lemma out_om_fairness_preserved_single (extr: out_trace) (omtr: obls_trace) 
+  Lemma out_om_fairness_preserved_single (extr: out_trace) (omtr: obls_trace OP) 
     (τ: Locale):
     out_om_traces_match extr omtr ->
-    out_fair (lift_locale τ) extr -> obls_trace_fair τ omtr.
+    out_fair (lift_locale τ) extr -> obls_trace_fair OP τ omtr.
   Proof using LIFT_INJ. 
     intros MATCH FAIR. red.
     apply fair_by_equiv. red. intros n OBS.
@@ -75,9 +61,9 @@ Section Preservation.
     clear -LIFT_INJ. intros (?&?&?%LIFT_INJ). eauto. 
   Qed.
 
-  Lemma out_om_fairness_preserved (extr: out_trace) (omtr: obls_trace):
+  Lemma out_om_fairness_preserved (extr: out_trace) (omtr: obls_trace OP):
     out_om_traces_match extr omtr ->
-    (forall ζ, out_fair ζ extr) -> (∀ τ, obls_trace_fair τ omtr).
+    (forall ζ, out_fair ζ extr) -> (∀ τ, obls_trace_fair OP τ omtr).
   Proof using LIFT_INJ.
     intros MATCH FAIR. intros. eapply out_om_fairness_preserved_single; eauto. 
   Qed. 

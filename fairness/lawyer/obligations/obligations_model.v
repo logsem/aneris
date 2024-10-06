@@ -404,5 +404,11 @@ Section Model.
     { apply SUB. apply H0. done. }
     lia.
   Qed. 
-  
+
+  Definition obls_trace_valid := trace_valid (@mtrans ObligationsModel).
+  Definition obls_trace := trace (mstate ObligationsModel) (mlabel ObligationsModel).
+
+  Definition has_obls (τ: Locale) (s: mstate ObligationsModel) := default ∅ (ps_obls s !! τ) ≠ ∅. 
+  Definition obls_trace_fair := fair_by has_obls eq.
+
 End Model.

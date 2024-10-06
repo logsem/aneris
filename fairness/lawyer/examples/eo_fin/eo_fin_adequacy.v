@@ -3,7 +3,7 @@ From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import locales_helpers comp_utils trace_lookup fairness fin_branch.
 From trillium.fairness.heap_lang Require Import simulation_adequacy.
 From trillium.fairness.lawyer Require Import sub_action_em action_model.
-From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_em obls_fairness_preservation obligations_am obligations_fin_branch.
+From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_em obls_fairness_preservation obligations_am obligations_fin_branch obls_termination.
 From trillium.fairness.lawyer.examples.eo_fin Require Import eo_fin.
 
 
