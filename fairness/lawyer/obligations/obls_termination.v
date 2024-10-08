@@ -423,28 +423,43 @@ Section Termination.
     Proof using.
       clear -LE. 
       apply Nat.le_sum in LE as [d ->]. multiset_solver.
-    Qed. 
+    Qed.
+
+    (* Lemma approx_expects_next k eps: *)
+    (*   approx_expects k eps = ∅ \/ *)
+    (*   let add := [^op set] ep ∈ eps, let '(sid, π, d) := ep in {[+ ((* π,  *)d) +]} in *)
+    (*   approx_expects k eps = approx_expects (S k) eps ⊎ add. *)
+    (* Proof using. *)
+    (*   rewrite /approx_expects.  *)
+
 
     Lemma ms_le_decr_expr k eps:
       ms_le deg_le (approx_expects (S k) eps) (approx_expects k eps).
-    Proof using.
+    Proof using. 
       rewrite /approx_expects.
       eapply big_opS_ms_le. intros [[??]?].
       apply ms_le_sub.
       apply scalar_mul_le. lia.
+    Qed.
+
+    Lemma approx_expects_add k eps e 
+      (FRESH: e ∉ eps):
+      let n := (2 * LIM_STEPS * last_expect (fst $ fst e) - k) in
+      approx_expects k (eps ∪ {[ e ]}) = approx_expects k eps ⊎ n *: {[+ e.2 +]}.
+    Proof using.
+      rewrite (union_comm_L _ {[ e ]}).
+      rewrite /approx_expects.
+      rewrite -leibniz_equiv_iff. 
+      rewrite big_opS_insert; auto.
+      rewrite gmultiset_op gmultiset_disj_union_comm. f_equiv.
+      destruct e as [[??]?]. done.
     Qed. 
-      
-    (*   simpl. *)
-      
-    (*   eapply ms_le_Proper. *)
-    (*   { symmetry. etrans; [eapply big_opS_set_map with (f := id) | ]. *)
-    (*     2: { f_equiv; [| reflexivity]. *)
-    (*          red. intros ((?&?)&?).    *)
-    (*   erewrite <-  *)
-    (*   eapply big_opS_ms_le.  *)
 
     Lemma loc_step_decr δ1 τ δ2 k
-      (STEP: loc_step OP δ1 τ δ2):
+      (STEP: loc_step OP δ1 τ δ2)
+      (EXP_BOUND: forall sid π d, expects_ep OP δ1 τ δ2 sid π d ->
+                  let n := 2 * LIM_STEPS * last_expect sid in
+                  k < n):
       ms_le deg_le (PF' (S k) δ2) (PF' k δ1).
     Proof using.
       rewrite /PF'. 
@@ -467,18 +482,53 @@ Section Termination.
           * admit.          
         + apply ms_le_decr_expr.
       - destruct T as (?&T). inversion T; subst.
-        apply SAME. destruct δ1. simpl in *.
-        subst new_obls0. rewrite dom_insert_L. simpl. set_solver. 
+        destruct δ1. simpl in *.
+        apply ms_le_disj_union.
+        + apply ms_le_sub. apply mset_map_sub. mss. 
+        + apply ms_le_decr_expr.
       - destruct T as (?&T). inversion T; subst.
-        apply SAME. destruct δ1. simpl in *.  
-        subst new_obls0. simpl.
-        rewrite dom_insert_L. 
-        set_solver. 
+        destruct δ1. simpl in *.  
+        apply ms_le_disj_union.
+        + apply ms_le_sub. apply mset_map_sub. mss. 
+        + apply ms_le_decr_expr.
       - destruct T as (?&?&?&?&T). inversion T; subst.
-        apply SAME. by destruct δ1. 
+        destruct δ1. simpl in *.
+        subst new_cps0 new_eps0. 
+        rewrite mset_map_sub_diff. 
+        2: { by apply gmultiset_singleton_subseteq_l. }
+        rewrite mset_map_singleton. simpl.
+
+        destruct (decide ((x, x0, x2) ∈ ps_eps)).
+        { rewrite union_comm_L subseteq_union_1_L; [| set_solver].
+          apply ms_le_disj_union.
+          + apply ms_le_sub. mss. 
+          + apply ms_le_decr_expr. }
+        forward eapply (approx_expects_add (S k)) as ->; eauto. simpl.
+        rewrite (gmultiset_disj_union_comm _ ((_ - _) *: _)) gmultiset_disj_union_assoc.
+        apply ms_le_disj_union.
+        + apply ms_le_exchange.
+          * admit.
+          * eapply elem_of_mset_map. eexists (_, _). eauto.
+          * admit.
+        + apply ms_le_decr_expr.
       - destruct T as (?&?&?&T). inversion T; subst.
-        apply SAME. by destruct δ1.
-    
+        destruct δ1. simpl in *.
+        subst new_cps0. rewrite mset_map_disj_union.
+        rewrite -gmultiset_disj_union_assoc. apply ms_le_disj_union.
+        { apply ms_le_refl. }
+        rewrite mset_map_singleton. simpl.
+        rewrite (union_difference_singleton_L _ _ EP).
+        rewrite (union_comm_L {[ _ ]} _). rewrite !approx_expects_add.
+        2, 3: set_solver.
+        simpl. rewrite gmultiset_disj_union_comm.
+        rewrite -gmultiset_disj_union_assoc.
+        apply ms_le_disj_union.
+        { apply ms_le_decr_expr. }
+        move EXP_BOUND at bottom. specialize_full EXP_BOUND; [by eauto| ].
+        eapply ms_le_Proper; [reflexivity| ..| apply ms_le_refl].
+        rewrite -gmultiset_scalar_mul_S_r. f_equiv. lia.  
+    Admitted. 
+        
  
     Lemma step_decr i
       (VALID: obls_trace_valid OP tr):
@@ -522,3 +572,4 @@ Section Termination.
 
 
 End Termination.
+
