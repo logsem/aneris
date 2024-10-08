@@ -9,299 +9,18 @@ From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From aneris.examples.transactional_consistency Require Import code_api wrapped_library.
 From aneris.examples.transactional_consistency.read_uncommitted.specs Require Import specs resources.
-From aneris.examples.transactional_consistency Require Import resource_algebras user_params aux_defs state_based_model.
+From aneris.examples.transactional_consistency 
+  Require Import resource_algebras user_params aux_defs state_based_model implication_trace_util.
 
 Section trace_proof.
   Context `{!anerisG Mdl Σ, !KVSG Σ, !User_params}.
-
-  Definition trace_inv_name := nroot.@"trinv".
-
-  (** Ghost theory for wrapped resources *)
-
-  (* For the OwnLinTrace/OwnLinHist resources and rules we are reusing trace infrastructure *)
-
-  Definition OwnLinHist (γ : gname) (l : list val) : iProp Σ :=
-    own γ (◯ (gmap_of_trace 0 l)).
-
-  Definition OwnLinTrace (γ : gname) (l : list val) : iProp Σ := 
-    own γ (● gmap_of_trace 0 l) ∗ OwnLinHist γ l.
-
-  Lemma own_lin_hist (γ : gname) (l : list val) :
-    OwnLinTrace γ l ==∗ OwnLinTrace γ l ∗ OwnLinHist γ l.
-  Proof.
-    rewrite /OwnLinTrace.
-    iIntros "(H1 & #H2)".
-    iModIntro.
-    iFrame "#∗".
-  Qed.
-
-  Lemma own_lin_prefix (γ : gname) (l h : list val) :
-    OwnLinTrace γ l ∗ OwnLinHist γ h -∗
-    OwnLinTrace γ l ∗ OwnLinHist γ h ∗ ⌜h `prefix_of` l⌝.
-  Proof.
-    rewrite /OwnLinTrace /OwnLinHist.
-    iIntros "((H1 & H2) & H3)".
-    iDestruct (own_op with "[$H1 $H3]") as "H".
-    iDestruct (own_valid with "H") as %[Hsub Hvalid]%auth_both_valid_discrete.
-    iDestruct "H" as "(H1 & H3)".
-    iFrame.
-    iPureIntro.
-    eapply gmap_of_trace_hist_valid_prefix; eauto.
-  Qed.
-
-  Lemma own_lin_add (γ : gname) (l: list val) (v : val) :
-    OwnLinTrace γ l ==∗ OwnLinTrace γ (l ++ [v]).
-  Proof.
-    rewrite /OwnLinTrace /OwnLinHist.
-    iIntros "(H1 & H2)".
-    rewrite gmap_of_trace_snoc Nat.add_0_l.
-    iMod (own_update_2 with "H1 H2") as "[H1 H2]".
-    apply auth_update.
-    eapply (alloc_local_update _ _ (length l : nat) (to_agree v)); try done.
-    { 
-      eapply not_elem_of_dom.
-      rewrite gmap_of_trace_dom.
-      intro Hfalse. 
-      lia. 
-    }
-    iModIntro. 
-    iFrame.
-  Qed.
-
-  Definition trace_lin_resources (lt t : list val) (γ : gname) : iProp Σ :=
-    ∃ (m : gmap string bool), ⌜∀ (x : string), x ∉ tags t → x ∉ (dom m)⌝ ∗ ghost_map_auth γ (1%Qp) m ∗ 
-      ∀ tag, ⌜(∃ e : val, e ∈ lt ∧ tagOfEvent e = Some tag)⌝ → ghost_map.ghost_map_elem γ tag (DfracOwn 1%Qp) true.
-  
-  Definition trace_post_resources (t : list val) (γ : gname) : iProp Σ :=
-    ∃ (m : gmap string bool), ⌜∀ (x : string), x ∉ tags t → x ∉ (dom m)⌝ ∗ ghost_map_auth γ (1%Qp) m ∗ 
-      ∀ tag, ⌜(∃ e : val, e ∈ t ∧ is_post_event e ∧ tagOfEvent e = Some tag)⌝ → ghost_map.ghost_map_elem γ tag (DfracOwn 1%Qp) true.
-
-  Definition lin_tag_res tag γ := ghost_map.ghost_map_elem γ tag (DfracOwn 1%Qp) true.
-
-  Lemma lin_tag_create lt t γ e tag : 
-    trace_lin_resources lt t γ ∗ ⌜tag ∉ tags t ∧ tagOfEvent e = Some tag ∧ ¬is_post_event e⌝ ==∗
-    trace_lin_resources lt (t ++ [e]) γ ∗ lin_tag_res tag γ.
-  Proof.
-    iIntros "((%m & %Hdom & Hghost_map & Himp) & (%Hnin & %Htag & %Hnot))".
-    assert (m !! tag = None) as Hlookup_none.
-    {
-      apply not_elem_of_dom_1.
-      by apply Hdom.
-    }
-    iMod (ghost_map_insert tag true Hlookup_none with "[$Hghost_map]") as "(Hghost_map & Hkey)".
-    iModIntro.
-    iFrame.
-    iExists (<[tag:=true]> m).
-    iFrame.
-    iPureIntro.
-    intros tag' Hnin'.
-    assert (tag' ∉ tags t) as Hnin''.
-    {
-      specialize (tags_sub e t) as Hsub.
-      set_solver.
-    }
-    specialize (Hdom tag' Hnin'').
-    rewrite dom_insert.
-    assert (tag ∈ tags (t ++ [e])) as Hin.
-    {
-      apply (tags_in e); last done.
-      set_solver.
-    }
-    set_solver.
-  Qed.
-
-  Lemma lin_tag_add lt t γ e tag : 
-    trace_lin_resources lt t γ ∗ lin_tag_res tag γ ∗ ⌜tagOfEvent e = Some tag⌝ -∗
-    trace_lin_resources (lt ++ [e]) t γ.
-  Proof.
-    iIntros "((%m & %Hdom & Hghost_map & Himp) & Hkey & %Htag)".
-    rewrite /trace_lin_resources.
-    iExists m.
-    iFrame.
-    iSplit; first by iPureIntro.
-    iIntros (tag') "%Hpure". 
-    destruct Hpure as (e' & Hin & Htag').
-    rewrite elem_of_app in Hin.
-    destruct Hin as [Hin | Hin].
-    + iApply "Himp".
-      iPureIntro.
-      by exists e'.
-    + assert (e' = e) as ->; first set_solver.
-      assert (tag = tag') as ->; first set_solver.
-      iFrame.
-  Qed.
-
-  Lemma lin_tag_add_post lt t γ e : 
-    trace_lin_resources lt t γ -∗
-    trace_lin_resources lt (t ++ [e]) γ.
-  Proof.
-    iIntros "(%m & %Hdom & Hghost_map & Himp)".
-    rewrite /trace_lin_resources.
-    iExists m.
-    iFrame.
-    iPureIntro.
-    intros tag Hnin.
-    apply Hdom.
-    specialize (tags_sub e t) as Hsub.
-    set_solver.
-  Qed.
-
-  Lemma lin_tag_not_in lt t γ tag : 
-    trace_lin_resources lt t γ ∗ lin_tag_res tag γ -∗ ¬⌜(∃ e : val, e ∈ lt ∧ tagOfEvent e = Some tag)⌝.
-  Proof.
-    iIntros "((%m & %Hdom & Hghost_map & Himp) & Hkey)".
-    iIntros "Hfalse".
-    iDestruct ("Himp" with "[$Hfalse]") as "Hfalse".
-    rewrite /lin_tag_res.
-    iCombine "Hkey" "Hfalse" as "Hfalse".
-    iDestruct (ghost_map_elem_valid with "Hfalse") as "%Hfalse".
-    by rewrite dfrac_valid_own in Hfalse.
-  Qed.
-
-  Definition post_tag_res tag γ := ghost_map.ghost_map_elem γ tag (DfracOwn 1%Qp) true.
-
-  Lemma post_tag_create t γ e tag : 
-    trace_post_resources t γ ∗ ⌜tag ∉ tags t ∧ tagOfEvent e = Some tag ∧ ¬is_post_event e⌝ ==∗
-    trace_post_resources (t ++ [e]) γ ∗ post_tag_res tag γ.
-  Proof.
-    iIntros "((%m & %Hdom & Hghost_map & Himp) & (%Hnin & %Htag & %Hnot))".
-    assert (m !! tag = None) as Hlookup_none.
-    {
-      apply not_elem_of_dom_1.
-      by apply Hdom.
-    }
-    iMod (ghost_map_insert tag true Hlookup_none with "[$Hghost_map]") as "(Hghost_map & Hkey)".
-    iModIntro.
-    iFrame.
-    iExists (<[tag:=true]> m).
-    iFrame.
-    iSplitR.
-    - iPureIntro.
-      intros tag' Hnin'.
-      assert (tag' ∉ tags t) as Hnin''.
-      {
-        specialize (tags_sub e t) as Hsub.
-        set_solver.
-      }
-      specialize (Hdom tag' Hnin'').
-      rewrite dom_insert.
-      assert (tag ∈ tags (t ++ [e])) as Hin.
-      {
-        apply (tags_in e); last done.
-        set_solver.
-      }
-      set_solver.
-    - iIntros (tag') "%Hpure".
-      iApply "Himp".
-      iPureIntro.
-      destruct Hpure as (e' & Hin & Hevent & Htag').
-      exists e'.
-      rewrite elem_of_app in Hin.
-      destruct Hin as [Hin | Hin]; first done.
-      assert (e = e') as ->; set_solver.
-  Qed.
-
-  Lemma post_tag_add t γ e tag : 
-    trace_post_resources t γ ∗ post_tag_res tag γ ∗ ⌜tagOfEvent e = Some tag ∧ is_post_event e⌝ -∗
-    trace_post_resources (t ++ [e]) γ.
-  Proof.
-    iIntros "((%m & %Hdom & Hghost_map & Himp) & Hkey & %Htag)".
-    rewrite /trace_post_resources.
-    iExists m.
-    iFrame.
-    iSplit.
-    - iPureIntro.
-      intros tag' Hin.
-      apply Hdom.
-      specialize(tags_sub e t) as Hsub.
-      set_solver.
-    - iIntros (tag') "%Hpure". 
-      destruct Hpure as (e' & Hin & Htag').
-      rewrite elem_of_app in Hin.
-      destruct Hin as [Hin | Hin].
-      + iApply "Himp".
-        iPureIntro.
-        by exists e'.
-      + assert (e' = e) as ->; first set_solver.
-        assert (tag = tag') as ->; first set_solver.
-        iFrame.
-    Qed.
-
-  Lemma post_tag_not_in t γ tag : 
-    trace_post_resources t γ ∗ post_tag_res tag γ -∗ ¬⌜(∃ e : val, e ∈ t ∧ is_post_event e ∧ tagOfEvent e = Some tag)⌝.
-  Proof.
-    iIntros "((%m & %Hdom & Hghost_map & Himp) & Hkey)".
-    iIntros "Hfalse".
-    iDestruct ("Himp" with "[$Hfalse]") as "Hfalse".
-    rewrite /lin_tag_res.
-    iCombine "Hkey" "Hfalse" as "Hfalse".
-    iDestruct (ghost_map_elem_valid with "Hfalse") as "%Hfalse".
-    by rewrite dfrac_valid_own in Hfalse.
-  Qed.
-
-  (** Predicates for wrapped resources *)
-
-  Definition open_trans (t : transaction) (c : val) (T : list transaction) : Prop :=
-    ∃ op, t ∈ T ∧ last t = Some op ∧ connOfOp op = c ∧ (¬is_cm_op op).
-
-  Definition latest_write (c : val) (k : Key) (ov : option val) (T : list transaction) : Prop := 
-    (ov = None ∧ (∀ t, open_trans t c T → ¬ ∃ v s, (Wr s k v) ∈ t)) ∨
-    (∃ v t tag, ov = Some v ∧ open_trans t c T ∧ (Wr (tag, c) k v) ∈ t ∧
-      (∀ op, op ∈ t → (∃ s' v', op = Wr s' k v' ∧ op ≠ Wr (tag, c) k v) → rel_list t op (Wr (tag, c) k v))).
-
-  Definition tag_eq (e1 e2 : val) : Prop := ∃ tag, tagOfEvent e1 = Some tag ∧ tagOfEvent e2 = Some tag.
-
-  Definition no_emit_with_address (sa : socket_address) (ltrace : list val) `(res : !RU_resources Mdl Σ)  : Prop := 
-    ¬∃ e c, e ∈ ltrace ∧ connOfEvent e = Some c ∧ extract c = Some #sa.
-
-  Definition active_trace_resources lt T s c γ (m : gmap Key (option val)) : iProp Σ :=
-    ∃ domain sub_domain tail, ⌜s = Active domain⌝ ∗ 
-      ⌜sub_domain = domain ∩ KVS_keys⌝ ∗ ⌜open_start c lt tail⌝ ∗ 
-      ([∗ set] k ∈ KVS_keys ∖ sub_domain, ∃ ov, ghost_map_elem γ k (DfracOwn 1%Qp) ov) ∗ 
-      (∀ k, ⌜k ∈ sub_domain⌝ → ∀ ov, ⌜m !! k = Some ov⌝ → ⌜latest_write c k ov T⌝).
-
-  Definition inactive_trace_resources lt T s c γ : iProp Σ :=
-    ⌜s = CanStart⌝ ∗ ⌜commit_closed c lt⌝ ∗ ⌜¬∃ t, open_trans t c T⌝ ∗
-    ([∗ set] k ∈ KVS_keys, ∃ ov, ghost_map_elem γ k (DfracOwn 1%Qp) ov).
-
-  Definition initialized_trace_resources lt T sa γmname `(res : !RU_resources Mdl Σ)
-  (mstate : gmap socket_address (local_state * option val)) : iProp Σ :=
-    ∃ s c γ (m : gmap Key (option val)), ⌜mstate !! sa = Some (s, Some c)⌝ ∗
-      ⌜extract c = Some #(LitSocketAddress sa)⌝ ∗ 
-      ghost_map_elem γmname sa DfracDiscarded (γ, c) ∗ 
-      ghost_map_auth γ (1%Qp) m ∗ 
-      ⌜(∃ e, e ∈ lt ∧ connOfEvent e = Some c ∧ is_in_lin_event e)⌝ ∗ 
-      (inactive_trace_resources lt T s c γ ∨ active_trace_resources lt T s c γ m).
-
-  Definition unnitialized_trace_resources sa (mstate : gmap socket_address (local_state * option val)) 
-  (mname : gmap socket_address (gname * val)) lt `(res : !RU_resources Mdl Σ) : Prop := 
-    (mstate !! sa = None ∨ mstate !! sa = Some (CanStart, None)) ∧ 
-    (¬∃ p, mname !! sa = Some p) ∧ no_emit_with_address sa lt res.
-
-  Definition client_trace_state_resources (lt : list val) (T : list transaction) (sa : socket_address) 
-  (γmstate γmname : gname) `(res : !RU_resources Mdl Σ)  (mstate : gmap socket_address (local_state * option val)) 
-  (mname : gmap socket_address (gname * val)) : iProp Σ := 
-    ⌜unnitialized_trace_resources sa mstate mname lt res⌝ ∨ initialized_trace_resources lt T sa γmname res mstate.
-
-  Definition trace_state_resources (lt : list val) (T : list transaction) (γmstate γmname : gname) 
-  (clients : gset socket_address) `(res : !RU_resources Mdl Σ) : iProp Σ := 
-    ∃ (mstate : gmap socket_address (local_state * option val)), ghost_map_auth γmstate (1%Qp) mstate ∗ 
-      ∃ (mname : gmap socket_address (gname * val)), ghost_map_auth γmname (1%Qp) mname ∗ 
-        ([∗ set] sa ∈ clients, client_trace_state_resources lt T sa γmstate γmname res mstate mname).
-
-  Definition GlobalInvExt `(res : !RU_resources Mdl Σ) (γmstate γmlin γmpost γmname γl : gname) (clients : gset socket_address) : iProp Σ := 
-    ∃ t lt T, trace_is t ∗ OwnLinTrace γl lt ∗ ⌜lin_trace_of lt t⌝ ∗ ⌜∀ t, t ∈ T → t ≠ []⌝ ∗
-      ⌜extraction_of lt T⌝ ∗ ⌜valid_transactions T⌝ ∗ ⌜valid_sequence lt⌝ ∗
-      trace_state_resources lt T γmstate γmname clients res ∗
-      trace_lin_resources lt t γmlin ∗
-      trace_post_resources t γmpost.
 
   (** Wrapped resources *)
 
   Global Program Instance wrapped_resources (γmstate γmlin γmpost γmname γl : gname) (clients : gset socket_address) 
   `(res : !RU_resources Mdl Σ) : RU_resources Mdl Σ :=
     {|
-      GlobalInv := (GlobalInv ∗ trace_inv trace_inv_name valid_trace_ru ∗ inv KVS_InvName (GlobalInvExt res γmstate γmlin γmpost γmname γl clients))%I;
+      GlobalInv := (GlobalInv ∗ trace_inv trace_inv_name valid_trace_ru ∗ inv KVS_InvName (GlobalInvExt extract γmstate γmlin γmpost γmname γl clients))%I;
       OwnMemKey k V := (OwnMemKey k V  ∗ (∀ v, ⌜v ∈ V⌝ → ∃ lh tag c, OwnLinHist γl lh ∗ 
                         ⌜(#(LitString tag), (c, (#"WrLin", (#(LitString k), v))))%V ∈ lh⌝))%I;
       OwnLocalKey k c ov := (OwnLocalKey k c ov ∗ ∃ (sa : socket_address) γ, ghost_map_elem γmname sa DfracDiscarded (γ, c) ∗ 
@@ -351,7 +70,7 @@ Section trace_proof.
 
   (** Helper lemmas *)
 
-  Lemma commit_closed_neq `(res : !RU_resources Mdl Σ) sa sa' c c' lt e : 
+  Lemma commit_closed_neq (extract : val → option val) sa sa' c c' lt e : 
     sa ≠ sa' →
     extract c = Some #sa →
     extract c' = Some #sa' →
@@ -374,7 +93,7 @@ Section trace_proof.
     split_and!; try done; apply (rel_list_last_neq lt _ _ e); set_solver.
   Qed.
 
-  Lemma open_start_neq `(res : !RU_resources Mdl Σ) sa sa' c c' lt tail e : 
+  Lemma open_start_neq (extract : val → option val) sa sa' c c' lt tail e : 
     sa ≠ sa' →
     extract c = Some #sa →
     extract c' = Some #sa' →
@@ -401,7 +120,7 @@ Section trace_proof.
     by do 2 rewrite -app_assoc.
   Qed.
 
-  Lemma open_trans_neq1 `(res : !RU_resources Mdl Σ) sa sa' c c' t T op : 
+  Lemma open_trans_neq1 (extract : val → option val) sa sa' c c' t T op : 
     sa ≠ sa' →
     extract c = Some #sa →
     extract c' = Some #sa' →
@@ -414,7 +133,7 @@ Section trace_proof.
     set_solver.
   Qed.
 
-  Lemma open_trans_neq2 `(res : !RU_resources Mdl Σ) sa sa' c c' t T op : 
+  Lemma open_trans_neq2 (extract : val → option val) sa sa' c c' t T op : 
     sa ≠ sa' →
     extract c = Some #sa →
     extract c' = Some #sa' →
@@ -427,7 +146,7 @@ Section trace_proof.
     set_solver.
   Qed.
 
- Lemma open_trans_neq3 `(res : !RU_resources Mdl Σ) sa sa' c c' t T1 T2 trans op : 
+ Lemma open_trans_neq3 (extract : val → option val) sa sa' c c' t T1 T2 trans op : 
     sa ≠ sa' →
     extract c = Some #sa →
     extract c' = Some #sa' →
@@ -448,7 +167,7 @@ Section trace_proof.
     set_solver.
   Qed.
 
-   Lemma open_trans_neq4 `(res : !RU_resources Mdl Σ) sa sa' c c' t T1 T2 trans op : 
+   Lemma open_trans_neq4 (extract : val → option val) sa sa' c c' t T1 T2 trans op : 
     sa ≠ sa' →
     extract c = Some #sa →
     extract c' = Some #sa' →
@@ -473,7 +192,7 @@ Section trace_proof.
     set_solver.
   Qed.
 
-  Lemma latest_neq1 `(res : !RU_resources Mdl Σ) sa sa' c c' T op k v : 
+  Lemma latest_neq1 (extract : val → option val) sa sa' c c' T op k v : 
     sa ≠ sa' →
     extract c = Some #sa →
     extract c' = Some #sa' →
@@ -493,7 +212,7 @@ Section trace_proof.
       by eapply open_trans_neq2 in Hopen.
   Qed.
 
-  Lemma latest_neq2 `(res : !RU_resources Mdl Σ) sa sa' c c' T1 T2 trans op k v : 
+  Lemma latest_neq2 (extract : val → option val) sa sa' c c' T1 T2 trans op k v : 
     sa ≠ sa' →
     extract c = Some #sa →
     extract c' = Some #sa' →
@@ -566,7 +285,7 @@ Section trace_proof.
         rewrite /is_cm_op; set_solver.
   Qed.
 
-  Lemma latest_write_preserve `(res : !RU_resources Mdl Σ) tag c T1 T2 trans k k' v ov : 
+  Lemma latest_write_preserve tag c T1 T2 trans k k' v ov : 
     k ≠ k' →
     valid_transactions (T1 ++ trans :: T2) →
     (∃ op, op ∈ trans ∧ last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) →
@@ -634,9 +353,9 @@ Section trace_proof.
   Qed.
 
   Lemma unique_init_events_add_init (lt t : list val) (tag : string) (c : val) 
-  (sa : socket_address) (res : RU_resources Mdl Σ) :
+  (sa : socket_address) (extract : val → option val) :
     extract c = Some #sa →
-    no_emit_with_address sa lt res →
+    no_emit_with_address sa lt extract →
     unique_init_events lt →
     unique_init_events (lt ++ [(#tag, (c, #"InLin"))%V]).
   Proof.
@@ -673,12 +392,12 @@ Section trace_proof.
   Qed.
 
   Lemma unnitialized_trace_resources_neq1 (sa sa' : socket_address) lt c le mstate mname 
-  (res : RU_resources Mdl Σ) :
+  (extract : val → option val) :
     connOfEvent le = Some c →
     sa ≠ sa' →
     extract c = Some #sa →
-    unnitialized_trace_resources sa' mstate mname lt res →
-    unnitialized_trace_resources sa' mstate mname (lt ++ [le]) res.
+    unnitialized_trace_resources sa' mstate mname lt extract →
+    unnitialized_trace_resources sa' mstate mname (lt ++ [le]) extract.
   Proof.
     intros Hconn Hneq Hextract (Hunit1 & Hunit2 & Hunit3).
     split_and!; try done.
@@ -689,12 +408,12 @@ Section trace_proof.
   Qed.
 
   Lemma unnitialized_trace_resources_neq2 (sa sa' : socket_address) lt c le mstate mname 
-  (res : RU_resources Mdl Σ) p :
+  (extract : val → option val) p :
     connOfEvent le = Some c →
     sa ≠ sa' →
     extract c = Some #sa →
-    unnitialized_trace_resources sa' mstate mname lt res →
-    unnitialized_trace_resources sa' (<[sa:=p]> mstate) mname (lt ++ [le]) res.
+    unnitialized_trace_resources sa' mstate mname lt extract →
+    unnitialized_trace_resources sa' (<[sa:=p]> mstate) mname (lt ++ [le]) extract.
   Proof.
     intros Hconn Hneq Hextract (Hunit1 & Hunit2 & Hunit3).
     split_and!; try done.
@@ -706,12 +425,12 @@ Section trace_proof.
   Qed.
 
   Lemma unnitialized_trace_resources_neq3 (sa sa' : socket_address) lt c le mstate mname 
-  (res : RU_resources Mdl Σ) p1 p2 :
+  (extract : val → option val) p1 p2 :
     connOfEvent le = Some c →
     sa ≠ sa' →
     extract c = Some #sa →
-    unnitialized_trace_resources sa' mstate mname lt res →
-    unnitialized_trace_resources sa' (<[sa:=p1]> mstate) (<[sa:=p2]> mname) (lt ++ [le]) res.
+    unnitialized_trace_resources sa' mstate mname lt extract →
+    unnitialized_trace_resources sa' (<[sa:=p1]> mstate) (<[sa:=p2]> mname) (lt ++ [le]) extract.
   Proof.
     intros Hconn Hneq Hextract (Hunit1 & Hunit2 & Hunit3).
     split_and!; try done.
@@ -724,12 +443,12 @@ Section trace_proof.
   Qed.
 
   Lemma initialized_trace_resources_neq1 (sa sa' : socket_address) c le lt T
-  γmname mstate (res : RU_resources Mdl Σ) :
+  γmname mstate (extract : val → option val) :
     ⌜sa ≠ sa'⌝ -∗
     ⌜extract c = Some #sa⌝ -∗
     ⌜connOfEvent le = Some c⌝ -∗
-    initialized_trace_resources lt T sa' γmname res mstate -∗
-    initialized_trace_resources  (lt ++ [le]) T sa' γmname res mstate.
+    initialized_trace_resources lt T sa' γmname extract mstate -∗
+    initialized_trace_resources  (lt ++ [le]) T sa' γmname extract mstate.
   Proof.
     iIntros (Hneq Hextract Hconn) "Hres".
     iDestruct "Hres" as "(%s & %c' & %γ & %m & %Heq_lookup & %Hextract' & 
@@ -766,12 +485,12 @@ Section trace_proof.
   Qed.
 
   Lemma initialized_trace_resources_neq2 (sa sa' : socket_address) c le lt T
-  γmname mstate p (res : RU_resources Mdl Σ) :
+  γmname mstate p (extract : val → option val) :
     ⌜sa ≠ sa'⌝ -∗
     ⌜extract c = Some #sa⌝ -∗
     ⌜connOfEvent le = Some c⌝ -∗
-    initialized_trace_resources lt T sa' γmname res mstate -∗
-    initialized_trace_resources  (lt ++ [le]) T sa' γmname res (<[sa:=p]> mstate).
+    initialized_trace_resources lt T sa' γmname extract mstate -∗
+    initialized_trace_resources  (lt ++ [le]) T sa' γmname extract (<[sa:=p]> mstate).
   Proof.
     iIntros (Hneq Hextract Hconn) "Hres".
     rewrite /initialized_trace_resources.
@@ -780,13 +499,13 @@ Section trace_proof.
   Qed.
 
   Lemma initialized_trace_resources_neq3 (sa sa' : socket_address) op c le lt T
-  γmname mstate (res : RU_resources Mdl Σ) :
+  γmname mstate (extract : val → option val) :
     ⌜sa ≠ sa'⌝ -∗
     ⌜extract c = Some #sa⌝ -∗
     ⌜connOfEvent le = Some c⌝ -∗
     ⌜connOfOp op = c⌝ -∗
-    initialized_trace_resources lt T sa' γmname res mstate -∗
-    initialized_trace_resources  (lt ++ [le]) (T ++ [[op]]) sa' γmname res mstate.
+    initialized_trace_resources lt T sa' γmname extract mstate -∗
+    initialized_trace_resources  (lt ++ [le]) (T ++ [[op]]) sa' γmname extract mstate.
   Proof.
     iIntros (Hneq Hextract Hconn Hconn') "Hres".
     iDestruct "Hres" as "(%s & %c' & %γ & %m & %Heq_lookup & %Hextract' & 
@@ -828,14 +547,14 @@ Section trace_proof.
   Qed.
 
   Lemma initialized_trace_resources_neq4 (sa sa' : socket_address) op c le lt T1 T2 trans
-  γmname mstate (res : RU_resources Mdl Σ) :
+  γmname mstate (extract : val → option val) :
     ⌜sa ≠ sa'⌝ -∗
     ⌜extract c = Some #sa⌝ -∗
     ⌜connOfEvent le = Some c⌝ -∗
     ⌜connOfOp op = c⌝ -∗
     ⌜(∃ op : operation, op ∈ trans ∧ last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false)⌝ -∗
-    initialized_trace_resources lt (T1 ++ trans :: T2) sa' γmname res mstate -∗
-    initialized_trace_resources  (lt ++ [le]) (T1 ++ (trans ++ [op]) :: T2) sa' γmname res mstate.
+    initialized_trace_resources lt (T1 ++ trans :: T2) sa' γmname extract mstate -∗
+    initialized_trace_resources  (lt ++ [le]) (T1 ++ (trans ++ [op]) :: T2) sa' γmname extract mstate.
   Proof.
     iIntros (Hneq Hextract Hconn Hconn' Hop) "Hres".
     iDestruct "Hres" as "(%s & %c' & %γ & %m & %Heq_lookup & %Hextract' & 
@@ -877,13 +596,13 @@ Section trace_proof.
   Qed.
 
   Lemma initialized_trace_resources_neq5 (sa sa' : socket_address) c le lt T op
-  γmname mstate p (res : RU_resources Mdl Σ) :
+  γmname mstate p (extract : val → option val) :
     ⌜sa ≠ sa'⌝ -∗
     ⌜extract c = Some #sa⌝ -∗
     ⌜connOfEvent le = Some c⌝ -∗
     ⌜connOfOp op = c⌝ -∗
-    initialized_trace_resources lt T sa' γmname res mstate -∗
-    initialized_trace_resources  (lt ++ [le]) (T ++ [[op]]) sa' γmname res (<[sa:=p]> mstate).
+    initialized_trace_resources lt T sa' γmname extract mstate -∗
+    initialized_trace_resources  (lt ++ [le]) (T ++ [[op]]) sa' γmname extract (<[sa:=p]> mstate).
   Proof.
     iIntros (Hneq Hextract Hconn_le Hconn_op) "Hres".
     rewrite /initialized_trace_resources.
@@ -892,14 +611,14 @@ Section trace_proof.
   Qed.
 
   Lemma initialized_trace_resources_neq6 (sa sa' : socket_address) c le lt T1 T2 trans op
-  γmname mstate p (res : RU_resources Mdl Σ) :
+  γmname mstate p (extract : val → option val) :
     ⌜sa ≠ sa'⌝ -∗
     ⌜extract c = Some #sa⌝ -∗
     ⌜connOfEvent le = Some c⌝ -∗
     ⌜connOfOp op = c⌝ -∗
     ⌜(∃ op : operation, op ∈ trans ∧ last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false)⌝ -∗
-    initialized_trace_resources lt (T1 ++ trans :: T2) sa' γmname res mstate -∗
-    initialized_trace_resources (lt ++ [le]) (T1 ++ (trans ++ [op]) :: T2) sa' γmname res (<[sa:=p]> mstate).
+    initialized_trace_resources lt (T1 ++ trans :: T2) sa' γmname extract mstate -∗
+    initialized_trace_resources (lt ++ [le]) (T1 ++ (trans ++ [op]) :: T2) sa' γmname extract (<[sa:=p]> mstate).
   Proof.
     iIntros (Hneq Hextract Hconn_le Hconn_op Hop) "Hres".
     rewrite /initialized_trace_resources.
@@ -908,13 +627,13 @@ Section trace_proof.
   Qed.
 
   Lemma client_trace_state_resources_neq1 (sa sa' : socket_address) T op c le lt 
-  γstate γmname mstate mname (res : RU_resources Mdl Σ) :
+  γstate γmname mstate mname (extract : val → option val) :
     ⌜sa ≠ sa'⌝ -∗
     ⌜extract c = Some #sa⌝ -∗
     ⌜connOfEvent le = Some c⌝ -∗
     ⌜connOfOp op = c⌝ -∗
-    client_trace_state_resources lt T sa' γstate γmname res mstate mname -∗
-    client_trace_state_resources (lt ++ [le]) (T ++ [[op]]) sa' γstate γmname res mstate mname.
+    client_trace_state_resources lt T sa' γstate γmname extract mstate mname -∗
+    client_trace_state_resources (lt ++ [le]) (T ++ [[op]]) sa' γstate γmname extract mstate mname.
   Proof.
     iIntros (Hneq Hextract Hconn Hconn') "Hres".
     iDestruct "Hres" as "[%Hres|Hres]".
@@ -926,12 +645,12 @@ Section trace_proof.
   Qed.
 
   Lemma client_trace_state_resources_neq2 (sa sa' : socket_address) c le lt T 
-  γstate γmname mstate mname p (res : RU_resources Mdl Σ) :
+  γstate γmname mstate mname p (extract : val → option val) :
     ⌜sa ≠ sa'⌝ -∗
     ⌜extract c = Some #sa⌝ -∗
     ⌜connOfEvent le = Some c⌝ -∗
-    client_trace_state_resources lt T sa' γstate γmname res mstate mname -∗
-    client_trace_state_resources (lt ++ [le]) T sa' γstate γmname res (<[sa:=p]> mstate) mname.
+    client_trace_state_resources lt T sa' γstate γmname extract mstate mname -∗
+    client_trace_state_resources (lt ++ [le]) T sa' γstate γmname extract (<[sa:=p]> mstate) mname.
   Proof.
     iIntros (Hneq Hextract Hconn) "Hres".
     iDestruct "Hres" as "[%Hres|Hres]".
@@ -943,12 +662,12 @@ Section trace_proof.
   Qed.
 
   Lemma client_trace_state_resources_neq3 (sa sa' : socket_address) c le lt T
-  γstate γmname mstate mname p1 p2 (res : RU_resources Mdl Σ) :
+  γstate γmname mstate mname p1 p2 (extract : val → option val) :
     ⌜sa ≠ sa'⌝ -∗
     ⌜extract c = Some #sa⌝ -∗
     ⌜connOfEvent le = Some c⌝ -∗
-    client_trace_state_resources lt T sa' γstate γmname res mstate mname -∗
-    client_trace_state_resources (lt ++ [le]) T sa' γstate γmname res (<[sa:=p1]> mstate) (<[sa:=p2]> mname).
+    client_trace_state_resources lt T sa' γstate γmname extract mstate mname -∗
+    client_trace_state_resources (lt ++ [le]) T sa' γstate γmname extract (<[sa:=p1]> mstate) (<[sa:=p2]> mname).
   Proof.
     iIntros (Hneq Hextract Hconn) "Hres".
     iDestruct "Hres" as "[%Hres|Hres]".
@@ -960,14 +679,14 @@ Section trace_proof.
   Qed.
 
   Lemma client_trace_state_resources_neq4 (sa sa' : socket_address) T1 T2 trans op c le lt 
-  γstate γmname mstate mname (res : RU_resources Mdl Σ) :
+  γstate γmname mstate mname (extract : val → option val) :
     ⌜sa ≠ sa'⌝ -∗
     ⌜extract c = Some #sa⌝ -∗
     ⌜connOfEvent le = Some c⌝ -∗
     ⌜connOfOp op = c⌝ -∗
     ⌜(∃ op : operation, op ∈ trans ∧ last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false)⌝ -∗
-    client_trace_state_resources lt (T1 ++ trans :: T2) sa' γstate γmname res mstate mname -∗
-    client_trace_state_resources (lt ++ [le]) (T1 ++ (trans ++ [op]) :: T2) sa' γstate γmname res mstate mname.
+    client_trace_state_resources lt (T1 ++ trans :: T2) sa' γstate γmname extract mstate mname -∗
+    client_trace_state_resources (lt ++ [le]) (T1 ++ (trans ++ [op]) :: T2) sa' γstate γmname extract mstate mname.
   Proof.
     iIntros (Hneq Hextract Hconn Hconn' Hop) "Hres".
     iDestruct "Hres" as "[%Hres|Hres]".
@@ -979,13 +698,13 @@ Section trace_proof.
   Qed.
 
   Lemma client_trace_state_resources_neq5 (sa sa' : socket_address) c le lt T op
-  γstate γmname mstate mname p (res : RU_resources Mdl Σ) :
+  γstate γmname mstate mname p (extract : val → option val) :
     ⌜sa ≠ sa'⌝ -∗
     ⌜extract c = Some #sa⌝ -∗
     ⌜connOfEvent le = Some c⌝ -∗
     ⌜connOfOp op = c⌝ -∗
-    client_trace_state_resources lt T sa' γstate γmname res mstate mname -∗
-    client_trace_state_resources (lt ++ [le]) (T ++ [[op]]) sa' γstate γmname res (<[sa:=p]> mstate) mname.
+    client_trace_state_resources lt T sa' γstate γmname extract mstate mname -∗
+    client_trace_state_resources (lt ++ [le]) (T ++ [[op]]) sa' γstate γmname extract (<[sa:=p]> mstate) mname.
   Proof.
     iIntros (Hneq Hextract Hconn_le Hconn_op) "Hres".
     iDestruct "Hres" as "[%Hres|Hres]".
@@ -997,14 +716,14 @@ Section trace_proof.
   Qed.
 
   Lemma client_trace_state_resources_neq6 (sa sa' : socket_address) c le lt T1 T2 trans op
-  γstate γmname mstate mname p (res : RU_resources Mdl Σ) :
+  γstate γmname mstate mname p (extract : val → option val) :
     ⌜sa ≠ sa'⌝ -∗
     ⌜extract c = Some #sa⌝ -∗
     ⌜connOfEvent le = Some c⌝ -∗
     ⌜connOfOp op = c⌝ -∗
     ⌜(∃ op : operation, op ∈ trans ∧ last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false)⌝ -∗
-    client_trace_state_resources lt (T1 ++ trans :: T2) sa' γstate γmname res mstate mname -∗
-    client_trace_state_resources (lt ++ [le]) (T1 ++ (trans ++ [op]) :: T2) sa' γstate γmname res (<[sa:=p]> mstate) mname.
+    client_trace_state_resources lt (T1 ++ trans :: T2) sa' γstate γmname extract mstate mname -∗
+    client_trace_state_resources (lt ++ [le]) (T1 ++ (trans ++ [op]) :: T2) sa' γstate γmname extract (<[sa:=p]> mstate) mname.
   Proof.
     iIntros (Hneq Hextract Hconn_le Hconn_op Hop) "Hres".
     iDestruct "Hres" as "[%Hres|Hres]".
@@ -1016,7 +735,7 @@ Section trace_proof.
   Qed.
 
   Lemma trace_state_resources_read_lin1 (clients : gset socket_address) (c : val) (tag : string) (lt : list val) (T : list transaction)
-  (k : Key) (sa : socket_address) (wo : option val) (s : local_state) (γ γmstate γmname : gname) (res : RU_resources Mdl Σ) 
+  (k : Key) (sa : socket_address) (wo : option val) (s : local_state) (γ γmstate γmname : gname) (extract : val → option val) 
   (mstate : gmap socket_address (local_state * option val)) (mname : gmap socket_address (gname * val)) (m : gmap Key (option val)) :
     ⌜mstate !! sa = Some (s, Some c)⌝ -∗ 
     ⌜extract c = Some #sa⌝ -∗ 
@@ -1029,10 +748,10 @@ Section trace_proof.
     ghost_map_auth γmstate 1 mstate -∗
     ghost_map_auth γmname 1 mname -∗
     ghost_map_auth γ 1 m -∗
-    ([∗ set] y ∈ (clients ∖ {[sa]}), ⌜unnitialized_trace_resources y mstate mname lt res⌝
-      ∨ initialized_trace_resources lt T y γmname res mstate) -∗
+    ([∗ set] y ∈ (clients ∖ {[sa]}), ⌜unnitialized_trace_resources y mstate mname lt extract⌝
+      ∨ initialized_trace_resources lt T y γmname extract mstate) -∗
     active_trace_resources lt T s c γ m -∗
-    trace_state_resources (lt ++ [(#tag, (c, (#"RdLin", (#k, $wo))))%V]) (T ++ [[Rd (tag, c) k wo]]) γmstate γmname clients res.
+    trace_state_resources (lt ++ [(#tag, (c, (#"RdLin", (#k, $wo))))%V]) (T ++ [[Rd (tag, c) k wo]]) γmstate γmname clients extract.
   Proof.
     iIntros (Hlookup Hextract Heq_sa_clients Hdec) "#Hinit_in #Hpers_pointer Hmap_mstate Hmap_mname Hmap_m Hdisj_trace_res Htrace_res".
     iExists mstate.
@@ -1104,7 +823,7 @@ Section trace_proof.
 
   Lemma trace_state_resources_read_lin2 (clients : gset socket_address) (c : val) (tag : string) (lt : list val) 
   (T1 T2 : list transaction) (trans : transaction)
-  (k : Key) (sa : socket_address) (wo : option val) (s : local_state) (γ γmstate γmname : gname) (res : RU_resources Mdl Σ) 
+  (k : Key) (sa : socket_address) (wo : option val) (s : local_state) (γ γmstate γmname : gname) (extract : val → option val) 
   (mstate : gmap socket_address (local_state * option val)) (mname : gmap socket_address (gname * val)) (m : gmap Key (option val)) :
     ⌜mstate !! sa = Some (s, Some c)⌝ -∗ 
     ⌜extract c = Some #sa⌝ -∗ 
@@ -1118,10 +837,10 @@ Section trace_proof.
     ghost_map_auth γmstate 1 mstate -∗
     ghost_map_auth γmname 1 mname -∗
     ghost_map_auth γ 1 m -∗
-    ([∗ set] y ∈ (clients ∖ {[sa]}), ⌜unnitialized_trace_resources y mstate mname lt res⌝
-      ∨ initialized_trace_resources lt (T1 ++ trans :: T2) y γmname res mstate) -∗
+    ([∗ set] y ∈ (clients ∖ {[sa]}), ⌜unnitialized_trace_resources y mstate mname lt extract⌝
+      ∨ initialized_trace_resources lt (T1 ++ trans :: T2) y γmname extract mstate) -∗
     active_trace_resources lt (T1 ++ trans :: T2) s c γ m -∗
-    trace_state_resources (lt ++ [(#tag, (c, (#"RdLin", (#k, $wo))))%V]) (T1 ++ (trans ++ [Rd (tag, c) k wo]) :: T2) γmstate γmname clients res.
+    trace_state_resources (lt ++ [(#tag, (c, (#"RdLin", (#k, $wo))))%V]) (T1 ++ (trans ++ [Rd (tag, c) k wo]) :: T2) γmstate γmname clients extract.
   Proof.
     iIntros (Hlookup Hextract Heq_sa_clients Hdec Hop) "#Hinit_in #Hpers_pointer Hmap_mstate Hmap_mname Hmap_m Hdisj_trace_res Htrace_res".
     iExists mstate.
@@ -1216,7 +935,7 @@ Section trace_proof.
   Qed.
 
   Lemma trace_state_resources_write_lin1 (clients : gset socket_address) (c : val) (tag : string) (lt : list val) (T : list transaction)
-  (k : Key) (v : val) (sa : socket_address) (s : local_state) (γ γmstate γmname : gname) (res : RU_resources Mdl Σ) 
+  (k : Key) (v : val) (sa : socket_address) (s : local_state) (γ γmstate γmname : gname) (extract : val → option val) 
   (mstate : gmap socket_address (local_state * option val)) (mname : gmap socket_address (gname * val)) (m : gmap Key (option val)) :
     ⌜mstate !! sa = Some (s, Some c)⌝ -∗ 
     ⌜extract c = Some #sa⌝ -∗ 
@@ -1229,10 +948,10 @@ Section trace_proof.
     ghost_map_auth γmstate 1 mstate -∗
     ghost_map_auth γmname 1 mname -∗
     ghost_map_auth γ 1 (<[k:=Some v]> m) -∗
-    ([∗ set] y ∈ (clients ∖ {[sa]}), ⌜unnitialized_trace_resources y mstate mname lt res⌝
-      ∨ initialized_trace_resources lt T y γmname res mstate) -∗
+    ([∗ set] y ∈ (clients ∖ {[sa]}), ⌜unnitialized_trace_resources y mstate mname lt extract⌝
+      ∨ initialized_trace_resources lt T y γmname extract mstate) -∗
     active_trace_resources lt T s c γ m -∗
-    trace_state_resources (lt ++ [(#tag, (c, (#"WrLin", (#k, v))))%V]) (T ++ [[Wr (tag, c) k v]]) γmstate γmname clients res.
+    trace_state_resources (lt ++ [(#tag, (c, (#"WrLin", (#k, v))))%V]) (T ++ [[Wr (tag, c) k v]]) γmstate γmname clients extract.
   Proof.
     iIntros (Hlookup Hextract Heq_sa_clients Hdec) "#Hinit_in #Hpers_pointer Hmap_mstate Hmap_mname Hmap_m Hdisj_trace_res Htrace_res".
     iExists mstate.
@@ -1309,7 +1028,7 @@ Section trace_proof.
   Qed.
 
   Lemma trace_state_resources_write_lin2 (clients : gset socket_address) (c : val) (tag : string) (lt : list val) (T1 T2 : list transaction)
-  (trans : transaction) (k : Key) (v : val) (sa : socket_address) (s : local_state) (γ γmstate γmname : gname) (res : RU_resources Mdl Σ) 
+  (trans : transaction) (k : Key) (v : val) (sa : socket_address) (s : local_state) (γ γmstate γmname : gname) (extract : val → option val) 
   (mstate : gmap socket_address (local_state * option val)) (mname : gmap socket_address (gname * val)) (m : gmap Key (option val)) :
     ⌜valid_transactions (T1 ++ trans :: T2)⌝ -∗ 
     ⌜mstate !! sa = Some (s, Some c)⌝ -∗ 
@@ -1324,10 +1043,10 @@ Section trace_proof.
     ghost_map_auth γmstate 1 mstate -∗
     ghost_map_auth γmname 1 mname -∗
     ghost_map_auth γ 1 (<[k:=Some v]> m) -∗
-    ([∗ set] y ∈ (clients ∖ {[sa]}), ⌜unnitialized_trace_resources y mstate mname lt res⌝
-      ∨ initialized_trace_resources lt (T1 ++ trans :: T2) y γmname res mstate) -∗
+    ([∗ set] y ∈ (clients ∖ {[sa]}), ⌜unnitialized_trace_resources y mstate mname lt extract⌝
+      ∨ initialized_trace_resources lt (T1 ++ trans :: T2) y γmname extract mstate) -∗
     active_trace_resources lt (T1 ++ trans :: T2) s c γ m -∗
-    trace_state_resources (lt ++ [(#tag, (c, (#"WrLin", (#k, v))))%V]) (T1 ++ (trans ++ [Wr (tag, c) k v]) :: T2) γmstate γmname clients res.
+    trace_state_resources (lt ++ [(#tag, (c, (#"WrLin", (#k, v))))%V]) (T1 ++ (trans ++ [Wr (tag, c) k v]) :: T2) γmstate γmname clients extract.
   Proof.
     iIntros (Hvalid_trans Hlookup Hextract Heq_sa_clients Hdec Hop) "#Hinit_in #Hpers_pointer Hmap_mstate Hmap_mname Hmap_m Hdisj_trace_res Htrace_res".
     iExists mstate.
@@ -1394,7 +1113,7 @@ Section trace_proof.
   Qed.
 
   Lemma trace_state_resources_commit_lin1 (clients : gset socket_address) (c : val) (tag : string) (lt : list val) (T : list transaction)
-  (sa : socket_address) (s : gset Key) (γ γmstate γmname : gname) (res : RU_resources Mdl Σ) (b : bool)
+  (sa : socket_address) (s : gset Key) (γ γmstate γmname : gname) (extract : val → option val) (b : bool)
   (mc : gmap Key (option val)) (mstate : gmap socket_address (local_state * option val)) 
   (mname : gmap socket_address (gname * val)) (m : gmap Key (option val)) :
     ⌜¬(∃ e : val, e ∈ lt ∧ tagOfEvent e = Some tag)⌝ -∗
@@ -1412,9 +1131,9 @@ Section trace_proof.
     ghost_map_auth γmstate 1 (<[sa:=(CanStart, Some c)]> mstate) -∗ 
     ghost_map_auth γmname 1 mname -∗
     ghost_map_auth γ 1 m -∗
-    ([∗ set] y ∈ (clients ∖ {[sa]}), client_trace_state_resources lt T y γmstate γmname res mstate mname) -∗
+    ([∗ set] y ∈ (clients ∖ {[sa]}), client_trace_state_resources lt T y γmstate γmname extract mstate mname) -∗
     active_trace_resources lt T (Active s) c γ m -∗
-    trace_state_resources (lt ++ [(#tag, (c, (#"CmLin", #b)))%V]) (T ++ [[Cm (tag, c) b]]) γmstate γmname clients res.
+    trace_state_resources (lt ++ [(#tag, (c, (#"CmLin", #b)))%V]) (T ++ [[Cm (tag, c) b]]) γmstate γmname clients extract.
   Proof.
     iIntros (Hnot_in Hdom_eq Hvalid_seq Hlookup Hextract Heq_sa_clients Hdec) 
       "#Hinit_in Hkeys_conn #Hsa_pointer Hmap_mstate Hmap_mname Hmap_m Hdisj_trace_res Htrace_res".
@@ -1508,7 +1227,7 @@ Section trace_proof.
   Qed.
 
   Lemma trace_state_resources_commit_lin2 (clients : gset socket_address) (c : val) (tag : string) (lt : list val) (T1 T2 : list transaction)
-  (trans : transaction) (sa : socket_address) (s : gset Key) (γ γmstate γmname : gname) (res : RU_resources Mdl Σ) (b : bool)
+  (trans : transaction) (sa : socket_address) (s : gset Key) (γ γmstate γmname : gname) (extract : val → option val) (b : bool)
   (mc : gmap Key (option val)) (mstate : gmap socket_address (local_state * option val)) 
   (mname : gmap socket_address (gname * val)) (m : gmap Key (option val)) :
     ⌜¬(∃ e : val, e ∈ lt ∧ tagOfEvent e = Some tag)⌝ -∗
@@ -1526,9 +1245,9 @@ Section trace_proof.
     ghost_map_auth γmstate 1 (<[sa:=(CanStart, Some c)]> mstate) -∗ 
     ghost_map_auth γmname 1 mname -∗
     ghost_map_auth γ 1 m -∗
-    ([∗ set] y ∈ (clients ∖ {[sa]}), client_trace_state_resources lt (T1 ++ trans :: T2) y γmstate γmname res mstate mname) -∗
+    ([∗ set] y ∈ (clients ∖ {[sa]}), client_trace_state_resources lt (T1 ++ trans :: T2) y γmstate γmname extract mstate mname) -∗
     active_trace_resources lt (T1 ++ trans :: T2) (Active s) c γ m -∗
-    trace_state_resources (lt ++ [(#tag, (c, (#"CmLin", #b)))%V]) (T1 ++ (trans ++ [Cm (tag, c) b]) :: T2) γmstate γmname clients res.
+    trace_state_resources (lt ++ [(#tag, (c, (#"CmLin", #b)))%V]) (T1 ++ (trans ++ [Cm (tag, c) b]) :: T2) γmstate γmname clients extract.
   Proof.
     iIntros (Hnot_in Hdom_eq Hvalid_seq Hvalid_trans Hlookup Hextract Heq_sa_clients Hop) 
       "#Hinit_in Hkeys_conn #Hsa_pointer Hmap_mstate Hmap_mname Hmap_m Hdisj_trace_res Htrace_res".
@@ -1639,7 +1358,7 @@ Section trace_proof.
   (lib : KVS_transaction_api) : 
     ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
     trace_inv trace_inv_name valid_trace_ru -∗
-    inv KVS_InvName (GlobalInvExt res γmstate γmlin γmpost γmname γl clients) -∗
+    inv KVS_InvName (GlobalInvExt extract γmstate γmlin γmpost γmname γl clients) -∗
     @init_client_proxy_spec _ _ _ _ lib res -∗
     @init_client_proxy_spec _ _ _ _ (KVS_wrapped_api lib) (wrapped_resources γmstate γmlin γmpost γmname γl clients res).
   Proof.
@@ -1733,7 +1452,7 @@ Section trace_proof.
     rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
     iDestruct "Hext_rest1'" as "(Hext_rest1_sa & Hext_rest1)".
     rewrite big_sepS_singleton.
-    iAssert ((⌜mname !! sa = None⌝ ∧ ⌜no_emit_with_address sa lt' res⌝)%I) as "(%Hlookup_none & %Hno_emit)".
+    iAssert ((⌜mname !! sa = None⌝ ∧ ⌜no_emit_with_address sa lt' extract⌝)%I) as "(%Hlookup_none & %Hno_emit)".
     {
       iDestruct ("Hext_rest1_sa") as "[(_ & %Hnot_lookup & %Hno_emit)|[%s [%c' [%γ [%m (%Hfalse & asd)]]]]]".
       - iPureIntro. 
@@ -1895,7 +1614,7 @@ Section trace_proof.
   (lib : KVS_transaction_api) : 
     ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
     trace_inv trace_inv_name valid_trace_ru -∗
-    inv KVS_InvName (GlobalInvExt res γmstate γmlin γmpost γmname γl clients) -∗
+    inv KVS_InvName (GlobalInvExt extract γmstate γmlin γmpost γmname γl clients) -∗
     @read_spec _ _ _ _ lib res -∗
     @read_spec _ _ _ _ (KVS_wrapped_api lib) (wrapped_resources γmstate γmlin γmpost γmname γl clients res).
   Proof.
@@ -2193,7 +1912,7 @@ Section trace_proof.
                          simpl in Hex'.
                          eauto.
                   ** iApply (trace_state_resources_read_lin2 clients c tag1 lt' T1 T2 trans k sa wo
-                        s γ γmstate γmname res mstate mname m with "[][][][][][][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
+                        s γ γmstate γmname extract mstate mname m with "[][][][][][][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
                         [$Hmap_m][$Hdisj_trace_res][$Htrace_res]"); try by iPureIntro.
                      --- iPureIntro.
                          intros Hfalse.
@@ -2257,7 +1976,7 @@ Section trace_proof.
                          simpl in Hex'.
                          eauto.
                   ** iApply (trace_state_resources_read_lin1 clients c tag1 lt' T' k sa wo
-                        s γ γmstate γmname res mstate mname m with "[][][][][][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
+                        s γ γmstate γmname extract mstate mname m with "[][][][][][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
                         [$Hmap_m][$Hdisj_trace_res][$Htrace_res]"); try by iPureIntro.
                      iPureIntro.
                      destruct Hinit as (e & Hin'' & Hconn'' & Hevent'').
@@ -2333,7 +2052,7 @@ Section trace_proof.
   (lib : KVS_transaction_api) : 
     ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
     trace_inv trace_inv_name valid_trace_ru -∗
-    inv KVS_InvName (GlobalInvExt res γmstate γmlin γmpost γmname γl clients) -∗
+    inv KVS_InvName (GlobalInvExt extract γmstate γmlin γmpost γmname γl clients) -∗
     @write_spec _ _ _ _ lib res -∗
     @write_spec _ _ _ _ (KVS_wrapped_api lib) (wrapped_resources γmstate γmlin γmpost γmname γl clients res).
   Proof.
@@ -2514,7 +2233,7 @@ Section trace_proof.
                          set_solver.
                      --- by exists t'.
                   ** iApply (trace_state_resources_write_lin2 clients c tag1 lt' T1 T2 trans k v sa 
-                        s γ γmstate γmname res mstate mname m with "[][][][][][][][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
+                        s γ γmstate γmname extract mstate mname m with "[][][][][][][][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
                         [$Hmap_m][$Hdisj_trace_res][$Htrace_res]"); try by iPureIntro.
                      --- iPureIntro.
                          intros Hfalse.
@@ -2566,7 +2285,7 @@ Section trace_proof.
                          set_solver.
                      --- by exists t'.
                   ** iApply (trace_state_resources_write_lin1 clients c tag1 lt' T' k v.(SV_val) sa
-                        s γ γmstate γmname res mstate mname m with "[][][][][][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
+                        s γ γmstate γmname extract mstate mname m with "[][][][][][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
                         [$Hmap_m][$Hdisj_trace_res][$Htrace_res]"); try by iPureIntro.
                      iPureIntro.
                      destruct Hinit as (e & Hin'' & Hconn'' & Hevent'').
@@ -2646,7 +2365,7 @@ Section trace_proof.
   (lib : KVS_transaction_api) : 
     ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
     trace_inv trace_inv_name valid_trace_ru -∗
-    inv KVS_InvName (GlobalInvExt res γmstate γmlin γmpost γmname γl clients) -∗
+    inv KVS_InvName (GlobalInvExt extract γmstate γmlin γmpost γmname γl clients) -∗
     @start_spec _ _ _ _ lib res -∗
     @start_spec _ _ _ _ (KVS_wrapped_api lib) (wrapped_resources γmstate γmlin γmpost γmname γl clients res).
   Proof.
@@ -2997,7 +2716,7 @@ Section trace_proof.
   (lib : KVS_transaction_api) : 
     ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
     trace_inv trace_inv_name valid_trace_ru -∗
-    inv KVS_InvName (GlobalInvExt res γmstate γmlin γmpost γmname γl clients) -∗
+    inv KVS_InvName (GlobalInvExt extract γmstate γmlin γmpost γmname γl clients) -∗
     @commit_spec _ _ _ _ lib res -∗
     @commit_spec _ _ _ _ (KVS_wrapped_api lib) (wrapped_resources γmstate γmlin γmpost γmname γl clients res).
   Proof.
@@ -3178,7 +2897,7 @@ Section trace_proof.
                          set_solver.
                      --- by exists t'.
                   ** iApply (trace_state_resources_commit_lin2 clients c tag1 lt' T1 T2 trans sa 
-                       s γ γmstate γmname res b mc mstate mname m' with 
+                       s γ γmstate γmname extract b mc mstate mname m' with 
                        "[//][//][//][//][//][//][//][//][][$Hkeys_conn2][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
                        [$Hmap_m][$Hdisj_trace_res][$Htrace_res]").
                      iPureIntro.
@@ -3227,7 +2946,7 @@ Section trace_proof.
                          set_solver.
                      --- by exists t'.
                   ** iApply (trace_state_resources_commit_lin1 clients c tag1 lt' T' sa 
-                       s γ γmstate γmname res b mc mstate mname m' with 
+                       s γ γmstate γmname extract b mc mstate mname m' with 
                        "[//][//][//][//][//][//][//][][$Hkeys_conn2][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
                        [$Hmap_m][$Hdisj_trace_res][$Htrace_res]").
                      iPureIntro.
@@ -3315,7 +3034,7 @@ Section trace_proof.
       by apply gmap_of_trace_valid.
     }
     iDestruct "Hltrace" as "[Hltrace Hlhist]".
-    iMod (inv_alloc KVS_InvName ⊤ (GlobalInvExt res γmstate γmlin γmpost γmname γl clients) with 
+    iMod (inv_alloc KVS_InvName ⊤ (GlobalInvExt extract γmstate γmlin γmpost γmname γl clients) with 
       "[Htr Hghost_map_mstate Hghost_map_mlin Hghost_map_mpost Hghost_map_mname Hltrace Hlhist]") as "#HinvExt".
     {
       iNext.
