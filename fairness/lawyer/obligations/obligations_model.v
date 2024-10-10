@@ -141,7 +141,7 @@ Section Model.
       (SIG: ps_sigs ps !! s = Some (l, false))
       (EP: (s, π, δ) ∈ ps_eps ps)
       (OBLS_LT: lt_locale_obls l θ ps):
-    let new_cps := ps_cps ps ⊎ {[+ (π, δ) +]} in
+    let new_cps := ps_cps ps ⊎ {[+ (π__max, δ) +]} in
     expects_ep ps θ (update_cps new_cps ps) s π δ.
 
   Definition fork_left (π: Phase): Phase := ndot π 0. 

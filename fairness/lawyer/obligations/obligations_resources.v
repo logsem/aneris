@@ -494,7 +494,7 @@ Section ObligationsRepr.
       :
       ⊢ ep sid π d -∗ sgn sid l (Some false) -∗ obls ζ R -∗
         sgns_level_gt R l -∗ th_phase_ge ζ π -∗
-        OU ζ (cp π d ∗ sgn sid l (Some false) ∗ obls ζ R ∗ th_phase_ge ζ π).
+        OU ζ (∃ π', cp π' d ∗ sgn sid l (Some false) ∗ obls ζ R ∗ th_phase_ge ζ π ∗ ⌜ phase_le π π' ⌝).
     Proof using H1 H0.
       rewrite /OU /OU'. iIntros "#EP SIG OBLS #SIGS_LT PH %δ MSI".
       iDestruct (sigs_msi_exact with "[$] [$]") as %Sζ.
@@ -516,7 +516,9 @@ Section ObligationsRepr.
         { econstructor; eauto. }
         simpl. reflexivity. }
 
-      rewrite bi.sep_comm. rewrite -own_op.
+      rewrite bi.sep_comm.
+      iApply bi.sep_exist_l. iExists x. rewrite bi.sep_assoc. iSplitL; [| done].
+      rewrite -own_op. 
       iApply own_update; [| by iFrame].
       apply auth_update_alloc.
       eapply local_update_proper.
