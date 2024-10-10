@@ -185,6 +185,11 @@ Section LocaleFairness.
     exists m s', otr S!! (n + m) = Some s' /\
              fairness_sat t s' (otr L!! (n + m)).
 
+  Definition fair_by'_strong (t: T) (otr: trace S L) :=
+    forall n, from_option (locale_prop t) False (otr S!! n) ->
+    exists m, ClassicalFacts.Minimal 
+           (fun d => exists s', otr S!! (n + d) = Some s' /\ fairness_sat t s' (otr L!! (n + d))) m.
+
   Lemma fair_by_equiv:
     forall (t: T) (otr: trace S L), fair_by t otr <-> fair_by' t otr.
   Proof.
@@ -193,7 +198,45 @@ Section LocaleFairness.
     repeat setoid_rewrite pred_at_trace_lookup.
     apply Morphisms_Prop.iff_iff_iff_impl_morphism; [| done].    
     destruct (otr S!! n); simpl; set_solver.
-  Qed. 
+  Qed.
+
+  (* TODO: move *)
+  Lemma impl_iff_intro {A B C: Prop}
+    (PRE: A -> B <-> C):
+    (A -> B) <-> (A -> C).
+  Proof using. tauto. Qed.
+
+  Global Instance fairness_sat_dec
+    `{forall t s, Decision (locale_prop t s)}
+    `{forall t l, Decision (does_step t l)}:
+    forall t s ol, Decision (fairness_sat t s ol).
+  Proof using.
+    intros. rewrite /fairness_sat.
+    destruct (decide (locale_prop t s)) as [EN| ]; [| left; tauto]. 
+    destruct ol as [l| ]; [| right; set_solver].
+    destruct (decide (does_step t l)).
+    - left. eauto.
+    - right. set_solver.
+  Qed.
+
+  Lemma fair_by'_strenghten
+    `{forall t s ol, Decision (fairness_sat t s ol)}:
+    forall (t: T) (otr: trace S L), fair_by' t otr <-> fair_by'_strong t otr.
+  Proof using.
+    intros. rewrite /fair_by' /fair_by'_strong.
+    apply forall_proper. intros n.
+    apply impl_iff_intro. intros Pn. destruct (otr S!! n) eqn:NTH; [| done].
+    simpl in Pn.
+    split.
+    2: { intros (?&?&?). eauto. }
+    intros [m EX]. pattern m in EX. apply min_prop_dec_impl in EX.
+    { destruct EX. eauto. }
+    intros i. destruct (otr S!! (n + i)) eqn:NEXT.
+    2: { right. set_solver. }
+    destruct (decide (fairness_sat t s0 (otr L!! (n + i)))).
+    - left. eauto.
+    - right. set_solver.
+  Qed.
 
 End LocaleFairness.
 
