@@ -3,22 +3,18 @@ From trillium.fairness Require Import fairness locales_helpers.
 From trillium.fairness.lawyer.obligations Require Import obls_utils.
 
 
-Class ObligationsParams 
-  (Degree Level Locale: Type)
-  (* (Degree Level: Type) *)
-  (LIM_STEPS: nat) := {
+Class ObligationsParams (Degree Level Locale: Type) (LIM_STEPS: nat) := {
   opar_deg_eqdec :> EqDecision Degree;
   opar_deg_cnt :> Countable Degree;
-  opar_deg_lt: Degree -> Degree -> Prop;
+  (* opar_deg_lt: Degree -> Degree -> Prop; *)
+  deg_le: relation Degree;
+  deg_PO :> PartialOrder deg_le;
 
   opar_lvl_eqdec :> EqDecision Level;
   opar_lvl_cnt :> Countable Level;
 
-  opar_lvl_lt: Level -> Level -> Prop;
-  (* (* TODO: get rid of this? *) *)
-  (* opar_l0: Level; *)
-  (* opar_l0_least: forall l, l ≠ opar_l0 -> opar_lvl_lt opar_l0 l; *)
-  
+  lvl_le: relation Level;
+  lvl_PO :> PartialOrder lvl_le;
 }. 
 
 
@@ -37,7 +33,10 @@ Section Model.
 
   Definition CallPermission: Type := Phase * Degree.
 
-  Definition ExpectPermission: Type := SignalId * Phase * Degree. 
+  Definition ExpectPermission: Type := SignalId * Phase * Degree.
+
+  Definition deg_lt := strict deg_le. 
+  Definition lvl_lt := strict lvl_le. 
 
   (* TODO: can we merge obligations and signals? *)
   Record ProgressState := {
@@ -67,7 +66,7 @@ Section Model.
     let levels': gset (option Level) :=
       set_map (fun s => (ps_sigs ps !! s ≫= Some ∘ fst)) obls in
     let levels := extract_Somes_gset levels' in
-    set_Forall (opar_lvl_lt l) levels.
+    set_Forall (lvl_lt l) levels.
     
   Inductive burns_cp: PS -> Locale -> PS -> Phase -> Degree -> Prop :=
   | bcp_step ps θ π δ π__max
@@ -81,7 +80,7 @@ Section Model.
       (LOC_PHASE: ps_phases ps !! θ = Some π__max)
       (PHASE_LE: phase_le π π__max)
       (CP: (π, δ) ∈ ps_cps ps)
-      (DEG_LE: opar_deg_lt δ' δ)
+      (DEG_LE: deg_lt δ' δ)
       (LOW_BOUND: n <= ps_exc_bound ps):
     let new_cps := ps_cps ps ∖ {[+ (π, δ) +]} ⊎ n *: {[+ (π, δ') +]} in
     exchanges_cp ps θ (update_cps new_cps ps) π δ δ' n.
@@ -128,7 +127,7 @@ Section Model.
       (LOC_PHASE: ps_phases ps !! θ = Some π__max)
       (LE: phase_le π π__max)
       (CP: (π, δ) ∈ ps_cps ps)
-      (DEG_LE: opar_deg_lt δ' δ):
+      (DEG_LE: deg_lt δ' δ):
     let new_cps := ps_cps ps ∖ {[+ (π, δ) +]} in
     let new_eps := ps_eps ps ∪ {[ (s, π, δ') ]} in
     let new_ps := update_eps new_eps $ update_cps new_cps ps in

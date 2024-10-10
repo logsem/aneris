@@ -340,7 +340,7 @@ Section TestProg.
                                   em_thread_post τ (em_GS0 := heap_fairnessGS (heapGS := hGS))}.
 
   Lemma test_spec (τ: locale heap_lang) (π: Phase) (d d': Degree) (l: Level)
-    (DEG: opar_deg_lt d' d)
+    (DEG: deg_lt _ d' d)
     :
     {{{ cp_mul OP π d 10 (H3 := oGS) ∗ th_phase_ge OP τ π (H3 := oGS) ∗ obls OP τ ∅ (H3 := oGS) ∗ exc_lb OP 5 (H3 := oGS) }}}
       test_prog @ τ

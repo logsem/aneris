@@ -108,7 +108,7 @@ Section ObligationsRepr.
     own obls_obls (◯ ({[ τ := Excl R]}: gmapUR Locale (exclR (gsetR natO)))).
 
   Definition sgns_level_gt `{ObligationsGS Σ} (R: gset SignalId) lm: iProp Σ :=
-    [∗ set] s ∈ R, (∃ l, sgn s l None ∗ ⌜ opar_lvl_lt lm l ⌝). 
+    [∗ set] s ∈ R, (∃ l, sgn s l None ∗ ⌜ lvl_lt _ lm l ⌝). 
   
   Definition ep `{ObligationsGS Σ} (sid: SignalId) π d: iProp Σ :=
     own obls_eps (◯ {[ (sid, π, d) ]}). 
@@ -410,7 +410,7 @@ Section ObligationsRepr.
 
     Lemma exchange_cp_upd ζ π d d' b k
       (LE: k <= b)
-      (DEG: opar_deg_lt d' d):
+      (DEG: deg_lt _ d' d):
       ⊢ cp π d -∗ th_phase_ge ζ π -∗ exc_lb b -∗ OU ζ (cp_mul π d' k ∗ th_phase_ge ζ π). 
     Proof using.
       rewrite /OU /OU'. iIntros "CP PH #LB %δ MSI".
@@ -444,7 +444,7 @@ Section ObligationsRepr.
     Qed.
 
     (* TODO: ? use duplicable "signal exists" resource *)
-    Lemma create_ep_upd ζ π d d' sid l ov (DEG: opar_deg_lt d' d) 
+    Lemma create_ep_upd ζ π d d' sid l ov (DEG: deg_lt _ d' d) 
       :
       ⊢ cp π d -∗ sgn sid l ov -∗ th_phase_ge ζ π -∗ 
         OU ζ (ep sid π d' ∗ sgn sid l ov ∗ th_phase_ge ζ π).

@@ -131,12 +131,22 @@ Section FiniteBranching.
   Lemma expects_ep_next_states δ:
     list_approx (fun δ' => exists τ s π d, expects_ep OP δ τ δ' s π d).
   Proof using.
-    set (add_cp (ep: @ExpectPermission Degree) := let '(_, π, d) := ep in ps_cps _ δ ⊎ {[+ (π, d) +]}).
-    exists (map (flip (update_cps OP) δ ∘ add_cp) (elements $ ps_eps _ δ)).
+    set (add_cp (ep: @ExpectPermission Degree) :=
+           τ ← elements $ dom $ ps_phases _ δ;
+           let πτ := default namespaces.nroot (ps_phases _ δ !! τ) in
+           let cps' := let '(_, _, d) := ep in ps_cps _ δ ⊎ {[+ (πτ, d) +]} in
+           let δ' := update_cps OP cps' δ in
+           mret δ'
+        ).
+    exists (flat_map add_cp (elements $ ps_eps _ δ)).
     intros ? (?&?&?&?& STEP). inversion STEP; subst; simpl in *. simpl.
-    apply elem_of_list_In. apply in_map_iff. eexists ((_, _), _). split; [reflexivity| ].
-    apply elem_of_list_In, elem_of_elements. eauto.
-  Qed. 
+    apply elem_of_list_In. apply in_flat_map. eexists ((_, _), _).
+    rewrite -!elem_of_list_In elem_of_elements. split; eauto.
+    rewrite /add_cp. apply elem_of_list_bind. setoid_rewrite elem_of_list_ret.
+    eexists. split.
+    2: { apply elem_of_elements. eapply elem_of_dom; eauto. }
+    rewrite LOC_PHASE. reflexivity. 
+  Qed.
 
   Lemma forks_locale_next_states δ τ':
     list_approx (fun δ' => exists τ obls', forks_locale _ δ τ δ' τ' obls'). 

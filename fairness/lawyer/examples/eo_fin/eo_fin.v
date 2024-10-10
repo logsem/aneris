@@ -14,7 +14,23 @@ Close Scope Z.
 (* Definition EODegree n := Fin.t (S n). *)
 (* Definition EOLevel n := Fin.t (S n). *)
 Definition EODegree n := { i | i < n }. 
-Definition EOLevel n := { i | i < n }. 
+Definition EOLevel n := { i | i < n }.
+
+
+Definition bounded_nat_le n (x y: { i | i < n }) := `x <= `y. 
+
+(* TODO: move? *)
+Instance nat_bounded_PO n: PartialOrder (bounded_nat_le n).
+Proof using.
+  split.
+  - split.
+    + red. intros. red. reflexivity.
+    + red. intros [??] [??] [??]. rewrite /bounded_nat_le. simpl. lia.
+  - red. intros [??] [??]. rewrite /bounded_nat_le. simpl.
+    intros. assert (x = x0) by lia. subst.
+    assert (l0 = l) by apply Nat.lt_pi. congruence.
+Qed. 
+
 
 Section EoFin.
   Context (LIM: nat).
@@ -24,15 +40,14 @@ Section EoFin.
   Instance EO_OP: ObligationsParams (EODegree NUM_DEG) (EOLevel LIM) (locale heap_lang) MAX_OBL_STEPS.
   Proof using.
     esplit; try by apply _.
-    - rewrite /EODegree.
-      exact (fun d1 d2 => proj1_sig d1 < proj1_sig d2).
-    - exact (fun d1 d2 => proj1_sig d1 < proj1_sig d2).
+    - apply nat_bounded_PO. 
+    - apply nat_bounded_PO. 
   Defined.
 
   Let OM := ObligationsModel EO_OP.
 
   Let EOLevelOfe := sigO (fun i => i < LIM).
-  Let EODegreeOfe := sigO (fun i => i < NUM_DEG). 
+  Let EODegreeOfe := sigO (fun i => i < NUM_DEG).
 
   Instance EO_lvl_LeibnizEquiv: LeibnizEquiv EOLevelOfe.
   Admitted. 
@@ -121,8 +136,11 @@ Section EoFin.
     Let d0 := nth_deg 0 (Nat.lt_0_succ _). 
     Let d1 := nth_deg 1 (proj1 (Nat.succ_lt_mono _ _) (Nat.lt_0_succ _)).
 
-    Lemma d01_lt: opar_deg_lt d0 d1.
-    Proof. simpl. lia. Qed. 
+    Lemma d01_lt: deg_lt _ d0 d1.
+    Proof.
+      red. apply strict_spec_alt. split; try done.
+      subst d0 d1. simpl. red. simpl. lia. 
+    Qed.
 
     Ltac BMU_burn_cp :=
       iApply BMU_intro;

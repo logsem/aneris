@@ -34,19 +34,18 @@ Section Termination.
   Section SignalsEventuallySet.
     Context (tr: obls_trace OP).
 
-    Context (sig_le: relation Level).
-    Hypothesis (SIG_WF: wf (strict sig_le)).
-
+    Hypothesis (LVL_WF: wf (strict lvl_le)).
+    
     Context (lvl__def: Level). 
 
     Definition lvl_at (sid_i: SignalId * nat): Level :=
       let '(sid, i) := sid_i in
       from_option (fun δ => from_option fst lvl__def (ps_sigs _ δ !! sid)) lvl__def (tr S!! i).
 
-    Definition tr_sig_lt: relation (SignalId * nat) := MR (strict sig_le) lvl_at. 
+    Definition tr_sig_lt: relation (SignalId * nat) := MR (strict lvl_le) lvl_at. 
 
     Lemma tr_sig_lt_wf: wf tr_sig_lt.
-    Proof using SIG_WF. apply measure_wf. apply SIG_WF. Qed.
+    Proof using LVL_WF. apply measure_wf. apply LVL_WF. Qed.
 
     Definition never_set_after sid c := 
       forall i, c <= i -> from_option (fun δ => from_option snd true (ps_sigs _ δ !! sid)) true (tr S!! i) = false. 
@@ -86,8 +85,6 @@ Section Termination.
 
     Definition TPF (π: Phase) (i: nat): gmultiset Degree :=
       from_option (PF π ((LIM_STEPS + 2) * i)) ∅ (tr S!! i).
-
-    Context (deg_le: relation Degree).
 
     Lemma ms_le_exp_le m n eps
       (LE: m <= n):
@@ -136,6 +133,7 @@ Section Termination.
       :
       ms_le deg_le (PF π__ow (S k) δ2) (PF π__ow k δ1).
     Proof using.
+      clear LVL_WF.
       rewrite /PF.
       destruct STEP as [T|[T|[T|[T|T]]]]. 
       - destruct T as (?&?&T). inversion T; subst. 
@@ -163,10 +161,10 @@ Section Termination.
                by apply mset_filter_spec. }
           rewrite mset_map_mul !mset_map_singleton. simpl.
           apply ms_le_exchange.
-          * admit.
+          * apply _. 
           * eapply elem_of_mset_map. eexists (_, _). split; eauto.
             apply mset_filter_spec. split; eauto. 
-          * admit.          
+          * done. 
         + apply ms_le_exp_le. lia. 
       - destruct T as (?&T). inversion T; subst.
         destruct δ1. simpl in *.
@@ -211,12 +209,11 @@ Section Termination.
         apply ms_le_disj_union; revgoals. 
         + apply ms_le_exp_le. lia. 
         + simpl. apply ms_le_exchange.
-          * admit.
+          * apply _. 
           * eapply elem_of_mset_map. eexists (_, _). split; eauto.
             apply mset_filter_spec. split; eauto. 
-          * admit.
-    Admitted. 
-
+          * done. 
+    Qed. 
 
     Lemma other_loc_step_ms_le π__ow δ1 τ δ2 k
       (STEP: loc_step OP δ1 τ δ2)
@@ -225,7 +222,7 @@ Section Termination.
         phases_incompat π__ow π):
       ms_le deg_le (PF π__ow (S k) δ2) (PF π__ow k δ1).
     Proof using.
-      clear sig_le SIG_WF. 
+      clear LVL_WF.
       rewrite /PF.
       apply loc_step_split in STEP as [NOEXP | EXP].
       { eapply loc_step_no_exp_all_ms_le; eauto. }
@@ -253,7 +250,7 @@ Section Termination.
       let π__ow := default π0 (ps_phases _ δ1 !! τ) in
       ms_le deg_le (PF π__ow (S k) δ2) (PF π__ow k δ1).
     Proof using.
-      clear sig_le SIG_WF. 
+      clear LVL_WF. 
       rewrite /PF.
       apply loc_step_split in STEP as [NOEXP | EXP].
       { eapply loc_step_no_exp_all_ms_le; eauto. }
@@ -344,7 +341,6 @@ Section Termination.
         destruct (ps_obls OP δ' !! τ) as [obs| ] eqn:OBLS'; [| set_solver].
         simpl in OBL'. simpl. apply elem_of_map. eexists. split; eauto.
         rewrite SIG'. done. }
-      assert (strict sig_le l ls) as SIG_LT by admit. clear OBLS_LT.
 
       enough (set_before sid > i).
       { apply PeanoNat.Nat.le_succ_l in H0. 
@@ -365,7 +361,7 @@ Section Termination.
       move MIN at bottom. red in MIN. specialize (MIN (_, _) NEVER_SET').
       rewrite /tr_sig_lt /MR in MIN. simpl in MIN.
       rewrite ITH in MIN. simpl in MIN. rewrite SIG0 SIG__min in MIN. simpl in MIN.
-      specialize (MIN SIG_LT).
+      specialize (MIN OBLS_LT).
       edestruct @strict_not_both; eauto. 
     Admitted.
 
