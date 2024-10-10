@@ -1,5 +1,5 @@
 From trillium.fairness Require Import my_omega lemmas trace_len.
-From trillium.fairness Require Import inftraces trace_utils.
+From trillium.fairness Require Import inftraces trace_utils utils.
 
 Section TraceLookup.
   Context {St L: Type}. 
@@ -195,6 +195,14 @@ Section TraceLookup.
     split; try tauto. intros. split; auto. 
     eapply state_lookup_prev; eauto. lia.    
   Qed.     
+
+  Lemma label_lookup_states' (tr: trace St L):
+    forall i, is_Some (tr L!! i) <-> is_Some (tr S!! (S i)). 
+  Proof using.
+    intros. rewrite label_lookup_states.
+    rewrite Nat.add_1_r. rewrite and_comm iff_and_impl_helper; [done| ].
+    intros. eapply state_lookup_prev; eauto. 
+  Qed.
 
   Lemma pred_at_trace_lookup (tr: trace St L) (i: nat) P:
       pred_at tr i P <-> exists st, tr S!! i = Some st /\ P st (tr L!! i). 
