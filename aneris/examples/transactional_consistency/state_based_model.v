@@ -2068,3 +2068,50 @@ Proof.
     destruct (exists_execution T Hempty) as (exec & Hexec_props).
     by exists T, exec.
 Qed.
+
+Lemma valid_trace_pre T tag t e lt exec test : 
+  lin_trace_of lt t →
+  is_pre_event e →
+  tagOfEvent e = Some tag →
+  tag ∉ tags t →
+  valid_sequence lt →
+  valid_transactions T → 
+  extraction_of lt T →
+  (∀ t, t ∈ T → t ≠ []) →
+  based_on exec (comTrans T) →
+  valid_execution test exec →
+  valid_trace test (t ++ [e]).
+Proof.
+  intros Hlin Hexists Hpost Htag Hvalid Hvalid_trans 
+    Hextract Hempty Hbased Hvalid_exec.
+  exists lt.
+  split_and!; try done.
+  - apply (lin_trace_valid tag); try done; eauto.
+  - exists T, exec.
+    split_and!; try done.
+Qed.
+
+Lemma valid_trace_post T tag t e lt exec test : 
+  lin_trace_of lt t →
+  (∃ le, postToLin e = Some le ∧ le ∈ lt) →
+  is_post_event e →
+  tagOfEvent e = Some tag →
+  valid_sequence lt →
+  valid_transactions T → 
+  extraction_of lt T →
+  (∀ t, t ∈ T → t ≠ []) →
+  based_on exec (comTrans T) →
+  valid_execution test exec →
+  valid_trace test (t ++ [e]).
+Proof.
+  intros Hlin Hexists Hpost Htag Hvalid Hvalid_trans 
+    Hextract Hempty Hbased Hvalid_exec.
+  exists lt.
+  split_and!; try done.
+  - apply (lin_trace_valid tag); try done.
+    right.
+    rewrite /is_post_event in Hpost.
+    set_solver.
+  - exists T, exec. 
+    split_and!; try done.
+Qed.
