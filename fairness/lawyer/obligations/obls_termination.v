@@ -1,5 +1,6 @@
 Require Import Coq.Program.Wf.
 Require Import Relation_Operators.
+From stdpp Require Import namespaces.
 From iris.proofmode Require Import tactics.
 From iris.algebra Require Import gset gmultiset.
 From trillium.fairness Require Import locales_helpers inftraces fairness trace_len.
@@ -48,8 +49,16 @@ Section Termination.
     Proof using LVL_WF. apply measure_wf. apply LVL_WF. Qed.
 
     Definition never_set_after sid c := 
-      forall i, c <= i -> from_option (fun δ => from_option snd true (ps_sigs _ δ !! sid)) true (tr S!! i) = false. 
+      forall i, c <= i -> from_option (fun δ => from_option snd true (ps_sigs _ δ !! sid)) false (tr S!! i) = false.
 
+    Lemma never_set_after_after sid i j
+      (LE: i <= j):
+      never_set_after sid i -> never_set_after sid j.
+    Proof using.
+      rewrite /never_set_after. intros NEVER m LE'.
+      eapply NEVER. lia. 
+    Qed.
+      
     Context {set_before: SignalId -> nat}.
 
     Definition approx_expects (k: nat) (eps: gset (@ExpectPermission Degree)) :=
@@ -77,7 +86,6 @@ Section Termination.
       intros [[??]?]. rewrite /phase_le. solve_decision.
     Qed. 
 
-    Let π0 := namespaces.nroot. 
     Definition PF (π: Phase) (k: nat) (δ: ProgressState OP) :=
       (mset_map snd ∘ (mset_filter (fun '(π_, _) => phase_le π_ π)) ∘ (ps_cps OP)) δ
         ⊎
@@ -118,7 +126,21 @@ Section Termination.
       destruct e as [[??]?]. done.
     Qed.
 
-    Definition phases_incompat π1 π2 := ¬ phase_le π1 π2 /\ ¬ phase_le π2 π1. 
+    (* TODO: move *)
+    Definition phases_incompat π1 π2 := ¬ phase_le π1 π2 /\ ¬ phase_le π2 π1.
+
+    (* (* TODO: move to Wf condition *) *)
+    (* Definition phases_disjoint (π1 π2: Phase) := π1 ## π2.  *)
+
+    (* Lemma phases_disjoint_incompat π1 π2: *)
+    (*   phases_disjoint π1 π2 -> phases_incompat π1 π2. *)
+    (* Proof using. *)
+    (*   rewrite /phases_disjoint /phases_incompat /phase_le. *)
+    (*   rewrite /disjoint /ndisjoint. intros DISJ. *)
+    (*   split; intros SUB.  *)
+    (*   - destruct (DISJ (coPpick (↑π2))); [apply SUB| ]; apply coPpick_elem_of, nclose_infinite.   *)
+    (*   - destruct (DISJ (coPpick (↑π1))); [| apply SUB]; apply coPpick_elem_of, nclose_infinite. *)
+    (* Qed.      *)
 
     Definition loc_step_no_exp_all δ1 τ δ2 :=
       (exists π δ, burns_cp OP δ1 τ δ2 π δ) \/
@@ -239,7 +261,9 @@ Section Termination.
       apply loc_step_split in STEP as [NOEXP | EXP].
       - eapply loc_step_no_exp_all_ms_le; eauto.
       - destruct EXP as (?&?&?&?). eapply EXP_CASE; eauto.
-    Qed. 
+    Qed.
+
+    Let π0 := nroot. 
 
     Lemma other_expect_ms_le π__ow δ1 τ δ2 k
       (OTHER: let π := default π0 (ps_phases _ δ1 !! τ) in
@@ -380,7 +404,8 @@ Section Termination.
 
     Lemma never_set_owned s c
       (NEVER_SET: never_set_after s c):
-      forall i, c <= i -> exists τ, s ∈ from_option (fun δ => default ∅ (ps_obls _ δ !! τ)) ∅ (tr S!! i).
+      forall i, c <= i ->
+           map_Exists (fun τ obs => s ∈ obs) (from_option (ps_obls _) ∅ (tr S!! i)). 
     Proof. Admitted. 
 
     Lemma burns_cp_ms_le δ1 τ δ2 π π' d k
@@ -631,6 +656,47 @@ Section Termination.
       set_solver.
     Qed.
 
+    Lemma obls_transfer_phase δ1 τ δ2 s τs πs
+      (STEP: om_trans _ δ1 τ δ2)
+      (OBL: s ∈ default ∅ (ps_obls _ δ1 !! τs))
+      (PH: ps_phases _ δ1 !! τ = Some πs):
+      map_Forall (fun _ obls_ => s ∉ obls_) (ps_obls _ δ2) \/
+      exists τ' π',
+        s ∈ default ∅ (ps_obls _ δ2 !! τ') /\
+        ps_phases _ δ2 !! τ' = Some π' /\
+        phase_le πs π'.
+    Proof using. Admitted.
+
+    (* TODO: introduce general theorems about preservation of state/transition properties by omTrans *)
+    Goal True. Admitted.
+
+    (* Lemma om_trans_new_cps δ1 τ δ2 *)
+    (*   (STEP: om_trans _ δ1 τ δ2) *)
+    (*   (πτ := default π0 (ps_phases _ δ1 !! τ)) *)
+    (*   : *)
+    (*   forall cp, cp ∈ ps_cps _ δ2 ∖ ps_cps _ δ1 -> cp.1 = πτ. *)
+    (* Proof using. Admitted.  *)
+    
+    (* Lemma om_trans_new_eps δ1 τ δ2 *)
+    (*   (STEP: om_trans _ δ1 τ δ2) *)
+    (*   (πτ := default π0 (ps_phases _ δ1 !! τ)) *)
+    (*   : *)
+    (*   forall ep, ep ∈ ps_eps _ δ2 ∖ ps_eps _ δ1 -> phase_le (ep.1.2) πτ. *)
+    (* Proof using. Admitted. *)
+
+    (* TODO: add to Wf *)
+    Lemma cps_phase_bound δ:
+      ¬ (exists τ π cp,
+            ps_phases _ δ !! τ = Some π /\
+            cp ∈ ps_cps _ δ /\
+            phase_lt π cp.1).
+    Proof using. Admitted. 
+
+    (* TODO: move *)
+    Lemma gmultiset_empty_no_elements `{Countable K}:
+      forall (g: gmultiset K), g = ∅ <-> forall k, ¬ k ∈ g.
+    Proof using. clear. mss. Qed. 
+
     Theorem signals_eventually_set
       (VALID: obls_trace_valid OP tr)
       (FAIR: forall τ, obls_trace_fair _ τ tr):
@@ -652,7 +718,8 @@ Section Termination.
 
       (* TODO: add this to Wf condition *)
       (* TODO: add this "default empty" wrapper to model and use everywhere *)
-      assert (forall τ1 τ2 δ, default ∅ (ps_obls _ δ !! τ1) ## default ∅ (ps_obls _ δ !! τ2)) as OBLS_DISJ.
+      assert (forall τ1 τ2 δ, τ1 ≠ τ2 ->
+                 default ∅ (ps_obls _ δ !! τ1) ## default ∅ (ps_obls _ δ !! τ2)) as OBLS_DISJ.
       { admit. }
 
       assert (forall i π τ δ,
@@ -675,10 +742,197 @@ Section Termination.
         rewrite map_union_empty dom_singleton_L.
         rewrite set_map_singleton_L. rewrite H1.
         rewrite extract_Somes_gset_singleton. rewrite gset_pick_singleton.
-        done. }             
+        done. }
         
-
       set (OTF i := TPF (s_ow i) i).
+
+      assert (forall d, c <= d -> exists j, d < j /\ ms_lt deg_le (OTF j) (OTF d)). 
+      { intros d LE.
+        pose proof (never_set_owned _ _ UNSET) as OWN. specialize (OWN _ LE).  
+        destruct (tr S!! d) as [δ| ] eqn:DTH.
+        2: { simpl in OWN. by apply map_Exists_empty in OWN. }
+        simpl in OWN. rewrite map_Exists_lookup in OWN. 
+        destruct OWN as [τ OWN]. 
+        destruct (ps_obls OP δ !! τ) as [obs| ] eqn:OBLSd.
+        2: { set_solver. }
+        destruct OWN as (? & [=<-] & OWN). 
+        pose proof (FAIR τ) as F. apply fair_by_equiv, fair_by'_strenghten in F.
+        2: { solve_decision. }
+        red in F. specialize (F d). specialize_full F.
+        { rewrite DTH. simpl. red. rewrite OBLSd. simpl. set_solver. }
+        destruct F as (m & (δm & MTH & STEP) & MINm).
+
+        assert (exists π, ps_phases _ δ !! τ = Some π) as [π PH].
+        { (* follows from DPO *)
+          admit. }
+
+        (* rewrite /OTF in EMP. erewrite S_OWNER in EMP; eauto. *)
+        (* 2: { rewrite OBLSd. set_solver. }  *)
+        
+        forward eapply next_step_rewind. 
+        { eauto. }
+        { apply DTH. }
+        { eauto. }
+        { apply (Nat.le_add_r _ m). }
+        { intros k BOUNDk Kτ.
+          specialize (MINm (k - d)).
+          specialize_full MINm; [| lia].
+          rewrite -Nat.le_add_sub; [| lia].
+          forward eapply (proj1 (label_lookup_states _ _)); eauto. intros [[? KTH] _].
+          eexists. split; eauto. red. right. eauto. }
+        intros TPFle.
+
+        (* rewrite EMP in TPFle. apply ms_le_empty in TPFle. *)
+
+        red in STEP. destruct STEP.
+        { (* steps in between keep the obligation assigned *)
+          admit. }
+        destruct H0 as (?&LBL&<-).
+        forward eapply (proj1 (label_lookup_states' _ _)); eauto.
+        rewrite -Nat.add_1_r. intros [δm' MTH'].
+
+        (* forward eapply (trace_valid_steps'' _ _ VALID (d + m)) as STEP; eauto. *)
+        (* simpl in STEP. *)
+
+        assert (ps_obls OP δm !! τ = Some obs) as OBLSm.
+        { (* obligations haven't been changed with other threads' steps *)
+          admit. }
+
+        assert (ps_phases OP δm !! τ = Some π) as PHm.
+        { (* phase is kept by other steps *)
+          admit. }
+        
+        forward eapply (owm_om_trans_ms_lt π τ (d + m)); eauto.
+        { admit. }
+        { (* tr_sig_lt doesn't depend on concrete index *)
+          admit. }
+        { by rewrite OBLSm. }
+
+        intros LT.
+        exists (S (d + m)). split; [lia| ].
+        rewrite /OTF. erewrite (S_OWNER d); eauto.
+        2: { by rewrite OBLSd. }
+        eapply strict_transitive_l; [| apply TPFle]. 
+        eapply strict_transitive_r; [| apply LT].
+
+        forward eapply (obls_transfer_phase δm τ) with (τs := τ). 
+        { eapply trace_valid_steps''; eauto. }
+        { rewrite OBLSm. done. }
+        { eauto. }
+        intros [NO_OWN | OWN'].
+        { apply map_not_Exists in NO_OWN. destruct NO_OWN.
+          erewrite @f_equal. 
+          { eapply never_set_owned.
+            { eapply never_set_after_after; [| apply UNSET ].
+              etrans; [apply LE| ]. apply (Nat.le_add_r _ (m + 1)). }
+            reflexivity. }
+          rewrite Nat.add_assoc. rewrite MTH'. done. }
+        
+        destruct OWN' as (τ' & π' & OWN' & PH' & LE').
+        destruct (ps_obls OP δm' !! τ') as [obs'| ] eqn:OBLSd'.
+        2: { set_solver. }
+
+        erewrite S_OWNER.
+        3: { apply PH'. }
+        2: { rewrite -MTH'. f_equal. lia. }
+        2: { rewrite OBLSd'. done. } 
+
+        (* TODO: extract? *)
+        rewrite /TPF.
+        generalize ((LIM_STEPS + 2) * S (d + m)) as N. intros.
+        rewrite plus_n_Sm -Nat.add_1_r Nat.add_assoc MTH'. simpl.
+        rewrite /PF. apply ms_le_disj_union.
+        - apply ms_le_sub, mset_map_sub.
+          apply mset_filter_subseteq_mono_strong.
+          intros [pi de] IN' LEpi.
+          foobar. show that no CPs appear in the "gap" between stepping phase and the fresh one.
+          destruct (decide ((pi, de) ∈ ps_cps _ δm)).
+          + 
+            assert (exists τ__o π__o, τ__o ∈ dom $ ps_phases _ δm /\
+                              ps_phases _ δm !! τ__o = Some π__o /\
+                              phase_le pi π__o) as (τ__o & π__o & DOM__o & PH__o & LE__o).
+            { (* should be a part of Wf *)
+              admit. }
+            destruct (decide (τ__o = τ)) as [-> | NEQ].
+            { rewrite PHm in PH__o. inversion PH__o. done. }
+            assert (phases_disjoint π__o π) as DISJ.
+            { (* by Wf *)
+              admit. }
+            destruct (DISJ (coPpick (↑π'))).
+            * red in LE__o. apply LE__o.  
+            red in DISJ. 
+
+            set_solver. 
+            { etrans.
+              { etrans; [apply LEpi| ]. 
+              apply reflexive_eq.
+              clear -LE' LE__o LEpi.
+              apply partial_order_antisym; [apply _|..].  
+                        set_solver. }
+            set_solver.
+ 
+          set_solver. 
+          
+
+          
+
+
+          
+          apply reflexive_eq.
+          erewrite mset_filter_equiv with (Q := fun a => phase_le a.1 π \/ phase_lt π a.1 /\ phase_le a.1 π').
+          2: { intros [??]. simpl. set_solver. }
+          unshelve erewrite mset_filter_disj_union_disj.
+          { intros [??]. simpl. admit. }
+          { intros [??]. simpl. admit. }
+          2: { intros [??]. simpl. set_solver. }
+          etrans; [| apply gmultiset_disj_union_right_id].
+          f_equal.
+          { apply mset_filter_equiv. intros [??]. done. }
+          destruct (decide (π' = π)) as [-> | FRESH].
+          { apply mset_filter_False. set_solver. }
+          rewrite (gmultiset_disj_union_difference (ps_cps OP δm ∩ ps_cps OP δm') (ps_cps _ _)); [| mss].
+          rewrite mset_filter_disj_union.
+          apply gmultiset_empty_no_elements.
+          intros [pi de] [OLD | NEW]%gmultiset_elem_of_disj_union.
+          + set_solver. 
+            (* apply mset_filter_spec in OLD as [IN OLD]. simpl in OLD. *)
+            (* apply gmultiset_elem_of_intersection, proj1 in IN. *)
+            (* assert (exists τ__o π__o, τ__o ∈ dom $ ps_phases _ δm /\ *)
+            (*                   ps_phases _ δm !! τ__o = Some π__o /\ *)
+            (*                   phase_le π__o pi) as (τ__o & π__o & DOM__o & PH__o & LE__o). *)
+            (* { (* should be a part of Wf *) *)
+            (*   admit. } *)
+            (* destruct (decide (π__o = π)) as [-> | NEQ]. *)
+            (* { set_solver. } *)
+            (* set_solver.  *)
+            (* assert (phases_disjoint π__o π) as DISJ. *)            
+          + clear DTH OWN MTH LBL MINm.
+            clear OBLSd TPFle MTH' PHm.
+            clear PH.
+            clear OBLSm.
+            clear NEW.
+            
+            set_solver. 
+            apply mset_filter_spec in NEW as [IN NEW]. simpl in NEW.
+            forward eapply om_trans_new_cps with (cp := (pi, de)).
+            { eapply (trace_valid_steps'' _ _ VALID (d + m)); eauto. }
+            all: mss. 
+        - 
+          
+          etrans; [| apply gmultiset_disj_union_right_id].
+          f_equal.
+          + admit.
+          + apply gmultiset_size_empty_iff, gmultiset_size_empty_iff.
+            
+            
+ 
+          
+          apply mset_filter_equiv.
+          intros [pi ?]. 
+          reflexivity. 
+          apply subseteq_proper. 
+
+
       enough (exists d, c <= d /\ OTF d = ∅) as (d & LE & EMP). 
       { eapply never_set_owned in UNSET; [| apply LE].
         destruct (tr S!! d) as [δ| ] eqn:DTH; [| set_solver]. simpl in UNSET.

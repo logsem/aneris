@@ -474,5 +474,47 @@ Section MultisetDefs.
     Qed. 
 
   End MultisetFilter.
-  
+
+  Lemma mset_filter_disj_union_disj (P Q: A -> Prop) g
+    `{∀ x, Decision (P x)} `{∀ x, Decision (Q x)}
+    (DISJ: forall a, ¬ (P a /\ Q a)):
+    mset_filter (fun a => P a \/ Q a) g = mset_filter P g ⊎ mset_filter Q g.
+  Proof using.
+    apply gmultiset_eq. intros a.
+    rewrite multiplicity_disj_union !mset_filter_multiplicity.
+    destruct (decide (P a)), (decide (Q a)).
+    - edestruct DISJ; eauto.
+    - rewrite decide_True; [done| ]. tauto.  
+    - rewrite decide_True; [done| ]. tauto.
+    - rewrite decide_False; [done| ]. tauto.
+  Qed.
+
+  Lemma mset_filter_equiv (P Q: A -> Prop)
+    `{∀ x, Decision (P x)} `{∀ x, Decision (Q x)}
+    (EQUIV: ∀ x, P x ↔ Q x):
+    forall g, mset_filter P g = mset_filter Q g.
+  Proof using.
+    intros. rewrite /mset_filter. erewrite list_filter_iff; eauto.
+  Qed. 
+
+  Lemma mset_filter_subseteq_mono_strong (P Q: A -> Prop)
+    `{∀ x, Decision (P x)} `{∀ x, Decision (Q x)}
+    (g: gmultiset A)
+    (IMPL: ∀ x, x ∈ g -> P x -> Q x):
+    mset_filter P g ⊆ mset_filter Q g.
+  Proof using.
+    intros. red. red. intros x. 
+    destruct (decide (x ∈ g)).
+    2: { trans 0; [| lia].
+         edestruct Nat.le_gt_cases as [LE | LT]; [apply LE| ].
+         destruct n. apply elem_of_multiplicity.
+         rewrite mset_filter_multiplicity in LT.
+         destruct (decide (P x)); [done| lia]. }  
+         
+    rewrite !mset_filter_multiplicity.
+    destruct (decide (P x)); [| lia].
+    rewrite decide_True; [lia| ].
+    by apply IMPL. 
+  Qed. 
+    
 End MultisetDefs.
