@@ -103,7 +103,7 @@ Definition commit_test_ru : commitTest := λ exec trans, true.
 
 Definition read_state (c : val) (k : Key) (ov : option val) (i : nat) 
 (exec : execution) (s : state) : Prop := 
-  ∃ j, i <= j ∧ (split exec).2 !! j = Some s ∧ s !! k = ov.
+  ∃ j, j <= i ∧ (split exec).2 !! j = Some s ∧ s !! k = ov.
 
 Definition pre_read (exec : execution) (t : transaction) : Prop :=
   ∀ tag c k ov i, (split exec).1 !! i = Some t → (Rd (tag, c) k ov) ∈ t → 

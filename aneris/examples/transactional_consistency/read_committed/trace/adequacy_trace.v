@@ -33,7 +33,5 @@ Proof.
   iMod H6 as "Hspec".
   iMod (implication_trace.library_implication with "[$Htr $Hspec $Hinv]") 
     as "Hspec"; last done.
-  iPureIntro.
-  rewrite /implication_trace.trace_inv_name H0. 
-  set_solver.
- Qed.
+  by iPureIntro.
+Qed.

@@ -43,8 +43,7 @@ Section trace_proof.
   Definition trace_inv_name := nroot.@"trinv".
 
   (* Primary lemma to be used with adequacy *)
-  Lemma library_implication `{!anerisG Mdl Σ} (clients : gset socket_address) 
-  (lib : KVS_transaction_api) :
+  Lemma library_implication (clients : gset socket_address) (lib : KVS_transaction_api) :
     ((SI_spec clients lib) ∗ trace_is [] ∗ 
       trace_inv trace_inv_name valid_trace_si ∗ ⌜KVS_InvName = nroot .@ "kvs_inv"⌝) ={⊤}=∗ 
     SI_spec clients (KVS_wrapped_api lib).

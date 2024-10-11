@@ -31,5 +31,7 @@ Proof.
   eapply adequacy_trace; try done; first apply valid_trace_si_empty.
   iIntros (Ag) "(Htr & #Hinv)".
   iMod H6 as "Hspec".
-  by iMod (implication_trace.library_implication with "[$Htr $Hspec $Hinv]") as "Hspec"; try done.
+  iMod (implication_trace.library_implication with "[$Htr $Hspec $Hinv]") 
+    as "Hspec"; last done.
+  by iPureIntro.
  Qed.

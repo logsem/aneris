@@ -7,7 +7,7 @@ From aneris.aneris_lang Require Import lang resources.
 From aneris.aneris_lang.lib Require Import lock_proof.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs Require Import
   time events.
-From aneris.examples.transactional_consistency Require Import aux_defs user_params.
+From aneris.examples.transactional_consistency Require Import aux_defs user_params state_based_model.
 Import gen_heap_light.
 Import lock_proof.
 From aneris.examples.reliable_communication.spec Require Import ras.
@@ -47,6 +47,7 @@ Class IDBG Σ :=
     IDBG_Trace2 :> ghost_mapG Σ socket_address (gname * val);
     IDBG_Trace3 :> ghost_mapG Σ string bool;
     IDBG_Trace4 :> ghost_mapG Σ Key (option val);
+    IDBG_Trace5 :> inG Σ (authR (gmapUR nat (agreeR (leibnizO transaction))));
   }.
 
 Notation KVSG Σ := (IDBG Σ).
@@ -71,6 +72,7 @@ Definition KVSΣ : gFunctors :=
      ghost_mapΣ socket_address (gname * val);
      ghost_mapΣ string bool;
      ghost_mapΣ Key (option val);
+     GFunctor (authR (gmapUR nat (agreeR (leibnizO transaction))));
      mono_natΣ;
      ras.SpecChanΣ;
      lockΣ].

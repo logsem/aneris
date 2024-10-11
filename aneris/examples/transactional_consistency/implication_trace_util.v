@@ -246,6 +246,11 @@ Section trace_proof_util.
     (ov = None ∧ (∀ t, open_trans t c T → ¬ ∃ v s, (Wr s k v) ∈ t)) ∨
     (∃ v t tag, ov = Some v ∧ open_trans t c T ∧ (Wr (tag, c) k v) ∈ t ∧
       (∀ op, op ∈ t → (∃ s' v', op = Wr s' k v' ∧ op ≠ Wr (tag, c) k v) → rel_list t op (Wr (tag, c) k v))).
+  
+  Definition com_true (trans : list operation) : Prop := ∃ s, last trans = Some (Cm s true).
+
+  Definition latest_write_trans (k : Key) (v : val) (trans : list operation) : Prop := 
+    ∃ s, (Wr s k v) ∈ trans ∧ ¬(∃ s' v', rel_list trans (Wr s k v) (Wr s' k v')).
 
   Definition tag_eq (e1 e2 : val) : Prop := ∃ tag, tagOfEvent e1 = Some tag ∧ tagOfEvent e2 = Some tag.
 
@@ -287,8 +292,8 @@ Section trace_proof_util.
       ∃ (mname : gmap socket_address (gname * val)), ghost_map_auth γmname (1%Qp) mname ∗ 
         ([∗ set] sa ∈ clients, client_trace_state_resources lt T sa γmstate γmname extract mstate mname).
 
-  Definition GlobalInvExt (extract : val → option val) (γmstate γmlin γmpost γmname γl : gname) (clients : gset socket_address) : iProp Σ := 
-    ∃ t lt T, trace_is t ∗ OwnLinTrace γl lt ∗ ⌜lin_trace_of lt t⌝ ∗ ⌜∀ t, t ∈ T → t ≠ []⌝ ∗
+  Definition GlobalInvExt (T : list transaction) (extract : val → option val) (γmstate γmlin γmpost γmname γl : gname) (clients : gset socket_address) : iProp Σ := 
+    ∃ t lt, trace_is t ∗ OwnLinTrace γl lt ∗ ⌜lin_trace_of lt t⌝ ∗ ⌜∀ t, t ∈ T → t ≠ []⌝ ∗
       ⌜extraction_of lt T⌝ ∗ ⌜valid_transactions T⌝ ∗ ⌜valid_sequence lt⌝ ∗
       trace_state_resources lt T γmstate γmname clients extract ∗
       trace_lin_resources lt t γmlin ∗
