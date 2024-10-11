@@ -95,10 +95,36 @@ Section MultisetOrder.
       eexists. repeat split; eauto. apply Rab.
   Qed.
 
+  Global Instance ms_le_PreOrder: PreOrder ms_le.
+  Proof using. Admitted.
+
+  Global Instance ms_le_AntiSymm: AntiSymm eq ms_le.
+  Proof using.
+    red. intros ?? LE1 LE2.
+    red in LE1, LE2. apply gmultiset_eq. intros a.
+    (* TODO: consider the maximal element with differing multiplicity *)
+    (* destruct (Nat.lt_trichotomy (multiplicity a x) (multiplicity a y)) as [?|[?|?]]; eauto. *)
+    (* - specialize (LE2 _ H0). *)
+  Admitted.
+
+  Goal PartialOrder ms_le.
+    esplit; apply _.
+  Defined. 
   Lemma empty_ms_le X: ms_le ∅ X.
   Proof using.
     red. intros ?. rewrite multiplicity_empty. lia.
   Qed.
+
+  Lemma ms_le_empty X: ms_le X ∅ <-> X = ∅. 
+  Proof using.
+    destruct (decide (X = ∅)) as [->| NEQ].
+    { done. }
+    split; [| done]. intros LE.
+    apply gmultiset_choose in NEQ as [x IN].
+    red in LE. setoid_rewrite multiplicity_empty in LE. 
+    specialize (LE x ltac:(by apply elem_of_multiplicity)).
+    destruct LE as (?&?&?). lia.
+  Qed. 
 
   (* TODO: generalize, move *)
   Lemma multiset_difference_empty (X: gmultiset A):
@@ -231,6 +257,19 @@ Section MultisetOrder.
     - intros ? [I1 | I2]%gmultiset_elem_of_disj_union.
       + destruct (LT1 _ I1) as (b1 & INB1 & R1). mss.
       + destruct (LT2 _ I2) as (b2 & INB2 & R2). mss.
+  Qed.
+
+  Lemma ms_le_lt_disj_union X1 Y1 X2 Y2
+    (LE1: ms_lt X1 Y1) (LE2: ms_le X2 Y2):
+    ms_lt (X1 ⊎ X2) (Y1 ⊎ Y2).
+  Proof using.
+    clear PO.
+    eapply strict_transitive_r.
+    { eapply ms_le_disj_union; [reflexivity| ]. eauto. }
+    apply strict_spec_alt. split. 
+    { apply ms_le_disj_union; try done. apply LE1. }
+    intros ?. apply strict_spec_alt in LE1. destruct LE1 as [LE NEQ].
+    destruct NEQ. mss.
   Qed. 
   
   Global Instance ms_le_Proper:
@@ -270,21 +309,6 @@ Section MultisetOrder.
     rewrite decide_True; [lia| done].
   Qed.  
       
-  Global Instance ms_le_PreOrder: PreOrder ms_le.
-  Proof using. Admitted.
-
-  Global Instance ms_le_AntiSymm: AntiSymm eq ms_le.
-  Proof using.
-    red. intros ?? LE1 LE2.
-    red in LE1, LE2. apply gmultiset_eq. intros a.
-    (* TODO: consider the maximal element with differing multiplicity *)
-    (* destruct (Nat.lt_trichotomy (multiplicity a x) (multiplicity a y)) as [?|[?|?]]; eauto. *)
-    (* - specialize (LE2 _ H0). *)
-  Admitted.
-
-  Goal PartialOrder ms_le.
-    esplit; apply _.
-  Defined. 
 
 End MultisetOrder.
 
