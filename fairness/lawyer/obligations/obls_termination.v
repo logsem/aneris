@@ -88,13 +88,20 @@ Section Termination.
       intros [[??]?]. rewrite /phase_le. solve_decision.
     Qed. 
 
-    Definition PF (π: Phase) (k: nat) (δ: ProgressState OP) :=
-      (mset_map snd ∘ (mset_filter (fun '(π_, _) => phase_le π_ π)) ∘ (ps_cps OP)) δ
+    Definition PF' (P: Phase -> Prop)
+      `{forall π, Decision (P π)}
+      (k: nat) (δ: ProgressState OP) :=
+      (mset_map snd ∘ (mset_filter (fun '(π_, _) => P π_)) ∘ (ps_cps OP)) δ
         ⊎
-      approx_expects k (filter (fun '(_, π_, _) => phase_le π_ π) (ps_eps OP δ)). 
+      approx_expects k (filter (fun '(_, π_, _) => P π_) (ps_eps OP δ)).
 
-    Definition TPF (π: Phase) (i: nat): gmultiset Degree :=
-      from_option (PF π ((LIM_STEPS + 2) * i)) ∅ (tr S!! i).
+    Definition phase_ge := flip phase_le. 
+    Definition PF (π: Phase) := PF' (phase_ge π). 
+
+    Definition TPF (P: Phase -> Prop)
+      `{forall π, Decision (P π)}
+      (i: nat): gmultiset Degree :=
+      from_option (PF' P ((LIM_STEPS + 2) * i)) ∅ (tr S!! i).
 
     Lemma ms_le_exp_mono m n X Y
       (LE: m <= n)
@@ -114,9 +121,10 @@ Section Termination.
       apply scalar_mul_le. lia.
     Qed.
 
-    Lemma ms_le_PF_le m n π δ
+    Lemma ms_le_PF_le m n (* π *) P δ
+      `{forall π, Decision (P π)}
       (LE: m <= n):
-      ms_le deg_le (PF π n δ) (PF π m δ).
+      ms_le deg_le (PF' P n δ) (PF' P m δ).
     Proof using.
       apply ms_le_disj_union.
       + apply ms_le_sub. apply mset_map_sub. apply mset_filter_subseteq_mono. mss.
@@ -136,11 +144,12 @@ Section Termination.
       destruct e as [[??]?]. done.
     Qed.
 
-    Lemma exchange_cp_ms_le π__ow δ1 τ δ2 k π d d' n
+    Lemma exchange_cp_ms_le (* π__ow *)P δ1 τ δ2 k π d d' n
+      `{forall π, Decision (P π)}
       (EXC: exchanges_cp OP δ1 τ δ2 π d d' n):
-      ms_le deg_le (PF π__ow (S k) δ2) (PF π__ow k δ1).
+      ms_le deg_le (PF' P (S k) δ2) (PF' P k δ1).
     Proof using.
-      clear -EXC. rewrite /PF. 
+      clear -EXC. rewrite /PF /PF'. 
       inversion EXC; subst. 
       destruct δ1. simpl in *. 
       apply ms_le_disj_union.
@@ -150,12 +159,12 @@ Section Termination.
         rewrite !mset_filter_mul_comm.
         rewrite !mset_filter_singleton. 
         destruct decide.
-        2: { rewrite decide_False; [| tauto].
+        2: { (* rewrite decide_False; [| tauto]. *)
              rewrite multiset_difference_empty gmultiset_scalar_mul_empty.
              rewrite mset_map_empty.
              eapply ms_le_Proper; [reflexivity | | reflexivity].
              mss. }
-        rewrite decide_True; [| tauto].
+        (* rewrite decide_True; [| tauto]. *)
         rewrite mset_map_sub_diff. 
         2: { apply gmultiset_singleton_subseteq_l.
              by apply mset_filter_spec. }
@@ -168,12 +177,13 @@ Section Termination.
       + apply ms_le_exp_mono; [lia | reflexivity].
     Qed.
 
-    Lemma create_ep_ms_le π__ow δ1 τ δ2 k s π d d'
+    Lemma create_ep_ms_le (* π__ow *) P δ1 τ δ2 k s π d d'
+      `{forall π, Decision (P π)}
       (CREATE: creates_ep OP δ1 τ δ2 s π d d'):
-      ms_le deg_le (PF π__ow (S k) δ2) (PF π__ow k δ1).
+      ms_le deg_le (PF' P (S k) δ2) (PF' P k δ1).
     Proof using.
       clear -CREATE. 
-      rewrite /PF. inversion CREATE; subst.
+      rewrite /PF /PF'. inversion CREATE; subst.
       destruct δ1. simpl in *.
       subst new_cps0 new_eps0.
       
@@ -212,10 +222,11 @@ Section Termination.
         * done.
     Qed.
 
-    Lemma loc_step_no_exp_all_ms_le π__ow δ1 τ δ2 k
+    Lemma loc_step_no_exp_all_ms_le (* π__ow *) P δ1 τ δ2 k
+      `{forall π, Decision (P π)}
       (STEP: loc_step_no_exp_all δ1 τ δ2)
       :
-      ms_le deg_le (PF π__ow (S k) δ2) (PF π__ow k δ1).
+      ms_le deg_le (PF' P (S k) δ2) (PF' P k δ1).
     Proof using.
       clear -STEP OM.
       destruct STEP as [T|[T|[T|[T|T]]]]. 
@@ -239,16 +250,18 @@ Section Termination.
       - destruct T as (?&?&?&?&T). eapply create_ep_ms_le; eauto. 
     Qed.
 
-    Definition expect_ms_le π δ1 τ δ2 k :=
+    Definition expect_ms_le (* π *) P δ1 τ δ2 k
+      `{forall π, Decision (P π)}:=
       forall sid π' d,
         expects_ep _ δ1 τ δ2 sid π' d ->
-        ms_le deg_le (PF π (S k) δ2) (PF π k δ1). 
+        ms_le deg_le (PF' P (S k) δ2) (PF' P k δ1). 
 
-    Lemma loc_step_ms_le π δ1 τ δ2 k
+    Lemma loc_step_ms_le (* π *) P δ1 τ δ2 k
+      `{forall π, Decision (P π)}
       (STEP: loc_step _ δ1 τ δ2)
-      (EXP_CASE: expect_ms_le π δ1 τ δ2 k)
+      (EXP_CASE: expect_ms_le P δ1 τ δ2 k)
       :
-      ms_le deg_le (PF π (S k) δ2) (PF π k δ1).
+      ms_le deg_le (PF' P (S k) δ2) (PF' P k δ1).
     Proof using.
       clear LVL_WF.
       apply loc_step_split in STEP as [NOEXP | EXP].
@@ -261,11 +274,11 @@ Section Termination.
     Lemma other_expect_ms_le π__ow δ1 τ δ2 k
       (OTHER: let π := default π0 (ps_phases _ δ1 !! τ) in
               phases_incompat π__ow π):
-      expect_ms_le π__ow δ1 τ δ2 k. 
+      expect_ms_le (phase_ge π__ow) δ1 τ δ2 k. 
     Proof using.
       clear LVL_WF SET_BEFORE_SPEC. 
       red. intros sid π' d EXP. 
-      rewrite /PF.
+      rewrite /PF /PF'.
       inversion EXP; subst.
       destruct δ1. simpl in *.
       subst new_cps0.
@@ -287,11 +300,11 @@ Section Termination.
                   k < n)
       :
       let π__ow := default π0 (ps_phases _ δ1 !! τ) in
-      expect_ms_le π__ow δ1 τ δ2 k. 
+      expect_ms_le (phase_ge π__ow) δ1 τ δ2 k. 
     Proof using.
       clear LVL_WF SET_BEFORE_SPEC.
       intros. red. intros sid π' d EXP. 
-      rewrite /PF.
+      rewrite /PF /PF'.
 
       inversion EXP; subst.
       destruct δ1. simpl in *. subst new_cps0.
@@ -299,7 +312,8 @@ Section Termination.
       
       rewrite !mset_filter_disj_union mset_map_disj_union.
       rewrite !mset_filter_singleton.
-      rewrite decide_True; [| reflexivity]. rewrite mset_map_singleton. simpl. 
+      rewrite decide_True; [| red; reflexivity].
+      rewrite mset_map_singleton. simpl. 
 
       (* rewrite mset_map_disj_union. *)
       rewrite -gmultiset_disj_union_assoc. apply ms_le_disj_union.
@@ -323,16 +337,19 @@ Section Termination.
       rewrite -gmultiset_scalar_mul_S_r. f_equiv. lia.
     Qed.
 
-    Definition nsteps_keep_ms_le π δ i τ :=
+    Definition nsteps_keep_ms_le (* π *) P δ i τ
+      `{forall π, Decision (P π)}
+      :=
       forall δ' k
       (ITH: tr S!! i = Some δ)
       (BOUND : k ≤ LIM_STEPS)
       (STEPS: nsteps (λ p1 p2, loc_step OP p1 τ p2) k δ δ'),
-      ms_le deg_le (PF π ((LIM_STEPS + 2) * i + k) δ') (PF π ((LIM_STEPS + 2) * i) δ).
+      ms_le deg_le (PF' P ((LIM_STEPS + 2) * i + k) δ') (PF' P ((LIM_STEPS + 2) * i) δ).
 
-    Lemma forks_locale_ms_le π δ1 τ δ2 τ' R k
+    Lemma forks_locale_ms_le (* π *) P δ1 τ δ2 τ' R k
+      `{forall π, Decision (P π)}
       (FORK: forks_locale OP δ1 τ δ2 τ' R):
-      ms_le deg_le (PF π (S k) δ2) (PF π k δ1).
+      ms_le deg_le (PF' P (S k) δ2) (PF' P k δ1).
     Proof using.
       rewrite /PF.
       inversion FORK; subst. 
@@ -342,7 +359,8 @@ Section Termination.
       + apply ms_le_exp_mono; [lia | reflexivity].
     Qed.
 
-    Lemma om_trans_ms_rel (bd: bool) π i
+    Lemma om_trans_ms_rel (bd: bool) (* π *) P i
+      `{forall π, Decision (P π)}
       (rel := (if bd then ms_lt deg_le else ms_le deg_le): relation (gmultiset Degree))
       (VALID: obls_trace_valid OP tr)
       (BURN_REL:
@@ -352,12 +370,12 @@ Section Termination.
           nsteps (λ p1 p2, loc_step OP p1 τ p2) k δ mb ->
           (∃ π δ, burns_cp OP mb τ mf π δ) ->
           clos_refl (ProgressState OP) (λ p1 p2, ∃ τ' R, forks_locale OP p1 τ p2 τ' R) mf δ' ->
-          rel (PF π ((LIM_STEPS + 2) * i + LIM_STEPS + 1) mf) (PF π ((LIM_STEPS + 2) * i + LIM_STEPS) mb))
+          rel (PF' P ((LIM_STEPS + 2) * i + LIM_STEPS + 1) mf) (PF' P ((LIM_STEPS + 2) * i + LIM_STEPS) mb))
       (NSTEPS_LE: forall δ τ,
           tr L!! i = Some τ ->
-          nsteps_keep_ms_le π δ i τ)
+          nsteps_keep_ms_le P δ i τ)
       (DOM: is_Some (tr S!! (S i))):
-      rel (TPF π (S i)) (TPF π i).
+      rel (TPF P (S i)) (TPF P i).
     Proof using.
       rewrite /TPF. simpl.
       forward eapply (proj2 (label_lookup_states' _ _)) as [τ ITHl]; eauto.  
@@ -373,24 +391,24 @@ Section Termination.
       2: { eapply state_label_lookup; eauto. rewrite Nat.add_1_r. eauto. }
       eapply NSTEPS_LE in PSTEP; eauto. 
 
-      assert (ms_le deg_le (PF π ((LIM_STEPS + 2) * S i) δ')
-            (PF π ((LIM_STEPS + 2) * i + LIM_STEPS + 1) mf)).
-      { inversion FSTEP.
+      assert (ms_le deg_le (PF' P ((LIM_STEPS + 2) * S i) δ')
+            (PF' P ((LIM_STEPS + 2) * i + LIM_STEPS + 1) mf)) as LE. 
+      { inversion FSTEP as [? FORK | ]. 
         2: { subst mf.
              rewrite /PF. apply ms_le_disj_union.
              - reflexivity.
              - apply ms_le_exp_mono; [lia | reflexivity]. }
-        destruct H1 as (?&?&?). 
+        destruct FORK as (?&?&?). 
         subst y. eapply ms_le_Proper; [| reflexivity| eapply forks_locale_ms_le; eauto].
         f_equiv. apply leibniz_equiv_iff. lia. }  
 
       destruct bd; subst rel.
       - eapply strict_transitive_l; [| apply PSTEP]. 
-        eapply strict_transitive_r; [apply H1| ]. 
+        eapply strict_transitive_r; [apply LE| ]. 
         eapply strict_transitive_l; [apply BSTEP| ].
         apply ms_le_PF_le. lia.
       - etrans; [| apply PSTEP].
-        etrans; [apply H1| ].
+        etrans; [apply LE| ].
         etrans; [apply BSTEP| ].
         apply ms_le_PF_le. lia.
     Qed.
@@ -401,9 +419,10 @@ Section Termination.
            map_Exists (fun τ obs => s ∈ obs) (from_option (ps_obls _) ∅ (tr S!! i)). 
     Proof using OM. Admitted. 
 
-    Lemma burns_cp_ms_le δ1 τ δ2 π π' d k
+    Lemma burns_cp_ms_le δ1 τ δ2 (* π *) P π' d k
+      `{forall π, Decision (P π)}
       (STEP: burns_cp OP δ1 τ δ2 π' d):
-      ms_le deg_le (PF π (S k) δ2) (PF π k δ1).
+      ms_le deg_le (PF' P (S k) δ2) (PF' P k δ1).
     Proof using.
       clear LVL_WF SET_BEFORE_SPEC. 
       rewrite /PF. 
@@ -419,7 +438,7 @@ Section Termination.
       (VALID: obls_trace_valid OP tr)
       (PH: from_option (fun δ => ps_phases _ δ !! τ = Some πτ) False (tr S!! n))
       (NOτ: tr L!! n ≠ Some τ):
-      ms_le deg_le (TPF πτ (S n)) (TPF πτ n).
+      ms_le deg_le (TPF (phase_ge πτ) (S n)) (TPF (phase_ge πτ) n).
     Proof using.
       destruct (tr S!! (S n)) as [δ'| ] eqn:NEXT.
       2: { rewrite /TPF. rewrite NEXT. simpl. apply empty_ms_le. }
@@ -461,14 +480,13 @@ Section Termination.
       admit.
     Admitted.
 
-
     Lemma next_step_rewind τ π i δ0 j
       (VALID: obls_trace_valid OP tr)
       (ITH: tr S!! i = Some δ0)
       (PH: ps_phases _ δ0 !! τ = Some π)
       (LE: i <= j)
       (NOτ: forall k, i <= k < j -> tr L!! k ≠ Some τ):
-      ms_le deg_le (TPF π j) (TPF π i).
+      ms_le deg_le (TPF (phase_ge π) j) (TPF (phase_ge π) i).
     Proof using. 
       apply Nat.le_sum in LE as [d ->]. induction d.
       { rewrite Nat.add_0_r. reflexivity. }
@@ -535,13 +553,15 @@ Section Termination.
       edestruct @strict_not_both; eauto. 
     Admitted.
 
-    Lemma burns_cp_own_ms_lt δ1 τ δ2 πτ πb d k
+    Lemma burns_cp_own_ms_lt δ1 τ δ2 πτ πb d k P
+      `{forall π, Decision (P π)}
       (PH: ps_phases _ δ1 !! τ = Some πτ)
+      (Pτ: P πb)
       (STEP: burns_cp OP δ1 τ δ2 πb d):
-      ms_lt deg_le (PF πτ (S k) δ2) (PF πτ k δ1).
+      ms_lt deg_le (PF' P (S k) δ2) (PF' P k δ1).
     Proof using.
       clear tr SET_BEFORE_SPEC LVL_WF.
-      rewrite /PF. 
+      rewrite /PF /PF'. 
       inversion STEP; subst.
       destruct δ1. simpl in *.
 
@@ -567,7 +587,7 @@ Section Termination.
       rewrite mset_filter_disj_union mset_filter_singleton decide_True; [| set_solver].
       rewrite mset_map_disj_union mset_map_singleton. simpl.
       mss. 
-    Qed.         
+    Qed.
 
     Lemma owm_om_trans_ms_lt πτ τ n s δ0
       (NTH: tr S!! n = Some δ0)
@@ -577,7 +597,7 @@ Section Termination.
       (MIN: minimal_in_prop tr_sig_lt (s, n) (λ sn, never_set_after sn.1 sn.2))
       (OWNER: s ∈ default ∅ (ps_obls _ δ0 !! τ))
       (LBL: tr L!! n = Some τ):
-      ms_lt deg_le (TPF πτ (S n)) (TPF πτ n).
+      ms_lt deg_le (TPF (phase_ge πτ) (S n)) (TPF (phase_ge πτ) n).
     Proof using.
       forward eapply (proj1 (label_lookup_states' _ _)); eauto. intros [δ' NTH']. 
       
@@ -587,11 +607,16 @@ Section Termination.
         apply state_label_lookup in H1 as (NTH_&?&LBL_).
         rewrite LBL in LBL_. inversion LBL_. subst τ0. 
         rewrite NTH in NTH_. inversion NTH_. subst δ0. 
-        destruct H4 as (?&?&?). 
-        eapply burns_cp_own_ms_lt; eauto.
-        rewrite -PH.
-        (* phases are preserved by loc steps *)
-        admit. }
+        destruct H4 as (?&?&?).
+
+        inversion H4. subst. 
+        assert (ps_phases _ mb !! τ = Some πτ) as PH'.
+        { (* phases are preserved by loc steps *)
+          admit. 
+        }
+        rewrite LOC_PHASE in PH'. inversion PH'. subst π__max.  
+
+        eapply burns_cp_own_ms_lt with (πb := x); eauto. }
 
       (* TODO: extract the lemma below? *)
 
@@ -724,7 +749,7 @@ Section Termination.
       (UNSET: never_set_after s c)
       (MIN: minimal_in_prop tr_sig_lt (s, c)
           (λ ab : SignalId * nat, never_set_after ab.1 ab.2))
-      (OTF := λ i, TPF (s_ow s i) i):
+      (OTF := λ i, TPF (phase_ge (s_ow s i)) i):
       ∀ d, c ≤ d → ∃ j, d < j ∧ ms_lt deg_le (OTF j) (OTF d).
     Proof using.
       intros d LE.
@@ -843,8 +868,8 @@ Section Termination.
       intros EX. apply ex_prod' in EX.
       eapply sets_have_min in EX; [| apply tr_sig_lt_wf].
       apply ex_prod in EX. simpl in EX. destruct EX as (s & c & UNSET & MIN).
-        
-      set (OTF i := TPF (s_ow s i) i).
+      
+      set (OTF i := TPF (phase_ge (s_ow s i)) i).
 
       set (R := MR (ms_lt deg_le) (fun i => OTF (c + i))). 
       forward eapply well_founded_ind with (R := R) (P := fun _ => False).
