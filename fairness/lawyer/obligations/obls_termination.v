@@ -654,6 +654,120 @@ Section Termination.
         apply Nat.le_sum in H1 as [u EQ]. rewrite EQ. lia. }
 
       eapply other_sig_exp_lim; eauto.
+    Admitted.
+
+    Let any_phase (_: Phase) := True.
+
+    (* TODO: move *)
+    Lemma gset_filter_True `{Countable K} (g: gset K)
+      (P: K -> Prop)
+      `{∀ x, Decision (P x)}
+      (TRUE: forall k, k ∈ g -> P k):
+      filter P g = g.
+    Proof using. clear -TRUE. set_solver. Qed. 
+
+    Lemma any_expect_ms_le δ1 τ δ2 k
+      (SET_BOUND: forall sid π d, expects_ep OP δ1 τ δ2 sid π d ->
+                  let n := (LIM_STEPS + 2) * set_before sid in
+                  k < n)
+      :
+      expect_ms_le any_phase δ1 τ δ2 k. 
+    Proof using SET_BEFORE_SPEC.
+      clear LVL_WF.
+      intros. red. intros sid π' d EXP. 
+      rewrite /PF /PF'.
+      
+      inversion EXP; subst.
+      destruct δ1. simpl in *. subst new_cps0.
+      rewrite !mset_filter_True.
+      2, 3: intros [??]; done.
+      rewrite gset_filter_True.
+      2: intros ((?&?)&?); done.      
+      
+      rewrite mset_map_disj_union.
+      rewrite mset_map_singleton. simpl. 
+
+      (* rewrite mset_map_disj_union. *)
+      rewrite -gmultiset_disj_union_assoc. apply ms_le_disj_union.
+      { apply ms_le_refl. }
+      rewrite (union_difference_singleton_L _ _ EP).
+      
+      rewrite (union_comm_L {[ _ ]} _).
+      rewrite !approx_expects_add.
+      2, 3: set_solver.
+      simpl. rewrite gmultiset_disj_union_comm.
+      rewrite -gmultiset_disj_union_assoc.
+      apply ms_le_disj_union.
+      { apply ms_le_exp_mono; [lia | reflexivity]. }
+
+      move SET_BOUND at bottom. specialize_full SET_BOUND; [by eauto| ].
+      eapply ms_le_Proper; [reflexivity| ..| apply ms_le_refl].
+      rewrite -gmultiset_scalar_mul_S_r. f_equiv. lia.
+    Qed.
+
+    (* TODO: try to unify with previous lemmas? *)
+    Lemma om_trans_all_ms_lt n
+      (* (NTH: tr S!! n = Some δ0) *)
+      (VALID: obls_trace_valid OP tr)
+      (* (PH: ps_phases _ δ0 !! τ = Some πτ) *)
+      (* (NEVER_SET : never_set_after s n) *)
+      (* (MIN: minimal_in_prop tr_sig_lt (s, n) (λ sn, never_set_after sn.1 sn.2)) *)
+      (* (OWNER: s ∈ default ∅ (ps_obls _ δ0 !! τ)) *)
+      (* (LBL: tr L!! n = Some τ) *)
+      (DOM: is_Some (tr S!! (S n)))
+      :
+      ms_lt deg_le (TPF any_phase (S n)) (TPF any_phase n).
+    Proof using.
+      destruct DOM as [δ' NTH']. 
+      
+      apply (om_trans_ms_rel true); auto.
+      { intros δ δ'_ τ mb mf k NTH BOUND PSTEPS BURNS FORKS. 
+        rewrite Nat.add_succ_r Nat.add_0_r.
+        apply state_label_lookup in NTH as (NTH_&NTH'_&LBL_).
+        rewrite Nat.add_1_r NTH' in NTH'_. inversion NTH'_. subst δ'_. 
+        destruct BURNS as (?&?&BURNS).
+        inversion BURNS. subst. 
+        eapply burns_cp_own_ms_lt with (πb := x); done. }
+
+      (* TODO: extract the lemma below? *)
+
+      clear δ' NTH'. 
+      intros δ τ' IDTHl. 
+      red. intros δk k IDTH BOUND NSTEPS.
+
+      generalize dependent δk. induction k.
+      { intros ? ->%obls_utils.nsteps_0.
+        rewrite Nat.add_0_r. reflexivity. }
+      intros δ'' (δ' & STEPS & STEP)%nsteps_inv_r.
+      specialize (IHk ltac:(lia) _ STEPS).
+      etrans; eauto.
+      eapply ms_le_Proper; [| | eapply loc_step_ms_le]; eauto.
+      { rewrite -PeanoNat.Nat.add_succ_comm. simpl. reflexivity. }
+
+      eapply any_expect_ms_le. 
+      
+      intros sid π d EXP. simpl.
+      inversion EXP. subst.
+
+      enough (set_before sid > n).
+      { apply PeanoNat.Nat.le_succ_l in H1. 
+        apply Nat.le_sum in H1 as [u EQ]. rewrite EQ. lia. }
+
+      red.
+      clear LE. 
+      edestruct Nat.lt_ge_cases as [LT | LE]; [apply LT| ].   
+      pose proof SET_BEFORE_SPEC as SB.
+      assert (∀ c, ¬ never_set_after sid c) as SET by admit. 
+      specialize (SB _ _ SET LE).
+      rewrite IDTH in SB. simpl in SB.
+
+      destruct (ps_sigs OP δ !! sid) as [[??]| ] eqn:SIG0; [| done].
+      simpl in SB. subst. 
+      (* signal cannot be unset *)
+      assert (ps_sigs OP δ !! sid = Some (l, false)) as SIG0'.
+      { admit. }
+      congruence. 
+      
     Admitted. 
 
     Lemma obls_transfer_phase δ1 τ δ2 s τs πs

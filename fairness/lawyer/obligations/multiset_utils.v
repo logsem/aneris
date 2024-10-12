@@ -58,6 +58,10 @@ Section GmultisetUtils.
     forall (g: gmultiset A), g = ∅ <-> forall k, ¬ k ∈ g.
   Proof using. mss. Qed.
 
+  Lemma not_elem_of_multiplicity a (g: gmultiset A):
+    a ∉ g ↔ multiplicity a g = 0.
+  Proof using. mss. Qed.
+
 End GmultisetUtils.
 
 Section MultisetOrder.
@@ -415,15 +419,6 @@ Section MultisetDefs.
       apply gmultiset_elements_disj_union.
     Qed.
 
-    Lemma mset_filter_False g
-      (FALSE: forall a, a ∈ g -> ¬ P a):
-      mset_filter g = ∅.
-    Proof using.
-      destruct (decide (mset_filter g = ∅)) as [| NE]; [done| ]. 
-      apply gmultiset_choose in NE as [? IN].
-      apply mset_filter_spec in IN as [??]. set_solver.
-    Qed. 
-
     Lemma mset_filter_singleton a:
       mset_filter {[+ a +]} = if (decide (P a)) then {[+ a +]} else ∅.
     Proof using.
@@ -450,6 +445,27 @@ Section MultisetDefs.
         rewrite multiplicity_empty. lia.
       - rewrite multiplicity_empty. lia.
     Qed.
+
+    Lemma mset_filter_True g
+      (FALSE: forall a, a ∈ g -> P a):
+      mset_filter g = g.
+    Proof using.
+      apply gmultiset_eq. intros a.
+      rewrite mset_filter_multiplicity.
+      destruct (decide (a ∈ g)).
+      { rewrite decide_True; eauto. }
+      rewrite (proj1 (not_elem_of_multiplicity _ _) _); auto.
+      destruct decide; done. 
+    Qed.
+
+    Lemma mset_filter_False g
+      (FALSE: forall a, a ∈ g -> ¬ P a):
+      mset_filter g = ∅.
+    Proof using.
+      destruct (decide (mset_filter g = ∅)) as [| NE]; [done| ]. 
+      apply gmultiset_choose in NE as [? IN].
+      apply mset_filter_spec in IN as [??]. set_solver.
+    Qed. 
 
     Lemma mset_filter_subseteq_mono:
       Proper (subseteq ==> subseteq) mset_filter.
