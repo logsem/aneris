@@ -29,9 +29,6 @@ Section PhaseFuel.
     
   Context (tr: obls_trace OP).
   
-  Context `{Inhabited Level}. 
-  Let lvl__def := @inhabitant Level _. 
-  
   Context (sig_bound: SignalId -> nat).
   
   Definition approx_expects (k: nat) (eps: gset (@ExpectPermission Degree)) :=
