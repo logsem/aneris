@@ -386,7 +386,6 @@ Section Model.
     - red. set_solver.
   Qed.         
   
-  (* TODO: refactor *)
   Definition phase_lt := strict phase_le.
   
   Lemma phase_lt_fork π (d: nat):
@@ -403,6 +402,25 @@ Section Model.
     { apply SUB. apply H0. done. }
     lia.
   Qed. 
+
+  Definition phases_incompat π1 π2 := ¬ phase_le π1 π2 /\ ¬ phase_le π2 π1.
+
+  (* Definition phases_disjoint (π1 π2: Phase) := π1 ## π2.  *)
+  
+  (* Lemma phases_disjoint_incompat π1 π2: *)
+  (*   phases_disjoint π1 π2 -> phases_incompat π1 π2. *)
+  (* Proof using. *)
+  (*   rewrite /phases_disjoint /phases_incompat /phase_le. *)
+  (*   rewrite /disjoint /ndisjoint. intros DISJ. *)
+  (*   split; intros SUB.  *)
+  (*   - destruct (DISJ (coPpick (↑π2))); [apply SUB| ]; apply coPpick_elem_of, nclose_infinite.   *)
+  (*   - destruct (DISJ (coPpick (↑π1))); [| apply SUB]; apply coPpick_elem_of, nclose_infinite. *)
+  (* Qed.      *)
+  
+  Global Instance phase_le_dec: forall x y, Decision (phase_le x y).
+  Proof using. 
+    intros. rewrite /phase_le. solve_decision. 
+  Qed.
 
   Definition obls_trace_valid := trace_valid (@mtrans ObligationsModel).
   Definition obls_trace := trace (mstate ObligationsModel) (mlabel ObligationsModel).

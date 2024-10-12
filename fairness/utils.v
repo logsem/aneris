@@ -722,6 +722,14 @@ Section ExtractSomes.
     - destruct x; eauto. done.
   Qed. 
 
+  Lemma extract_Somes_gset_singleton (ok: option A):
+    extract_Somes_gset {[ ok ]} = match ok with | Some k => {[ k ]} | None => ∅ end.
+  Proof using.
+    destruct ok; try set_solver.
+    apply set_eq. intros ?. rewrite <- extract_Somes_gset_spec.
+    set_solver.
+  Qed.
+
 End ExtractSomes.
 
 

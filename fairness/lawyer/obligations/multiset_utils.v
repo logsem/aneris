@@ -54,6 +54,10 @@ Section GmultisetUtils.
     intros. destruct decide; set_solver.
   Qed.
 
+  Lemma gmultiset_empty_no_elements:
+    forall (g: gmultiset A), g = ∅ <-> forall k, ¬ k ∈ g.
+  Proof using. mss. Qed.
+
 End GmultisetUtils.
 
 Section MultisetOrder.
