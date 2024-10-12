@@ -2021,52 +2021,40 @@ Proof.
               all : apply lookup_cons_Some; eauto.
 Qed.
 
-Lemma valid_trace_ru_pre T tag t e lt : 
-  lin_trace_of lt t →
-  is_pre_event e →
-  tagOfEvent e = Some tag →
-  tag ∉ tags t →
-  valid_sequence lt →
-  valid_transactions T → 
-  extraction_of lt T →
-  (∀ t, t ∈ T → t ≠ []) →
-  valid_trace_ru (t ++ [e]).
+Lemma based_on_add1 op exec T1 T2 trans :
+  ¬is_cm_op op →
+  (∃ op, op ∈ trans ∧ last trans = Some op ∧ isCmOp op = false) →
+  based_on exec (comTrans (T1 ++ trans :: T2)) →
+  based_on exec (comTrans (T1 ++ (trans ++ [op]) :: T2)).
 Proof.
-  intros Hlin Hpre Htag Hvalid Hvalid_trans 
-    Hextract Hempty Hnin.
-  rewrite /valid_trace_ru /valid_trace.
-  exists lt.
-  split.
-  - apply (lin_trace_valid tag); try done; eauto.
-  - split; first done.
-    destruct (exists_execution T) as [E (Hbased & Hvalid_exec)]; first set_solver.
-    eexists T, E.
-    by do 3 (split; first done).
+  intros Hnot Hop Hbased.
+  rewrite /comTrans.
+  rewrite /comTrans in Hbased.
+  rewrite List.filter_app.
+  rewrite List.filter_app in Hbased.
+  simpl.
+  simpl in Hbased.
+  destruct Hop as (op' & _ & Heq & Hcm_op).
+  rewrite Heq in Hbased.
+  rewrite /isCmOp in Hcm_op.
+  rewrite /is_cm_op in Hnot.
+  destruct op'; last set_solver.
+  all : destruct op.
+  3, 6 : set_solver.
+  all : rewrite last_snoc; done.
 Qed.
 
-Lemma valid_trace_ru_post T tag t e lt : 
-  lin_trace_of lt t →
-  (∃ le, postToLin e = Some le ∧ le ∈ lt) →
-  is_post_event e →
-  tagOfEvent e = Some tag →
-  valid_sequence lt →
-  valid_transactions T → 
-  extraction_of lt T →
-  (∀ t, t ∈ T → t ≠ []) →
-  valid_trace_ru (t ++ [e]).
+Lemma based_on_add2 op exec T :
+  ¬is_cm_op op →
+  based_on exec (comTrans T) →
+  based_on exec (comTrans (T ++ [[op]])). 
 Proof.
-  intros Hlin Hexists Hpost Htag Hvalid Hvalid_trans 
-    Hextract Hempty.
-  rewrite /valid_trace_ru /valid_trace.
-  exists lt.
-  split.
-  - apply (lin_trace_valid tag); try done.
-    right.
-    rewrite /is_post_event in Hpost.
-    set_solver.
-  - split; first done.
-    destruct (exists_execution T Hempty) as (exec & Hexec_props).
-    by exists T, exec.
+  intros Hnot Hbased.
+  rewrite /comTrans.
+  rewrite List.filter_app.
+  simpl.
+  rewrite /is_cm_op in Hnot.
+  destruct op; last set_solver; simpl; by rewrite app_nil_r.
 Qed.
 
 Lemma valid_trace_pre T tag t e lt exec test : 

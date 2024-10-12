@@ -292,9 +292,11 @@ Section trace_proof_util.
       ∃ (mname : gmap socket_address (gname * val)), ghost_map_auth γmname (1%Qp) mname ∗ 
         ([∗ set] sa ∈ clients, client_trace_state_resources lt T sa γmstate γmname extract mstate mname).
 
-  Definition GlobalInvExt (T : list transaction) (extract : val → option val) (γmstate γmlin γmpost γmname γl : gname) (clients : gset socket_address) : iProp Σ := 
-    ∃ t lt, trace_is t ∗ OwnLinTrace γl lt ∗ ⌜lin_trace_of lt t⌝ ∗ ⌜∀ t, t ∈ T → t ≠ []⌝ ∗
+  Definition GlobalInvExt (test : commitTest) (T : list transaction) (extract : val → option val) 
+    (γmstate γmlin γmpost γmname γl : gname) (clients : gset socket_address) : iProp Σ := 
+    ∃ t lt exec, trace_is t ∗ OwnLinTrace γl lt ∗ ⌜lin_trace_of lt t⌝ ∗ ⌜∀ t, t ∈ T → t ≠ []⌝ ∗
       ⌜extraction_of lt T⌝ ∗ ⌜valid_transactions T⌝ ∗ ⌜valid_sequence lt⌝ ∗
+      ⌜based_on exec (comTrans T)⌝ ∗ ⌜valid_execution test exec⌝ ∗
       trace_state_resources lt T γmstate γmname clients extract ∗
       trace_lin_resources lt t γmlin ∗
       trace_post_resources t γmpost.
