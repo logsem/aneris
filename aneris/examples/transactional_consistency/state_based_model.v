@@ -2021,21 +2021,17 @@ Proof.
               all : apply lookup_cons_Some; eauto.
 Qed.
 
-Lemma based_on_add1 op exec T1 T2 trans :
+Lemma com_trans_eq1 op T1 T2 trans:
   ¬is_cm_op op →
   (∃ op, op ∈ trans ∧ last trans = Some op ∧ isCmOp op = false) →
-  based_on exec (comTrans (T1 ++ trans :: T2)) →
-  based_on exec (comTrans (T1 ++ (trans ++ [op]) :: T2)).
+  comTrans (T1 ++ trans :: T2) = comTrans (T1 ++ (trans ++ [op]) :: T2).
 Proof.
-  intros Hnot Hop Hbased.
+  intros Hnot Hop.
   rewrite /comTrans.
-  rewrite /comTrans in Hbased.
-  rewrite List.filter_app.
-  rewrite List.filter_app in Hbased.
+  do 2 rewrite List.filter_app.
   simpl.
-  simpl in Hbased.
   destruct Hop as (op' & _ & Heq & Hcm_op).
-  rewrite Heq in Hbased.
+  rewrite Heq.
   rewrite /isCmOp in Hcm_op.
   rewrite /is_cm_op in Hnot.
   destruct op'; last set_solver.
@@ -2044,17 +2040,35 @@ Proof.
   all : rewrite last_snoc; done.
 Qed.
 
+Lemma com_trans_eq2 op T :
+  ¬is_cm_op op →
+  comTrans T = comTrans (T ++ [[op]]).
+Proof.
+  intros Hnot.
+  rewrite /comTrans.
+  rewrite List.filter_app.
+  simpl.
+  rewrite /is_cm_op in Hnot.
+  destruct op; last set_solver; simpl; by rewrite app_nil_r.
+Qed. 
+
+Lemma based_on_add1 op exec T1 T2 trans :
+  ¬is_cm_op op →
+  (∃ op, op ∈ trans ∧ last trans = Some op ∧ isCmOp op = false) →
+  based_on exec (comTrans (T1 ++ trans :: T2)) →
+  based_on exec (comTrans (T1 ++ (trans ++ [op]) :: T2)).
+Proof.
+  intros Hnot Hop Hbased.
+  by rewrite -com_trans_eq1.
+Qed.
+
 Lemma based_on_add2 op exec T :
   ¬is_cm_op op →
   based_on exec (comTrans T) →
   based_on exec (comTrans (T ++ [[op]])). 
 Proof.
   intros Hnot Hbased.
-  rewrite /comTrans.
-  rewrite List.filter_app.
-  simpl.
-  rewrite /is_cm_op in Hnot.
-  destruct op; last set_solver; simpl; by rewrite app_nil_r.
+  by rewrite -com_trans_eq2.
 Qed.
 
 Lemma valid_trace_pre T tag t e lt exec test : 
