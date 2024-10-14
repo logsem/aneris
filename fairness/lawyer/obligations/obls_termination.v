@@ -331,14 +331,6 @@ Section Termination.
   (*   forall ep, ep ∈ ps_eps _ δ2 ∖ ps_eps _ δ1 -> phase_le (ep.1.2) πτ. *)
   (* Proof using. Admitted. *)
   
-  (* TODO: add to Wf *)
-  Lemma cps_phase_bound δ:
-    ¬ (exists τ π cp,
-          ps_phases _ δ !! τ = Some π /\
-            cp ∈ ps_cps _ δ /\
-            phase_lt π cp.1).
-  Proof using. Admitted. 
-  
   Lemma om_trans_cps_bound δ1 τ δ2 πτ cp π'
     (PH: ps_phases _ δ1 !! τ = Some πτ)
     (STEP: om_trans _ δ1 τ δ2)
