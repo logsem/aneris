@@ -118,6 +118,7 @@ Section MultisetOrder.
   Goal PartialOrder ms_le.
     esplit; apply _.
   Defined. 
+
   Lemma empty_ms_le X: ms_le ∅ X.
   Proof using.
     red. intros ?. rewrite multiplicity_empty. lia.
@@ -132,6 +133,11 @@ Section MultisetOrder.
     red in LE. setoid_rewrite multiplicity_empty in LE. 
     specialize (LE x ltac:(by apply elem_of_multiplicity)).
     destruct LE as (?&?&?). lia.
+  Qed. 
+
+  Lemma no_ms_lt_empty X: ¬ ms_lt X ∅. 
+  Proof using.
+    intros [LE NE]%strict_spec_alt. apply ms_le_empty in LE. done.
   Qed. 
 
   (* TODO: generalize, move *)

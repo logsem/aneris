@@ -3,7 +3,7 @@ Require Import Relation_Operators.
 From stdpp Require Import namespaces.
 From iris.proofmode Require Import tactics.
 From iris.algebra Require Import gset gmultiset.
-From trillium.fairness Require Import locales_helpers inftraces fairness trace_len.
+From trillium.fairness Require Import locales_helpers inftraces fairness trace_len my_omega.
 From trillium.fairness.lawyer.obligations Require Import obligations_model multiset_utils obls_utils wf_utils obls_pf.
 From stdpp Require Import relations.
 
@@ -28,14 +28,13 @@ Section Termination.
 
   (* TODO: get rid of excessive negations *)
   Definition eventually_set sid :=
-    forall c, ¬ never_set_after sid c. 
+    forall c, ¬ never_set_after sid c.
+
+  Definition sb_prop sid n := 
+    forall i, eventually_set sid -> n <= i -> sig_val_at sid i = true. 
 
   Context {set_before: SignalId -> nat}.
-  Hypothesis (SET_BEFORE_SPEC: 
-               forall sid i,
-                 eventually_set sid ->
-                 set_before sid <= i ->
-                 sig_val_at sid i = true).  
+  Hypothesis (SET_BEFORE_SPEC: forall sid, sb_prop sid (set_before sid)). 
   
   Definition lvl_at (sid_i: SignalId * nat): Level :=
     let '(sid, i) := sid_i in
@@ -53,7 +52,7 @@ Section Termination.
     rewrite /never_set_after. intros NEVER m LE'.
     eapply NEVER. lia. 
   Qed.
-  
+
   Definition phase_ge := flip phase_le. 
   Definition PF (π: Phase) := PF' OP set_before (phase_ge π).
   Definition TPF (π: Phase) := TPF' OP tr set_before (phase_ge π).
@@ -524,11 +523,17 @@ Section Termination.
   Theorem signals_eventually_set
     (VALID: obls_trace_valid OP tr)
     (FAIR: forall τ, obls_trace_fair _ τ tr):
-    ¬ exists sid c, never_set_after sid c. 
+    (* ¬ exists sid c, never_set_after sid c.  *)
+    forall sid, eventually_set sid. 
   Proof using.
-    intros EX. apply ex_prod' in EX.
-    eapply sets_have_min in EX; [| apply tr_sig_lt_wf].
-    apply ex_prod in EX. simpl in EX. destruct EX as (s & c & UNSET & MIN).
+    intros sid. red. intros c UNSET.
+    (* red in UNSET.  *)
+    pattern c in UNSET. apply ex_intro in UNSET. 
+    pattern sid in UNSET. apply ex_intro in UNSET. 
+    
+    apply ex_prod' in UNSET. 
+    eapply sets_have_min in UNSET; [| apply tr_sig_lt_wf]. clear sid c. 
+    apply ex_prod in UNSET. simpl in UNSET. destruct UNSET as (s & c & UNSET & MIN).
     
     set (OTF i := TPF (s_ow s i) i).
     
@@ -663,6 +668,29 @@ Section Termination.
     
   Admitted. 
 
+  Theorem trace_terminates
+    (VALID: obls_trace_valid OP tr)
+    (FAIR: forall τ, obls_trace_fair _ τ tr):
+    terminating_trace tr. 
+  Proof using.      
+    set (R := MR (ms_lt deg_le) APF).    
+    forward eapply well_founded_ind with (R := R) (P := fun _ => terminating_trace tr).
+    4: done.
+    3: exact 0. 
+    { eapply measure_wf.
+      admit. }
+    intros i NEXT.
+
+    destruct (tr S!! (S i)) eqn:ITH'.
+    2: { pose proof (trace_has_len tr) as [len ?]. 
+         eapply state_lookup_dom_neg in ITH'; eauto.
+         lia_NO' len.
+         eapply terminating_trace_equiv; eauto. }
+
+    forward eapply om_trans_all_ms_lt; eauto.
+    by apply signals_eventually_set. 
+  Admitted. 
+
 End Termination.
 
 
@@ -675,32 +703,35 @@ Section TerminationFull.
   Context (tr: obls_trace OP).
 
   Lemma set_before_ex
-    (VALID: obls_trace_valid OP tr)
-    (FAIR: ∀ τ, obls_trace_fair OP τ tr)
     :
-    forall sid i, exists b,
-      eventually_set OP tr sid ->
-      b <= i ->
-      sig_val_at OP tr sid i = true.
+    forall sid, exists b, sb_prop OP tr sid b. 
   Proof using.
-    intros sid i.
-    destruct (Classical_Prop.classic (eventually_set OP tr sid)) as [SET | UNSET].
-    2: { exists 0. done. }
-    red in SET. specialize (SET i). rewrite /never_set_after in SET.
-    apply not_forall_exists_not in SET as [c SET].
-    apply Classical_Prop.imply_to_and in SET as [LEic SET].
-    exists c. intros SET' LEci.
-    assert (i = c) as -> by lia.
-    apply not_false_is_true in SET.
-    done. 
-  Qed.     
+    intros sid.
+    destruct (Classical_Prop.classic (exists c, sig_val_at OP tr sid c = false)) as [[c USED] | UNUSED].
+    2: { exists 0. red. intros.
+         apply not_exists_forall_not with (x := i) in UNUSED.
+         by apply not_false_is_true. }
+    destruct (Classical_Prop.classic (exists s, c <= s /\ sig_val_at OP tr sid s = true)) as [[s SET] | UNSET].
+    - exists s. red. intros.
+      (* prove the signal value preservation property *)
+      admit.
+    - exists c. red. intros i SET ?.
+      destruct UNSET. red in SET. specialize (SET i).
+      rewrite /never_set_after in SET.
+      apply not_forall_exists_not in SET as [c' SET].
+      apply Classical_Prop.imply_to_and in SET as [LEic SET].
+      exists c'. split; [lia| ]. by apply not_false_is_true.
+  Admitted.
 
   Lemma obls_fair_trace_terminate:
     obls_trace_valid OP tr ->
     (∀ τ, obls_trace_fair OP τ tr) ->
     terminating_trace tr.
   Proof using.
-    
-  Admitted. 
+    intros VALID FAIR.
+    Require Import Coq.Logic.ClassicalChoice.
+    pose proof (choice _ set_before_ex) as [sb ?].
+    eapply trace_terminates; eauto. 
+  Qed. 
 
 End TerminationFull.
