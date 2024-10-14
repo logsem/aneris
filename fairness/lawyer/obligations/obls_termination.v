@@ -18,17 +18,24 @@ Section Termination.
   Hypothesis (LVL_WF: wf (strict lvl_le)).
   
   Context `{Inhabited Level}. 
-  Let lvl__def := @inhabitant Level _. 
-  
+  Let lvl__def := @inhabitant Level _.
+
+  Definition sig_val_at sid i := 
+    from_option (fun δ => from_option snd true (ps_sigs _ δ !! sid)) true (tr S!! i). 
+    
   Definition never_set_after sid c := 
-    forall i, c <= i -> from_option (fun δ => from_option snd true (ps_sigs _ δ !! sid)) false (tr S!! i) = false.
-  
+    forall i, c <= i -> sig_val_at sid i = false.
+
+  (* TODO: get rid of excessive negations *)
+  Definition eventually_set sid :=
+    forall c, ¬ never_set_after sid c. 
+
   Context {set_before: SignalId -> nat}.
   Hypothesis (SET_BEFORE_SPEC: 
                forall sid i,
-                 (forall c, ¬ never_set_after sid c) ->
+                 eventually_set sid ->
                  set_before sid <= i ->
-                 from_option (fun δ => from_option snd false (ps_sigs _ δ !! sid)) false (tr S!! i) = true).
+                 sig_val_at sid i = true).  
   
   Definition lvl_at (sid_i: SignalId * nat): Level :=
     let '(sid, i) := sid_i in
@@ -211,7 +218,7 @@ Section Termination.
     
     move NEVER_SET at bottom. red in NEVER_SET.
     specialize (NEVER_SET _ ltac:(reflexivity)).
-    rewrite ITH in NEVER_SET. simpl in NEVER_SET. 
+    rewrite /sig_val_at in NEVER_SET. rewrite ITH in NEVER_SET. simpl in NEVER_SET. 
     destruct (ps_sigs OP δ !! s) as [[ls ?]|] eqn:SIG__min; [| done].
     simpl in NEVER_SET. subst. 
     
@@ -231,7 +238,8 @@ Section Termination.
     assert (ps_sigs OP δ !! sid = Some (l, false)) as SIG0 by admit.
     
     pose proof (SET_BEFORE_SPEC sid i). specialize_full H1; [| done| ].
-    2: { rewrite ITH in H1. simpl in H1.
+    2: { rewrite /sig_val_at in H1. 
+         rewrite ITH in H1. simpl in H1.
          rewrite SIG0 in H1. done. }
     
     intros c NEVER_SET_.
@@ -600,6 +608,7 @@ Section Termination.
     (* (OWNER: s ∈ default ∅ (ps_obls _ δ0 !! τ)) *)
     (* (LBL: tr L!! n = Some τ) *)
     (DOM: is_Some (tr S!! (S n)))
+    (ALL_SET: ∀ sid, eventually_set sid)
     :
     ms_lt deg_le (APF (S n)) (APF n).
   Proof using.
@@ -642,18 +651,49 @@ Section Termination.
     clear LE. 
     edestruct Nat.lt_ge_cases as [LT | LE]; [apply LT| ].   
     pose proof SET_BEFORE_SPEC as SB.
-    assert (∀ c, ¬ never_set_after sid c) as SET by admit. 
-    specialize (SB _ _ SET LE).
-    rewrite IDTH in SB. simpl in SB.
+    specialize (SB _ _ (ALL_SET sid) LE).
+    rewrite /sig_val_at in SB. rewrite IDTH in SB. simpl in SB.
     
-    destruct (ps_sigs OP δ !! sid) as [[??]| ] eqn:SIG0; [| done].
-    simpl in SB. subst. 
-    (* signal cannot be unset *)
+    (* either it was there when the big step started,
+       or it's a new signal, but then the thread holds an obligation
+       and cannot wait on it *)
     assert (ps_sigs OP δ !! sid = Some (l, false)) as SIG0'.
     { admit. }
-    congruence. 
+    rewrite SIG0' in SB. done. 
     
   Admitted. 
+
+End Termination.
+
+
+(* TODO: merge the sections *)
+Section TerminationFull.
+  Context `(OP: ObligationsParams Degree Level Locale LIM_STEPS).
+  Context `{Countable Locale}. 
+  Let OM := ObligationsModel OP.
+
+  Context (tr: obls_trace OP).
+
+  Lemma set_before_ex
+    (VALID: obls_trace_valid OP tr)
+    (FAIR: ∀ τ, obls_trace_fair OP τ tr)
+    :
+    forall sid i, exists b,
+      eventually_set OP tr sid ->
+      b <= i ->
+      sig_val_at OP tr sid i = true.
+  Proof using.
+    intros sid i.
+    destruct (Classical_Prop.classic (eventually_set OP tr sid)) as [SET | UNSET].
+    2: { exists 0. done. }
+    red in SET. specialize (SET i). rewrite /never_set_after in SET.
+    apply not_forall_exists_not in SET as [c SET].
+    apply Classical_Prop.imply_to_and in SET as [LEic SET].
+    exists c. intros SET' LEci.
+    assert (i = c) as -> by lia.
+    apply not_false_is_true in SET.
+    done. 
+  Qed.     
 
   Lemma obls_fair_trace_terminate:
     obls_trace_valid OP tr ->
@@ -663,4 +703,4 @@ Section Termination.
     
   Admitted. 
 
-End Termination.
+End TerminationFull.
