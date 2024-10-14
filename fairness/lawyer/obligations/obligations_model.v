@@ -1,3 +1,4 @@
+Require Import Relation_Operators.
 From stdpp Require Import namespaces. 
 From trillium.fairness Require Import fairness locales_helpers.
 From trillium.fairness.lawyer.obligations Require Import obls_utils.
@@ -185,8 +186,6 @@ Section Model.
 
   Definition loc_step_of θ := fun ps1 ps2 => loc_step ps1 θ ps2. 
   Definition fork_step_of θ := fun ps1 ps2 => exists τ' R, forks_locale ps1 θ ps2 τ' R. 
-
-  Require Import Relation_Operators.
 
   Notation " x ;;; y " := (rel_compose x y) (at level 20).
 
@@ -475,6 +474,33 @@ Section Model.
       all: set_solver. 
   Qed.
 
+  Lemma loc_step_obls_disj_pres τ: preserved_by_loc_step τ obls_disjoint.
+  Proof using.
+    do 2 red. intros δ1 δ2 DPI STEP.
+    inv_loc_step STEP; destruct δ1; try done; simpl in *.
+    - subst new_ps. red. simpl. intros τ1 τ2 NEQ.
+      subst new_obls0. simpl.
+
+      destruct (<[τ:=cur_loc_obls0 ∪ {[s0]}]> ps_obls0 !! τ1) eqn:L1, (<[τ:=cur_loc_obls0 ∪ {[s0]}]> ps_obls0 !! τ2) eqn:L2.
+      all: try set_solver. simpl.
+      rewrite !lookup_insert_Some in L1, L2. subst cur_loc_obls0.
+      destruct L1 as [(<- & EQ1) | (NEQ1 & EQ1)], L2 as [(<- & EQ2) | (NEQ2 & EQ2)]; try done; try subst g. 
+      + apply disjoint_union_l. split.
+        * eapply disjoint_proper. 
+          3: eapply DPI; eauto.
+          ** simpl. done.
+          ** simpl. rewrite EQ2. done.
+        * apply disjoint_singleton_l. subst s0.
+          admit.
+      + admit.
+      + admit.
+    - subst new_ps. red. simpl. intros τ1 τ2 NEQ.
+      subst new_obls0. simpl. 
+      destruct (decide (τ1 = τ)) as [->| NE1], (decide (τ2 = τ)) as [-> | NE2]; try done.
+      + intros [(?&EQ) | ?]; [| tauto]. intros [? | ?]; [tauto| ].  
+      { intros [(? & 
+      destruct lookup. 
+
   Lemma wf_preserved_by_loc_step τ: preserved_by (loc_step_of τ) om_st_wf.
   Proof using.
     red. intros ?? WF1 STEP. 
@@ -484,7 +510,7 @@ Section Model.
     - eapply loc_step_dpi_pres; eauto. apply WF1.
     - eapply loc_step_cpb_pres'; eauto. split; apply WF1.
     - eapply loc_step_epb_pres'; eauto. split; apply WF1.
-    - 
+    -
 
 
 End Model.
