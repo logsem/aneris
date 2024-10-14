@@ -29,13 +29,11 @@ Section Actions.
     assert ((↑pref.@encode x: coPset) ## (↑pref.@encode y)) as D.
     { assert (encode x ≠ encode y); [| solve_ndisj].
       intros ?. destruct NEQ. eapply encode_inj; eauto. }
-  (*   opose proof * (coPpick_elem_of (↑pref.@encode x)) as IN1. *)
-  (*   { eapply nclose_infinite. } *)
-  (*   opose proof * (coPpick_elem_of (↑pref.@encode y)) as IN2. *)
-  (*   { eapply nclose_infinite. } *)
-  (*   rewrite EQ in IN1. set_solver. *)
-  (* Qed. *)
-  Admitted. 
+    pose proof (coPpick_elem_of (↑pref.@encode x)) as IN1.
+    pose proof (coPpick_elem_of (↑pref.@encode y)) as IN2.
+    rewrite EQ in IN1. 
+    edestruct D; [apply IN1 | apply IN2]; apply nclose_infinite.
+  Qed. 
     
   Lemma pick_act_disj_neq `{Countable T1} `{Countable T2}
     ns1 ns2 (DISJ: ns1 ## ns2):

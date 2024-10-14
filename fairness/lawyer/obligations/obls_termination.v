@@ -204,52 +204,6 @@ Section Termination.
     admit. 
   Admitted.      
 
-  Lemma other_sig_exp_lim (δ : ObligationsModel OP) (i : nat) (τ : Locale)
-    (s : SignalId) (δ' : ProgressState OP) (sid : SignalId) (l : Level)
-    (ITH : tr S!! i = Some δ)
-    (NEVER_SET : never_set_after s i)
-    (MIN: minimal_in_prop tr_sig_lt (s, i) (λ sn, never_set_after sn.1 sn.2))
-    (OWNER: s ∈ default ∅ (ps_obls _ δ !! τ))
-    (OBLS_LT : lt_locale_obls OP l τ δ'):
-    i < set_before sid.
-  Proof using. 
-    red in OBLS_LT. red in OBLS_LT.
-    
-    move NEVER_SET at bottom. red in NEVER_SET.
-    specialize (NEVER_SET _ ltac:(reflexivity)).
-    rewrite /sig_val_at in NEVER_SET. rewrite ITH in NEVER_SET. simpl in NEVER_SET. 
-    destruct (ps_sigs OP δ !! s) as [[ls ?]|] eqn:SIG__min; [| done].
-    simpl in NEVER_SET. subst. 
-    
-    assert (ps_sigs _ δ' !! s = Some (ls, false)) as SIG' by admit.
-    assert (s ∈ default ∅ (ps_obls _ δ' !! τ)) as OBL' by admit.
-    specialize (OBLS_LT ls). specialize_full OBLS_LT.
-    { apply extract_Somes_gset_spec.
-      destruct (ps_obls OP δ' !! τ) as [obs| ] eqn:OBLS'; [| set_solver].
-      simpl in OBL'. simpl. apply elem_of_map. eexists. split; eauto.
-      rewrite SIG'. done. }      
-    
-    red. destruct (Nat.lt_ge_cases i (set_before sid)) as [?|GE]; [done| ].   
-    
-    (* either it was there when the big step started,
-       or it's a new signal, but then the thread holds an obligation
-       and cannot wait on it *)
-    assert (ps_sigs OP δ !! sid = Some (l, false)) as SIG0 by admit.
-    
-    pose proof (SET_BEFORE_SPEC sid i). specialize_full H1; [| done| ].
-    2: { rewrite /sig_val_at in H1. 
-         rewrite ITH in H1. simpl in H1.
-         rewrite SIG0 in H1. done. }
-    
-    intros c NEVER_SET_.
-    assert (never_set_after sid i) as NEVER_SET' by admit. clear NEVER_SET_.
-    move MIN at bottom. red in MIN. specialize (MIN (_, _) NEVER_SET').
-    rewrite /tr_sig_lt /MR in MIN. simpl in MIN.
-    rewrite ITH in MIN. simpl in MIN. rewrite SIG0 SIG__min in MIN. simpl in MIN.
-    specialize (MIN OBLS_LT).
-    edestruct @strict_not_both; eauto. 
-  Admitted.
-
   Lemma owm_om_trans_ms_lt πτ τ n s δ0
     (NTH: tr S!! n = Some δ0)
     (VALID: obls_trace_valid OP tr)
@@ -290,7 +244,6 @@ Section Termination.
     generalize dependent δk. induction k.
     { intros ? ->%obls_utils.nsteps_0.
       rewrite Nat.add_0_r. reflexivity. }
-    (* clear δ' NEXT.  *)
     intros δ'' (δ' & STEPS & STEP)%nsteps_inv_r.
     specialize (IHk ltac:(lia) _ STEPS).
     etrans; eauto.
@@ -313,8 +266,41 @@ Section Termination.
     enough (set_before sid > n).
     { apply PeanoNat.Nat.le_succ_l in H1. 
       apply Nat.le_sum in H1 as [u EQ]. rewrite EQ. lia. }
+        
+    move NEVER_SET at bottom. red in NEVER_SET.
+    specialize (NEVER_SET _ ltac:(reflexivity)).
+    rewrite /sig_val_at in NEVER_SET. rewrite NTH in NEVER_SET. simpl in NEVER_SET. 
+    destruct (ps_sigs OP δ0 !! s) as [[ls ?]|] eqn:SIG__min; [| done].
+    simpl in NEVER_SET. subst. 
+        
+    assert (s ∈ default ∅ (ps_obls _ δ' !! τ)) as OBL' by admit.
+    assert (ps_sigs _ δ' !! s = Some (ls, false)) as SIG' by admit. 
+    specialize (OBLS_LT ls). specialize_full OBLS_LT.
+    { apply extract_Somes_gset_spec.
+      destruct (ps_obls OP δ' !! τ) as [obs| ] eqn:OBLS'; [| set_solver].
+      simpl in OBL'. simpl. apply elem_of_map. eexists. split; eauto.
+      rewrite SIG'. done. }
     
-    eapply other_sig_exp_lim; eauto.
+    red. destruct (Nat.lt_ge_cases n (set_before sid)) as [?|GE]; [done| ].   
+    
+    (* either it was there when the big step started,
+       or it's a new signal, but then the thread holds an obligation
+       and cannot wait on it *)
+    assert (ps_sigs OP δ0 !! sid = Some (l, false)) as SIG0 by admit.
+    
+    pose proof (SET_BEFORE_SPEC sid n). specialize_full H1; [| done| ].
+    2: { rewrite /sig_val_at in H1. 
+         rewrite NTH in H1. simpl in H1.
+         rewrite SIG0 in H1. done. }
+    
+    intros c NEVER_SET_.
+    assert (never_set_after sid n) as NEVER_SET' by admit. clear NEVER_SET_.
+    move MIN at bottom. red in MIN. specialize (MIN (_, _) NEVER_SET').
+    rewrite /tr_sig_lt /MR in MIN. simpl in MIN.
+    rewrite NTH in MIN. simpl in MIN. rewrite SIG0 SIG__min in MIN. simpl in MIN.
+    specialize (MIN OBLS_LT).
+    edestruct @strict_not_both; eauto. 
+
   Admitted.
 
   Lemma obls_transfer_phase δ1 τ δ2 s τs πs
@@ -468,7 +454,7 @@ Section Termination.
       admit. }
     
     forward eapply (owm_om_trans_ms_lt π τ (d + m)); eauto.
-    { admit. }
+    { eapply never_set_after_after; [| apply UNSET]. lia. }
     { (* tr_sig_lt doesn't depend on concrete index *)
       admit. }
     { by rewrite OBLSm. }
@@ -518,7 +504,7 @@ Section Termination.
       eapply trace_valid_steps''; eauto.  
     - apply ms_le_exp_mono; [lia| ].
       admit.
-  Admitted.       
+  Admitted.
   
   Theorem signals_eventually_set
     (VALID: obls_trace_valid OP tr)
@@ -605,13 +591,7 @@ Section Termination.
   
   (* TODO: try to unify with similar lemmas? *)
   Lemma om_trans_all_ms_lt n
-    (* (NTH: tr S!! n = Some δ0) *)
     (VALID: obls_trace_valid OP tr)
-    (* (PH: ps_phases _ δ0 !! τ = Some πτ) *)
-    (* (NEVER_SET : never_set_after s n) *)
-    (* (MIN: minimal_in_prop tr_sig_lt (s, n) (λ sn, never_set_after sn.1 sn.2)) *)
-    (* (OWNER: s ∈ default ∅ (ps_obls _ δ0 !! τ)) *)
-    (* (LBL: tr L!! n = Some τ) *)
     (DOM: is_Some (tr S!! (S n)))
     (ALL_SET: ∀ sid, eventually_set sid)
     :
@@ -723,7 +703,7 @@ Section TerminationFull.
       exists c'. split; [lia| ]. by apply not_false_is_true.
   Admitted.
 
-  Lemma obls_fair_trace_terminate:
+  Theorem obls_fair_trace_terminate:
     obls_trace_valid OP tr ->
     (∀ τ, obls_trace_fair OP τ tr) ->
     terminating_trace tr.

@@ -2,7 +2,7 @@ From iris.algebra Require Import auth gmap gset excl excl_auth gmultiset.
 From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import locales_helpers comp_utils trace_lookup fairness fin_branch.
 From trillium.fairness.lawyer Require Import sub_action_em action_model.
-From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_em obligations_am obls_fairness_preservation obls_utils.
+From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_em obligations_am obls_fairness_preservation obls_utils gset_prod.
 From stdpp Require Import finite. 
 
 Section FiniteBranching.
@@ -24,16 +24,6 @@ Section FiniteBranching.
   Let OM := ObligationsModel OP.
 
   Context `{Inhabited Locale}.
-
-  (* TODO: move / find implementation *)
-  Definition gset_prod `{Countable K, Countable T} (k: gset K) (t: gset T):
-    gset (K * T).
-    clear H3 H1 H0 H. 
-  Admitted.
-
-  Lemma gset_prod_spec `{Countable K, Countable T} (k: gset K) (t: gset T):
-    forall p, p ∈ gset_prod k t <-> p.1 ∈ k /\ p.2 ∈ t.
-  Proof using. Admitted.
 
   Lemma burns_cp_next_states δ:
     list_approx (fun δ' => exists τ π d, burns_cp OP δ τ δ' π d). 
