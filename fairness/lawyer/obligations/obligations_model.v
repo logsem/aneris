@@ -209,8 +209,23 @@ Section Model.
   Definition ObligationsModel: Model :=
     {| mtrans := om_trans |}. 
 
-  Definition phases_incompat π1 π2 := ¬ phase_le π1 π2 /\ ¬ phase_le π2 π1.
+  (* Definition phases_incompat π1 π2 := ¬ phase_le π1 π2 /\ ¬ phase_le π2 π1. *)
+  Definition phases_disj (π1 π2: Phase) := ↑ π1 ## (↑ π2: coPset).
 
+  Global Instance phases_disj_sym: Symmetric phases_disj.
+  Proof using.
+    red. rewrite /phases_disj. set_solver.
+  Qed. 
+
+  Lemma phases_disj_not_le (π1 π2: Phase)
+    (DISJ: phases_disj π1 π2):
+      ¬ phase_le π1 π2. 
+  Proof using.
+    intros LE. red in DISJ.
+    pose proof (coPpick_elem_of (↑ π2) (nclose_infinite _)) as IN1.
+    edestruct DISJ; eauto.
+  Qed.  
+  
   Definition phase_lt := strict phase_le.  
 
   Global Instance phase_le_PreOrder: PreOrder phase_le.
@@ -256,11 +271,12 @@ Section Model.
     dom $ filter (fun '(s, (l, b)) => b = false) (ps_sigs δ) ⊆
     flatten_gset $ map_img $ ps_obls δ.
 
-  Definition dom_phases_incompat δ :=
-    forall π1 π2, π1 ∈ (map_img $ ps_phases δ: gset Phase) -> 
-              π2 ∈ (map_img $ ps_phases δ: gset Phase) ->
-              π1 ≠ π2 -> phases_incompat π1 π2. 
-
+  Definition dom_phases_disj δ :=
+    forall τ1 τ2 π1 π2, 
+      τ1 ≠ τ2 ->
+      ps_phases δ !! τ1 = Some π1 ->
+      ps_phases δ !! τ2 = Some π2 ->
+      phases_disj π1 π2. 
 
   Definition eps_phase_bound δ :=
     ¬ (exists τ π ep, ps_phases δ !! τ = Some π /\
@@ -270,6 +286,9 @@ Section Model.
     ¬ (exists τ π cp, ps_phases δ !! τ = Some π /\
                   cp ∈ ps_cps δ /\ phase_lt π cp.1).
 
+  Definition obligations_are_signals δ :=
+    flatten_gset $ map_img $ ps_obls δ ⊆ dom $ ps_sigs δ. 
+
   Definition obls_disjoint δ :=
     forall τ1 τ2, τ1 ≠ τ2 -> 
              default ∅ (ps_obls δ !! τ1) ## default ∅ (ps_obls δ !! τ2).   
@@ -277,9 +296,10 @@ Section Model.
   Record om_st_wf (δ: ProgressState) := {
     om_wf_dpo: dom_phases_obls δ;
     om_wf_asg: obls_assigned δ;
-    om_wf_ph_incompat: dom_phases_incompat δ;
+    om_wf_ph_disj: dom_phases_disj δ;
     om_wf_cps_ph_bound: cps_phase_bound δ;
     om_wf_eps_ph_bound: eps_phase_bound δ;
+    om_wf_obls_are_sigs: obligations_are_signals δ;
     om_wf_obls_disj: obls_disjoint δ;
   }.
 
@@ -354,6 +374,41 @@ Section Model.
     - subst new_obls0. simpl. red. set_solver. 
   Qed.
 
+  (* TODO: move *)
+  Lemma map_split `{Countable K} {A: Type} (m: gmap K A) k:
+    m = from_option (singletonM k) ∅ (m !! k) ∪ delete k m.
+  Proof using.
+    apply map_eq. intros k'.
+    destruct (decide (k' = k)) as [->|?].
+    - destruct (m !! k) eqn:KTH.
+      + simpl. rewrite lookup_union_l'.
+        all: by rewrite lookup_singleton.
+      + simpl. rewrite lookup_union_r; [| done].
+        by rewrite lookup_delete.
+    - rewrite lookup_union_r.
+      2: { destruct (m !! k); [| set_solver]. 
+           by rewrite lookup_singleton_ne. } 
+      by rewrite lookup_delete_ne.
+  Qed.
+
+  (* TODO: move *)
+  Lemma flatten_gset_empty `{Countable K}:
+    flatten_gset ∅ = (∅: gset K).
+  Proof using. set_solver. Qed. 
+
+  (* todo: move *)
+  Lemma map_img_sets_split_helper `{Countable K, Countable A} (k: K) (m: gmap K (gset A)):
+    flatten_gset $ map_img m = default ∅ (m !! k) ∪ (flatten_gset $ map_img (delete k m)).
+  Proof using.
+    rewrite {1}(map_split m k). rewrite map_img_union_disjoint_L.
+    2: { destruct (m !! k) eqn:KTH; simpl. 
+         all: apply map_disjoint_dom; set_solver. }
+    rewrite flatten_gset_union. f_equal.
+    destruct (m !! k) eqn:KTH; simpl.
+    - by rewrite map_img_singleton_L flatten_gset_singleton.
+    - by rewrite map_img_empty_L flatten_gset_empty.
+  Qed. 
+
   Lemma loc_step_asg_pres τ: preserved_by_loc_step τ obls_assigned.
   Proof using.
     do 2 red. intros δ1 δ2 ASG STEP.
@@ -366,18 +421,13 @@ Section Model.
       rewrite flatten_gset_union flatten_gset_singleton.
       rewrite (union_comm_L _ {[ _ ]}) -union_assoc_L.
       apply union_mono; [done| ]. etrans; [apply ASG| ].
-      simpl.
-      apply elem_of_dom in DOM as [obls DOM].
-      erewrite <- (insert_id ps_obls0) at 1; eauto.
-      rewrite map_img_insert_L.
-      rewrite flatten_gset_union flatten_gset_singleton.
-      subst cur_loc_obls0. rewrite DOM. done.
+      simpl. rewrite {1}(map_img_sets_split_helper τ ps_obls0). done. 
     - subst new_ps. red. simpl.
       subst new_sigs0 new_obls0.
       rewrite map_filter_insert. setoid_rewrite decide_False; [| done].
       rewrite map_img_insert_L.
-      apply elem_of_dom in DOM as [obls DOM].
       rewrite flatten_gset_union flatten_gset_singleton.
+      apply elem_of_dom in DOM as [obls DOM].
       subst cur_loc_obls0. rewrite DOM. simpl.
 
       apply elem_of_subseteq. intros s' DOM'. rewrite elem_of_union. 
@@ -396,9 +446,9 @@ Section Model.
       apply elem_of_map_img. eexists. eapply lookup_delete_Some; eauto.
   Qed.
 
-  Lemma loc_step_dpi_pres τ: preserved_by_loc_step τ dom_phases_incompat.
+  Lemma loc_step_dpd_pres τ: preserved_by_loc_step τ dom_phases_disj.
   Proof using.
-    do 2 red. intros δ1 δ2 DPI STEP.
+    do 2 red. intros δ1 δ2 DPD STEP.
     inv_loc_step STEP; destruct δ1; try done; simpl in *.
   Qed.
 
@@ -416,11 +466,11 @@ Section Model.
   Proof using. multiset_solver. Qed. 
 
   Lemma loc_step_epb_pres' τ: preserved_by_loc_step τ 
-                                (fun δ => eps_phase_bound δ /\ dom_phases_incompat δ). 
+                                (fun δ => eps_phase_bound δ /\ dom_phases_disj δ). 
   Proof using.
-    do 2 red. intros δ1 δ2 [EPB DPI] STEP.
+    do 2 red. intros δ1 δ2 [EPB DPD] STEP.
     split.
-    2: { eapply loc_step_dpi_pres; eauto. } 
+    2: { eapply loc_step_dpd_pres; eauto. } 
     pose proof (@loc_step_phases_pres _ _ _ _ ltac:(reflexivity) STEP) as PH.
     add_case (ps_eps δ2 ⊆ ps_eps δ1) EPS_LE.
     { intros LE. red. intros (τ' & π & ep & PH2 & IN & LT).
@@ -434,18 +484,18 @@ Section Model.
     { edestruct EPB; eauto. set_solver. }
     apply elem_of_singleton in IN as ->. (* simpl in *. *)
     simpl in *.
-
-    edestruct (DPI π π__max); simpl.
-    1, 2: by eapply elem_of_map_img; eauto.
-    all: set_solver. 
-  Qed. 
+    assert (phase_lt π π__max) as LE' by set_solver.
+    pose proof LE' as LE''%strict_include. 
+    eapply phases_disj_not_le in LE''; eauto.
+    eapply DPD; eauto; [set_solver| ..]; eapply elem_of_map_img; eauto. 
+  Qed.
 
   Lemma loc_step_cpb_pres' τ: preserved_by_loc_step τ
-                                (fun δ => cps_phase_bound δ /\ dom_phases_incompat δ). 
+                                (fun δ => cps_phase_bound δ /\ dom_phases_disj δ). 
   Proof using.
-    do 2 red. intros δ1 δ2 [CPB DPI] STEP.
+    do 2 red. intros δ1 δ2 [CPB DPD] STEP.
     split.
-    2: by eapply loc_step_dpi_pres; eauto. 
+    2: by eapply loc_step_dpd_pres; eauto. 
     pose proof (@loc_step_phases_pres _ _ _ _ ltac:(reflexivity) STEP) as PH.
     add_case (ps_cps δ2 ⊆ ps_cps δ1) CPS_LE.
     { intros LE. red. intros (τ' & π & cp & PH2 & IN & LT).
@@ -469,14 +519,38 @@ Section Model.
       destruct IN as [IN | IN].
       { edestruct CPB; eauto. set_solver. }
       apply gmultiset_elem_of_singleton in IN as ->. simpl in *.
-      edestruct (DPI π π__max); simpl.
-      1, 2: by eapply elem_of_map_img; eauto.
-      all: set_solver. 
+      pose proof LT as LE''%strict_include. 
+      eapply phases_disj_not_le in LE''; eauto.
+      eapply DPD; eauto; [set_solver| ..]; eapply elem_of_map_img; eauto. 
   Qed.
 
-  Lemma loc_step_obls_disj_pres τ: preserved_by_loc_step τ obls_disjoint.
+  Lemma loc_step_obls_sigs_pres τ: preserved_by_loc_step τ obligations_are_signals.
   Proof using.
-    do 2 red. intros δ1 δ2 DPI STEP.
+    do 2 red. intros δ1 δ2 OS STEP.
+    inv_loc_step STEP; destruct δ1; try done; simpl in *.
+    - subst new_ps. red. simpl. subst new_obls0 new_sigs0.
+      rewrite map_img_insert_L dom_insert_L.
+      rewrite flatten_gset_union flatten_gset_singleton.
+      rewrite (union_comm_L _ {[ _ ]}) -union_assoc_L.
+      apply union_mono; [done| ].
+      red in OS. simpl in OS.
+      etrans; [| apply OS].
+      rewrite {1}(map_img_sets_split_helper τ ps_obls0). done.
+    - subst new_ps. red. simpl. subst new_obls0 new_sigs0.
+      etrans; [| etrans]; [| apply OS| ]; simpl.
+      2: { set_solver. }
+      rewrite map_img_insert_L.
+      rewrite flatten_gset_union flatten_gset_singleton.
+      rewrite {1}(map_img_sets_split_helper τ ps_obls0). 
+      subst cur_loc_obls0. set_solver.
+  Qed. 
+
+  Lemma loc_step_obls_disj_pres' τ: preserved_by_loc_step τ
+                                      (fun δ => obls_disjoint δ /\ obligations_are_signals δ). 
+  Proof using.
+    do 2 red. intros δ1 δ2 [DPI OS] STEP.
+    split.
+    2: by eapply loc_step_obls_sigs_pres; eauto. 
     inv_loc_step STEP; destruct δ1; try done; simpl in *.
     - subst new_ps. red. simpl. intros τ1 τ2 NEQ.
       subst new_obls0. simpl.
@@ -484,33 +558,244 @@ Section Model.
       destruct (<[τ:=cur_loc_obls0 ∪ {[s0]}]> ps_obls0 !! τ1) eqn:L1, (<[τ:=cur_loc_obls0 ∪ {[s0]}]> ps_obls0 !! τ2) eqn:L2.
       all: try set_solver. simpl.
       rewrite !lookup_insert_Some in L1, L2. subst cur_loc_obls0.
-      destruct L1 as [(<- & EQ1) | (NEQ1 & EQ1)], L2 as [(<- & EQ2) | (NEQ2 & EQ2)]; try done; try subst g. 
-      + apply disjoint_union_l. split.
+      destruct L1 as [(<- & EQ1) | (NEQ1 & EQ1)], L2 as [(<- & EQ2) | (NEQ2 & EQ2)]; try done. 
+      + subst g. apply disjoint_union_l. split.
         * eapply disjoint_proper. 
           3: eapply DPI; eauto.
           ** simpl. done.
           ** simpl. rewrite EQ2. done.
         * apply disjoint_singleton_l. subst s0.
-          admit.
-      + admit.
-      + admit.
+          intros IN. edestruct next_sig_id_fresh.
+          apply OS. simpl. apply flatten_gset_spec. eexists. split; eauto.
+          eapply elem_of_map_img; eauto. 
+      + subst g0. apply disjoint_union_r. split.
+        * symmetry. eapply disjoint_proper. 
+          3: eapply DPI; eauto.
+          ** simpl. done.
+          ** simpl. rewrite EQ1. done.
+        * symmetry. apply disjoint_singleton_l. subst s0.
+          intros IN. edestruct next_sig_id_fresh.
+          apply OS. simpl. apply flatten_gset_spec. eexists. split; eauto.
+          eapply elem_of_map_img; eauto. 
+      + forward eapply (DPI _ _ NEQ); eauto. simpl. rewrite EQ1 EQ2. set_solver.  
     - subst new_ps. red. simpl. intros τ1 τ2 NEQ.
-      subst new_obls0. simpl. 
-      destruct (decide (τ1 = τ)) as [->| NE1], (decide (τ2 = τ)) as [-> | NE2]; try done.
-      + intros [(?&EQ) | ?]; [| tauto]. intros [? | ?]; [tauto| ].  
-      { intros [(? & 
-      destruct lookup. 
-
+      subst new_obls0. simpl.
+      eapply disjoint_subseteq; revgoals.
+      + eapply DPI; eauto.
+      + simpl. destruct (decide (τ2 = τ)) as [-> | ?].
+        * rewrite lookup_insert. set_solver.
+        * rewrite lookup_insert_ne; done.
+      + simpl. destruct (decide (τ1 = τ)) as [-> | ?].
+        * rewrite lookup_insert. set_solver.
+        * rewrite lookup_insert_ne; done.
+      + apply _. 
+  Qed.
+        
   Lemma wf_preserved_by_loc_step τ: preserved_by (loc_step_of τ) om_st_wf.
   Proof using.
     red. intros ?? WF1 STEP. 
     split.
     - eapply loc_step_dpo_pres; eauto. apply WF1.
     - eapply loc_step_asg_pres; eauto. apply WF1.  
-    - eapply loc_step_dpi_pres; eauto. apply WF1.
+    - eapply loc_step_dpd_pres; eauto. apply WF1.
     - eapply loc_step_cpb_pres'; eauto. split; apply WF1.
     - eapply loc_step_epb_pres'; eauto. split; apply WF1.
-    -
+    - eapply loc_step_obls_sigs_pres; eauto. apply WF1.
+    - eapply loc_step_obls_disj_pres'; eauto. split; apply WF1.
+  Qed.
 
+  Lemma fork_step_obls_reorder δ1 τ δ2
+    (STEP: fork_step_of τ δ1 δ2)
+    (DPO1: dom_phases_obls δ1):
+    flatten_gset (map_img $ ps_obls δ2) = flatten_gset (map_img $ ps_obls δ1).
+  Proof using.
+    red in STEP. destruct STEP as (?&?&STEP).    
+    inversion STEP. subst.
+    assert (x ∉ dom $ ps_obls δ1) as FRESH''.
+    { rewrite -DPO1; auto. }
+    destruct δ1; subst; simpl in *.
+subst new_obls0.
+    rewrite map_img_insert_L. rewrite delete_insert_ne.
+    2: { intros ->. destruct FRESH'. by apply elem_of_dom. }
+    rewrite map_img_insert_L. 
+    rewrite (map_img_sets_split_helper x ps_obls0).
+    rewrite not_elem_of_dom_1; [| done]. 
+    simpl. rewrite union_empty_l_L. erewrite !delete_notin with (i := x).
+    2: { by apply not_elem_of_dom. }
+    rewrite (map_img_sets_split_helper τ ps_obls0).
+    rewrite !flatten_gset_union !flatten_gset_singleton.
+    rewrite union_assoc_L. f_equal. 
+    subst cur_obls0 obls' cur_obls.
+    destruct (ps_obls0 !! τ); simpl; [| set_solver].
+    apply set_eq. intros k. destruct (decide (k ∈ x0)); set_solver.
+  Qed.  
 
+  Lemma fork_step_dpo_pres τ:
+    preserved_by (fork_step_of τ) dom_phases_obls. 
+  Proof using.
+    do 2 red. intros δ1 δ2 ASG STEP. 
+    red in STEP. destruct STEP as (?&?&STEP).    
+    inversion STEP. subst.
+    destruct δ1; simpl in *.
+    subst new_phases0 new_obls0.
+    rewrite !dom_insert_L. set_solver.
+  Qed. 
+
+  Lemma fork_step_asg_pres' τ:
+    preserved_by (fun δ1 δ2 => fork_step_of τ δ1 δ2 /\ dom_phases_obls δ1) obls_assigned.
+  Proof using.
+    do 2 red. intros δ1 δ2 ASG [STEP WF1].
+    red in STEP. destruct STEP as (?&?&STEP).    
+    inversion STEP. subst.
+    erewrite fork_step_obls_reorder; eauto.
+    2: { red. eauto. }
+    destruct δ1; subst; simpl in *. done. 
+  Qed.
+
+  Lemma phases_disj_forks π (i j: nat) (NEQ: i ≠ j):
+    phases_disj (π .@ i) (π .@ j).
+  Proof using.
+    red. eapply ndot_ne_disjoint; eauto. 
+  Qed.
+
+  Lemma phase_disj_ndot π1 π2 (i: nat)
+    (DISJ: phases_disj π1 π2):
+    phases_disj (π1 .@ i) π2.
+  Proof using.
+    red. eapply disjoint_subseteq; [..| apply DISJ].
+    - apply _.
+    - apply nclose_subseteq.
+    - done.
+  Qed. 
+
+  Lemma fork_step_dpd_pres τ:
+    preserved_by (fork_step_of τ) dom_phases_disj.
+  Proof using.
+    do 2 red. intros δ1 δ2 DPD STEP. 
+    red in STEP. destruct STEP as (?&?&STEP).    
+    inversion STEP. subst. subst ps'. simpl.
+    destruct δ1; simpl in *. subst new_phases0.
+    intros τ1 τ2 π1 π2. 
+    rewrite !lookup_insert_Some.    
+    intros NEQ [[-> <-] | [NEQ1 [[<- <-]| [NEQ1' PH1]]]] [[-> <-] | [NEQ2 [[<- <-]| [NEQ2' PH2]]]]; try tauto || by apply phases_disj_forks.
+    3, 4: symmetry.
+    1-3: by apply phase_disj_ndot; eapply DPD; simpl; eauto. 
+    { apply phase_disj_ndot. eapply DPD; [apply NEQ1'| ..]; eauto. }
+    eapply DPD; [apply NEQ|..]; eauto. 
+  Qed.
+
+  Lemma fork_step_cpb_pres τ: preserved_by (fork_step_of τ) cps_phase_bound.
+  Proof using.
+    do 2 red. intros δ1 δ2 CPB STEP. 
+    red in STEP. destruct STEP as (?&?&STEP).    
+    inversion STEP. subst. subst ps'. simpl.
+    destruct δ1; simpl in *. subst new_phases0.
+    repeat setoid_rewrite lookup_insert_Some.
+    intros (? & ? & ? & ([[-> <-] | [NEQ [[<- <-]| [NEQ' PH]]]] & IN & LT)).
+    - destruct CPB. exists τ. do 2 eexists. split; [| split]; eauto.
+      etrans; eauto. apply phase_lt_fork.
+    - destruct CPB. exists τ. do 2 eexists. split; [| split]; eauto.
+      etrans; eauto. apply phase_lt_fork.
+    - destruct CPB. exists x1. eauto.
+  Qed. 
+
+  Lemma fork_step_epb_pres τ: preserved_by (fork_step_of τ) eps_phase_bound.
+  Proof using.
+    do 2 red. intros δ1 δ2 EPB STEP. 
+    red in STEP. destruct STEP as (?&?&STEP).    
+    inversion STEP. subst. subst ps'. simpl.
+    destruct δ1; simpl in *. subst new_phases0.
+    repeat setoid_rewrite lookup_insert_Some.
+    intros (? & ? & ? & ([[-> <-] | [NEQ [[<- <-]| [NEQ' PH]]]] & IN & LT)).
+    - destruct EPB. exists τ. do 2 eexists. split; [| split]; eauto.
+      etrans; eauto. apply phase_lt_fork.
+    - destruct EPB. exists τ. do 2 eexists. split; [| split]; eauto.
+      etrans; eauto. apply phase_lt_fork.
+    - destruct EPB. exists x1. eauto.
+  Qed. 
+
+  Lemma fork_step_obls_sigs_pres τ: preserved_by (fun δ1 δ2 => fork_step_of τ δ1 δ2 /\ dom_phases_obls δ1) obligations_are_signals.
+  Proof using.
+    do 2 red. intros δ1 δ2 OS [STEP DPO1].
+    red in STEP. destruct STEP as (?&?&STEP).    
+    inversion STEP; subst.
+    erewrite fork_step_obls_reorder; eauto.
+    2: { red. eauto. }
+    destruct δ1; simpl in *. done.
+  Qed.
+
+  (* (* TODO: move *) *)
+  (* Lemma insert_lookup_eq `{Countable K} {A: Type} n a (m: gmap K A) k: *)
+  (*   (<[ n := a ]> m) !! k = (if (decide (k = n)) then (Some a) else None) ⋅ (m !! k). *)
+
+  Lemma lookup_map_singleton `{Countable K} {A: Type} (k: K) (a: A) k':
+    ({[ k := a ]}: gmap K A) !! k' = if (decide (k' = k)) then Some a else None.
+  Proof using.
+    destruct decide; subst.
+    - apply lookup_singleton.
+    - by apply lookup_singleton_ne.
+  Qed. 
+    
+  Lemma fork_step_obls_disj_pres τ:
+    preserved_by (fork_step_of τ) obls_disjoint. 
+  Proof using.
+    do 2 red. intros δ1 δ2 OS STEP. 
+    red in STEP. destruct STEP as (?&?&STEP).    
+    inversion STEP; subst.
+    destruct δ1; simpl in *. subst new_obls0.
+    intros τ1 τ2 NEQ. 
+    rewrite !insert_union_singleton_l !lookup_union.
+    rewrite !lookup_map_singleton.
+    
+    repeat destruct decide; subst; try tauto.
+    all: repeat rewrite union_Some_l; repeat rewrite option_union_left_id; simpl; subst obls' cur_obls cur_obls0.
+    - eapply disjoint_subseteq.
+      4: { apply OS, NEQ. }
+      { apply _. }
+      all: set_solver.
+    - set_solver. 
+    - eapply disjoint_subseteq.
+      4: { symmetry. apply OS, n1. }
+      { apply _. }
+      all: simpl; set_solver.
+    - set_solver.
+    - eapply disjoint_subseteq.
+      4: { symmetry. apply OS, n1. }
+      { apply _. }
+      all: simpl; set_solver.
+    - eapply disjoint_subseteq.
+      4: { apply OS, n0. }
+      { apply _. }
+      all: simpl; set_solver.
+    - eapply disjoint_subseteq.
+      4: { apply OS, n0. }
+      { apply _. }
+      all: simpl; set_solver.
+    - eapply disjoint_subseteq.
+      4: { apply OS, n0. }
+      { apply _. }
+      all: simpl; set_solver.
+    - eapply disjoint_subseteq; eauto. apply _. 
+  Qed.     
+    
+  Lemma wf_preserved_by_fork_step τ: preserved_by (fork_step_of τ) om_st_wf.
+  Proof using.
+    red. intros ?? WF1 STEP. 
+    split.
+    - eapply fork_step_dpo_pres; eauto. apply WF1.
+    - eapply fork_step_asg_pres'; [| split]; eauto; apply WF1.
+    - eapply fork_step_dpd_pres; eauto. apply WF1.
+    - eapply fork_step_cpb_pres; eauto. apply WF1.
+    - eapply fork_step_epb_pres; eauto. apply WF1.
+    - eapply fork_step_obls_sigs_pres; [| split]; eauto; apply WF1.
+    - eapply fork_step_obls_disj_pres; eauto. apply WF1.
+  Qed.
+
+  Lemma om_trans_wf_pres τ: preserved_by (om_trans_of τ) om_st_wf.
+  Proof using.
+    apply pres_by_loc_fork_steps_implies_om_trans.
+    - apply wf_preserved_by_loc_step.
+    - apply wf_preserved_by_fork_step.
+  Qed. 
+    
 End Model.

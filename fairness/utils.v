@@ -906,31 +906,37 @@ Section CoPsetOrdering.
 
 End CoPsetOrdering.
 
-(* TODO: can be proved simpler if we could unfold ndot *)
-Lemma ns_ndot_disj (ns: namespace) (i: nat):
+
+Lemma ns_ndot_disj' (ns: namespace) (i: nat):
   ns ≠ ns .@ i.
-Proof.
+Proof using.
   intros EQ.
   pose proof (coPpick_elem_of (↑ ns .@ (i + 1)) (nclose_infinite _)) as IN.
   pose proof IN as IN'. rewrite {2}EQ in IN'.
   apply nclose_subseteq in IN'.
   edestruct @ndot_ne_disjoint; [| apply IN | apply IN'].
-  lia.
-Qed. 
+  lia. 
+Qed.   
 
 (* TODO: can be proved simpler if we could unfold ndot *)
-Lemma ns_ndot_diff_disj (ns: namespace) (i j: nat)
+Lemma ns_ndot_diff_not_subseteq (ns: namespace) (i j: nat)
   (NEQ: i ≠ j):
-  ns .@ i ≠ ns .@ j.
+  (↑ (ns .@ i): coPset) ⊈ ↑ (ns .@ j).
 Proof.
   intros EQ.
   pose proof (coPpick_elem_of (↑ ns .@ i) (nclose_infinite _)) as IN1.
-  pose proof (coPpick_elem_of (↑ ns .@ j) (nclose_infinite _)) as IN2.
-  rewrite -{1}EQ in IN2. 
-  edestruct @ndot_ne_disjoint; [| apply IN1 | apply IN2].
+  edestruct @ndot_ne_disjoint; [| apply IN1 | ].
+  2: { apply EQ. done. }  
   done. 
 Qed. 
 
+Lemma ns_ndot_disj (ns: namespace) (i j: nat)
+  (NEQ: i ≠ j):
+  ns .@ i ≠ ns .@ j.
+Proof using.
+  intros EQ. edestruct (ns_ndot_diff_not_subseteq ns); eauto.
+  by rewrite EQ.
+Qed. 
 
 Lemma gset_to_gmap_singleton `{Countable K} {B: Type} (b: B) (k: K):
   gset_to_gmap b {[ k ]} = {[ k := b ]}.
