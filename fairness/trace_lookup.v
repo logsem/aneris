@@ -204,6 +204,14 @@ Section TraceLookup.
     intros. eapply state_lookup_prev; eauto. 
   Qed.
 
+  Lemma next_state_lookup (tr: trace St L):
+    forall i, is_Some (tr S!! (S i)) <-> is_Some (tr S!! i) /\ is_Some (tr L!! i).
+  Proof using.
+    intros. rewrite label_lookup_states. rewrite Nat.add_1_r.
+    split; [| tauto]. intros. apply and_assoc. split; eauto.
+    rewrite and_idemp. eapply state_lookup_prev; eauto.
+  Qed. 
+  
   Lemma pred_at_trace_lookup (tr: trace St L) (i: nat) P:
       pred_at tr i P <-> exists st, tr S!! i = Some st /\ P st (tr L!! i). 
   Proof using.

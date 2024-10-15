@@ -356,6 +356,26 @@ Section Model.
     eapply FPRES; eauto. 
   Qed.
 
+  Lemma pres_by_valid_trace (tr: obls_trace) i P
+    (VALID: obls_trace_valid tr)
+    (PPRES: forall τ, preserved_by_loc_step τ P)
+    (FPRES: forall τ, preserved_by_fork τ P)
+    (Pi: from_option P True (tr S!! i)):
+    forall j, i <= j -> from_option P True (tr S!! j).
+  Proof using.
+    intros ? [d ->]%Nat.le_sum. induction d.
+    { rewrite Nat.add_0_r. done. }
+    rewrite -plus_n_Sm.
+    destruct (tr S!! S (i + d)) eqn:NEXT; [| done]. simpl.
+    forward eapply (proj1 (next_state_lookup _ _)); eauto.
+    intros [[? CUR] [? LBL]].
+    rewrite CUR in IHd. simpl in IHd.
+    forward eapply trace_valid_steps''; eauto.
+    { rewrite Nat.add_1_r. eauto. }
+    intros STEP. 
+    eapply pres_by_loc_fork_steps_implies_om_trans; eauto.
+  Qed.    
+
   Ltac inv_loc_step STEP :=
     destruct STEP as [T|[T|[T|[T|[T|T]]]]];
     [destruct T as (?&?&T) |
@@ -796,6 +816,19 @@ subst new_obls0.
     apply pres_by_loc_fork_steps_implies_om_trans.
     - apply wf_preserved_by_loc_step.
     - apply wf_preserved_by_fork_step.
-  Qed. 
+  Qed.
+
+  
     
 End Model.
+
+Ltac inv_loc_step STEP :=
+    destruct STEP as [T|[T|[T|[T|[T|T]]]]];
+    [destruct T as (?&?&T) |
+     destruct T as (?&?&?&?&T) |
+     destruct T as (?&T) |
+     destruct T as (?&T) |
+     destruct T as (?&?&?&?&T) |
+     destruct T as (?&?&?&T) ];
+    inversion T; subst. 
+
