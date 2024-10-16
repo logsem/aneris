@@ -228,6 +228,18 @@ Section Termination.
       destruct ost as [[??]|]; done.
     Qed.
 
+    Lemma loc_steps_rep_phase_exact_pres δ1 τs δ2 τ oπ k
+      (PH: ps_phases _ δ1 !! τ = oπ)
+      (STEPS: nsteps (loc_step_of _ τs) k δ1 δ2):
+      ps_phases _ δ2 !! τ = oπ.
+    Proof using.
+      forward eapply pres_by_loc_step_implies_rep.
+      { apply loc_step_phases_pres. }
+      intros P. red in P. rewrite /preserved_by in P. specialize_full P; eauto.
+      { reflexivity. }
+      red in P. rewrite P. done.
+    Qed. 
+
     (* Context `(STEP: om_trans OP δ1 τ δ2). *)
     Context (δ1 δ2: ProgressState OP).    
     Context (WF1: om_st_wf _ δ1).
@@ -248,7 +260,7 @@ Section Termination.
     (PH: from_option (fun δ => ps_phases _ δ !! τ = Some πτ) False (tr S!! n))
     (NOτ: tr L!! n ≠ Some τ):
     ms_le deg_le (TPF πτ (S n)) (TPF πτ n).
-  Proof using.
+  Proof using WF.
     destruct (tr S!! (S n)) as [δ'| ] eqn:NEXT.
     2: { rewrite /TPF /TPF'. rewrite NEXT. simpl. apply empty_ms_le. }
     
@@ -273,23 +285,43 @@ Section Termination.
     etrans; eauto.
     eapply ms_le_Proper; [| | eapply loc_step_ms_le]; eauto.
     { rewrite -PeanoNat.Nat.add_succ_comm. simpl. reflexivity. }
-    apply other_expect_ms_le. simpl. 
+    apply other_expect_ms_le. simpl.
+
+    assert (om_st_wf OP δ') as WF'.
+    { eapply pres_by_loc_step_implies_rep; eauto. 
+      apply wf_preserved_by_loc_step. }
+    
     assert (exists π', ps_phases _ δ' !! τ' = Some π') as [π' PH'].
-    { (* follows from DPO and the fact that
-         loc_step only applies to locales in either phases or obls *)
-      admit. }
+    { apply om_step_wf_dom in STEP; [| done]. 
+      rewrite -om_wf_dpo in STEP; [| done]. eapply elem_of_dom in STEP; eauto. }
     rewrite PH'. simpl.
     rewrite IDTH in PH. simpl in PH. 
-    
-    assert (ps_phases _ δ' !! τ = Some πτ) as PHδ'.
-    { (* phase preserved by loc steps *)
-      admit. }
 
     symmetry. eapply (om_wf_ph_disj _ δ'); eauto.
-    eapply pres_by_loc_step_implies_rep; eauto.
-    apply wf_preserved_by_loc_step.
-  Admitted.
-  
+    eapply loc_steps_rep_phase_exact_pres; eauto. 
+  Qed.
+
+  Lemma other_loc_step_pres_phase_eq τ π τs
+    (OTHER: τs ≠ τ):
+    preserved_by _ (loc_step_of _ τs) (fun δ => ps_phases _ δ !! τ = Some π).
+  Proof using.
+    red. intros ?? PH STEP.
+    eapply loc_step_phases_pres in STEP; [| reflexivity].
+    by rewrite STEP.
+  Qed. 
+    
+  Lemma other_fork_step_pres_phase_eq τ π τs
+    (OTHER: τs ≠ τ):
+    preserved_by _ (fork_step_of _ τs) (fun δ => ps_phases _ δ !! τ = Some π).
+  Proof using.
+    red. intros ?? PH (?&?&STEP).
+    inversion STEP. subst. destruct δ1; simpl in *.
+    subst new_phases0.
+    rewrite lookup_insert_ne.
+    2: { intros ->. destruct FRESH'. by eapply elem_of_dom. }
+    rewrite lookup_insert_ne; done. 
+  Qed.  
+    
   Lemma next_step_rewind τ π i δ0 j
     (VALID: obls_trace_valid OP tr)
     (ITH: tr S!! i = Some δ0)
@@ -297,7 +329,8 @@ Section Termination.
     (LE: i <= j)
     (NOτ: forall k, i <= k < j -> tr L!! k ≠ Some τ):
     ms_le deg_le (TPF π j) (TPF π i).
-  Proof using. 
+  Proof using WF.
+    clear SET_BEFORE_SPEC LVL_WF. 
     apply Nat.le_sum in LE as [d ->]. induction d.
     { rewrite Nat.add_0_r. reflexivity. }
     specialize_full IHd.
@@ -314,9 +347,17 @@ Section Termination.
     2: { specialize (NOτ (i + d) ltac:(lia)). done. }
     rewrite IDTH. simpl. 
     
-    (* phase preserved by non-τ steps *)
-    admit. 
-  Admitted.
+    forward eapply (pres_by_valid_trace_strong _ tr i (i + d)). 
+    4: { apply (other_fork_step_pres_phase_eq τ π). }
+    3: { apply (other_loc_step_pres_phase_eq τ π). }
+    all: try done. 
+    { lia. }
+    { rewrite ITH. done. }
+    { intros. simpl. specialize (NOτ k). specialize_full NOτ; eauto.
+      { lia. }
+      rewrite H2 in NOτ. set_solver. }
+    by rewrite IDTH.
+  Qed. 
     
   Lemma owm_om_trans_ms_lt πτ τ n s δ0
     (NTH: tr S!! n = Some δ0)
@@ -340,9 +381,7 @@ Section Termination.
       
       inversion H4. subst. 
       assert (ps_phases _ mb !! τ = Some πτ) as PH'.
-      { (* phases are preserved by loc steps *)
-        admit. 
-      }
+      { eapply loc_steps_rep_phase_exact_pres; eauto. }
       rewrite LOC_PHASE in PH'. inversion PH'. subst π__max.  
       
       eapply burns_cp_own_ms_lt with (πb := x); eauto. }
@@ -365,8 +404,7 @@ Section Termination.
     { rewrite -PeanoNat.Nat.add_succ_comm. simpl. reflexivity. }
     
     assert (ps_phases _ δ' !! τ = Some πτ) as PHδ'.
-    { (* phase preserved by loc steps *)
-      admit. }
+    { eapply loc_steps_rep_phase_exact_pres; eauto. }
     
     replace πτ with (default π0 (ps_phases OP δ' !! τ)).
     2: { rewrite PHδ'. done. }
@@ -614,8 +652,8 @@ Section Termination.
     destruct F as (m & (δm & MTH & STEP) & MINm).
     
     assert (exists π, ps_phases _ δ !! τ = Some π) as [π PH].
-    { (* follows from DPO *)
-      admit. }
+    { apply mk_is_Some, elem_of_dom in OBLSd. rewrite -om_wf_dpo in OBLSd; eauto.
+      by apply elem_of_dom. }
     
     (* rewrite /OTF in EMP. erewrite S_OWNER in EMP; eauto. *)
     (* 2: { rewrite OBLSd. set_solver. }  *)
@@ -650,8 +688,19 @@ Section Termination.
       admit. }
     
     assert (ps_phases OP δm !! τ = Some π) as PHm.
-    { (* phase is kept by other steps *)
-      admit. }
+    { forward eapply (pres_by_valid_trace_strong _ tr d (d + m)). 
+      4: { apply (other_fork_step_pres_phase_eq τ π). }
+      3: { apply (other_loc_step_pres_phase_eq τ π). }
+      all: try done. 
+      { lia. }
+      { rewrite DTH. done. }
+      { intros ? ? [LE' LT'] LBL' ->.
+        apply Nat.le_sum in LE' as [u ->]. 
+        specialize (MINm u). specialize_full MINm; [| lia]. 
+        eapply mk_is_Some, state_lookup_prev with (j := d + u) in MTH' as [? K].
+        2: lia.
+        eexists. split; eauto. red. right. eauto. }
+      by rewrite MTH. }
     
     forward eapply (owm_om_trans_ms_lt π τ (d + m)); eauto.
     { eapply never_set_after_after; [| apply UNSET]. lia. }

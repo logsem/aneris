@@ -356,14 +356,17 @@ Section Model.
     eapply FPRES; eauto. 
   Qed.
 
-  Lemma pres_by_valid_trace (tr: obls_trace) i P
+  Lemma pres_by_valid_trace_strong (tr: obls_trace) i j P (T: Locale -> Prop)
+    (LE: i <= j)
     (VALID: obls_trace_valid tr)
-    (PPRES: forall τ, preserved_by_loc_step τ P)
-    (FPRES: forall τ, preserved_by_fork τ P)
-    (Pi: from_option P True (tr S!! i)):
-    forall j, i <= j -> from_option P True (tr S!! j).
+    (PPRES: forall τ, T τ -> preserved_by_loc_step τ P)
+    (FPRES: forall τ, T τ -> preserved_by_fork τ P)
+    (Pi: from_option P True (tr S!! i))
+    (Tij: forall k τ, i <= k < j -> tr L!! k = Some τ -> T τ)
+    :
+    from_option P True (tr S!! j). 
   Proof using.
-    intros ? [d ->]%Nat.le_sum. induction d.
+    apply Nat.le_sum in LE as [d ->]. induction d.
     { rewrite Nat.add_0_r. done. }
     rewrite -plus_n_Sm.
     destruct (tr S!! S (i + d)) eqn:NEXT; [| done]. simpl.
@@ -372,9 +375,21 @@ Section Model.
     rewrite CUR in IHd. simpl in IHd.
     forward eapply trace_valid_steps''; eauto.
     { rewrite Nat.add_1_r. eauto. }
-    intros STEP. 
+    intros STEP.
+    pose proof (Tij (i + d) _ ltac:(lia) LBL).
     eapply pres_by_loc_fork_steps_implies_om_trans; eauto.
-  Qed.    
+    apply IHd. intros. eapply Tij; eauto. lia.  
+  Qed.
+
+  Lemma pres_by_valid_trace (tr: obls_trace) i P
+    (VALID: obls_trace_valid tr)
+    (PPRES: forall τ, preserved_by_loc_step τ P)
+    (FPRES: forall τ, preserved_by_fork τ P)
+    (Pi: from_option P True (tr S!! i)):
+    forall j, i <= j -> from_option P True (tr S!! j).
+  Proof using.
+    intros. eapply pres_by_valid_trace_strong with (T := fun _ => True); eauto.
+  Qed. 
 
   Ltac inv_loc_step STEP :=
     destruct STEP as [T|[T|[T|[T|[T|T]]]]];
