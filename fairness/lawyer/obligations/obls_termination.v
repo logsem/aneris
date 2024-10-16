@@ -364,7 +364,7 @@ Section Termination.
     (VALID: obls_trace_valid OP tr)
     (PH: ps_phases _ δ0 !! τ = Some πτ)
     (NEVER_SET : never_set_after s n)
-    (MIN: minimal_in_prop tr_sig_lt (s, n) (λ sn, never_set_after sn.1 sn.2))
+    (MIN: minimal_in_prop tr_sig_lt (s, n) (λ sn, never_set_after sn.1 sn.2 /\ n <= sn.2))
     (OWNER: s ∈ default ∅ (ps_obls _ δ0 !! τ))
     (LBL: tr L!! n = Some τ):
     ms_lt deg_le (TPF πτ (S n)) (TPF πτ n).
@@ -450,7 +450,11 @@ Section Termination.
     assert (never_set_after sid (max n c)) as NEVER_SET'.
     { eapply never_set_after_after; [| apply NEVER_SET_]. lia. } 
     clear NEVER_SET_.
-    move MIN at bottom. red in MIN. specialize (MIN (_, _) NEVER_SET').
+    move MIN at bottom. red in MIN.
+
+    (* specialize (MIN (_, _) NEVER_SET'). *)
+    specialize (MIN (sid, (n `max` c)) ltac:(split; [done| simpl; lia])). 
+
     eapply never_set_after_eq_false in NEVER_SET'; [| reflexivity].
     destruct NEVER_SET' as (?&?&NC&NCsig). 
     rewrite /tr_sig_lt /MR in MIN. simpl in MIN.
@@ -626,7 +630,7 @@ Section Termination.
     (FAIR: ∀ τ, obls_trace_fair OP τ tr)
     (UNSET: never_set_after s c)
     (MIN: minimal_in_prop tr_sig_lt (s, c)
-            (λ ab : SignalId * nat, never_set_after ab.1 ab.2))
+            (λ ab : SignalId * nat, never_set_after ab.1 ab.2 /\ c <= ab.2))
     (OTF := λ i, TPF (s_ow s i) i):
     ∀ d, c ≤ d → ∃ j, d < j ∧ ms_lt deg_le (OTF j) (OTF d).
   Proof using.
@@ -698,8 +702,25 @@ Section Termination.
     
     forward eapply (owm_om_trans_ms_lt π τ (d + m)); eauto.
     { eapply never_set_after_after; [| apply UNSET]. lia. }
-    { (* tr_sig_lt doesn't depend on concrete index *)
-      admit. }
+    { red. intros [??] [N' LE'] ?. simpl in LE', N'.
+      move MIN at bottom. red in MIN.
+      specialize (MIN (_, _) ltac:(split; [apply N'| simpl; lia])).
+      pose proof (never_set_after_eq_false _ _ UNSET c ltac:(lia)).
+      pose proof (never_set_after_eq_false _ _ UNSET (d + m) ltac:(lia)).
+      destruct H2 as (?&l&CTH&SIGc), H3 as (?&l_&DMTH&SIGdm).
+
+      forward eapply pres_by_valid_trace with (i := c) (j := d + m); eauto.
+      { intros. apply (loc_step_sig_st_le_pres _ s (Some (l, false))). }
+      { intros. apply fork_step_sig_st_le_pres. }
+      { rewrite CTH. simpl. by rewrite SIGc. }
+      { lia. }
+      rewrite DMTH. simpl. rewrite SIGdm. simpl. intros [<- _].
+
+      clear -H1 MIN SIGc SIGdm DMTH CTH.
+      unfold tr_sig_lt, MR, lvl_at in *.
+      rewrite DMTH. simpl. rewrite SIGdm. simpl.
+      rewrite CTH in MIN. simpl in MIN. rewrite SIGc in MIN. simpl in MIN.
+      apply MIN. rewrite DMTH in H1. simpl in H1. rewrite SIGdm in H1. done. }
     { by rewrite OBLSm. }
     
     intros LT.
@@ -759,14 +780,14 @@ Section Termination.
     (* ¬ exists sid c, never_set_after sid c.  *)
     forall sid, eventually_set sid. 
   Proof using.
-    intros sid. red. intros c UNSET.
+    intros sid. red. intros m UNSET.
     (* red in UNSET.  *)
-    pattern c in UNSET. apply ex_intro in UNSET. 
-    pattern sid in UNSET. apply ex_intro in UNSET. 
-    
-    apply ex_prod' in UNSET. 
-    eapply sets_have_min in UNSET; [| apply tr_sig_lt_wf]. clear sid c. 
-    apply ex_prod in UNSET. simpl in UNSET. destruct UNSET as (s & c & UNSET & MIN).
+
+    assert (exists ab, never_set_after ab.1 ab.2 /\ m <= ab.2) as MIN. 
+    { exists (sid, m). eauto. }
+
+    eapply sets_have_min in MIN; [| apply tr_sig_lt_wf]. clear sid UNSET. 
+    apply ex_prod in MIN. simpl in MIN. destruct MIN as (s & c & [UNSET LEm] & MIN).
     
     set (OTF i := TPF (s_ow s i) i).
     
@@ -779,6 +800,8 @@ Section Termination.
     intros i NEXT.
     (* pose proof (min_owner_PF_decr (c + i) ltac:(lia)) as D. *)
     forward eapply min_owner_PF_decr with (d := c + i); eauto.
+    { red. intros [??] [N LE] ?.
+      apply MIN; auto. split; auto. lia. }
     { lia. }
     intros (j & AFTER & DECR).
     apply (NEXT (j - c)). red. red.
