@@ -301,8 +301,7 @@ Section Termination.
     eapply loc_steps_rep_phase_exact_pres; eauto. 
   Qed.
 
-  Lemma other_loc_step_pres_phase_eq τ π τs
-    (OTHER: τs ≠ τ):
+  Lemma loc_step_pres_phase_eq τ π τs:
     preserved_by _ (loc_step_of _ τs) (fun δ => ps_phases _ δ !! τ = Some π).
   Proof using.
     red. intros ?? PH STEP.
@@ -349,7 +348,7 @@ Section Termination.
     
     forward eapply (pres_by_valid_trace_strong _ tr i (i + d)). 
     4: { apply (other_fork_step_pres_phase_eq τ π). }
-    3: { apply (other_loc_step_pres_phase_eq τ π). }
+    3: { intros. apply (loc_step_pres_phase_eq τ π). }
     all: try done. 
     { lia. }
     { rewrite ITH. done. }
@@ -586,9 +585,32 @@ Section Termination.
     (STEP: om_trans _ δ1 τ δ2)
     (IN2 : cp ∈ ps_cps _ δ2)
     (LEcp : phase_le cp.1 π')
-    (FRESHπ': π' ∉ (map_img (ps_phases _ δ1) : gset Phase)):
+    (FRESHπ': π' ∈ (map_img (ps_phases _ δ2) ∖ (map_img (ps_phases _ δ1) : gset Phase))):
     phase_le cp.1 πτ.
-  Proof using. Admitted.
+  Proof using.
+    red in STEP. destruct STEP as (δ' & PSTEP & FSTEP).
+    forward eapply pres_by_loc_step_implies_progress.
+    { apply loc_step_phases_pres. }
+    intros PRES. do 2 red in PRES. specialize_full PRES; eauto.
+    { reflexivity. }
+    red in PRES. rewrite -PRES in PH. rewrite -PRES in FRESHπ'.
+    clear dependent δ1. 
+    inversion FSTEP.
+    2: { subst. set_solver. }
+    subst. destruct H1 as (?&?&STEP). inversion STEP. subst.
+    destruct δ'. simpl in *.
+    revert FRESHπ'. subst new_phases0. rewrite map_img_insert_L.
+    rewrite delete_notin.
+    2: { apply not_elem_of_dom. rewrite dom_insert.
+         apply not_elem_of_union. split; auto.
+         apply not_elem_of_singleton. intros ->.
+         destruct FRESH'. eapply elem_of_dom. eauto. }
+    rewrite map_img_insert_L.
+    rewrite !difference_union_distr_l.
+    rewrite difference_disjoint.
+    2: { apply disjoint_singleton_l.
+         intros [τ1 IN1]%elem_of_map_img. 
+  Admitted.
 
   Definition s_ow (s: SignalId) (i: nat) := 
     let π := 
@@ -688,7 +710,7 @@ Section Termination.
     assert (ps_phases OP δm !! τ = Some π) as PHm.
     { forward eapply (pres_by_valid_trace_strong _ tr d (d + m)). 
       4: { apply (other_fork_step_pres_phase_eq τ π). }
-      3: { apply (other_loc_step_pres_phase_eq τ π). }
+      3: { intros. apply (loc_step_pres_phase_eq τ π). }
       all: try done. 
       { lia. }
       { rewrite DTH. done. }
@@ -776,8 +798,11 @@ Section Termination.
         { eapply (WF (d + m)); eauto. }
         { apply n. }
         all: eauto. }
-      replace pi with (pi, de).1; [| done]. eapply om_trans_cps_bound; eauto.
-      eapply trace_valid_steps''; eauto.  
+      replace pi with (pi, de).1; [| done].
+      eapply om_trans_cps_bound; eauto.
+      { eapply trace_valid_steps''; eauto. }
+      apply elem_of_difference. split; auto.
+      eapply elem_of_map_img; eauto. 
     - apply ms_le_exp_mono; [lia| ].
       admit.
   Admitted.
