@@ -595,19 +595,13 @@ Section Termination.
       mret ow
     in default π0 π.
 
-  (* TODO: move to Wf *)
-  Lemma OBLS_DISJ: ∀ (τ1 τ2 : Locale) (δ : ProgressState OP),
-      τ1 ≠ τ2
-      → default ∅ (ps_obls OP δ !! τ1) ## default ∅ (ps_obls OP δ !! τ2).
-  Proof using. Admitted. 
-
   Lemma S_OWNER s i π τ δ
     (ITH: tr S!! i = Some δ)
     (PH: ps_phases _ δ !! τ = Some π)
     (OW: s ∈ default ∅ (ps_obls _ δ !! τ)):
     s_ow s i = π.
-  Proof using.
-    clear dependent set_before LVL_WF WF. 
+  Proof using WF.
+    clear dependent set_before LVL_WF. 
     intros. rewrite /s_ow. rewrite ITH. simpl.
     destruct (ps_obls OP δ !! τ) as [obls| ] eqn:OBLS; [| done]. simpl in OW.
     erewrite <- map_difference_union with (m2 := (ps_obls OP δ)).
@@ -618,9 +612,9 @@ Section Termination.
     rewrite (proj2 (map_filter_empty_iff _ _)).
     2: { red. intros τ' ? LOC' IN'.
          apply lookup_difference_Some in LOC'. destruct LOC' as [OBLS' ?%lookup_singleton_None].
-         specialize (OBLS_DISJ τ τ' δ).
-         pose proof (@OBLS_DISJ  _ _ δ H1) as D. rewrite OBLS OBLS' in D.
-         set_solver. }
+         edestruct @om_wf_obls_disj; eauto.
+         - by rewrite OBLS.
+         - by rewrite OBLS'. }
     rewrite map_union_empty dom_singleton_L.
     rewrite set_map_singleton_L. rewrite PH.
     rewrite extract_Somes_gset_singleton. rewrite gset_pick_singleton.
@@ -934,11 +928,12 @@ Section TerminationFull.
   Let OM := ObligationsModel OP.
 
   Context (tr: obls_trace OP).
+  Hypothesis (VALID: obls_trace_valid OP tr) (FAIR: ∀ τ, obls_trace_fair OP τ tr).
 
   Lemma set_before_ex
     :
     forall sid, exists b, sb_prop OP tr sid b. 
-  Proof using.
+  Proof using VALID.
     intros sid.
     destruct (Classical_Prop.classic (exists c, sig_val_at OP tr sid c = false)) as [[c USED] | UNUSED].
     2: { exists 0. red. intros.
@@ -946,22 +941,41 @@ Section TerminationFull.
          by apply not_false_is_true. }
     destruct (Classical_Prop.classic (exists s, c <= s /\ sig_val_at OP tr sid s = true)) as [[s SET] | UNSET].
     - exists s. red. intros.
-      (* prove the signal value preservation property *)
-      admit.
+      unfold sig_val_at in *.
+      destruct (tr S!! c) eqn:CTH; [| done]. simpl in USED.
+      destruct (ps_sigs OP m !! sid) as [[??]| ] eqn:SIGm; [| done]. simpl in USED. subst.
+      
+      destruct (tr S!! i) eqn:ITH; [| done]. simpl.
+      
+      destruct SET as [LE SET]. 
+      forward eapply state_lookup_prev; [eauto | apply H1| ]. intros [? STH]. 
+      rewrite STH in SET. simpl in SET. 
+      
+      forward eapply pres_by_valid_trace with (i := c) (j := s); eauto.
+      { intros. apply (loc_step_sig_st_le_pres _ _ sid (Some (l, false))). }
+      { intros. apply fork_step_sig_st_le_pres. }
+      { rewrite CTH. simpl. by rewrite SIGm. }
+      rewrite STH. simpl.
+      destruct (ps_sigs OP x !! sid) as [[??]| ] eqn:SIGs; [| done].
+      simpl in SET. subst. intros [<- ?]. 
+
+      forward eapply pres_by_valid_trace with (i := s) (j := i); eauto.
+      { intros. apply (loc_step_sig_st_le_pres _ _ sid (Some (l, true))). }
+      { intros. apply fork_step_sig_st_le_pres. }
+      { rewrite STH. simpl. by rewrite SIGs. }
+      rewrite ITH. simpl. destruct (ps_sigs OP m0 !! sid) as [[??]| ]; [| done].
+      simpl. intros [??]. destruct b; done. 
     - exists c. red. intros i SET ?.
       destruct UNSET. red in SET. specialize (SET i).
       rewrite /never_set_after in SET.
       apply not_forall_exists_not in SET as [c' SET].
       apply Classical_Prop.imply_to_and in SET as [LEic SET].
       exists c'. split; [lia| ]. by apply not_false_is_true.
-  Admitted.
+  Qed. 
 
   Theorem obls_fair_trace_terminate:
-    obls_trace_valid OP tr ->
-    (∀ τ, obls_trace_fair OP τ tr) ->
     terminating_trace tr.
-  Proof using.
-    intros VALID FAIR.
+  Proof using VALID FAIR.
     Require Import Coq.Logic.ClassicalChoice.
     pose proof (choice _ set_before_ex) as [sb ?].
     eapply trace_terminates; eauto. 
