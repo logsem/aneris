@@ -766,8 +766,16 @@ Section Termination.
       intros [pi de] IN' LEpi.
       destruct (decide (π' = π)) as [-> | NEQ]; [done| ].
       assert (π' ∉ (map_img (ps_phases _ δm): gset Phase)) as FRESHπ'.
-      { (* should follow from phase incompatibility for δm *)
-        admit. }
+      { intros IN.
+        rename π' into π''. 
+        apply elem_of_map_img in IN as (τ'' & T'').
+        destruct (decide (τ'' = τ)) as [-> | ?]; [set_solver| ].
+        pose proof (coPpick_elem_of (↑ π'') (nclose_infinite _)) as P.
+
+        edestruct @om_wf_ph_disj.
+        { eapply (WF (d + m)); eauto. }
+        { apply n. }
+        all: eauto. }
       replace pi with (pi, de).1; [| done]. eapply om_trans_cps_bound; eauto.
       eapply trace_valid_steps''; eauto.  
     - apply ms_le_exp_mono; [lia| ].
