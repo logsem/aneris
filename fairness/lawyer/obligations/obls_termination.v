@@ -482,11 +482,13 @@ Section Termination.
   Qed.
 
   Lemma fork_step_pres_asg_bound sid πb τ:
-    preserved_by _ (fork_step_of _ τ) (fun δ => asg_bound sid πb δ).
+    preserved_by _ (fork_step_of _ τ) (fun δ => asg_bound sid πb δ /\ om_st_wf _ δ).
   Proof using.
     clear tr set_before WF SET_BEFORE_SPEC LVL_WF.
 
-    red. intros δ1 δ2 AB STEP.
+    red. intros δ1 δ2 [AB WF1] STEP.
+    split.
+    2: { eapply wf_preserved_by_fork_step; eauto. }
 
     destruct AB as [SET | AB].
     { destruct SET as [l SID]. red.
@@ -522,18 +524,6 @@ Section Termination.
     split; [set_solver|  ]. split; eauto.
     etrans; eauto. apply phase_lt_fork.
   Qed. 
-
-  (* Lemma obls_transfer_phase δ1 τ δ2 s τs πs *)
-  (*   (* (WF1 *) *)
-  (*   (STEP: om_trans _ δ1 τ δ2) *)
-  (*   (OBL: s ∈ default ∅ (ps_obls _ δ1 !! τs)) *)
-  (*   (PH: ps_phases _ δ1 !! τs = Some πs): *)
-  (*   map_Forall (fun _ obls_ => s ∉ obls_) (ps_obls _ δ2) \/ *)
-  (*     exists τ' π', *)
-  (*       s ∈ default ∅ (ps_obls _ δ2 !! τ') /\ *)
-  (*       ps_phases _ δ2 !! τ' = Some π' /\ *)
-  (*       phase_le πs π'. *)
-  (* Proof using. *)
 
   (* Lemma om_trans_new_cps δ1 τ δ2 *)
   (*   (STEP: om_trans _ δ1 τ δ2) *)
@@ -676,18 +666,22 @@ Section Termination.
     eapply strict_transitive_l; [| apply TPFle]. 
     eapply strict_transitive_r; [| apply LT].
     
-    forward eapply (obls_transfer_phase δm τ) with (τs := τ). 
-    { eapply trace_valid_steps''; eauto. }
-    { rewrite OBLSm. done. }
-    { eauto. }
-    intros [NO_OWN | OWN'].
-    { apply map_not_Exists in NO_OWN. destruct NO_OWN.
-      erewrite @f_equal. 
-      { eapply never_set_owned.
-        { eapply never_set_after_after; [| apply UNSET ].
-          etrans; [apply LE| ]. apply (Nat.le_add_r _ (m + 1)). }
-        reflexivity. }
-      rewrite Nat.add_assoc. rewrite MTH'. done. }
+    (* forward eapply (obls_transfer_phase δm τ) with (τs := τ).  *)
+    (* { eapply trace_valid_steps''; eauto. } *)
+    (* { rewrite OBLSm. done. } *)
+    (* { eauto. } *)
+    forward eapply pres_by_loc_fork_steps_implies_om_trans.
+    { apply loc_step_pres_asg_bound. }
+    { apply fork_step_pres_asg_bound. }
+    intros PRES. do 2 red in PRES. specialize_full PRES.
+    { split; [| by apply (WF (d + m))].
+      red. right. exists τ, π. rewrite OBLSm. simpl. do 2 (split; [done| ]).
+      reflexivity. }
+    { red. eapply trace_valid_steps''; eauto. }
+    apply proj1 in PRES. red in PRES. destruct PRES as [[l NO_OWN] | OWN'].
+    { pose proof (UNSET (d + m + 1) ltac:(lia)) as U.
+      rewrite /sig_val_at in U. rewrite MTH' in U. simpl in U.
+      rewrite NO_OWN in U. done. }
     
     destruct OWN' as (τ' & π' & OWN' & PH' & LE').
     destruct (ps_obls OP δm' !! τ') as [obs'| ] eqn:OBLSd'.
@@ -767,7 +761,7 @@ Section Termination.
     :
     expect_ms_le OP set_before any_phase δ1 τ δ2 k. 
   Proof using SET_BEFORE_SPEC.
-    clear LVL_WF.
+    clear LVL_WF WF.
     intros. red. intros sid π' d EXP. 
     rewrite /PF /PF'.
     
