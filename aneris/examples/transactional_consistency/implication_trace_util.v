@@ -303,6 +303,42 @@ Section trace_proof_util.
 
   (* Helper lemmas *)
 
+  Lemma trans_eq c T1 T2 trans trans' :
+    open_trans trans' c (T1 ++ trans :: T2) →
+    valid_transactions (T1 ++ trans :: T2) →
+    (∃ op, op ∈ trans ∧ last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) →
+    trans = trans'.
+  Proof.
+    intros Hopen_trans Hvalid_trans Hop.
+    destruct Hvalid_trans as (_ & Hvalid_trans).
+    destruct Hopen_trans as (op_last & Htrans'_in & Hlast' & Hconn_last' & Hcm_last').
+    assert (trans ∈ T1 ++ trans :: T2) as Htrans_in; first set_solver.
+    rewrite elem_of_list_lookup in Htrans_in.
+    rewrite elem_of_list_lookup in Htrans'_in.
+    destruct Htrans_in as (i & Htrans_in).
+    destruct Htrans'_in as (i' & Htrans'_in).
+    assert (i = i'); last set_solver.
+    destruct Hop as (op & _ & Hlast & Hop_conn & Hop_cm).
+    apply (Hvalid_trans trans trans' op op_last i i' c); try done.
+    intros (tag_cm & b & ->).
+    by simpl in Hop_cm.
+  Qed.
+
+  Lemma com_trans_in trans T : 
+    trans ∈ T →
+    com_true trans →
+    trans ∈ comTrans T.
+  Proof.
+    intros Hin Hcom.
+    destruct (elem_of_list_split _ _ Hin) as (T1 & T2 & ->).
+    rewrite /comTrans.
+    rewrite List.filter_app.
+    apply elem_of_app; right.
+    simpl.
+    destruct Hcom as (s & ->).
+    set_solver.
+  Qed.
+
   Lemma commit_closed_neq (extract : val → option val) sa sa' c c' lt e : 
     sa ≠ sa' →
     extract c = Some #sa →
