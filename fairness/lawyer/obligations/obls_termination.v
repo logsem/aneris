@@ -283,34 +283,39 @@ Section Termination.
     
     (* TODO: extract the lemma below? *)
     
-    intros δ τ' IDTHl. 
-    red. intros δk k IDTH BOUND NSTEPS. 
+    intros τ' IDTHl. 
+    red. intros δk δk' mb mf k ITH BOUND NSTEPS BSTEP FSTEP. 
     rewrite IDTHl in NOτ.
     assert (τ' ≠ τ) as X by (by intros ->). clear NOτ. rename X into NOτ. 
-    
-    generalize dependent δk. induction k.
+
+    clear BSTEP. 
+    generalize dependent mb. induction k.
     { intros ? ->%obls_utils.nsteps_0.
       rewrite Nat.add_0_r. reflexivity. }
     clear δ' NEXT. 
     intros δ'' (δ' & STEPS & STEP)%nsteps_inv_r.
     specialize (IHk ltac:(lia) _ STEPS).
     etrans; eauto.
+
     eapply ms_le_Proper; [| | eapply loc_step_ms_le]; eauto.
     { rewrite -PeanoNat.Nat.add_succ_comm. simpl. reflexivity. }
     apply other_expect_ms_le. simpl.
 
     assert (om_st_wf OP δ') as WF'.
     { eapply pres_by_loc_step_implies_rep; eauto. 
-      apply wf_preserved_by_loc_step. }
+      { apply wf_preserved_by_loc_step. }
+      apply (WF n). by apply state_label_lookup in ITH as (?&?&?). }
     
     assert (exists π', ps_phases _ δ' !! τ' = Some π') as [π' PH'].
     { apply om_step_wf_dom in STEP; [| done]. 
       rewrite -om_wf_dpo in STEP; [| done]. eapply elem_of_dom in STEP; eauto. }
     rewrite PH'. simpl.
+
+    apply state_label_lookup in ITH as (IDTH & ? & ?).
     rewrite IDTH in PH. simpl in PH. 
 
     symmetry. eapply (om_wf_ph_disj _ δ'); eauto.
-    eapply loc_steps_rep_phase_exact_pres; eauto. 
+    eapply loc_steps_rep_phase_exact_pres; eauto.    
   Qed.
 
   Lemma loc_step_pres_phase_eq τ π τs:
@@ -400,10 +405,13 @@ Section Termination.
     (* TODO: extract the lemma below? *)
     
     clear δ' NTH'. 
-    intros δ τ' IDTHl. 
-    red. intros δk k IDTH BOUND NSTEPS.
-    rewrite NTH in IDTH. inversion IDTH. subst δ. 
-    rewrite LBL in IDTHl. inversion IDTHl. subst τ'. clear IDTHl. 
+    intros τ' IDTHl. 
+    red. intros δk δk' mb mf k ITH BOUND NSTEPS BSTEP FSTEP.
+    apply state_label_lookup in ITH as (IDTH & IDTH' & _). 
+    rewrite NTH in IDTH. inversion IDTH. subst δ0. clear IDTH. 
+    rewrite LBL in IDTHl. inversion IDTHl. subst τ'. clear IDTHl.
+
+    foobar. 
     
     generalize dependent δk. induction k.
     { intros ? ->%obls_utils.nsteps_0.
@@ -437,7 +445,10 @@ Section Termination.
     simpl in NEVER_SET. subst. 
     
     assert (s ∈ default ∅ (ps_obls _ δ' !! τ)) as OBL' by admit.
-    assert (ps_sigs _ δ' !! s = Some (ls, false)) as SIG' by admit. 
+
+    assert (ps_sigs _ δ' !! s = Some (ls, false)) as SIG'.
+    { admit. }
+
     specialize (OBLS_LT ls). specialize_full OBLS_LT.
     { apply extract_Somes_gset_spec.
       destruct (ps_obls OP δ' !! τ) as [obs| ] eqn:OBLS'; [| set_solver].

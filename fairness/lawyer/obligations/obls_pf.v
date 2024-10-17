@@ -225,13 +225,16 @@ Section PhaseFuel.
     - destruct EXP as (?&?&?&?). eapply EXP_CASE; eauto.
   Qed.
   
-  Definition nsteps_keep_ms_le δ i τ
+  Definition nsteps_keep_ms_le i τ
     :=
-    forall δ' k
-      (ITH: tr S!! i = Some δ)
+    forall δ δ' mb mf k
+      (ITH: tr !! i = Some (δ, Some (τ, δ')))
       (BOUND : k ≤ LIM_STEPS)
-      (STEPS: nsteps (λ p1 p2, loc_step OP p1 τ p2) k δ δ'),
-      ms_le deg_le (PF' ((LIM_STEPS + 2) * i + k) δ') (PF' ((LIM_STEPS + 2) * i) δ).
+      (STEPS: nsteps (λ p1 p2, loc_step OP p1 τ p2) k δ mb)
+      (BSTEP: (∃ π δ, burns_cp OP mb τ mf π δ))
+      (FSTEP: clos_refl (ProgressState OP) (λ p1 p2, ∃ τ' R, forks_locale OP p1 τ p2 τ' R) mf δ'),
+      ms_le deg_le (PF' ((LIM_STEPS + 2) * i + k) mb) (PF' ((LIM_STEPS + 2) * i) δ).
+
   
   Lemma forks_locale_ms_le δ1 τ δ2 τ' R k
     (FORK: forks_locale OP δ1 τ δ2 τ' R):
@@ -256,9 +259,9 @@ Section PhaseFuel.
         (∃ π δ, burns_cp OP mb τ mf π δ) ->
         clos_refl (ProgressState OP) (λ p1 p2, ∃ τ' R, forks_locale OP p1 τ p2 τ' R) mf δ' ->
         rel (PF' ((LIM_STEPS + 2) * i + LIM_STEPS + 1) mf) (PF' ((LIM_STEPS + 2) * i + LIM_STEPS) mb))
-    (NSTEPS_LE: forall δ τ,
+    (NSTEPS_LE: forall τ,
         tr L!! i = Some τ ->
-        nsteps_keep_ms_le δ i τ)
+        nsteps_keep_ms_le i τ)
     (DOM: is_Some (tr S!! (S i))):
     rel (TPF' (S i)) (TPF' i).
   Proof using.
@@ -272,10 +275,12 @@ Section PhaseFuel.
     simpl in STEP. red in STEP. destruct STEP as (mf & PSTEP & FSTEP).
     red in PSTEP. destruct PSTEP as (k & BOUND & (mb & PSTEP & BSTEP)).
     
+    rewrite /nsteps_keep_ms_le in NSTEPS_LE. specialize_full NSTEPS_LE; eauto.
+    { eapply state_label_lookup; eauto. rewrite Nat.add_1_r. eauto. }
+
     eapply BURN_REL in BSTEP; eauto.
     2: { eapply state_label_lookup; eauto. rewrite Nat.add_1_r. eauto. }
-    eapply NSTEPS_LE in PSTEP; eauto. 
-    
+
     assert (ms_le deg_le (PF' ((LIM_STEPS + 2) * S i) δ')
               (PF' ((LIM_STEPS + 2) * i + LIM_STEPS + 1) mf)) as LE. 
     { inversion FSTEP as [? FORK | ]. 
@@ -288,11 +293,11 @@ Section PhaseFuel.
       f_equiv. apply leibniz_equiv_iff. lia. }  
     
     destruct bd; subst rel.
-    - eapply strict_transitive_l; [| apply PSTEP]. 
+    - eapply strict_transitive_l; [| apply NSTEPS_LE]. 
       eapply strict_transitive_r; [apply LE| ]. 
       eapply strict_transitive_l; [apply BSTEP| ].
       apply ms_le_PF_le. lia.
-    - etrans; [| apply PSTEP].
+    - etrans; [| apply NSTEPS_LE].
       etrans; [apply LE| ].
       etrans; [apply BSTEP| ].
       apply ms_le_PF_le. lia.
