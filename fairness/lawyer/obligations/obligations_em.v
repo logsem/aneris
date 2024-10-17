@@ -37,8 +37,10 @@ Section ObligationsEM.
   Proof.
     destruct c1 as [tp1 σ1], c2 as [tp2 σ2].
     red. rewrite NOFORK.
-    eapply progress_step_obls_pres in TRANS; [| apply obls_eq_init].
-    rewrite TRANS. done. 
+    unshelve forward eapply (pres_by_loc_step_implies_progress _ _ _ _ _ _ _ TRANS). 
+    2: { eapply @loc_step_obls_pres. }
+    { reflexivity. }
+    intros EQ. by rewrite EQ. 
   Qed.
       
   Definition obls_cfg_corr (σ: cfg Λ) (δ: mstate OM) :=
@@ -116,10 +118,11 @@ Section ObligationsEM.
       em_initialization := obls_resources_init;
     |}.
 
-  Definition phase0: Phase := nroot .@ "phases". 
+  (* TODO: remove duplicate *)
+  Definition phase0: Phase := nil.
 
   Definition init_phases (n: nat): list Phase :=
-    (fun i => phase0 .@ i) <$> seq 0 n. 
+    (fun i => ext_phase phase0 i) <$> seq 0 n. 
 
   Definition init_om_state (c: cfg Λ): mstate OM := {|
       ps_cps := ∅;

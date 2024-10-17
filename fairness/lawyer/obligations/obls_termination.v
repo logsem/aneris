@@ -578,29 +578,6 @@ Section Termination.
     etrans; eauto. apply phase_lt_fork.
   Qed. 
 
-  (* Lemma om_trans_new_cps δ1 τ δ2 *)
-  (*   (STEP: om_trans _ δ1 τ δ2) *)
-  (*   (πτ := default π0 (ps_phases _ δ1 !! τ)) *)
-  (*   : *)
-  (*   forall cp, cp ∈ ps_cps _ δ2 ∖ ps_cps _ δ1 -> cp.1 = πτ. *)
-  (* Proof using. Admitted.  *)
-  
-  (* Lemma om_trans_new_eps δ1 τ δ2 *)
-  (*   (STEP: om_trans _ δ1 τ δ2) *)
-  (*   (πτ := default π0 (ps_phases _ δ1 !! τ)) *)
-  (*   : *)
-  (*   forall ep, ep ∈ ps_eps _ δ2 ∖ ps_eps _ δ1 -> phase_le (ep.1.2) πτ. *)
-  (* Proof using. Admitted. *)
-  
-  (* Lemma cps_phase_bound_alt δ: *)
-  (*   cps_phase_bound _ δ <-> *)
-  (*   forall cp, cp ∈ ps_cps _ δ -> *)
-  (*   exists τ π, ps_phases _ δ !! τ = Some π /\ phase_le cp.1 π. *)
-  (* Proof using. *)
-  (*   rewrite /cps_phase_bound. split. *)
-  (*   - intros CPB [π d] IN.  *)
-
-
   Definition s_ow (s: SignalId) (i: nat) := 
     let π := 
       δ ← tr S!! i;
@@ -635,12 +612,6 @@ Section Termination.
     rewrite extract_Somes_gset_singleton. rewrite gset_pick_singleton.
     done.
   Qed.
-
-  (* TODO: remove these duplicates *)
-  Goal True. Admitted. 
-
-  (* TODO: move? *)
-  Definition is_fork (π1 π2: Phase) := exists (d: bool), π2 = ext_phase π1 d. 
 
   Lemma fresh_phase_is_fork δ1 τ δ2 π
     (WF1: om_st_wf _ δ1)
@@ -680,7 +651,7 @@ Section Termination.
          { apply LOC_PHASE. }
          { apply IN1. }
          { apply phase_lt_fork. }
-         pose proof (phase_lt_fork π1 true) as [??]%strict_spec_alt. done. }
+         pose proof (phase_lt_fork π1 1) as [??]%strict_spec_alt. done. }
     rewrite difference_disjoint.
     2: { apply disjoint_singleton_l.
          intros [τ' IN']%elem_of_map_img.
@@ -688,25 +659,13 @@ Section Termination.
          { apply LOC_PHASE. }
          { apply IN'. }
          { apply phase_lt_fork. }
-         pose proof (phase_lt_fork π1 false) as [??]%strict_spec_alt. done. }
+         pose proof (phase_lt_fork π1 0) as [??]%strict_spec_alt. done. }
     rewrite subseteq_empty_difference.
     2: { apply map_subseteq_img, delete_subseteq. }
 
     rewrite union_empty_r_L elem_of_union !elem_of_singleton.
     rewrite /is_fork. intros [-> | ->]; eauto.
   Qed.
-
-  (* TODO: move *)
-  Lemma phase_le_ext_split π1 π2 d
-    (LE: phase_le π1 (ext_phase π2 d)):
-    π1 = ext_phase π2 d \/ phase_le π1 π2.
-  Proof using.
-    do 2 red in LE. destruct LE as [p EQ]. rewrite /ext_phase in EQ.
-    destruct p.
-    { simpl in EQ. eauto. }
-    rewrite -app_comm_cons in EQ. inversion EQ. subst.
-    right. red. red. exists p. eauto.
-  Qed. 
 
   Lemma om_trans_cps_bound δ1 τ δ2 π cp τ' π'
     (WF1: om_st_wf _ δ1)

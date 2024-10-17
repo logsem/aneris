@@ -25,7 +25,7 @@ Section Model.
   (* opar_loc_cnt :> Countable Locale; *)
   Context `{Countable Locale}. 
   
-  Definition Phase := list bool. 
+  Definition Phase := list natO.
   Definition phase_le : Phase -> Phase -> Prop := suffix. 
     
     (* fun π1 π2 => (↑π2: coPset) ⊆ ↑π1.  *)
@@ -145,9 +145,9 @@ Section Model.
     let new_cps := ps_cps ps ⊎ {[+ (π__max, δ) +]} in
     expects_ep ps θ (update_cps new_cps ps) s π δ.
 
-  Definition ext_phase (π: Phase) (d: bool) := d :: π. 
-  Definition fork_left (π: Phase): Phase := ext_phase π false. 
-  Definition fork_right (π: Phase): Phase := ext_phase π true.
+  Definition ext_phase (π: Phase) (d: nat) := d :: π. 
+  Definition fork_left (π: Phase): Phase := ext_phase π 0. 
+  Definition fork_right (π: Phase): Phase := ext_phase π 1.
 
   Inductive forks_locale: PS -> Locale -> PS -> Locale -> gset SignalId -> Prop :=
   | fl_step ps θ θ' π0 obls_
@@ -252,7 +252,7 @@ Section Model.
     (* - red. set_solver. *)
   Defined. 
   
-  Lemma phase_lt_fork π (d: bool):
+  Lemma phase_lt_fork π (d: nat):
     phase_lt π (ext_phase π d).
   Proof.
     rewrite /ext_phase. 
@@ -304,40 +304,18 @@ Section Model.
     forall τ1 τ2, τ1 ≠ τ2 -> 
              default ∅ (ps_obls δ !! τ1) ## default ∅ (ps_obls δ !! τ2).   
 
-  (* Definition is_fork (π1 π2: Phase) := exists (i: nat), π2 = π1 .@ i.  *)
+  Definition is_fork (π1 π2: Phase) := exists (d: nat), π2 = ext_phase π1 d. 
 
-  (* Definition ancestor_of (π π': Phase) := *)
-  (*   exists n, relations.nsteps is_fork n π π'. *)
-
-  (* Lemma is_fork_phase_le π1 π2 *)
-  (*   (FORK: is_fork π1 π2): *)
-  (*   phase_le π1 π2. *)
-  (* Proof using. *)
-  (*   destruct FORK as [? ->]. apply phase_lt_fork. *)
-  (* Qed. *)
-
-  (* Lemma ancestor_of_phase_le π1 π2 *)
-  (*   (ANC: ancestor_of π1 π2): *)
-  (*   phase_le π1 π2. *)
-  (* Proof using. *)
-  (*   destruct ANC as [n ANC]. generalize dependent π2. induction n. *)
-  (*   { intros ? ->%nsteps_0. done. } *)
-  (*   intros ? (πp & FORKS & FORK)%rel_compose_nsteps_next. *)
-  (*   etrans; eauto. by apply is_fork_phase_le.  *)
-  (* Qed. *)
-
-  (* Lemma forks_prev n π π' (d: nat) *)
-  (*   (FORKS: relations.nsteps is_fork (S n) π (π' .@ d)): *)
-  (*   relations.nsteps is_fork n π π'.  *)
-  (* Proof using.  *)
-  (*   apply rel_compose_nsteps_next in FORKS as (πp & FORKS & FORK). *)
-  (*   red in FORK. destruct FORK as [? EQ]. *)
-  (*   apply ndot_inj in EQ. destruct EQ as [-> ->]. done. *)
-  (* Qed. *)
-
-  (* Definition cps_phases_ancestors δ := *)
-  (*   forall cp π, cp ∈ ps_cps δ -> π ∈ (map_img (ps_phases δ): gset Phase) -> *)
-  (*           phase_le cp.1 π -> ancestor_of cp.1 π.   *)
+  Lemma phase_le_ext_split π1 π2 d
+    (LE: phase_le π1 (ext_phase π2 d)):
+    π1 = ext_phase π2 d \/ phase_le π1 π2.
+  Proof using.
+    do 2 red in LE. destruct LE as [p EQ]. rewrite /ext_phase in EQ.
+    destruct p.
+    { simpl in EQ. eauto. }
+    rewrite -app_comm_cons in EQ. inversion EQ. subst.
+    right. red. red. exists p. eauto.
+  Qed. 
 
   Record om_st_wf (δ: ProgressState) := {
     om_wf_dpo: dom_phases_obls δ;
@@ -677,34 +655,6 @@ Section Model.
         * rewrite lookup_insert_ne; done.
       + apply _. 
   Qed.
-
-  (* Lemma loc_step_cps_ph_anc_pres τ: preserved_by (loc_step_of τ) (fun δ => cps_phases_ancestors δ /\ dom_phases_disj δ). *)
-  (* Proof using. *)
-  (*   intros δ1 δ2 [ANC DPD] STEP.  *)
-  (*   split. *)
-  (*   2: { eapply loc_step_dpd_pres; eauto. } *)
-  (*   red.  *)
-  (*   inv_loc_step STEP; destruct δ1; try done; simpl in *. *)
-  (*   - intros. apply ANC; eauto. simpl. multiset_solver. *)
-  (*   - intros cp π. simpl. subst new_cps0. *)
-  (*     intros [OLD | NEW]%gmultiset_elem_of_disj_union PH_DOM LE. *)
-  (*     + eapply @ANC; eauto. simpl. multiset_solver. *)
-  (*     + apply gmultiset_elem_of_scalar_mul in NEW as [_ NEW]. *)
-  (*       apply gmultiset_elem_of_singleton in NEW as ->. *)
-  (*       eapply ANC in CP; eauto. *)
-  (*   - intros. apply ANC; eauto. simpl. multiset_solver. *)
-  (*   - intros cp π. simpl. subst new_cps0. *)
-  (*     intros [OLD | NEW]%gmultiset_elem_of_disj_union PH_DOM LE'. *)
-  (*     + eapply @ANC; eauto. *)
-  (*     + apply gmultiset_elem_of_singleton in NEW as ->. *)
-  (*       apply elem_of_map_img in PH_DOM as [τ' DOM']. *)
-  (*       destruct (decide (τ' = τ)) as [-> | NEQ]. *)
-  (*       { simpl in *. rewrite LOC_PHASE in DOM'. inversion DOM'. *)
-  (*         subst π__max. exists 0. by apply nsteps_0. } *)
-        
-  (*       apply not_eq_sym in NEQ. eapply DPD in NEQ. specialize_full NEQ; eauto. *)
-  (*       apply phases_disj_not_le in NEQ. done. *)
-  (* Qed.     *)
         
   Lemma wf_preserved_by_loc_step τ: preserved_by (loc_step_of τ) om_st_wf.
   Proof using.
@@ -717,7 +667,6 @@ Section Model.
     - eapply loc_step_epb_pres'; eauto. split; apply WF1.
     - eapply loc_step_obls_sigs_pres; eauto. apply WF1.
     - eapply loc_step_obls_disj_pres'; eauto. split; apply WF1.
-    (* - eapply loc_step_cps_ph_anc_pres; eauto. split; apply WF1. *)
   Qed.
 
   Lemma fork_step_obls_reorder δ1 τ δ2
@@ -768,7 +717,7 @@ subst new_obls0.
     destruct δ1; subst; simpl in *. done. 
   Qed.
 
-  Lemma ext_phase_not_le π (i j: bool) (NEQ: i ≠ j):
+  Lemma ext_phase_not_le π (i j: nat) (NEQ: i ≠ j):
     ¬ phase_le (ext_phase π i) (ext_phase π j).
   Proof using.
     rewrite /ext_phase /phase_le.
@@ -779,13 +728,13 @@ subst new_obls0.
       rewrite app_length in PREF. simpl in PREF. lia.  
   Qed. 
 
-  Lemma phases_disj_forks π (i j: bool) (NEQ: i ≠ j):
+  Lemma phases_disj_forks π (i j: nat) (NEQ: i ≠ j):
     phases_disj (ext_phase π i) (ext_phase π j).
   Proof using.
     split; apply ext_phase_not_le; done. 
   Qed.
 
-  Lemma phase_disj_ext π1 π2 (i: bool)
+  Lemma phase_disj_ext π1 π2 (i: nat)
     (DISJ: phases_disj π1 π2):
     phases_disj (ext_phase π1 i) π2.
   Proof using.
@@ -950,6 +899,18 @@ subst new_obls0.
     - apply wf_preserved_by_fork_step.
   Qed.
     
+  Definition obls_eq R δ1 := dom $ ps_obls δ1 = R.
+      
+  Lemma loc_step_obls_pres R τ: preserved_by (loc_step_of τ) (obls_eq R). 
+  Proof using.
+    do 2 red. intros δ1 δ2 OE STEP. 
+    add_case (dom $ ps_obls δ2 = dom $ ps_obls δ1) SAME.
+    { intros EQ. by rewrite EQ. }
+    inv_loc_step STEP; destruct δ1; try done; simpl in *.
+    - subst new_obls0. rewrite dom_insert_L. simpl. set_solver.
+    - subst new_obls0. rewrite dom_insert_L. simpl. set_solver.
+  Qed.
+
 End Model.
 
 Ltac inv_loc_step STEP :=

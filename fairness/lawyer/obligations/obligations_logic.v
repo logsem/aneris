@@ -36,7 +36,7 @@ Section ProgramLogic.
             ⌜ nsteps (fun p1 p2 => loc_step OP p1 τ p2) k δ δ__k  ⌝ ∗
             ⌜ threads_own_obls OP c δ ⌝ ∗
             ⌜ dom_phases_obls OP δ ⌝ ∗
-            ⌜ obls_eq OP δ__k (dom $ ps_obls OP δ) ⌝ ∗
+            ⌜ obls_eq OP (dom $ ps_obls OP δ) δ__k ⌝ ∗
            ⌜ locale_step c (Some τ) c' ⌝ ∗
            ⌜ step_fork c c' = oτ' ⌝
     .
@@ -67,8 +67,11 @@ Section ProgramLogic.
       iMod (burn_cp_upd_impl with "[$] [$]") as "X".
       { eexists. split; eauto.
         rewrite -PH.
-        erewrite loc_step_nsteps_phases_pres; eauto.
-        apply phases_eq_init. }
+        unshelve eapply (pres_by_loc_step_implies_rep _ _ _ _ _ _) in TRANSS.
+        { eapply loc_step_phases_pres. }
+        3: reflexivity.
+        2: { rewrite TRANSS. reflexivity. } 
+      }
       iDestruct "X" as "(%δ' & MSI & %BURNS)". 
       iModIntro. iExists _. simpl. iFrame.
       
@@ -82,7 +85,8 @@ Section ProgramLogic.
         eexists. split; eauto. }
       
       iPureIntro. split; [split| ]; auto.
-      - eapply progress_step_dpo_pres; eauto.
+      - eapply pres_by_loc_step_implies_progress; eauto.
+        { apply loc_step_dpo_pres. }
         do 2 (eexists; split; eauto).
       - simpl. red. eexists. split; eauto.
         + eexists. split; eauto. eexists. split; eauto.
@@ -122,12 +126,14 @@ Section ProgramLogic.
         red. etrans; eauto. }
       iDestruct "X" as "(%δ' & MSI & %BURNS)".
 
-      assert (obls_eq OP δ' (dom (ps_obls OP δ))) as OBLS'.
-      { eapply (progress_step_obls_pres _ δ); eauto.
-        2: done. 
+      assert (obls_eq OP (dom (ps_obls OP δ)) δ') as OBLS'.
+      { eapply pres_by_loc_step_implies_progress.
+        { apply loc_step_obls_pres. }
+        { reflexivity. }
         eexists. do 2 (esplit; eauto). }
       assert (dom_phases_obls OP δ') as DPO'.
-      { eapply progress_step_dpo_pres; eauto.
+      { eapply pres_by_loc_step_implies_progress; eauto.
+        { apply loc_step_dpo_pres. }
         eexists. do 2 (esplit; eauto). }
        
       iMod (fork_locale_upd_impl with "[$] [$] [$]") as "Y"; eauto. 
@@ -162,7 +168,7 @@ Section ProgramLogic.
         done. 
       - eexists. split; eauto.
         + eexists. split; eauto. eexists. split; eauto.
-        + left. eauto.
+        + left. red. eauto.
     Qed.
       
     Lemma BMU_intro E ζ b (P : iProp Σ):

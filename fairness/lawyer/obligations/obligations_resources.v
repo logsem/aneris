@@ -24,7 +24,7 @@ Section ObligationsRepr.
   Context (OP: ObligationsParams Degree Level Locale LIM_STEPS).
   Let OM := ObligationsModel OP.
 
-  Let phO := listO boolO. 
+  Let phO := listO natO. 
   Let cpO := prodO phO DegO. 
   Let sstR := prodR (agreeR LevelO) (excl' boolO).
  
