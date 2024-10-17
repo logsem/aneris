@@ -6,7 +6,7 @@ Section WfSetMin.
   Context {A: Type}.
 
   Definition minimal_in_prop (R : relation A) (x : A) (P : A -> Prop) :=
-    forall y, P y -> R y x -> R x y. 
+    forall y, P y -> R y x -> False. 
   
   Context {R: relation A}.
   Hypothesis (WF: wf R).
@@ -14,6 +14,9 @@ Section WfSetMin.
   Theorem sets_have_min (P: A -> Prop)
     (NE: exists a, P a):
     exists a, P a /\ minimal_in_prop R a P.
-  Proof. Admitted.
+  Proof.
+    (* look for existing pen-and-paper proofs *)
+    (* use choice *)
+  Admitted.
   
 End WfSetMin.

@@ -115,10 +115,6 @@ Section MultisetOrder.
     (* - specialize (LE2 _ H0). *)
   Admitted.
 
-  Goal PartialOrder ms_le.
-    esplit; apply _.
-  Defined. 
-
   Lemma empty_ms_le X: ms_le ∅ X.
   Proof using.
     red. intros ?. rewrite multiplicity_empty. lia.
@@ -172,6 +168,9 @@ Section MultisetOrder.
     X Y:
     ms_le X Y <-> ms_le_dm X Y.
   Proof using.
+    (* try using the second definition only *)
+    
+    
   (*   rewrite /ms_le /ms_le_dm. split. *)
   (*   - rename X into M, Y into N. *)
   (*     (* intros LE. *) *)
