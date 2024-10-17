@@ -24,7 +24,7 @@ Section ObligationsRepr.
   Context (OP: ObligationsParams Degree Level Locale LIM_STEPS).
   Let OM := ObligationsModel OP.
 
-  Let phO := listO positiveO. 
+  Let phO := listO boolO. 
   Let cpO := prodO phO DegO. 
   Let sstR := prodR (agreeR LevelO) (excl' boolO).
  
@@ -678,7 +678,6 @@ Section ObligationsRepr.
         rewrite fmap_empty insert_empty.
         apply singleton_local_update_any.
         intros. eapply exclusive_local_update. done.
-        Unshelve. apply excl_exclusive.
     Qed.
 
   End ResourcesUpdates.

@@ -1,6 +1,6 @@
 Require Import Coq.Program.Wf.
 Require Import Relation_Operators.
-From stdpp Require Import namespaces.
+(* From stdpp Require Import namespaces. *)
 From iris.proofmode Require Import tactics.
 From iris.algebra Require Import gset gmultiset.
 From trillium.fairness Require Import locales_helpers inftraces fairness trace_len my_omega.
@@ -57,8 +57,9 @@ Section Termination.
   Definition phase_ge := flip phase_le. 
   Definition PF (π: Phase) := PF' OP set_before (phase_ge π).
   Definition TPF (π: Phase) := TPF' OP tr set_before (phase_ge π).
-  
-  Let π0 := nroot.
+
+  (* TODO: move *)
+  Let π0: Phase := nil. 
 
   Lemma other_expect_ms_le π__ow δ1 τ δ2 k
     (OTHER: let π := default π0 (ps_phases _ δ1 !! τ) in
@@ -239,6 +240,17 @@ Section Termination.
       { reflexivity. }
       red in P. rewrite P. done.
     Qed. 
+
+    Lemma phases_not_le δ (WF0: om_st_wf _ δ) τ1 τ2 π1 π2
+      (P1: ps_phases _ δ !! τ1 = Some π1)
+      (P2: ps_phases _ δ !! τ2 = Some π2)
+      (PH_LE: phase_le π1 π2):
+      τ1 = τ2 /\ π1 = π2.
+    Proof using.
+      destruct (decide (τ1 = τ2)) as [-> | ?].
+      { rewrite P1 in P2. inversion P2. done. }
+      edestruct (om_wf_ph_disj _ δ); eauto. tauto. 
+    Qed.   
 
     (* Context `(STEP: om_trans OP δ1 τ δ2). *)
     Context (δ1 δ2: ProgressState OP).    
@@ -580,37 +592,14 @@ Section Termination.
   (*   forall ep, ep ∈ ps_eps _ δ2 ∖ ps_eps _ δ1 -> phase_le (ep.1.2) πτ. *)
   (* Proof using. Admitted. *)
   
-  Lemma om_trans_cps_bound δ1 τ δ2 πτ cp π'
-    (PH: ps_phases _ δ1 !! τ = Some πτ)
-    (STEP: om_trans _ δ1 τ δ2)
-    (IN2 : cp ∈ ps_cps _ δ2)
-    (LEcp : phase_le cp.1 π')
-    (FRESHπ': π' ∈ (map_img (ps_phases _ δ2) ∖ (map_img (ps_phases _ δ1) : gset Phase))):
-    phase_le cp.1 πτ.
-  Proof using.
-    red in STEP. destruct STEP as (δ' & PSTEP & FSTEP).
-    forward eapply pres_by_loc_step_implies_progress.
-    { apply loc_step_phases_pres. }
-    intros PRES. do 2 red in PRES. specialize_full PRES; eauto.
-    { reflexivity. }
-    red in PRES. rewrite -PRES in PH. rewrite -PRES in FRESHπ'.
-    clear dependent δ1. 
-    inversion FSTEP.
-    2: { subst. set_solver. }
-    subst. destruct H1 as (?&?&STEP). inversion STEP. subst.
-    destruct δ'. simpl in *.
-    revert FRESHπ'. subst new_phases0. rewrite map_img_insert_L.
-    rewrite delete_notin.
-    2: { apply not_elem_of_dom. rewrite dom_insert.
-         apply not_elem_of_union. split; auto.
-         apply not_elem_of_singleton. intros ->.
-         destruct FRESH'. eapply elem_of_dom. eauto. }
-    rewrite map_img_insert_L.
-    rewrite !difference_union_distr_l.
-    rewrite difference_disjoint.
-    2: { apply disjoint_singleton_l.
-         intros [τ1 IN1]%elem_of_map_img. 
-  Admitted.
+  (* Lemma cps_phase_bound_alt δ: *)
+  (*   cps_phase_bound _ δ <-> *)
+  (*   forall cp, cp ∈ ps_cps _ δ -> *)
+  (*   exists τ π, ps_phases _ δ !! τ = Some π /\ phase_le cp.1 π. *)
+  (* Proof using. *)
+  (*   rewrite /cps_phase_bound. split. *)
+  (*   - intros CPB [π d] IN.  *)
+
 
   Definition s_ow (s: SignalId) (i: nat) := 
     let π := 
@@ -646,6 +635,199 @@ Section Termination.
     rewrite extract_Somes_gset_singleton. rewrite gset_pick_singleton.
     done.
   Qed.
+
+  (* TODO: remove these duplicates *)
+  Goal True. Admitted. 
+
+  (* TODO: move? *)
+  Definition is_fork (π1 π2: Phase) := exists (d: bool), π2 = ext_phase π1 d. 
+
+  Lemma fresh_phase_is_fork δ1 τ δ2 π
+    (WF1: om_st_wf _ δ1)
+    (STEP: om_trans _ δ1 τ δ2)
+    (FRESH: π ∈ (map_img (ps_phases _ δ2): gset Phase) ∖ (map_img (ps_phases _ δ1): gset Phase)):
+    exists π0, ps_phases _ δ1 !! τ = Some π0 /\ is_fork π0 π.
+  Proof using.
+    clear WF SET_BEFORE_SPEC LVL_WF.
+    red in STEP. destruct STEP as (δ' & PSTEP & FSTEP).
+    
+    forward eapply pres_by_loc_step_implies_progress.
+    { apply loc_step_phases_pres. }
+    intros PH_EQ. do 2 red in PH_EQ. specialize_full PH_EQ; eauto.
+    { reflexivity. }
+    red in PH_EQ. rewrite -PH_EQ in FRESH. 
+
+    forward eapply pres_by_loc_step_implies_progress.
+    { apply wf_preserved_by_loc_step. }
+    intros WF'. do 2 red in WF'. specialize_full WF'; eauto.
+
+    inversion FSTEP; [| set_solver].
+    subst. destruct H1 as (?&?&FORK). inversion FORK. subst.
+    destruct δ'. simpl in *.
+    rewrite -PH_EQ. eexists. split; eauto. 
+    revert FRESH. subst new_phases0. rewrite map_img_insert_L.
+    rewrite delete_notin.
+    2: { apply not_elem_of_dom. rewrite dom_insert.
+         apply not_elem_of_union. split; auto.
+         apply not_elem_of_singleton. intros ->.
+         destruct FRESH'. eapply elem_of_dom. eauto. }
+    rewrite map_img_insert_L.
+    rewrite !difference_union_distr_l.
+    rewrite difference_disjoint.
+    2: { apply disjoint_singleton_l.
+         intros [τ1 IN1]%elem_of_map_img.
+         edestruct phases_not_le; [apply WF'| ..]; simpl.
+         { apply LOC_PHASE. }
+         { apply IN1. }
+         { apply phase_lt_fork. }
+         pose proof (phase_lt_fork π1 true) as [??]%strict_spec_alt. done. }
+    rewrite difference_disjoint.
+    2: { apply disjoint_singleton_l.
+         intros [τ' IN']%elem_of_map_img.
+         edestruct phases_not_le; [apply WF'| ..]; simpl.
+         { apply LOC_PHASE. }
+         { apply IN'. }
+         { apply phase_lt_fork. }
+         pose proof (phase_lt_fork π1 false) as [??]%strict_spec_alt. done. }
+    rewrite subseteq_empty_difference.
+    2: { apply map_subseteq_img, delete_subseteq. }
+
+    rewrite union_empty_r_L elem_of_union !elem_of_singleton.
+    rewrite /is_fork. intros [-> | ->]; eauto.
+  Qed.
+
+  (* TODO: move *)
+  Lemma phase_le_ext_split π1 π2 d
+    (LE: phase_le π1 (ext_phase π2 d)):
+    π1 = ext_phase π2 d \/ phase_le π1 π2.
+  Proof using.
+    do 2 red in LE. destruct LE as [p EQ]. rewrite /ext_phase in EQ.
+    destruct p.
+    { simpl in EQ. eauto. }
+    rewrite -app_comm_cons in EQ. inversion EQ. subst.
+    right. red. red. exists p. eauto.
+  Qed. 
+
+  Lemma om_trans_cps_bound δ1 τ δ2 π cp τ' π'
+    (WF1: om_st_wf _ δ1)
+    (PH: ps_phases _ δ1 !! τ = Some π)
+    (STEP: om_trans _ δ1 τ δ2)
+    (IN2 : cp ∈ ps_cps _ δ2)
+    (PH': ps_phases _ δ2 !! τ' = Some π')
+    (LE: phase_le π π')
+    (LEcp : phase_le cp.1 π'):
+    phase_le cp.1 π.
+  Proof using.    
+    destruct (decide (π' = π)) as [-> | NEQ].
+    { done. }
+    
+    forward eapply (om_trans_wf_pres _ _ δ1) as WF2; eauto.
+
+    assert (π' ∉ (map_img (ps_phases _ δ1): gset Phase)) as FRESHπ'.
+    { intros IN.
+      rename π' into π''.
+      apply elem_of_map_img in IN as (τ'' & T'').
+      destruct (decide (τ'' = τ)) as [-> | ?]; [set_solver| ].      
+      edestruct @om_wf_ph_disj.
+      { eapply WF1; eauto. }
+      all: eauto. }
+
+    assert (is_fork π π') as [d PH_FORK]; [| subst π'].
+    { eapply fresh_phase_is_fork in STEP; eauto.
+      2: { apply elem_of_difference. split; eauto. apply elem_of_map_img. eauto. }
+      destruct STEP as (? & PH0 & ?). congruence. }
+
+    apply phase_le_ext_split in LEcp as [EQ | ?]; [| done]. 
+
+    red in STEP. destruct STEP as (δ' & PSTEP & FSTEP).
+      
+    forward eapply pres_by_loc_step_implies_progress.
+    { apply loc_step_phases_pres. }
+    intros PH_EQ. do 2 red in PH_EQ. specialize_full PH_EQ; eauto.
+    { reflexivity. }
+    red in PH_EQ. rewrite -PH_EQ in PH.
+    
+    forward eapply pres_by_loc_step_implies_progress.
+    { apply wf_preserved_by_loc_step. }
+    intros WF'. do 2 red in WF'. specialize_full WF'.
+    2: { red. eauto. }
+    all: eauto.
+    
+    assert (ps_cps _ δ2 = ps_cps _ δ') as CPS2.
+    { inversion FSTEP; [| done].
+      subst. destruct H1 as (?&?&FORK). inversion FORK. subst.
+      by destruct δ'. }
+    
+    rewrite CPS2 in IN2.
+    apply om_wf_cps_ph_bound in WF'. red in WF'. simpl in WF'.
+    destruct WF'. do 3 eexists. split; [| split]; eauto.
+    rewrite EQ. apply phase_lt_fork.
+  Qed. 
+
+  (* TODO: unify with previous *)
+  Lemma om_trans_eps_bound δ1 τ δ2 π ep τ' π'
+    (WF1: om_st_wf _ δ1)
+    (PH: ps_phases _ δ1 !! τ = Some π)
+    (STEP: om_trans _ δ1 τ δ2)
+    (IN2 : ep ∈ ps_eps _ δ2)
+    (PH': ps_phases _ δ2 !! τ' = Some π')
+    (LE: phase_le π π')
+    (LEcp : phase_le ep.1.2 π'):
+    phase_le ep.1.2 π.
+  Proof using.    
+    destruct (decide (π' = π)) as [-> | NEQ].
+    { done. }
+    
+    forward eapply (om_trans_wf_pres _ _ δ1) as WF2; eauto.
+
+    assert (π' ∉ (map_img (ps_phases _ δ1): gset Phase)) as FRESHπ'.
+    { intros IN.
+      rename π' into π''.
+      apply elem_of_map_img in IN as (τ'' & T'').
+      destruct (decide (τ'' = τ)) as [-> | ?]; [set_solver| ].      
+      edestruct @om_wf_ph_disj.
+      { eapply WF1; eauto. }
+      all: eauto. }
+
+    assert (is_fork π π') as [d PH_FORK]; [| subst π'].
+    { eapply fresh_phase_is_fork in STEP; eauto.
+      2: { apply elem_of_difference. split; eauto. apply elem_of_map_img. eauto. }
+      destruct STEP as (? & PH0 & ?). congruence. }
+
+    apply phase_le_ext_split in LEcp as [EQ | ?]; [| done]. 
+
+    red in STEP. destruct STEP as (δ' & PSTEP & FSTEP).
+      
+    forward eapply pres_by_loc_step_implies_progress.
+    { apply loc_step_phases_pres. }
+    intros PH_EQ. do 2 red in PH_EQ. specialize_full PH_EQ; eauto.
+    { reflexivity. }
+    red in PH_EQ. rewrite -PH_EQ in PH.
+    
+    forward eapply pres_by_loc_step_implies_progress.
+    { apply wf_preserved_by_loc_step. }
+    intros WF'. do 2 red in WF'. specialize_full WF'.
+    2: { red. eauto. }
+    all: eauto.
+    
+    assert (ps_eps _ δ2 = ps_eps _ δ') as EPS2.
+    { inversion FSTEP; [| done].
+      subst. destruct H1 as (?&?&FORK). inversion FORK. subst.
+      by destruct δ'. }
+    
+    rewrite EPS2 in IN2.
+    apply om_wf_eps_ph_bound in WF'. red in WF'. simpl in WF'.
+    destruct WF'. do 3 eexists. split; [| split]; eauto.
+    rewrite EQ. apply phase_lt_fork.
+  Qed.
+
+  (* TODO: move *)
+  Lemma gset_filter_subseteq_mono_strong `{Countable A} (P Q: A -> Prop)
+    `{∀ x, Decision (P x)} `{∀ x, Decision (Q x)}
+    (g: gset A)
+    (IMPL: ∀ x, x ∈ g -> P x -> Q x):
+    filter P g ⊆ filter Q g.
+  Proof using. clear -IMPL. set_solver. Qed. 
 
   Lemma min_owner_PF_decr s c
     (VALID: obls_trace_valid OP tr)
@@ -740,7 +922,7 @@ Section Termination.
 
       clear -H1 MIN SIGc SIGdm DMTH CTH.
       unfold tr_sig_lt, MR, lvl_at in *.
-      rewrite DMTH. simpl. rewrite SIGdm. simpl.
+      (* rewrite DMTH. simpl. rewrite SIGdm. simpl. *)
       rewrite CTH in MIN. simpl in MIN. rewrite SIGc in MIN. simpl in MIN.
       apply MIN. rewrite DMTH in H1. simpl in H1. rewrite SIGdm in H1. done. }
     { by rewrite OBLSm. }
@@ -786,25 +968,19 @@ Section Termination.
     - apply ms_le_sub, mset_map_sub.
       apply mset_filter_subseteq_mono_strong.
       intros [pi de] IN' LEpi.
-      destruct (decide (π' = π)) as [-> | NEQ]; [done| ].
-      assert (π' ∉ (map_img (ps_phases _ δm): gset Phase)) as FRESHπ'.
-      { intros IN.
-        rename π' into π''. 
-        apply elem_of_map_img in IN as (τ'' & T'').
-        destruct (decide (τ'' = τ)) as [-> | ?]; [set_solver| ].
-        pose proof (coPpick_elem_of (↑ π'') (nclose_infinite _)) as P.
 
-        edestruct @om_wf_ph_disj.
-        { eapply (WF (d + m)); eauto. }
-        { apply n. }
-        all: eauto. }
       replace pi with (pi, de).1; [| done].
-      eapply om_trans_cps_bound; eauto.
-      { eapply trace_valid_steps''; eauto. }
-      apply elem_of_difference. split; auto.
-      eapply elem_of_map_img; eauto. 
+      eapply (om_trans_cps_bound δm); eauto.
+      eapply trace_valid_steps''; eauto.
     - apply ms_le_exp_mono; [lia| ].
-      admit.
+      apply gset_filter_subseteq_mono_strong. 
+      intros ep IN' LEpi.
+      destruct ep as [[? pi]?] eqn:EP.
+
+      replace pi with ep.1.2 by (by subst). 
+      eapply (om_trans_eps_bound δm); eauto.
+      2, 3: by subst. 
+      eapply trace_valid_steps''; eauto.
   Admitted.
   
   Theorem signals_eventually_set
@@ -834,7 +1010,7 @@ Section Termination.
     (* pose proof (min_owner_PF_decr (c + i) ltac:(lia)) as D. *)
     forward eapply min_owner_PF_decr with (d := c + i); eauto.
     { red. intros [??] [N LE] ?.
-      apply MIN; auto. split; auto. lia. }
+      eapply MIN; eauto. split; auto. lia. }
     { lia. }
     intros (j & AFTER & DECR).
     apply (NEXT (j - c)). red. red.
@@ -1035,6 +1211,6 @@ Section TerminationFull.
     Require Import Coq.Logic.ClassicalChoice.
     pose proof (choice _ set_before_ex) as [sb ?].
     eapply trace_terminates; eauto. 
-  Qed. 
+  Qed.
 
 End TerminationFull.

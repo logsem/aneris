@@ -1,7 +1,7 @@
 Require Import Relation_Operators.
 From stdpp Require Import namespaces. 
 From trillium.fairness Require Import fairness locales_helpers.
-From trillium.fairness.lawyer.obligations Require Import obls_utils.
+From trillium.fairness.lawyer.obligations Require Import obls_utils multiset_utils.
 
 
 Class ObligationsParams (Degree Level Locale: Type) (LIM_STEPS: nat) := {
@@ -24,10 +24,11 @@ Section Model.
   (* opar_loc_eqdec :> EqDecision Locale; *)
   (* opar_loc_cnt :> Countable Locale; *)
   Context `{Countable Locale}. 
-
-  Definition Phase := namespace. 
-  Definition phase_le : Phase -> Phase -> Prop :=
-    fun π1 π2 => (↑π2: coPset) ⊆ ↑π1. 
+  
+  Definition Phase := list bool. 
+  Definition phase_le : Phase -> Phase -> Prop := suffix. 
+    
+    (* fun π1 π2 => (↑π2: coPset) ⊆ ↑π1.  *)
 
   Definition SignalId := nat.
   Definition SignalState: Type := Level * bool. 
@@ -144,8 +145,9 @@ Section Model.
     let new_cps := ps_cps ps ⊎ {[+ (π__max, δ) +]} in
     expects_ep ps θ (update_cps new_cps ps) s π δ.
 
-  Definition fork_left (π: Phase): Phase := ndot π 0. 
-  Definition fork_right (π: Phase): Phase := ndot π 1. 
+  Definition ext_phase (π: Phase) (d: bool) := d :: π. 
+  Definition fork_left (π: Phase): Phase := ext_phase π false. 
+  Definition fork_right (π: Phase): Phase := ext_phase π true.
 
   Inductive forks_locale: PS -> Locale -> PS -> Locale -> gset SignalId -> Prop :=
   | fl_step ps θ θ' π0 obls_
@@ -210,51 +212,60 @@ Section Model.
     {| mtrans := om_trans |}. 
 
   (* Definition phases_incompat π1 π2 := ¬ phase_le π1 π2 /\ ¬ phase_le π2 π1. *)
-  Definition phases_disj (π1 π2: Phase) := ↑ π1 ## (↑ π2: coPset).
+  (* Definition phases_disj (π1 π2: Phase) := ↑ π1 ## (↑ π2: coPset). *)
+  Definition phases_disj (π1 π2: Phase) := 
+    ¬ phase_le π1 π2 /\ ¬ phase_le π2 π1.
 
   Global Instance phases_disj_sym: Symmetric phases_disj.
   Proof using.
     red. rewrite /phases_disj. set_solver.
   Qed. 
 
+  (* Lemma phases_disj_not_le' (π1 π2 π: Phase) *)
+  (*   (LE1: phase_le π π1) (LE2: phase_le π π2): *)
+  (*     ¬ phases_disj π1 π2.  *)
+  (* Proof using. *)
+  (*   intros DISJ.  *)
+  (*   pose proof (coPpick_elem_of (↑ π1) (nclose_infinite _)) as IN1%LE1. *)
+  (*   pose proof (coPpick_elem_of (↑ π1) (nclose_infinite _)) as IN1%LE1. *)
+  (*   apply LE1 in IN1.  *)
+  (*   edestruct DISJ; eauto. *)
+  (* Qed.   *)
+  
   Lemma phases_disj_not_le (π1 π2: Phase)
     (DISJ: phases_disj π1 π2):
       ¬ phase_le π1 π2. 
   Proof using.
-    intros LE. red in DISJ.
-    pose proof (coPpick_elem_of (↑ π2) (nclose_infinite _)) as IN1.
-    edestruct DISJ; eauto.
+    intros LE. red in DISJ. tauto. 
+    (* pose proof (coPpick_elem_of (↑ π2) (nclose_infinite _)) as IN1. *)
+    (* edestruct DISJ; eauto. *)
   Qed.  
   
   Definition phase_lt := strict phase_le.  
 
-  Global Instance phase_le_PreOrder: PreOrder phase_le.
+  Global Instance phase_le_PO: PartialOrder phase_le.
   Proof.
-    rewrite /phase_le. 
-    split.
-    - set_solver.
-    - red. set_solver.
-  Qed.         
+    apply _. 
+    (* rewrite /phase_le.  *)
+    (* split. *)
+    (* - set_solver. *)
+    (* - red. set_solver. *)
+  Defined. 
   
-  Lemma phase_lt_fork π (d: nat):
-    phase_lt π (π .@ d).
+  Lemma phase_lt_fork π (d: bool):
+    phase_lt π (ext_phase π d).
   Proof.
-    red. split.
-    { apply nclose_subseteq. }
-    red. rewrite /phase_le.
-    (* TODO: make a lemma? *)
-    intros SUB. pose proof (nclose_subseteq π (d + 1)).
-    pose proof (coPpick_elem_of (↑π.@(d + 1)) (nclose_infinite _)) as IN.
-    edestruct @ndot_ne_disjoint; cycle 1. 
-    { apply IN. }
-    { apply SUB. apply H0. done. }
-    lia.
+    rewrite /ext_phase. 
+    apply strict_spec_alt. split; try set_solver. 
+    - exists [d]. done.  
+    - intros EQ. apply (f_equal length) in EQ.
+      simpl in EQ. lia. 
   Qed. 
 
   Global Instance phase_le_dec: forall x y, Decision (phase_le x y).
-  Proof using. 
-    intros. rewrite /phase_le. solve_decision. 
-  Qed.
+  Proof using.
+    solve_decision. 
+  Defined. 
 
   Definition obls_trace_valid := trace_valid (@mtrans ObligationsModel).
   Definition obls_trace := trace (mstate ObligationsModel) (mlabel ObligationsModel).
@@ -293,6 +304,41 @@ Section Model.
     forall τ1 τ2, τ1 ≠ τ2 -> 
              default ∅ (ps_obls δ !! τ1) ## default ∅ (ps_obls δ !! τ2).   
 
+  (* Definition is_fork (π1 π2: Phase) := exists (i: nat), π2 = π1 .@ i.  *)
+
+  (* Definition ancestor_of (π π': Phase) := *)
+  (*   exists n, relations.nsteps is_fork n π π'. *)
+
+  (* Lemma is_fork_phase_le π1 π2 *)
+  (*   (FORK: is_fork π1 π2): *)
+  (*   phase_le π1 π2. *)
+  (* Proof using. *)
+  (*   destruct FORK as [? ->]. apply phase_lt_fork. *)
+  (* Qed. *)
+
+  (* Lemma ancestor_of_phase_le π1 π2 *)
+  (*   (ANC: ancestor_of π1 π2): *)
+  (*   phase_le π1 π2. *)
+  (* Proof using. *)
+  (*   destruct ANC as [n ANC]. generalize dependent π2. induction n. *)
+  (*   { intros ? ->%nsteps_0. done. } *)
+  (*   intros ? (πp & FORKS & FORK)%rel_compose_nsteps_next. *)
+  (*   etrans; eauto. by apply is_fork_phase_le.  *)
+  (* Qed. *)
+
+  (* Lemma forks_prev n π π' (d: nat) *)
+  (*   (FORKS: relations.nsteps is_fork (S n) π (π' .@ d)): *)
+  (*   relations.nsteps is_fork n π π'.  *)
+  (* Proof using.  *)
+  (*   apply rel_compose_nsteps_next in FORKS as (πp & FORKS & FORK). *)
+  (*   red in FORK. destruct FORK as [? EQ]. *)
+  (*   apply ndot_inj in EQ. destruct EQ as [-> ->]. done. *)
+  (* Qed. *)
+
+  (* Definition cps_phases_ancestors δ := *)
+  (*   forall cp π, cp ∈ ps_cps δ -> π ∈ (map_img (ps_phases δ): gset Phase) -> *)
+  (*           phase_le cp.1 π -> ancestor_of cp.1 π.   *)
+
   Record om_st_wf (δ: ProgressState) := {
     om_wf_dpo: dom_phases_obls δ;
     om_wf_asg: obls_assigned δ;
@@ -301,6 +347,7 @@ Section Model.
     om_wf_eps_ph_bound: eps_phase_bound δ;
     om_wf_obls_are_sigs: obligations_are_signals δ;
     om_wf_obls_disj: obls_disjoint δ;
+    (* om_wf_ph_anc: cps_phases_ancestors δ; *)
   }.
 
   Definition preserved_by 
@@ -519,10 +566,13 @@ Section Model.
     { edestruct EPB; eauto. set_solver. }
     apply elem_of_singleton in IN as ->. (* simpl in *. *)
     simpl in *.
-    assert (phase_lt π π__max) as LE' by set_solver.
+    assert (phase_lt π π__max) as LE'.
+    { eapply strict_transitive_l; eauto. } 
     pose proof LE' as LE''%strict_include. 
     eapply phases_disj_not_le in LE''; eauto.
-    eapply DPD; eauto; [set_solver| ..]; eapply elem_of_map_img; eauto. 
+    eapply DPD; eauto.
+    intros ->. rewrite LOC_PHASE in PH2. inversion PH2. subst.
+    apply strict_spec_alt in LE'. tauto. 
   Qed.
 
   Lemma loc_step_cpb_pres' τ: preserved_by_loc_step τ
@@ -556,7 +606,9 @@ Section Model.
       apply gmultiset_elem_of_singleton in IN as ->. simpl in *.
       pose proof LT as LE''%strict_include. 
       eapply phases_disj_not_le in LE''; eauto.
-      eapply DPD; eauto; [set_solver| ..]; eapply elem_of_map_img; eauto. 
+      eapply DPD; eauto.
+      intros ->. rewrite LOC_PHASE in PH2. inversion PH2. subst.
+      apply strict_spec_alt in LT. tauto. 
   Qed.
 
   Lemma loc_step_obls_sigs_pres τ: preserved_by_loc_step τ obligations_are_signals.
@@ -625,6 +677,34 @@ Section Model.
         * rewrite lookup_insert_ne; done.
       + apply _. 
   Qed.
+
+  (* Lemma loc_step_cps_ph_anc_pres τ: preserved_by (loc_step_of τ) (fun δ => cps_phases_ancestors δ /\ dom_phases_disj δ). *)
+  (* Proof using. *)
+  (*   intros δ1 δ2 [ANC DPD] STEP.  *)
+  (*   split. *)
+  (*   2: { eapply loc_step_dpd_pres; eauto. } *)
+  (*   red.  *)
+  (*   inv_loc_step STEP; destruct δ1; try done; simpl in *. *)
+  (*   - intros. apply ANC; eauto. simpl. multiset_solver. *)
+  (*   - intros cp π. simpl. subst new_cps0. *)
+  (*     intros [OLD | NEW]%gmultiset_elem_of_disj_union PH_DOM LE. *)
+  (*     + eapply @ANC; eauto. simpl. multiset_solver. *)
+  (*     + apply gmultiset_elem_of_scalar_mul in NEW as [_ NEW]. *)
+  (*       apply gmultiset_elem_of_singleton in NEW as ->. *)
+  (*       eapply ANC in CP; eauto. *)
+  (*   - intros. apply ANC; eauto. simpl. multiset_solver. *)
+  (*   - intros cp π. simpl. subst new_cps0. *)
+  (*     intros [OLD | NEW]%gmultiset_elem_of_disj_union PH_DOM LE'. *)
+  (*     + eapply @ANC; eauto. *)
+  (*     + apply gmultiset_elem_of_singleton in NEW as ->. *)
+  (*       apply elem_of_map_img in PH_DOM as [τ' DOM']. *)
+  (*       destruct (decide (τ' = τ)) as [-> | NEQ]. *)
+  (*       { simpl in *. rewrite LOC_PHASE in DOM'. inversion DOM'. *)
+  (*         subst π__max. exists 0. by apply nsteps_0. } *)
+        
+  (*       apply not_eq_sym in NEQ. eapply DPD in NEQ. specialize_full NEQ; eauto. *)
+  (*       apply phases_disj_not_le in NEQ. done. *)
+  (* Qed.     *)
         
   Lemma wf_preserved_by_loc_step τ: preserved_by (loc_step_of τ) om_st_wf.
   Proof using.
@@ -637,6 +717,7 @@ Section Model.
     - eapply loc_step_epb_pres'; eauto. split; apply WF1.
     - eapply loc_step_obls_sigs_pres; eauto. apply WF1.
     - eapply loc_step_obls_disj_pres'; eauto. split; apply WF1.
+    (* - eapply loc_step_cps_ph_anc_pres; eauto. split; apply WF1. *)
   Qed.
 
   Lemma fork_step_obls_reorder δ1 τ δ2
@@ -687,20 +768,37 @@ subst new_obls0.
     destruct δ1; subst; simpl in *. done. 
   Qed.
 
-  Lemma phases_disj_forks π (i j: nat) (NEQ: i ≠ j):
-    phases_disj (π .@ i) (π .@ j).
+  Lemma ext_phase_not_le π (i j: bool) (NEQ: i ≠ j):
+    ¬ phase_le (ext_phase π i) (ext_phase π j).
   Proof using.
-    red. eapply ndot_ne_disjoint; eauto. 
+    rewrite /ext_phase /phase_le.
+    intros. intros [p PREF].
+    destruct p; simpl in PREF. 
+    - inversion PREF. done.
+    - apply (f_equal length) in PREF. simpl in PREF.
+      rewrite app_length in PREF. simpl in PREF. lia.  
+  Qed. 
+
+  Lemma phases_disj_forks π (i j: bool) (NEQ: i ≠ j):
+    phases_disj (ext_phase π i) (ext_phase π j).
+  Proof using.
+    split; apply ext_phase_not_le; done. 
   Qed.
 
-  Lemma phase_disj_ndot π1 π2 (i: nat)
+  Lemma phase_disj_ext π1 π2 (i: bool)
     (DISJ: phases_disj π1 π2):
-    phases_disj (π1 .@ i) π2.
+    phases_disj (ext_phase π1 i) π2.
   Proof using.
-    red. eapply disjoint_subseteq; [..| apply DISJ].
-    - apply _.
-    - apply nclose_subseteq.
-    - done.
+    red. rewrite /ext_phase. split.  
+    - intros [p ->]. red in DISJ. apply proj1 in DISJ. edestruct DISJ; eauto.
+      rewrite cons_middle app_assoc. red. red. eauto.
+    - intros [p EQ]. red in DISJ.
+      destruct p.
+      { simpl in EQ. subst. apply proj1 in DISJ. edestruct DISJ; eauto.
+        red. red. exists [i]. eauto. }
+      rewrite -app_comm_cons in EQ. inversion EQ. subst.
+      apply proj2 in DISJ. edestruct DISJ; eauto.
+      red. red. exists p. eauto.
   Qed. 
 
   Lemma fork_step_dpd_pres τ:
@@ -714,8 +812,8 @@ subst new_obls0.
     rewrite !lookup_insert_Some.    
     intros NEQ [[-> <-] | [NEQ1 [[<- <-]| [NEQ1' PH1]]]] [[-> <-] | [NEQ2 [[<- <-]| [NEQ2' PH2]]]]; try tauto || by apply phases_disj_forks.
     3, 4: symmetry.
-    1-3: by apply phase_disj_ndot; eapply DPD; simpl; eauto. 
-    { apply phase_disj_ndot. eapply DPD; [apply NEQ1'| ..]; eauto. }
+    1-3: by apply phase_disj_ext; eapply DPD; simpl; eauto. 
+    { apply phase_disj_ext. eapply DPD; [apply NEQ1'| ..]; eauto. }
     eapply DPD; [apply NEQ|..]; eauto. 
   Qed.
 
@@ -812,6 +910,25 @@ subst new_obls0.
       all: simpl; set_solver.
     - eapply disjoint_subseteq; eauto. apply _. 
   Qed.     
+
+  (* Lemma fork_step_cps_anc_pres τ: *)
+  (*   preserved_by (fork_step_of τ) cps_phases_ancestors. *)
+  (* Proof using. *)
+  (*   do 2 red. intros δ1 δ2 OS STEP.  *)
+  (*   red in STEP. destruct STEP as (?&?&STEP).     *)
+  (*   inversion STEP; subst. *)
+  (*   destruct δ1; simpl in *. subst new_obls0. *)
+  (*   subst new_phases0. rewrite map_img_insert_L. *)
+  (*   rewrite delete_notin. *)
+  (*   2: { apply not_elem_of_dom. rewrite dom_insert. *)
+  (*        apply not_elem_of_union. split; auto. *)
+  (*        apply not_elem_of_singleton. intros ->. *)
+  (*        destruct FRESH'. eapply elem_of_dom. eauto. } *)
+  (*   rewrite map_img_insert_L. *)
+  (*   intros ???.  *)
+  (*   rewrite !elem_of_union !elem_of_singleton. intros [->|[-> | OLD]] LE. *)
+  (*   -  *)
+
     
   Lemma wf_preserved_by_fork_step τ: preserved_by (fork_step_of τ) om_st_wf.
   Proof using.
@@ -832,8 +949,6 @@ subst new_obls0.
     - apply wf_preserved_by_loc_step.
     - apply wf_preserved_by_fork_step.
   Qed.
-
-  
     
 End Model.
 
@@ -846,4 +961,3 @@ Ltac inv_loc_step STEP :=
      destruct T as (?&?&?&?&T) |
      destruct T as (?&?&?&T) ];
     inversion T; subst. 
-
