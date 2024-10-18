@@ -426,6 +426,68 @@ Section Termination.
     destruct b; tauto.
   Qed.     
 
+  (* TODO: rephrase in terms of preserved_by? *)
+  Lemma expected_signal_created_before δ1 δ2 τ n sid l
+    (NSTEPS: nsteps (loc_step_of _ τ) n δ1 δ2)
+    (SIG2: ps_sigs _ δ2 !! sid = Some (l, false))
+    (LT2: lt_locale_obls _ l τ δ2):
+    ps_sigs _ δ1 !! sid = Some (l, false).
+  Proof using.
+    clear WF VALID SET_BEFORE_SPEC LVL_WF set_before.
+    assert (sid ∉ default ∅ (ps_obls OP δ2 !! τ)) as NO2.
+    { intros IN2. 
+      destruct (ps_obls OP δ2 !! τ) eqn:OBLS2; [| done]. simpl. 
+      do 2 red in LT2. specialize (LT2 l).
+      rewrite OBLS2 in LT2. simpl in LT2.
+      specialize_full LT2.
+      2: { by apply strict_ne in LT2. }
+      apply extract_Somes_gset_spec.
+      apply elem_of_map. eexists. split; eauto.
+      by rewrite SIG2. }
+    clear LT2. generalize dependent δ2. induction n.
+    { by intros ? ->%nsteps_0. }
+    intros δ2 (δ' & STEPS & STEP)%rel_compose_nsteps_next SIG2 NO2.
+    forward eapply (loc_step_sig_st_le_pres τ sid).
+    intros LE'. red in LE'. specialize_full LE'; [| eauto |]. 
+    { apply sig_st_le_refl. }
+    rewrite SIG2 in LE'.
+
+    assert (ps_sigs OP δ' !! sid = Some (l, false)) as SIG'.
+    { destruct (ps_sigs OP δ' !! sid) as [[??]| ] eqn:SIG'.
+      { simpl in LE'. destruct LE' as [??]. subst. destruct b; tauto. }
+      clear dependent δ1. 
+      red in STEP.
+      inv_loc_step STEP; destruct δ'; simpl in *; subst.
+      + by rewrite SIG2 in SIG'.
+      + by rewrite SIG2 in SIG'.
+      + subst new_sigs0. rewrite lookup_insert_ne in SIG2.
+        { by rewrite SIG2 in SIG'. }
+        intros ->. subst new_obls0.
+        destruct NO2. rewrite lookup_insert. simpl. set_solver.
+      + subst new_sigs0. rewrite lookup_insert_ne in SIG2.
+        { by rewrite SIG2 in SIG'. }       
+        intros ->. by rewrite SIG' in SIG.
+      + by rewrite SIG2 in SIG'.
+      + by rewrite SIG2 in SIG'. }
+    clear LE'. 
+
+    eapply IHn; eauto.
+    destruct (ps_obls OP δ' !! τ) eqn:OBLS'; [| done]. simpl. intros IN'.
+    inv_loc_step STEP; destruct δ'; simpl in *; subst. 
+    + by rewrite OBLS' in NO2. 
+    + by rewrite OBLS' in NO2.
+    + subst new_sigs0 new_obls0.
+      destruct NO2. subst cur_loc_obls0. rewrite OBLS' lookup_insert. set_solver.
+    + subst new_sigs0 new_obls0.
+      subst cur_loc_obls0.
+      destruct (decide (x = sid)) as [-> | ?].
+      { rewrite lookup_insert in SIG2. done. }
+      rewrite lookup_insert_ne in SIG2; [| done].
+      destruct NO2. rewrite OBLS'. simpl. rewrite lookup_insert. simpl. set_solver.
+    + rewrite OBLS' in NO2. done.
+    + rewrite OBLS' in NO2. done. 
+  Qed.
+
   Lemma owm_om_trans_ms_lt πτ τ n s δ0
     (NTH: tr S!! n = Some δ0)
     (PH: ps_phases _ δ0 !! τ = Some πτ)
@@ -522,6 +584,7 @@ Section Termination.
     assert (s ∈ default ∅ (ps_obls _ δ' !! τ)) as OBL'.
     { admit. }
 
+    pose proof OBLS_LT as OL. 
     specialize (OBLS_LT ls). specialize_full OBLS_LT.
     { apply extract_Somes_gset_spec.
       destruct (ps_obls OP δ' !! τ) as [obs| ] eqn:OBLS'; [| set_solver].
@@ -533,7 +596,8 @@ Section Termination.
     (* either it was there when the big step started,
        or it's a new signal, but then the thread holds an obligation
        and cannot wait on it *)
-    assert (ps_sigs OP δk !! sid = Some (l, false)) as SIG0 by admit.
+    assert (ps_sigs OP δk !! sid = Some (l, false)) as SIG0.
+    { eapply expected_signal_created_before; eauto. }
     
     pose proof (SET_BEFORE_SPEC sid n). specialize_full H1; [| done| ].
     2: { rewrite /sig_val_at in H1. 
@@ -1114,7 +1178,7 @@ Section Termination.
     (ALL_SET: ∀ sid, eventually_set sid)
     :
     ms_lt deg_le (APF (S n)) (APF n).
-  Proof using VALID.
+  Proof using VALID SET_BEFORE_SPEC.
     destruct DOM as [δ' NTH']. 
     
     eapply om_trans_ms_rel with (bd := true); auto.
@@ -1162,10 +1226,10 @@ Section Termination.
        or it's a new signal, but then the thread holds an obligation
        and cannot wait on it *)
     assert (ps_sigs OP δn !! sid = Some (l, false)) as SIG0'.
-    { admit. }
+    { eapply expected_signal_created_before; eauto. }
     rewrite SIG0' in SB. done. 
     
-  Admitted. 
+  Qed. 
 
   Theorem trace_terminates
     (FAIR: forall τ, obls_trace_fair _ τ tr):
