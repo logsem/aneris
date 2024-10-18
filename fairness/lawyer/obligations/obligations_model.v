@@ -187,7 +187,10 @@ Section Model.
     (exists s π δ, expects_ep ps1 θ ps2 s π δ).
 
   Definition loc_step_of θ := fun ps1 ps2 => loc_step ps1 θ ps2. 
-  Definition fork_step_of θ := fun ps1 ps2 => exists τ' R, forks_locale ps1 θ ps2 τ' R. 
+  Definition fork_step_of θ := fun ps1 ps2 => exists τ' R, forks_locale ps1 θ ps2 τ' R.
+
+  Definition obls_any_step_of θ := 
+    fun ps1 ps2 => loc_step_of θ ps1 ps2 \/ fork_step_of θ ps1 ps2. 
 
   Notation " x ;;; y " := (rel_compose x y) (at level 20).
 
@@ -341,16 +344,24 @@ Section Model.
   Definition preserved_by_om_trans τ :=
     preserved_by (om_trans_of τ). 
 
+  Lemma pres_by_rel_implies_rep R P
+    (PRES: preserved_by R P)
+    :
+    forall n, preserved_by (relations.nsteps R n) P. 
+  Proof.
+    red. intros n. intros δ1.
+    induction n.
+    { simpl. intros ?? ->%nsteps_0. done. }
+    intros ?? (δ'&STEP1&STEP2)%rel_compose_nsteps_next.
+    apply IHn in STEP1; eauto.
+  Qed.
+
   Lemma pres_by_loc_step_implies_rep τ P
     (PRES: preserved_by_loc_step τ P)
     :
     preserved_by_rep_loc_step τ P. 
   Proof.
-    red. intros n. red. intros δ1.
-    induction n.
-    { simpl. intros ?? ->%nsteps_0. done. }
-    intros ?? (δ'&STEP1&STEP2)%rel_compose_nsteps_next.
-    apply IHn in STEP1; eauto.
+    red. intros. eapply pres_by_rel_implies_rep; eauto.
   Qed.
 
   Lemma pres_by_loc_step_implies_progress τ P
@@ -380,6 +391,15 @@ Section Model.
     inversion FSTEP; subst; try done.
     eapply FPRES; eauto. 
   Qed.
+
+  Lemma pres_by_loc_fork_steps_implies_any_pres τ P
+    (PPRES: preserved_by_loc_step τ P)
+    (FPRES: preserved_by_fork τ P)
+    :
+    preserved_by (obls_any_step_of τ) P. 
+  Proof using.
+    red. intros ??? [? | ?]; eauto.
+  Qed. 
 
   Lemma pres_by_valid_trace_strong (tr: obls_trace) i j P (T: Locale -> Prop)
     (LE: i <= j)

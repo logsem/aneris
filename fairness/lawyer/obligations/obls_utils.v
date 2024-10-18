@@ -84,4 +84,14 @@ Section RelationsUtils.
     clear. intros [??] [??]. done.
   Qed.
 
+  Global Instance nsteps_mono n:
+    Proper (subseteq ==> subseteq) (fun R => nsteps R n).
+  Proof.
+    red. induction n.
+    { intros ????? ?%nsteps_0. by apply nsteps_0. }
+    intros ????? (? & STEPS & STEP)%rel_compose_nsteps_next.
+    eapply IHn in STEPS; eauto.
+    eapply rel_compose_nsteps_next. eexists. split; eauto. 
+  Qed.
+  
 End RelationsUtils.
