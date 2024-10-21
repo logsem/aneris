@@ -213,7 +213,110 @@ Section EoFin.
       rewrite H1. apply to_agree_inj in H2. by rewrite H2.
     Qed.
 
- 
+
+    Lemma restore_map (smap: gmap nat SignalId) (s : SignalId) (m : nat) lm B
+      (DOM: dom smap = set_seq 0 (B `min` (m + 2)))
+      (IN: smap !! m = Some s)
+      (LVL: lvl2nat lm = m)
+      :
+      ⊢ (([∗ map] k↦y ∈ delete m smap,
+           ∃ l0, sgn EO_OP y l0 (Some (k <? m)) (H3 := oGS) ∗ ⌜lvl2nat l0 = k⌝) -∗
+          sgn EO_OP s lm (Some true) (H3 := oGS)-∗
+          [∗ map] i↦s0 ∈ smap,
+           ∃ l0, sgn EO_OP s0 l0 (Some (i <? m + 1)) (H3 := oGS) ∗ ⌜ lvl2nat l0 = i⌝)%I.
+    Proof using.
+      iIntros "SIGS SG".
+      rewrite (big_sepM_delete _ smap); eauto.
+      iSplitL "SG".
+      { iExists _. rewrite (proj2 (Nat.ltb_lt _ _)); [| lia].
+        iFrame. done. }
+      iApply (big_sepM_impl with "[$]"). iModIntro.
+      iIntros (???) "(%&?&?)". iExists _. iFrame.
+      apply lookup_delete_Some in H0 as [??].
+      apply mk_is_Some, elem_of_dom in H1.
+      rewrite DOM in H1. apply elem_of_set_seq in H1.
+      assert ((k <? m) = (k <? m + 1) \/ k = m).
+      { destruct (decide (k = m)); [tauto| ]. left.
+        destruct (k <? m) eqn:LT.
+        - rewrite (proj2 (PeanoNat.Nat.ltb_lt _ _)); [done | ].
+          apply PeanoNat.Nat.ltb_lt in LT. lia.
+        - rewrite (proj2 (PeanoNat.Nat.ltb_ge _ _)); [done | ].
+          apply PeanoNat.Nat.ltb_ge in LT. lia. }
+      destruct H2; [| done]. rewrite H2. done.
+    Qed.       
+
+    Lemma BMU_smap_restore
+  (τ : locale heap_lang)
+  (B : nat)
+  (BOUND : B < LIM)
+  (s : SignalId)
+  (m : nat)
+  (smap : gmap nat SignalId)
+  (DOM : dom smap = set_seq 0 (B `min` (m + 2)))
+  (IN : smap !! m = Some s)
+  (lm : sigO (λ i : nat, i < LIM))
+  (LVL : lvl2nat lm = m):
+        ⊢
+  obls EO_OP τ ∅ (H3 := oGS) -∗
+  ([∗ map] k↦y ∈ delete m smap, ∃ l0 : sigO (λ i : nat, i < LIM),
+                                          sgn EO_OP y l0 (Some (k <? m)) (H3 := oGS) ∗
+                                          ⌜lvl2nat l0 = k⌝) -∗
+  (sgn EO_OP s lm (Some true) (H3 := oGS)) -∗
+  own eofin_smap (● ((to_agree <$> smap): gmap _ _)) -∗
+  BMU EO_OP (⊤ ∖ ↑nroot.@"eofin") τ 1
+    (⌜B ≤ m + 2⌝ ∗ obls EO_OP τ ∅ (H3 := oGS) ∗ smap_repr (B `min` (m + 2)) (m + 1) smap
+     ∨ (|==> ⌜m + 2 < B⌝ ∗
+          (∃ (s' : SignalId) (lm': EOLevel B),
+             smap_repr (B `min` (m + 3)) (m + 1) (<[m + 2:=s']> smap) ∗
+             ith_sig (m + 2) s' ∗ obls EO_OP τ {[s']} (H3 := oGS) ∗
+             ⌜lvl2nat lm' = (m + 2)%nat⌝))) (oGS := oGS).
+    Proof using.
+      iIntros "OBLS SIGS SIG SM".
+      destruct (Nat.le_gt_cases B (m + 2)).
+      { rewrite PeanoNat.Nat.min_l in DOM; [| done]. 
+        iApply BMU_intro. iLeft. iFrame.
+        iSplitR; [done| ]. iSplitR.
+        { iPureIntro. rewrite PeanoNat.Nat.min_l; auto. }
+        iApply (restore_map with "[$] [$]"); eauto.
+        rewrite DOM. f_equal. symmetry. by apply Nat.min_l. }
+      
+      iApply OU_BMU.
+      assert {lm' : EOLevel B | lvl2nat lm' = m + 2} as [lm' LVL'].
+      { set (lm' := exist _ (m + 2) H0: EOLevel B).
+        exists lm'. done. }
+      iDestruct (OU_create_sig with "OBLS") as "FOO".
+      iApply (OU_wand with "[-FOO]"); [| by iFrame].
+      iIntros "(%s' & SG & OBLS)". rewrite union_empty_l_L.
+      iApply BMU_intro. iRight. iSplitR; [done| ].
+      rewrite PeanoNat.Nat.min_r in DOM; [| lia].
+      iMod (own_update with "SM") as "SM".
+      { apply auth_update_alloc. eapply (alloc_singleton_local_update _ (m + 2) (to_agree s')).
+        2: done. 
+        apply not_elem_of_dom. rewrite dom_fmap. rewrite DOM.
+        intros ?%elem_of_set_seq. lia. }
+      iModIntro. iDestruct "SM" as "[SM S']".
+      iExists s', lm'. 
+      iSplitL "SIGS SG SIG SM".
+      2: { iFrame. eauto. }
+      rewrite PeanoNat.Nat.min_r; [| lia]. rewrite /smap_repr.
+      rewrite -fmap_insert. iFrame. iSplitR.
+      { iPureIntro. rewrite dom_insert_L DOM.
+        apply set_eq. intros ?. rewrite elem_of_union elem_of_singleton.
+        rewrite !elem_of_set_seq. lia. }
+      rewrite big_sepM_insert_delete. iSplitL "SG".
+      { iExists _. rewrite (proj2 (PeanoNat.Nat.ltb_ge _ _)); [ | lia].
+        iFrame. iPureIntro.
+        Unshelve.
+        2: { assert (m + 2 < LIM) by lia. 
+             esplit. apply H1. }
+        done. }
+      rewrite (delete_notin _ (m + 2)).
+      2: { apply not_elem_of_dom. rewrite DOM. intros ?%elem_of_set_seq. lia. }
+      iApply (restore_map with "[$] [$]"); eauto.
+      rewrite DOM. f_equal. symmetry. by apply Nat.min_l.
+    Qed.
+
+
     Lemma thread_spec τ n l B (BOUND: B < LIM) π s:
       {{{ eofin_inv l B BOUND ∗ even_res n ∗
           
@@ -292,79 +395,9 @@ Section EoFin.
         { apply elem_of_singleton. reflexivity. }
         { by iFrame. }
         iApply (OU_wand with "[-OU]"); [| done]. iIntros "(SIG & OBLS)".
-        rewrite (subseteq_empty_difference_L {[ s ]}); [| done].
+        rewrite (subseteq_empty_difference_L {[ s ]}); [| done].        
 
-        (* iDestruct (cp_mul_take with "CPS") as "[CPS CP]".  *)
-        iAssert (BMU EO_OP (⊤ ∖ ↑nroot.@"eofin") τ 1
-                   (⌜ B <= m + 2 ⌝ ∗ obls EO_OP τ ∅ ∗ smap_repr (min B (m + 2)) (m + 1) smap ∨
-                    |==> ⌜ m + 2 < B ⌝ ∗ ∃ s' lm', smap_repr (min B (m + 3)) (m + 1) (<[m + 2:= s']> smap) ∗ ith_sig (m + 2) s' ∗ obls EO_OP τ {[ s' ]} ∗ ⌜ lvl2nat lm' = (m + 2)%nat ⌝))%I with "[OBLS SIGS SIG SM]" as "BMU".
-        {
-          iAssert (□ (([∗ map] k↦y ∈ delete m smap, ∃ l0 : sigO (λ i : nat, i < LIM),
-                         sgn EO_OP y l0 (Some (k <? m)) ∗
-                           ⌜lvl2nat l0 = k⌝) -∗  sgn EO_OP s lm (Some true) -∗ 
-                     [∗ map] i↦s0 ∈ smap, ∃ l0 : sigO (λ i0 : nat, i0 < LIM),
-                         sgn EO_OP s0 l0 (Some (i <? m + 1)) ∗ ⌜
-                         lvl2nat l0 = i⌝))%I as "foo".
-          { iModIntro. iIntros "SIGS SG".
-            rewrite (big_sepM_delete _ smap); eauto.
-            iSplitL "SG".
-            { iExists _. rewrite (proj2 (Nat.ltb_lt _ _)); [| lia]. 
-              iFrame. done. }  
-            iApply (big_sepM_impl with "[$]"). iModIntro.
-            iIntros (???) "(%&?&?)". iExists _. iFrame.
-            apply lookup_delete_Some in H1 as [??]. 
-            apply mk_is_Some, elem_of_dom in H2.
-            rewrite DOM in H2. apply elem_of_set_seq in H2.
-            assert ((k <? m) = (k <? m + 1) \/ k = m).
-            { destruct (decide (k = m)); [tauto| ]. left.
-              destruct (k <? m) eqn:LT.
-              - rewrite (proj2 (PeanoNat.Nat.ltb_lt _ _)); [done | ].
-                apply PeanoNat.Nat.ltb_lt in LT. lia.
-              - rewrite (proj2 (PeanoNat.Nat.ltb_ge _ _)); [done | ].
-                apply PeanoNat.Nat.ltb_ge in LT. lia. }
-            destruct H3; [| done]. rewrite H3. done. } 
-
-          destruct (Nat.le_gt_cases B (m + 2)).
-          { rewrite PeanoNat.Nat.min_l in DOM; [| done]. 
-            iApply BMU_intro. iLeft. iFrame.
-            iSplitR; [done| ]. iSplitR.
-            { iPureIntro. rewrite PeanoNat.Nat.min_l; auto. }
-            iApply ("foo" with "[$] [$]"). }
-            
-          iApply OU_BMU.
-          assert {lm' : EOLevel B | lvl2nat lm' = m + 2} as [lm' LVL'].
-          { set (lm' := exist _ (m + 2) H1: EOLevel B).
-            exists lm'. done. }
-          iDestruct (OU_create_sig with "OBLS") as "FOO".
-          iApply (OU_wand with "[-FOO]"); [| by iFrame].
-          iIntros "(%s' & SG & OBLS)". rewrite union_empty_l_L.
-          iApply BMU_intro. iRight. iSplitR; [done| ].
-          rewrite PeanoNat.Nat.min_r in DOM; [| lia].
-          iMod (own_update with "SM") as "SM".
-          { apply auth_update_alloc. eapply (alloc_singleton_local_update _ (m + 2) (to_agree s')).
-            2: done. 
-            apply not_elem_of_dom. rewrite dom_fmap. rewrite DOM.
-            intros ?%elem_of_set_seq. lia. }
-          iModIntro. iDestruct "SM" as "[SM S']".
-          iExists s', lm'. 
-          iSplitL "SIGS SG SIG SM".
-          2: { iFrame. eauto. }
-          rewrite PeanoNat.Nat.min_r; [| lia]. rewrite /smap_repr.
-          rewrite -fmap_insert. iFrame. iSplitR.
-          { iPureIntro. rewrite dom_insert_L DOM.
-            apply set_eq. intros ?. rewrite elem_of_union elem_of_singleton.
-            rewrite !elem_of_set_seq. lia. }
-          rewrite big_sepM_insert_delete. iSplitL "SG".
-          { iExists _. rewrite (proj2 (PeanoNat.Nat.ltb_ge _ _)); [ | lia].
-            iFrame. iPureIntro.
-            Unshelve. 2: { assert (m + 2 < LIM).
-                           { lia. }
-                           esplit. apply H2. }
-            done. }
-          rewrite (delete_notin _ (m + 2)).
-          2: { apply not_elem_of_dom. rewrite DOM. intros ?%elem_of_set_seq. lia. }
-          iApply ("foo" with "[$] [$]"). }
-
+        iPoseProof (BMU_smap_restore with "[$] [$] [$] [$]") as "BMU"; eauto.
         iApply (BMU_lower _ _ _ 1); [lia| ].
         iApply (BMU_wand with "[-BMU] [$]"). iIntros "COND".
 
