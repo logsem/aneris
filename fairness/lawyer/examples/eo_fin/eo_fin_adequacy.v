@@ -16,20 +16,6 @@ Section EOFinAdequacy.
   Let OM := ObligationsModel OP. 
   Let M := AM2M (ObligationsAM OP). 
   
-  (* Definition ex_om_traces_match: extrace heap_lang -> obls_trace OP -> Prop := *)
-  (*   traces_match *)
-  (*     (fun oτ τ' => oτ = Some τ') *)
-  (*     om_live_tids *)
-  (*     locale_step *)
-  (*     (@mtrans OM). *)
-
-  (* Definition om_sim_rel (extr: execution_trace heap_lang) (omtr : auxiliary_trace OM) := *)
-  (*   valid_state_evolution_fairness (obls_valid_evolution_step OP) extr omtr ∧ *)
-  (*   om_live_tids (trace_last extr) (trace_last omtr).  *)
-
-  (* Lemma om_sim_rel_FB: rel_finitary om_sim_rel. *)
-  (* Proof. Admitted.  *)
-
   Definition eofin_valid_evolution_step (c1 : cfg heap_lang) (oζ : olocale heap_lang) 
     (c2 : cfg heap_lang) (δ1 : mstate M) (ℓ : mlabel M) (δ2 : mstate M): Prop :=
     obls_ves_wrapper OP c1 oζ c2 δ1 ℓ δ2. 
@@ -58,6 +44,14 @@ Section EOFinAdequacy.
     eapply (finitary.in_list_finite (seq 0 n)).
     intros. apply elem_of_seq. lia.
   Qed.  
+
+  (* TODO: move? *)
+  Lemma fin_wf n: wf (strict (bounded_nat_le n)).
+  Proof using.
+    eapply (well_founded_lt_compat _ proj1_sig).
+    intros [??] [??]. rewrite strict_spec. rewrite /bounded_nat_le.
+    simpl. lia.
+  Qed.     
 
   Lemma eofin_sim_rel_FB: rel_finitary eofin_sim_rel.
   Proof using.
@@ -115,11 +109,13 @@ Section EOFinAdequacy.
 
   Lemma eofin_matching_traces_termination extr mtr
     (VALID: extrace_valid extr)
+    (OM_WF0: om_st_wf _ (trfirst mtr))
     (FAIR: ∀ tid, fair_ex tid extr)
-    (MATCH: eofin_om_traces_match extr mtr):
+    (MATCH: eofin_om_traces_match extr mtr)
+    (LIM_NZ: 0 < LIM):
   terminating_trace extr.
   Proof using.
-    clear -MATCH FAIR VALID OM.
+    clear -MATCH FAIR VALID OM LIM_NZ OM_WF0.
     assert (exists omtr, traces_match (fun ℓ τ => ℓ.2 = Some τ) eq (@mtrans M) (@mtrans OM) mtr omtr) as [omtr MATCHo]. 
     { clear -MATCH mtr.
       exists (project_nested_trace id ((mbind Some) ∘ snd) mtr).
@@ -169,7 +165,19 @@ Section EOFinAdequacy.
 
     pose proof (traces_match_valid2 _ _ _ _ _ _ MATCH'') as OM_VALID.  
     pose proof (obls_fair_trace_terminate _ _ OM_VALID OM_FAIR) as OM_TERM.
-
+    specialize_full OM_TERM.
+    { intros. eapply pres_by_valid_trace with (i := 0) (j := i) in OM_VALID. 
+      2: apply wf_preserved_by_loc_step.
+      2: apply wf_preserved_by_fork_step.
+      2: { rewrite state_lookup_0. simpl.
+           apply traces_match_first in MATCHo.
+           by rewrite -MATCHo. }
+      2: lia.
+      by rewrite H in OM_VALID. }
+    { apply fin_wf. }
+    { apply fin_wf. }
+    { constructor. by exists 0. }
+    
     pose proof (traces_match_preserves_termination _ _ _ _ _ _ MATCH'' OM_TERM). 
     done.
   Qed. 
@@ -186,7 +194,8 @@ Section EOFinAdequacy.
         (INIT: em_is_init_st ([e1], σ1) s1 (ExecutionModel := EM))
         (extr : heap_lang_extrace)
         (* (Hvex : extrace_valid extr) *)
-        (Hexfirst : trfirst extr = ([e1], σ1))    :
+        (Hexfirst : trfirst extr = ([e1], σ1))
+        (LIM_NZ: 0 < LIM):
     (* rel_finitary (sim_rel LM) → *)
     wp_premise Σ s e1 σ1 s1 eofin_sim_rel (p: @em_init_param _ _ EM) -> 
     extrace_fairly_terminating extr.
@@ -197,7 +206,9 @@ Section EOFinAdequacy.
     destruct (om_simulation_adequacy_model_trace
                 Σ _ e1 _ s1 _ INIT _ VALID Hexfirst Hwp) as (omtr&MATCH&OM0).
 
-    eapply eofin_matching_traces_termination; eauto. 
+    eapply eofin_matching_traces_termination; eauto.
+    rewrite OM0.
+    simpl in INIT. red in INIT. set_solver. 
   Qed.
 
 
@@ -295,10 +306,19 @@ Section EOFinAdequacy.
     iApply (no_obls_live_tids with "[$] [$] [$]"). done.  
   Qed.
       
+  Instance sig_lt_LE n: 
+    LeibnizEquiv (sigO (λ i : nat, i < n)).
+  Proof using.
+    red. intros [??] [??]. simpl.
+    rewrite sig_equiv_def. simpl.
+    rewrite leibniz_equiv_iff. intros ->.
+    f_equal. apply Nat.lt_pi.
+  Qed. 
 
   Theorem eofin_terminates
     (N : nat)
     (HN: N > 1)
+    (LIM_NZ: 0 < LIM)
     (extr : heap_lang_extrace)
     (Hexfirst : (trfirst extr).1 = [start #N]):
     (* (∀ tid, fair_ex tid extr) -> terminating_trace extr. *)
@@ -315,9 +335,11 @@ Section EOFinAdequacy.
                   _ _ _ _
                   _ _ EX0) as FAIR_TERM; eauto.
     { exact tt. }
-    { simpl. subst s1. rewrite EX0. apply init_om_state_init. }
+    { simpl. subst s1. rewrite EX0.
+      apply init_om_state_init. }
     
     apply FAIR_TERM.
+    { done. }
     red. intros ?. iStartProof. iIntros "[HEAP INIT] !>".
     iSplitL.
     - admit.

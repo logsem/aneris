@@ -1353,7 +1353,11 @@ Section TerminationFull.
       exists c'. split; [lia| ]. by apply not_false_is_true.
   Qed. 
 
-  Theorem obls_fair_trace_terminate:
+  Theorem obls_fair_trace_terminate
+    (TR_WF: ∀ i δ, tr S!! i = Some δ → om_st_wf OP δ)
+    (LVL_WF: wf (strict lvl_le))
+    (DEG_WF: wf (strict deg_le))
+    (LVL_INH: Inhabited Level):
     terminating_trace tr.
   Proof using VALID FAIR.
     Require Import Coq.Logic.ClassicalChoice.

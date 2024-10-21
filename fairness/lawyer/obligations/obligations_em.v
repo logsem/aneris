@@ -73,7 +73,9 @@ Section ObligationsEM.
   Definition obls_is_init_st (σ: cfg Λ) (δ: mstate OM) :=
     exists τ0,
       let R := {[ τ0 ]} in
-      locales_of_cfg σ = R /\ dom $ ps_obls OP δ = R /\ dom $ ps_phases OP δ = R.
+      locales_of_cfg σ = R /\ dom $ ps_obls OP δ = R /\ 
+      (* TODO: add this to invariant? *)
+      om_st_wf _ δ.
 
   Lemma obls_resources_init Σ {PRE: ObligationsPreGS OP Σ}:
     ∀ s1 σ p (INIT: obls_is_init_st σ s1),
@@ -104,9 +106,11 @@ Section ObligationsEM.
     { apply mono_nat_both_valid. reflexivity. }
     iModIntro. iExists {| obls_pre := PRE; |}.
     iFrame.
+
     iPureIntro. 
     red in INIT. destruct INIT as (?&?&?&?).
-    red. rewrite /threads_own_obls /dom_phases_obls. set_solver. 
+    red. rewrite /threads_own_obls /dom_phases_obls.
+    erewrite om_wf_dpo; eauto. set_solver.
   Qed.    
   
   Definition ObligationsEM: ExecutionModel Λ OM :=
@@ -162,13 +166,25 @@ Section ObligationsEM.
   Proof.
     red. rewrite locales_of_cfg_singleton.
     eexists. split; [eauto| ].
-    rewrite dom_gset_to_gmap. rewrite locales_of_cfg_singleton. split; [done| ]. 
-    rewrite dom_list_to_map_L.
-    rewrite locales_of_cfg_singleton.
-    rewrite fst_zip.
-    { by rewrite list_to_set_elements_L. } 
-    rewrite /init_phases. rewrite (fmap_length _ (seq _ _)) seq_length.
-    rewrite elements_singleton size_singleton. simpl. lia.  
+    rewrite dom_gset_to_gmap. rewrite locales_of_cfg_singleton. split; [done| ].
+   
+    rewrite /init_om_state. split.
+    - apply init_om_dpo.
+    - red. simpl. set_solver.
+    - red. rewrite locales_of_cfg_singleton. rewrite size_singleton.
+      simpl. rewrite elements_singleton.
+      rewrite /init_phases. simpl.
+      intros ?????. rewrite !insert_empty.
+      rewrite !lookup_singleton_Some. set_solver.
+    - red. simpl. set_solver.
+    - red. simpl. set_solver.
+    - red. simpl.
+      rewrite locales_of_cfg_singleton. rewrite gset_to_gmap_singleton.
+      rewrite map_img_singleton_L. set_solver.
+    - red. simpl. 
+      rewrite locales_of_cfg_singleton. rewrite gset_to_gmap_singleton.
+      intros ???. rewrite !lookup_map_singleton.
+      destruct decide, decide; simpl; done.
   Qed.
     
   From trillium.fairness.lawyer Require Import sub_action_em obligations_am action_model. 
