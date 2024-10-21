@@ -321,10 +321,13 @@ Section MultisetOrder.
     2: { intros ->. apply LTuv. done. }
     rewrite decide_True; [lia| done].
   Qed.  
-      
+
+  Theorem ms_lt_wf (WF: wf (strict R)):
+    wf ms_lt.
+  Proof using.
+  Admitted.      
 
 End MultisetOrder.
-
 
 
 Section MultisetDefs.
@@ -541,5 +544,5 @@ Section MultisetDefs.
     rewrite decide_True; [lia| ].
     by apply IMPL. 
   Qed. 
-    
+
 End MultisetDefs.

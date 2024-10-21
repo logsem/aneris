@@ -1134,10 +1134,11 @@ Section Termination.
   Qed. 
   
   Theorem signals_eventually_set
-    (FAIR: forall τ, obls_trace_fair _ τ tr):
+    (FAIR: forall τ, obls_trace_fair _ τ tr)
+    (DEG_WF: wf (strict deg_le)):
     (* ¬ exists sid c, never_set_after sid c.  *)
     forall sid, eventually_set sid. 
-  Proof using.
+  Proof using LVL_WF VALID WF SET_BEFORE_SPEC H0.
     intros sid. red. intros m UNSET.
     (* red in UNSET.  *)
 
@@ -1153,8 +1154,7 @@ Section Termination.
     forward eapply well_founded_ind with (R := R) (P := fun _ => False).
     4: done.
     3: exact 0.
-    { eapply measure_wf.
-      admit. }
+    { eapply measure_wf. by apply ms_lt_wf. }
     intros i NEXT.
     (* pose proof (min_owner_PF_decr (c + i) ltac:(lia)) as D. *)
     forward eapply min_owner_PF_decr with (d := c + i); eauto.
@@ -1165,7 +1165,7 @@ Section Termination.
     apply (NEXT (j - c)). red. red.
     rewrite -Nat.le_add_sub; [| lia]. done. 
     
-  Admitted.
+  Qed.
 
   Let any_phase (_: Phase) := True.
   Definition APF := TPF' OP tr set_before any_phase.
@@ -1277,15 +1277,15 @@ Section Termination.
   Qed. 
 
   Theorem trace_terminates
-    (FAIR: forall τ, obls_trace_fair _ τ tr):
+    (FAIR: forall τ, obls_trace_fair _ τ tr)
+    (DEG_WF: wf (strict deg_le)):
     terminating_trace tr. 
-  Proof using.      
+  Proof using WF VALID SET_BEFORE_SPEC LVL_WF H0.
     set (R := MR (ms_lt deg_le) APF).    
     forward eapply well_founded_ind with (R := R) (P := fun _ => terminating_trace tr).
     4: done.
     3: exact 0. 
-    { eapply measure_wf.
-      admit. }
+    { eapply measure_wf. eapply ms_lt_wf; eauto. }
     intros i NEXT.
 
     destruct (tr S!! (S i)) eqn:ITH'.
@@ -1296,7 +1296,7 @@ Section Termination.
 
     forward eapply om_trans_all_ms_lt; eauto.
     by apply signals_eventually_set. 
-  Admitted. 
+  Qed. 
 
 End Termination.
 
