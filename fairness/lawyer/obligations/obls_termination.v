@@ -264,7 +264,35 @@ Section Termination.
       destruct (decide (τ1 = τ2)) as [-> | ?].
       { rewrite P1 in P2. inversion P2. done. }
       edestruct (om_wf_ph_disj _ δ); eauto. tauto. 
-    Qed.   
+    Qed.
+
+    Lemma other_loc_step_pres_obls τ R τs
+      (OTHER: τs ≠ τ):
+      preserved_by _ (loc_step_of _ τs) (fun δ => ps_obls _ δ !! τ = Some R /\ om_st_wf _ δ).
+    Proof using.
+      red. intros δ1 δ2 [OB WF1] STEP.
+      split.
+      2: { eapply wf_preserved_by_loc_step; eauto. } 
+      inv_loc_step STEP; destruct δ1; try done; simpl in *.
+      - subst new_obls0. rewrite lookup_insert_ne; done.
+      - subst new_obls0. rewrite lookup_insert_ne; done.
+    Qed.
+
+    Lemma other_fork_step_pres_obls' τ R τs
+      (OTHER: τs ≠ τ):
+      preserved_by _ (fork_step_of _ τs) (fun δ => ps_obls _ δ !! τ = Some R /\ om_st_wf _ δ).
+    Proof using.
+      red. intros ?? [OB WF1] (?&?&STEP).
+      split.
+      2: { eapply wf_preserved_by_fork_step; eauto. red. eauto. }
+      inversion STEP. subst. destruct δ1; simpl in *.
+      subst new_obls0.
+      rewrite lookup_insert_ne.
+      2: { intros ->. destruct FRESH'.
+           apply om_wf_dpo in WF1. rewrite WF1. 
+           by eapply elem_of_dom. }
+      rewrite lookup_insert_ne; done. 
+    Qed.  
 
     (* Context `(STEP: om_trans OP δ1 τ δ2). *)
     Context (δ1 δ2: ProgressState OP).    
@@ -488,149 +516,6 @@ Section Termination.
     + rewrite OBLS' in NO2. done. 
   Qed.
 
-  Lemma owm_om_trans_ms_lt πτ τ n s δ0
-    (NTH: tr S!! n = Some δ0)
-    (PH: ps_phases _ δ0 !! τ = Some πτ)
-    (NEVER_SET : never_set_after s n)
-    (MIN: minimal_in_prop tr_sig_lt (s, n) (λ sn, never_set_after sn.1 sn.2 /\ n <= sn.2))
-    (OWNER: s ∈ default ∅ (ps_obls _ δ0 !! τ))
-    (LBL: tr L!! n = Some τ):
-    ms_lt deg_le (TPF πτ (S n)) (TPF πτ n).
-  Proof using VALID.
-    forward eapply (proj1 (label_lookup_states' _ _)); eauto. intros [δ' NTH']. 
-    
-    eapply om_trans_ms_rel with (bd := true); auto.
-    { intros.
-      rewrite Nat.add_succ_r Nat.add_0_r.
-      apply state_label_lookup in H1 as (NTH_&?&LBL_).
-      rewrite LBL in LBL_. inversion LBL_. subst τ0. 
-      rewrite NTH in NTH_. inversion NTH_. subst δ0. 
-      destruct H4 as (?&?&?).
-      
-      inversion H4. subst. 
-      assert (ps_phases _ mb !! τ = Some πτ) as PH'.
-      { eapply loc_steps_rep_phase_exact_pres; eauto. }
-      rewrite LOC_PHASE in PH'. inversion PH'. subst π__max.  
-      
-      eapply burns_cp_own_ms_lt with (πb := x); eauto. }
-    
-    (* TODO: extract the lemma below? *)
-    
-    clear δ' NTH'. 
-    intros τ' IDTHl. 
-    red. intros δk δk' mb mf k ITH BOUND NSTEPS BSTEP FSTEP.
-    apply state_label_lookup in ITH as (IDTH & IDTH' & _). 
-    rewrite NTH in IDTH. inversion IDTH. subst δ0. clear IDTH. 
-    rewrite LBL in IDTHl. inversion IDTHl. subst τ'. clear IDTHl.
-
-    (* destruct (ps_sigs OP δk !! s) as [[ls ?]|] eqn:SIG__min.  *)
-    pose proof (never_set_after_eq_false _ _ NEVER_SET _ ltac:(reflexivity)) as X.
-    destruct X as (?&ls&NTH_&SIGsn).
-    rewrite NTH in NTH_. inversion NTH_. subst x.
-    pose proof (never_set_after_eq_false _ _ NEVER_SET _ ltac:(apply Nat.le_succ_diag_r)) as X.
-    destruct X as (?&?&NTH'_&SIGsn').
-    rewrite -Nat.add_1_r IDTH' in NTH'_. inversion NTH'_. subst x.
-
-    forward eapply sig_st_le_lookup_helper with (i := n) (j := n + 1) (s := s); eauto; [lia| ].
-    rewrite SIGsn SIGsn'. simpl. intros [<- _].   
-
-    apply clos_refl_nsteps in FSTEP as [r FSTEP]. 
-    forward eapply signal_false_between; [apply SIGsn | apply SIGsn'| ..].
-    { eapply nsteps_mono; [| apply NSTEPS].
-      do 2 red. rewrite /obls_any_step_of. eauto. }
-    { apply rel_compose_nsteps_next'. eexists. split. 
-      - red. left. red. red. left. eauto.
-      - eapply nsteps_mono; [| apply FSTEP].
-        do 2 red. rewrite /obls_any_step_of. eauto. }
-    intros SIGmb. 
- 
-    clear dependent mf. clear dependent δk'. 
-    
-    generalize dependent mb. induction k.
-    { intros ? ->%obls_utils.nsteps_0.
-      rewrite Nat.add_0_r. reflexivity. }
-    intros mb (δ' & STEPS & STEP)%nsteps_inv_r SF.
-
-    assert (ps_sigs _ δ' !! s = Some (ls, false)) as SIG'.
-    { eapply signal_false_between; [apply SIGsn | apply SF| ..].
-      - eapply nsteps_mono; [| apply STEPS].
-        do 2 red. rewrite /obls_any_step_of. eauto.
-      - apply nsteps_1. left. eauto. }
-    specialize (IHk ltac:(lia) _ STEPS ltac:(done)).
-    etrans; eauto.
-    eapply ms_le_Proper; [| | eapply loc_step_ms_le]; eauto.
-    { rewrite -PeanoNat.Nat.add_succ_comm. simpl. reflexivity. }
-    
-    assert (ps_phases _ δ' !! τ = Some πτ) as PHδ'.
-    { eapply loc_steps_rep_phase_exact_pres; eauto. }
-    
-    replace πτ with (default π0 (ps_phases OP δ' !! τ)).
-    2: { rewrite PHδ'. done. }
-    
-    apply min_owner_expect_ms_le. simpl.
-    
-    intros sid π d EXP. simpl.
-    inversion EXP. subst.
-    rewrite PHδ' in LOC_PHASE. inversion LOC_PHASE. subst π__max.
-    
-    enough (set_before sid > n).
-    { apply PeanoNat.Nat.le_succ_l in H1. 
-      apply Nat.le_sum in H1 as [u EQ]. rewrite EQ. lia. }
-        
-    move NEVER_SET at bottom. red in NEVER_SET.
-    specialize (NEVER_SET _ ltac:(reflexivity)).
-    rewrite /sig_val_at in NEVER_SET. rewrite NTH in NEVER_SET. simpl in NEVER_SET. 
-
-    assert (s ∈ default ∅ (ps_obls _ δ' !! τ)) as OBL'.
-    { admit. }
-
-    pose proof OBLS_LT as OL. 
-    specialize (OBLS_LT ls). specialize_full OBLS_LT.
-    { apply extract_Somes_gset_spec.
-      destruct (ps_obls OP δ' !! τ) as [obs| ] eqn:OBLS'; [| set_solver].
-      simpl in OBL'. simpl. apply elem_of_map. eexists. split; eauto.
-      rewrite SIG'. done. }
-    
-    red. destruct (Nat.lt_ge_cases n (set_before sid)) as [?|GE]; [done| ].   
-    
-    (* either it was there when the big step started,
-       or it's a new signal, but then the thread holds an obligation
-       and cannot wait on it *)
-    assert (ps_sigs OP δk !! sid = Some (l, false)) as SIG0.
-    { eapply expected_signal_created_before; eauto. }
-    
-    pose proof (SET_BEFORE_SPEC sid n). specialize_full H1; [| done| ].
-    2: { rewrite /sig_val_at in H1. 
-         rewrite NTH in H1. simpl in H1.
-         rewrite SIG0 in H1. done. }
-    
-    intros c NEVER_SET_.
-
-    assert (never_set_after sid (max n c)) as NEVER_SET'.
-    { eapply never_set_after_after; [| apply NEVER_SET_]. lia. } 
-    clear NEVER_SET_.
-    move MIN at bottom. red in MIN.
-
-    (* specialize (MIN (_, _) NEVER_SET'). *)
-    specialize (MIN (sid, (n `max` c)) ltac:(split; [done| simpl; lia])). 
-
-    eapply never_set_after_eq_false in NEVER_SET'; [| reflexivity].
-    destruct NEVER_SET' as (?&?&NC&NCsig). 
-    rewrite /tr_sig_lt /MR in MIN. simpl in MIN.
-    rewrite NC NTH in MIN. simpl in MIN. rewrite NCsig SIGsn in MIN. simpl in MIN.
-
-    forward eapply pres_by_valid_trace with (i := n) (j := max n c); eauto.
-    { intros. apply (loc_step_sig_st_le_pres _ sid (Some (l, false))). }
-    { intros. apply fork_step_sig_st_le_pres. }
-    { rewrite NTH. simpl. rewrite SIG0. done. }
-    { lia. }
-    rewrite NC //= NCsig. intros [<- _].     
-    
-    specialize (MIN OBLS_LT).
-    edestruct @strict_not_both; eauto. done.  
-
-  Admitted.
-
   Definition asg_bound sid πb δ :=
     (* map_Forall (fun _ obls_ => sid ∉ obls_) (ps_obls _ δ) \/ *)
     (exists l, ps_sigs _ δ !! sid = Some (l, true)) \/
@@ -724,6 +609,161 @@ Section Termination.
     rewrite lookup_insert. simpl.
     split; [set_solver|  ]. split; eauto.
     etrans; eauto. apply phase_lt_fork.
+  Qed. 
+
+  Lemma owm_om_trans_ms_lt πτ τ n s δ0
+    (NTH: tr S!! n = Some δ0)
+    (PH: ps_phases _ δ0 !! τ = Some πτ)
+    (NEVER_SET : never_set_after s n)
+    (MIN: minimal_in_prop tr_sig_lt (s, n) (λ sn, never_set_after sn.1 sn.2 /\ n <= sn.2))
+    (OWNER: s ∈ default ∅ (ps_obls _ δ0 !! τ))
+    (LBL: tr L!! n = Some τ):
+    ms_lt deg_le (TPF πτ (S n)) (TPF πτ n).
+  Proof using VALID WF SET_BEFORE_SPEC.
+    clear LVL_WF. 
+    forward eapply (proj1 (label_lookup_states' _ _)); eauto. intros [δ' NTH']. 
+    
+    eapply om_trans_ms_rel with (bd := true); auto.
+    { intros.
+      rewrite Nat.add_succ_r Nat.add_0_r.
+      apply state_label_lookup in H1 as (NTH_&?&LBL_).
+      rewrite LBL in LBL_. inversion LBL_. subst τ0. 
+      rewrite NTH in NTH_. inversion NTH_. subst δ0. 
+      destruct H4 as (?&?&?).
+      
+      inversion H4. subst. 
+      assert (ps_phases _ mb !! τ = Some πτ) as PH'.
+      { eapply loc_steps_rep_phase_exact_pres; eauto. }
+      rewrite LOC_PHASE in PH'. inversion PH'. subst π__max.  
+      
+      eapply burns_cp_own_ms_lt with (πb := x); eauto. }
+    
+    (* TODO: extract the lemma below? *)
+    
+    clear δ' NTH'. 
+    intros τ' IDTHl. 
+    red. intros δk δk' mb mf k ITH BOUND NSTEPS BSTEP FSTEP.
+    apply state_label_lookup in ITH as (IDTH & IDTH' & _). 
+    rewrite NTH in IDTH. inversion IDTH. subst δ0. clear IDTH. 
+    rewrite LBL in IDTHl. inversion IDTHl. subst τ'. clear IDTHl.
+
+    (* destruct (ps_sigs OP δk !! s) as [[ls ?]|] eqn:SIG__min.  *)
+    pose proof (never_set_after_eq_false _ _ NEVER_SET _ ltac:(reflexivity)) as X.
+    destruct X as (?&ls&NTH_&SIGsn).
+    rewrite NTH in NTH_. inversion NTH_. subst x.
+    pose proof (never_set_after_eq_false _ _ NEVER_SET _ ltac:(apply Nat.le_succ_diag_r)) as X.
+    destruct X as (?&?&NTH'_&SIGsn').
+    rewrite -Nat.add_1_r IDTH' in NTH'_. inversion NTH'_. subst x.
+
+    forward eapply sig_st_le_lookup_helper with (i := n) (j := n + 1) (s := s); eauto; [lia| ].
+    rewrite SIGsn SIGsn'. simpl. intros [<- _].   
+
+    apply clos_refl_nsteps in FSTEP as [r FSTEP]. 
+    forward eapply signal_false_between; [apply SIGsn | apply SIGsn'| ..].
+    { eapply nsteps_mono; [| apply NSTEPS].
+      do 2 red. rewrite /obls_any_step_of. eauto. }
+    { apply rel_compose_nsteps_next'. eexists. split. 
+      - red. left. red. red. left. eauto.
+      - eapply nsteps_mono; [| apply FSTEP].
+        do 2 red. rewrite /obls_any_step_of. eauto. }
+    intros SIGmb. 
+ 
+    clear dependent mf. clear dependent δk'. 
+    
+    generalize dependent mb. induction k.
+    { intros ? ->%obls_utils.nsteps_0.
+      rewrite Nat.add_0_r. reflexivity. }
+    intros mb (δ' & STEPS & STEP)%nsteps_inv_r SF.
+
+    assert (ps_sigs _ δ' !! s = Some (ls, false)) as SIG'.
+    { eapply signal_false_between; [apply SIGsn | apply SF| ..].
+      - eapply nsteps_mono; [| apply STEPS].
+        do 2 red. rewrite /obls_any_step_of. eauto.
+      - apply nsteps_1. left. eauto. }
+    specialize (IHk ltac:(lia) _ STEPS ltac:(done)).
+    etrans; eauto.
+    eapply ms_le_Proper; [| | eapply loc_step_ms_le]; eauto.
+    { rewrite -PeanoNat.Nat.add_succ_comm. simpl. reflexivity. }
+    
+    assert (ps_phases _ δ' !! τ = Some πτ) as PHδ'.
+    { eapply loc_steps_rep_phase_exact_pres; eauto. }
+    
+    replace πτ with (default π0 (ps_phases OP δ' !! τ)).
+    2: { rewrite PHδ'. done. }
+    
+    apply min_owner_expect_ms_le. simpl.
+    
+    intros sid π d EXP. simpl.
+    inversion EXP. subst.
+    rewrite PHδ' in LOC_PHASE. inversion LOC_PHASE. subst π__max.
+    
+    enough (set_before sid > n).
+    { apply PeanoNat.Nat.le_succ_l in H1. 
+      apply Nat.le_sum in H1 as [u EQ]. rewrite EQ. lia. }
+        
+    move NEVER_SET at bottom. red in NEVER_SET.
+    specialize (NEVER_SET _ ltac:(reflexivity)).
+    rewrite /sig_val_at in NEVER_SET. rewrite NTH in NEVER_SET. simpl in NEVER_SET. 
+
+    assert (s ∈ default ∅ (ps_obls _ δ' !! τ)) as OBL'.
+    { unshelve eapply (pres_by_rel_implies_rep _ _ _ _ _ _ _) in STEPS.
+      { apply (loc_step_pres_asg_bound s πτ). }
+      2: { split.
+           2: { eapply WF; eauto. }
+           red. right. exists τ, πτ. set_solver. }           
+      simpl in STEPS. destruct STEPS as [ASG' WF']. red in ASG'.
+      destruct ASG' as [[? ?] | ]; [congruence| ].
+      destruct H1 as (τ' & π' & IN' & PH' & LE').
+      destruct (decide (τ' = τ)) as [| NEQ]; [congruence| ].
+      eapply om_wf_ph_disj in NEQ; eauto.
+      eapply phases_disj_not_le in LE'; [done| ].
+      symmetry. eapply NEQ; eauto. }
+
+    pose proof OBLS_LT as OL. 
+    specialize (OBLS_LT ls). specialize_full OBLS_LT.
+    { apply extract_Somes_gset_spec.
+      destruct (ps_obls OP δ' !! τ) as [obs| ] eqn:OBLS'; [| set_solver].
+      simpl in OBL'. simpl. apply elem_of_map. eexists. split; eauto.
+      rewrite SIG'. done. }
+    
+    red. destruct (Nat.lt_ge_cases n (set_before sid)) as [?|GE]; [done| ].   
+    
+    (* either it was there when the big step started,
+       or it's a new signal, but then the thread holds an obligation
+       and cannot wait on it *)
+    assert (ps_sigs OP δk !! sid = Some (l, false)) as SIG0.
+    { eapply expected_signal_created_before; eauto. }
+    
+    pose proof (SET_BEFORE_SPEC sid n). specialize_full H1; [| done| ].
+    2: { rewrite /sig_val_at in H1. 
+         rewrite NTH in H1. simpl in H1.
+         rewrite SIG0 in H1. done. }
+    
+    intros c NEVER_SET_.
+
+    assert (never_set_after sid (max n c)) as NEVER_SET'.
+    { eapply never_set_after_after; [| apply NEVER_SET_]. lia. } 
+    clear NEVER_SET_.
+    move MIN at bottom. red in MIN.
+
+    (* specialize (MIN (_, _) NEVER_SET'). *)
+    specialize (MIN (sid, (n `max` c)) ltac:(split; [done| simpl; lia])). 
+
+    eapply never_set_after_eq_false in NEVER_SET'; [| reflexivity].
+    destruct NEVER_SET' as (?&?&NC&NCsig). 
+    rewrite /tr_sig_lt /MR in MIN. simpl in MIN.
+    rewrite NC NTH in MIN. simpl in MIN. rewrite NCsig SIGsn in MIN. simpl in MIN.
+
+    forward eapply pres_by_valid_trace with (i := n) (j := max n c); eauto.
+    { intros. apply (loc_step_sig_st_le_pres _ sid (Some (l, false))). }
+    { intros. apply fork_step_sig_st_le_pres. }
+    { rewrite NTH. simpl. rewrite SIG0. done. }
+    { lia. }
+    rewrite NC //= NCsig. intros [<- _].     
+    
+    specialize (MIN OBLS_LT).
+    edestruct @strict_not_both; eauto. done.  
+
   Qed. 
 
   Definition s_ow (s: SignalId) (i: nat) := 
@@ -943,7 +983,8 @@ Section Termination.
             (λ ab : SignalId * nat, never_set_after ab.1 ab.2 /\ c <= ab.2))
     (OTF := λ i, TPF (s_ow s i) i):
     ∀ d, c ≤ d → ∃ j, d < j ∧ ms_lt deg_le (OTF j) (OTF d).
-  Proof using VALID.
+  Proof using VALID WF SET_BEFORE_SPEC.
+    clear LVL_WF.
     intros d LE.
     pose proof (never_set_owned _ _ UNSET) as OWN. specialize (OWN _ LE).  
     destruct (tr S!! d) as [δ| ] eqn:DTH.
@@ -965,34 +1006,43 @@ Section Termination.
     
     (* rewrite /OTF in EMP. erewrite S_OWNER in EMP; eauto. *)
     (* 2: { rewrite OBLSd. set_solver. }  *)
-    
-    forward eapply next_step_rewind. 
-    { apply DTH. }
-    { eauto. }
-    { apply (Nat.le_add_r _ m). }
+
+    assert (∀ k, d <= k < d + m → tr L!! k ≠ Some τ) as OTHER_STEPS.
     { intros k BOUNDk Kτ.
       specialize (MINm (k - d)).
       specialize_full MINm; [| lia].
       rewrite -Nat.le_add_sub; [| lia].
       forward eapply (proj1 (label_lookup_states _ _)); eauto. intros [[? KTH] _].
-      eexists. split; eauto. red. right. eauto. }
+      eexists. split; eauto. red. right. eauto. } 
+    
+    forward eapply next_step_rewind. 
+    { apply DTH. }
+    { eauto. }
+    { apply (Nat.le_add_r _ m). }
+    { done. }
+    
     intros TPFle.
     
     (* rewrite EMP in TPFle. apply ms_le_empty in TPFle. *)
     
+    assert (ps_obls OP δm !! τ = Some obs) as OBLSm.
+    { forward eapply (pres_by_valid_trace_strong _ tr d (d + m)). 
+      4: { eapply (other_fork_step_pres_obls' τ obs). }
+      3: { apply other_loc_step_pres_obls. }
+      all: try done. 
+      { lia. }
+      { rewrite DTH. simpl. eauto. }
+      { simpl. intros. set_solver. }
+      simpl. rewrite MTH. simpl. tauto. }
+
     red in STEP. destruct STEP.
-    { (* steps in between keep the obligation assigned *)
-      admit. }
+    { rewrite /has_obls in H1. rewrite OBLSm in H1. set_solver. }
     destruct H1 as (?&LBL&<-).
     forward eapply (proj1 (label_lookup_states' _ _)); eauto.
     rewrite -Nat.add_1_r. intros [δm' MTH'].
     
     (* forward eapply (trace_valid_steps'' _ _ VALID (d + m)) as STEP; eauto. *)
     (* simpl in STEP. *)
-    
-    assert (ps_obls OP δm !! τ = Some obs) as OBLSm.
-    { (* obligations haven't been changed with other threads' steps *)
-      admit. }
     
     assert (ps_phases OP δm !! τ = Some π) as PHm.
     { forward eapply (pres_by_valid_trace_strong _ tr d (d + m)). 
@@ -1001,12 +1051,7 @@ Section Termination.
       all: try done. 
       { lia. }
       { rewrite DTH. done. }
-      { intros ? ? [LE' LT'] LBL' ->.
-        apply Nat.le_sum in LE' as [u ->]. 
-        specialize (MINm u). specialize_full MINm; [| lia]. 
-        eapply mk_is_Some, state_lookup_prev with (j := d + u) in MTH' as [? K].
-        2: lia.
-        eexists. split; eauto. red. right. eauto. }
+      { set_solver. }
       by rewrite MTH. }
     
     forward eapply (owm_om_trans_ms_lt π τ (d + m)); eauto.
@@ -1086,7 +1131,7 @@ Section Termination.
       eapply (om_trans_eps_bound δm); eauto.
       2, 3: by subst. 
       eapply trace_valid_steps''; eauto.
-  Admitted.
+  Qed. 
   
   Theorem signals_eventually_set
     (FAIR: forall τ, obls_trace_fair _ τ tr):
