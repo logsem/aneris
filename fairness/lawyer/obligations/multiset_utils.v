@@ -29,6 +29,10 @@ Section GmultisetUtils.
     X ∖ Y = X.
   Proof using. clear -DISJ. mss. Qed. 
   
+  Lemma gmultiset_split_exact (X Y: gmultiset A):
+    X = (X ∖ Y) ⊎ (X ∩ Y). 
+  Proof using. mss. Qed. 
+
   Lemma gmultiset_split (X Y: gmultiset A):
     exists I X' Y', X = X' ⊎ I /\ Y = Y' ⊎ I /\ X' ## Y'.
   Proof using.
@@ -62,6 +66,24 @@ Section GmultisetUtils.
     a ∉ g ↔ multiplicity a g = 0.
   Proof using. mss. Qed.
 
+  Lemma multiplicity_big_DU_set (D: gset A) (f: A -> nat):
+    forall a, 
+    multiplicity a ([^disj_union set] a ∈ D, f a *: {[+ a +]}) =
+    if (decide (a ∈ D)) then (f a) else 0.
+  Proof using.
+    pattern D. apply set_ind; clear D. 
+    { red. intros ???. set_solver. }
+    { intros. rewrite big_opS_empty. set_solver. }
+    intros d D FRESH IH a.
+    rewrite big_opS_insert; [| done].
+    rewrite multiplicity_disj_union. rewrite IH.
+    rewrite multiplicity_scalar_mul multiplicity_singleton'.
+    destruct decide, decide; [set_solver| ..]. 
+    1, 2: rewrite decide_True; [| set_solver].
+    3: rewrite decide_False; [| set_solver].
+    all: subst; lia.
+  Qed. 
+
 End GmultisetUtils.
 
 Section MultisetOrder.
@@ -81,8 +103,46 @@ Section MultisetOrder.
     forall a, multiplicity a X > multiplicity a Y ->
     exists b, strict R a b /\ multiplicity b X < multiplicity b Y.
 
+  Definition dominates_over (X Y: gmultiset A) :=
+    forall y, y ∈ Y -> exists x, x ∈ X /\ strict R y x.
+
+  Instance dominates_over_Proper: Proper (equiv ==> equiv ==> iff) dominates_over.
+  Proof using. clear. intros ??????. mss. Qed.
+
+  Lemma dominates_minus1 (X Y: gmultiset A) a
+    (DOM': dominates_over (X ⊎ {[+ a +]}) (Y ⊎ {[+ a +]})):
+    dominates_over X Y.
+  Proof using PO.
+    red. intros y Yy.
+    red in DOM'.
+    pose proof (DOM' y ltac:(mss)) as Dy.
+    destruct Dy as (x & IN' & RR).
+    apply gmultiset_elem_of_disj_union in IN' as [? | EQ].
+    { eauto. }
+    apply gmultiset_elem_of_singleton in EQ. subst.
+    specialize (DOM' a ltac:(mss)) as (x & IN' & RR').    
+    apply gmultiset_elem_of_disj_union in IN' as [? | EQ].
+    2: { apply gmultiset_elem_of_singleton in EQ. subst.
+         apply strict_spec_alt in RR'. tauto. }
+    exists x. split; auto. etrans; eauto.
+  Qed.
+
+  Lemma gmultiset_difference_empty (X: gmultiset A):
+    X ∖ ∅ = X.
+  Proof using. clear. mss. Qed. 
+
+  Lemma dominates_minus (X Y D: gmultiset A)
+    (DOM': dominates_over (X ⊎ D) (Y ⊎ D)):
+    dominates_over X Y.
+  Proof using PO.
+    generalize dependent X. generalize dependent Y. pattern D. apply gmultiset_ind.
+    { intros ??. by rewrite !gmultiset_disj_union_right_id. }
+    intros. eapply H0. eapply (dominates_minus1 _ _ x).
+    eapply dominates_over_Proper; [..| apply DOM']; mss.
+  Qed. 
+
   Definition ms_le_dm (M N: gmultiset A) :=
-    exists X Y, X ⊆ N /\ M = (N ∖ X) ⊎ Y /\ (forall y, y ∈ Y -> exists x, x ∈ X /\ strict R y x). 
+    exists X Y, X ⊆ N /\ M = (N ∖ X) ⊎ Y /\ dominates_over X Y. 
 
   Lemma ms_le_equiv X Y:
     ms_le X Y <-> (ms_lt' X Y \/ X = Y).
@@ -161,107 +221,81 @@ Section MultisetOrder.
     red. intros ?. rewrite multiplicity_difference. lia.
   Qed.
 
-  Notation "'mlt' x X" := (multiplicity x X) (at level 20).
-  (* Context `{∀ x y, Decision (R x y)}.  *)
-
   Lemma ms_le_equiv'    
     X Y:
     ms_le X Y <-> ms_le_dm X Y.
-  Proof using.
-    (* try using the second definition only *)
-    
-    
-  (*   rewrite /ms_le /ms_le_dm. split. *)
-  (*   - rename X into M, Y into N. *)
-  (*     (* intros LE. *) *)
-  (*     (* set (M__max :=  *) *)
-  (*     destruct (decide (M = ∅)) as [-> | NE]. *)
-  (*     { intros. exists N, ∅. mss. }  *)
-      
-  (*     assert (exists m, m ∈ M /\ maximal R m M). *)
-  (*     { enough (exists m, m ∈ (dom M) /\ maximal R m (dom M)). *)
-  (*       2: { unshelve eapply minimal_exists_L; try by apply _. *)
-  (*            intros E. destruct NE. admit. } *)
-  (*       destruct H1 as (m & DOM & MAX). *)
-  (*       exists m. split. *)
-  (*       { eapply gmultiset_elem_of_dom; eauto. } *)
-  (*       red. red. simpl. intros. apply MAX; eauto. *)
-  (*       eapply gmultiset_elem_of_dom; eauto. } *)
-
-  (*     destruct H1 as (m & Mm & MAXm).  *)
-  (*     intros LE.       *)
-
-      
-  (*     exists ((mset_filter (fun a => R m a) N) ∖ M), ((mset_filter (fun a => ¬ R m a) M) ∖ N). *)
-  (*     repeat split. *)
-  (*     + admit. *)
-  (*     + apply gmultiset_eq. intros a. *)
-  (*       destruct (decide (R m a)). *)
-  (*       * rewrite multiplicity_disj_union. *)
-          
-      
-             
-  (*            apply gmultiset_eq. intros. rewrite multiplicity_empty. *)
-  (*            destruct (multiplicity x M) eqn:FF; [done| ]. *)
-             
-  (*            intros ?%dom_empty_L.  *)
-  (*       - apply _.  *)
-
-      
-  (*     generalize dependent N. pattern M. apply gmultiset_ind. *)
-  (*     { intros. exists N, ∅. mss. } *)
-  (*     clear M. intros m M IH N' LE. *)
-
-  (*     assert (exists n, n ∈ N' /\ R m n) as (n & N'n & Rmn). *)
-  (*     { admit. } *)
-
-  (*     pose proof (gmultiset_disj_union_difference' _ _ N'n) as EQ. *)
-  (*     rewrite EQ. rewrite EQ in LE.  *)
-  (*     remember (N' ∖ {[+ n +]}) as N. clear HeqN. clear N' N'n EQ. *)
-
-  (*     setoid_rewrite multiplicity_disj_union in LE. *)
-  (*     setoid_rewrite multiplicity_singleton' in LE.  *)
-
-      
-      
-  (*     specialize (IH N). destruct IH. *)
-  (*     { intros. *)
-  (*       specialize (LE a). *)
-        
-  (*       destruct (decide (a = n)). *)
-  (*       { subst. *)
-  (*         rewrite decide_False in LE; [| admit]. *)
-  (*         simpl in LE.  *)
-        
-  (*       destruct (decide (a = n)). *)
-  (*       { specialize (LE term+) *)
-
-  (*         subst. *)
-
-  (*         lia.  *)
-      
-      
-  (*     destruct (decide (m ∈ N)). *)
-  (*     2: { specialize (IH N). destruct IH. *)
-  (*          { intros. specialize (LE a). destruct LE as (b & ab & LT).  *)
-  (*            { rewrite multiplicity_disj_union. lia. } *)
-  (*            rewrite multiplicity_disj_union in LT. *)
-  (*            rewrite multiplicity_singleton' in LT.  *)
-  (*            eexists. split; eauto.  *)
-             
-      
-  (*     specialize (IH (N ∖ {[+ m +]})). *)
-  (*     destruct IH.  *)
-  (*     { intros a GT.  *)
-  (*       destruct (decide *)
-  (*     intros LE.  *)
-  Admitted.
+  Proof using PO.
+    rename X into M, Y into N.
+    set mu := @multiplicity A _ _. 
+    set (D := dom M ∪ dom N). 
+    rewrite /ms_le /ms_le_dm. split.
+    - intros LE.
+      set (X := [^ disj_union set] a ∈ D, (mu a N - mu a M) *: {[+ a +]}).
+      set (Y := [^ disj_union set] a ∈ D, (mu a M - mu a N) *: {[+ a +]}).
+      exists X, Y. repeat split.
+      + subst X.
+        do 2 red. intros. rewrite multiplicity_big_DU_set.
+        subst mu. destruct decide; lia. 
+      + subst X Y. apply gmultiset_eq. intros a.
+        rewrite multiplicity_disj_union.
+        rewrite multiplicity_difference.
+        rewrite !multiplicity_big_DU_set.
+        subst mu. destruct decide; try lia.
+        subst D. 
+        rewrite !(proj1 (not_elem_of_multiplicity _ _)); [lia| ..].
+        all: intros ?%gmultiset_elem_of_dom; set_solver.
+      + intros y Yy.
+        subst Y. rewrite elem_of_multiplicity in Yy.
+        rewrite multiplicity_big_DU_set in Yy. destruct decide; [| lia].
+        pose proof Yy. 
+        apply Nat.lt_add_lt_sub_r in Yy. apply LE in Yy as (x&?&GT).
+        exists x. split.
+        2: { apply strict_spec_alt. split; auto. intros ->.
+             subst mu. lia. }
+        subst X. do 2 red. rewrite multiplicity_big_DU_set.
+        subst mu. 
+        rewrite decide_True; [lia| ]. subst D. apply elem_of_union. right.
+        apply gmultiset_elem_of_dom. do 2 red. lia.
+    - intros LE a LT.  
+      assert (∃ X Y, X ⊆ N ∧ M = N ∖ X ⊎ Y ∧
+                     dominates_over X Y /\
+                     X ## Y).
+      { destruct LE as (X & Y & SUB & -> & GT).
+        apply gmultiset_disj_union_difference in SUB. remember (N ∖ X) as U.
+        subst N. clear HeqU.
+        set (V := X ∩ Y).
+        exists (X ∖ V), (Y ∖ V).
+        repeat split.
+        - mss.
+        - apply gmultiset_eq. intros b.
+          repeat rewrite ?multiplicity_disj_union ?multiplicity_difference ?multiplicity_intersection.
+          subst V. subst mu. lia.
+        - subst V. 
+          pose proof (gmultiset_split_exact X Y) as EQX.
+          pose proof (gmultiset_split_exact Y X) as EQY. 
+          rewrite gmultiset_difference_exact in EQX.
+          rewrite gmultiset_difference_exact in EQY.
+          rewrite EQX in GT. rewrite {3}EQY in GT.
+          rewrite (gmultiset_intersection_comm Y _) in GT.
+          eapply dominates_minus; eauto.
+        - mss. }
+      clear LE. destruct H0 as (X & Y & SUB & -> & GT & DISJ).
+      apply gmultiset_disj_union_difference in SUB. remember (N ∖ X) as U.
+      subst N. clear HeqU.
+      rewrite !multiplicity_disj_union in LT.
+      specialize (GT a). destruct GT as (x & INx & R'ax).
+      { apply elem_of_multiplicity. lia. }
+      eexists. split; [apply R'ax| ].
+      rewrite !multiplicity_disj_union.
+      rewrite elem_of_multiplicity in INx. 
+      enough (multiplicity x Y = 0); [lia| ].
+      apply not_elem_of_multiplicity. intros ?%DISJ; eauto.
+  Qed. 
 
   Lemma ms_le_disj_union X1 Y1 X2 Y2
     (LE1: ms_le X1 Y1) (LE2: ms_le X2 Y2):
     ms_le (X1 ⊎ X2) (Y1 ⊎ Y2).
-  Proof using.
-    clear PO. 
+  Proof using PO.
     apply ms_le_equiv'. apply ms_le_equiv' in LE1, LE2. red in LE1, LE2.
     destruct LE1 as (B1 & S1 & IN1 & -> & LT1), LE2 as (B2 & S2 & IN2 & -> & LT2).
     red. exists (B1 ⊎ B2), (S1 ⊎ S2). repeat split.
@@ -275,8 +309,7 @@ Section MultisetOrder.
   Lemma ms_le_lt_disj_union X1 Y1 X2 Y2
     (LE1: ms_lt X1 Y1) (LE2: ms_le X2 Y2):
     ms_lt (X1 ⊎ X2) (Y1 ⊎ Y2).
-  Proof using.
-    clear PO.
+  Proof using PO.
     eapply strict_transitive_r.
     { eapply ms_le_disj_union; [reflexivity| ]. eauto. }
     apply strict_spec_alt. split. 
@@ -296,7 +329,7 @@ Section MultisetOrder.
   Lemma big_opS_ms_le `{Countable B} f g (X: gset B)
     (LE: forall x, ms_le (f x) (g x)):
     ms_le ([^op set] x ∈ X, f x) ([^op set] x ∈ X, g x).
-  Proof using.
+  Proof using PO.
     pattern X. apply set_ind_L; clear X.
     { rewrite !big_opS_empty. apply empty_ms_le. }
     intros. rewrite !big_opS_insert; auto. simpl. rewrite !gmultiset_op.
