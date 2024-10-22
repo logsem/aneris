@@ -85,6 +85,15 @@ Definition commitTest : Type := execution -> transaction -> Prop.
 Definition applyTransaction (s : state) (t : transaction) : state := 
   foldl (λ s op, match op with | Wr sig k v => <[k := v]> s | _ => s end) s t.
 
+Definition extendExecution (e : execution) (t : transaction) : execution :=
+  match (last e) with 
+    | Some s => e ++ [(t, applyTransaction s.2 t)] 
+    | None => [(t, applyTransaction ∅ t)] 
+  end.
+
+Definition optionalExtendExecution (e : execution) (t : transaction) : execution :=
+  match (last t) with | Some (Cm _ true) => extendExecution e t | _ => e end.
+
 Definition valid_execution (test : commitTest) (exec : execution) : Prop :=
   (* Transitions are valid *)
   (∀ i e1 e2, exec !! i = Some e1 → 
@@ -2069,6 +2078,145 @@ Lemma based_on_add2 op exec T :
 Proof.
   intros Hnot Hbased.
   by rewrite -com_trans_eq2.
+Qed.
+
+Lemma based_on_add3 s b exec T :
+  based_on exec (comTrans T) →
+  based_on (optionalExtendExecution exec [Cm s b]) (comTrans (T ++ [[Cm s b]])).
+Proof.
+  intros Hbased.
+  rewrite /optionalExtendExecution /comTrans.
+  rewrite List.filter_app.
+  simpl.
+  destruct b.
+  - intros t.
+    split.
+    + intros Hhyp.
+      rewrite /extendExecution in Hhyp.
+      destruct (last exec) eqn:Hlast.
+      * rewrite split_split in Hhyp.
+        simpl in Hhyp.
+        destruct (Hbased t) as (Himp & _).
+        set_solver.
+      * simpl in Hhyp.
+        set_solver.
+    + intros Hhyp.
+      rewrite elem_of_app in Hhyp.
+      destruct Hhyp as [Hhyp|Hhyp].
+      * destruct (Hbased t) as (_ & Himp).
+        destruct (Himp Hhyp) as (Hin & Hneq).
+        split; last done.
+        rewrite /extendExecution.
+        destruct (last exec) eqn:Hlast.
+        -- simpl.
+           rewrite split_split.
+           simpl.
+           set_solver.
+        -- rewrite last_None in Hlast. 
+           set_solver.
+      * split; last set_solver.
+        rewrite /extendExecution.
+        destruct (last exec).
+        -- simpl.
+           rewrite split_split.
+           simpl.
+           set_solver.
+        -- simpl.
+           set_solver.
+  - rewrite app_nil_r.
+    by rewrite /comTrans in Hbased.
+Qed.
+
+Lemma based_on_add4 s b exec T1 T2 trans :
+  (∃ op, op ∈ trans ∧ last trans = Some op ∧ isCmOp op = false) ->
+  based_on exec (comTrans (T1 ++ trans :: T2)) →
+  based_on (optionalExtendExecution exec (trans ++ [Cm s b])) (comTrans (T1 ++ (trans ++ [Cm s b]) :: T2)).
+Proof.
+  intros Hop Hbased.
+  rewrite /optionalExtendExecution /comTrans.
+  rewrite List.filter_app.
+  simpl.
+  rewrite last_snoc.
+  destruct b.
+  - intros t.
+    split.
+    + intros Hhyp.
+      rewrite /extendExecution in Hhyp.
+      destruct (last exec) eqn:Hlast; last set_solver.
+      rewrite split_split in Hhyp.
+      simpl in Hhyp.
+      destruct (Hbased t) as (Himp & _).
+      destruct Hhyp as (Hin & Hneq).
+      rewrite elem_of_app in Hin.
+      destruct Hin as [Hin|Hin]; last set_solver.
+      assert (t ∈ comTrans (T1 ++ trans :: T2)) as Hin'; first set_solver.
+      assert (comTrans (T1 ++ trans :: T2) = comTrans (T1 ++ T2)) as Heq.
+      {
+        rewrite /comTrans. 
+        do 2 rewrite List.filter_app.
+        simpl.
+        destruct Hop as (op & _ & -> & Hcm).
+        rewrite /isCmOp in Hcm.
+        destruct op; simpl; set_solver.
+      }
+      rewrite Heq in Hin'.
+      rewrite /comTrans List.filter_app in Hin'.
+      set_solver.
+    + intros Hhyp.
+      rewrite elem_of_app in Hhyp.
+      destruct Hhyp as [Hhyp|Hhyp].
+      * destruct (Hbased t) as (_ & Himp).
+        assert (t ∈ comTrans (T1 ++ trans :: T2)) as Hin.
+        {
+          rewrite /comTrans List.filter_app.
+          set_solver.
+        }
+        destruct (Himp Hin) as (Hin' & Hneq).
+        split; last done.
+        rewrite /extendExecution.
+        destruct (last exec) eqn:Hlast.
+        -- simpl.
+           rewrite split_split.
+           simpl.
+           set_solver.
+        -- rewrite last_None in Hlast. 
+           set_solver.
+      * rewrite elem_of_cons in Hhyp. 
+        destruct Hhyp as [->|Hhyp].
+        -- rewrite /extendExecution.
+           destruct (last exec); simpl.
+           ++ split.
+              ** rewrite split_split.
+                 simpl.
+                 set_solver.
+              ** intros Hfalse; rewrite app_nil in Hfalse.
+                 set_solver.
+           ++ split; first set_solver.
+              intros Hfalse; rewrite app_nil in Hfalse.
+              set_solver.
+        -- destruct (Hbased t) as (_ & Himp).
+           assert (t ∈ comTrans (T1 ++ trans :: T2)) as Hin.
+           {
+             rewrite /comTrans List.filter_app; simpl.
+             destruct Hop as (op & _ & -> & Hcm).
+             destruct op; simpl; set_solver.
+           }
+           destruct (Himp Hin) as (Hin' & Hneq).
+           split; last done.
+           rewrite /extendExecution.
+           destruct (last exec) eqn:Hlast.
+           ++ simpl.
+              rewrite split_split.
+              simpl.
+              set_solver.
+           ++ rewrite last_None in Hlast. 
+              set_solver.
+  - rewrite /comTrans List.filter_app in Hbased.
+    simpl in Hbased.
+    destruct Hop as (op & _ & Heq & Hcm).
+    rewrite Heq in Hbased.
+    rewrite /isCmOp in Hcm.
+    destruct op; simpl; set_solver.
 Qed.
 
 Lemma valid_trace_pre T tag t e lt exec test : 
