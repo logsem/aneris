@@ -1,5 +1,6 @@
 Require Import Coq.Program.Wf.
 From stdpp Require Import relations.
+Require Import Coq.Logic.ClassicalChoice.
 
 
 Section WfSetMin.
@@ -15,8 +16,12 @@ Section WfSetMin.
     (NE: exists a, P a):
     exists a, P a /\ minimal_in_prop R a P.
   Proof.
-    (* look for existing pen-and-paper proofs *)
-    (* use choice *)
-  Admitted.
+    destruct NE as [a Pa].
+    induction a as [a IH] using (well_founded_induction WF). 
+    destruct (classic (exists b, P b /\ R b a)) as [(?&?&?) | MIN].
+    { eapply IH; eauto. }
+    exists a. split; eauto.
+    red. intros b Pb Rba. apply MIN. eauto.
+  Qed.
   
 End WfSetMin.
