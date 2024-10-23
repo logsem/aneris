@@ -82,7 +82,7 @@ Section Termination.
     2: { rewrite LOC_PHASE in OTHER. simpl in OTHER.
          eapply phases_disj_not_le; eauto. by symmetry. }
     
-    rewrite mset_map_empty. apply ms_le_disj_union.
+    rewrite mset_map_empty. apply ms_le_disj_union; [apply _| ..].
     + eapply ms_le_Proper; [reflexivity| | reflexivity]. mss.
     + apply ms_le_exp_mono; [lia | reflexivity].
   Qed.
@@ -108,7 +108,7 @@ Section Termination.
     rewrite decide_True; [| red; reflexivity].
     rewrite mset_map_singleton. simpl. 
     
-    rewrite -gmultiset_disj_union_assoc. apply ms_le_disj_union.
+    rewrite -gmultiset_disj_union_assoc. apply ms_le_disj_union; [apply _| ..].
     { apply ms_le_refl. }
     rewrite (union_difference_singleton_L _ _ EP).
     
@@ -121,7 +121,7 @@ Section Termination.
     2, 3: set_solver.
     simpl. rewrite gmultiset_disj_union_comm.
     rewrite -gmultiset_disj_union_assoc.
-    apply ms_le_disj_union.
+    apply ms_le_disj_union; [apply _| ..].
     { apply ms_le_exp_mono; [lia | reflexivity]. }
     
     move SET_BOUND at bottom. specialize_full SET_BOUND; [by eauto| ].
@@ -1114,7 +1114,7 @@ Section Termination.
     rewrite /TPF /TPF' /PF'.
     generalize ((LIM_STEPS + 2) * S (d + m)) as N. intros.
     rewrite plus_n_Sm -Nat.add_1_r Nat.add_assoc MTH'. simpl.
-    apply ms_le_disj_union.
+    apply ms_le_disj_union; [apply _| ..].
     - apply ms_le_sub, mset_map_sub.
       apply mset_filter_subseteq_mono_strong.
       intros [pi de] IN' LEpi.
@@ -1200,7 +1200,7 @@ Section Termination.
     rewrite mset_map_singleton. simpl. 
     
     (* rewrite mset_map_disj_union. *)
-    rewrite -gmultiset_disj_union_assoc. apply ms_le_disj_union.
+    rewrite -gmultiset_disj_union_assoc. apply ms_le_disj_union; [apply _| ..].
     { apply ms_le_refl. }
     rewrite (union_difference_singleton_L _ _ EP).
     
@@ -1209,7 +1209,7 @@ Section Termination.
     2, 3: set_solver.
     simpl. rewrite gmultiset_disj_union_comm.
     rewrite -gmultiset_disj_union_assoc.
-    apply ms_le_disj_union.
+    apply ms_le_disj_union; [apply _| ..].
     { apply ms_le_exp_mono; [lia | reflexivity]. }
     
     move SET_BOUND at bottom. specialize_full SET_BOUND; [by eauto| ].

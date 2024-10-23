@@ -65,13 +65,14 @@ Section PhaseFuel.
   
   Definition TPF' (i: nat): gmultiset Degree :=
     from_option (PF' ((LIM_STEPS + 2) * i)) ∅ (tr S!! i).
+
   
   Lemma ms_le_exp_mono m n X Y
     (LE: m <= n)
     (SUB: X ⊆ Y)
     :
     ms_le deg_le (approx_expects n X) (approx_expects m Y).
-  Proof using.
+  Proof using. 
     clear -LE SUB. 
     rewrite /approx_expects.
     apply union_difference_L in SUB. rewrite SUB.
@@ -79,16 +80,19 @@ Section PhaseFuel.
     etrans.
     2: { rewrite gmultiset_op. apply ms_le_sub. 
          apply gmultiset_disj_union_subseteq_l. }      
-    eapply big_opS_ms_le. intros [[??]?].
+    apply big_opS_ms_le; [apply _| ]. 
+    intros [[??]?].
     apply ms_le_sub.
     apply scalar_mul_le. lia.
   Qed.
   
+  Global Existing Instance deg_PO | 10. 
+
   Lemma ms_le_PF_le m n δ
     (LE: m <= n):
     ms_le deg_le (PF' n δ) (PF' m δ).
   Proof using.
-    apply ms_le_disj_union.
+    apply ms_le_disj_union; [apply _| ..].
     + apply ms_le_sub. apply mset_map_sub. apply mset_filter_subseteq_mono. mss.
     + apply ms_le_exp_mono; [lia | reflexivity].
   Qed. 
@@ -114,7 +118,7 @@ Section PhaseFuel.
     clear -EXC. rewrite /PF'. 
     inversion EXC; subst. 
     destruct δ1. simpl in *. 
-    apply ms_le_disj_union.
+    apply ms_le_disj_union; [apply _| ..].
     + subst new_cps0.
       rewrite !mset_filter_disj_union mset_map_disj_union.
       rewrite !mset_filter_difference. 
@@ -152,7 +156,7 @@ Section PhaseFuel.
     destruct decide.
     2: { rewrite filter_singleton_not_L; [| tauto].
          rewrite multiset_difference_empty. rewrite union_empty_r_L.
-         apply ms_le_disj_union.
+         apply ms_le_disj_union; [apply _| ..].
          + apply ms_le_sub. reflexivity. 
          + apply ms_le_exp_mono; [lia | reflexivity]. }
     
@@ -165,14 +169,14 @@ Section PhaseFuel.
     
     destruct (decide ((s, π, d') ∈ ps_eps)).
     { rewrite union_comm_L subseteq_union_1_L; [| set_solver].
-      apply ms_le_disj_union.
+      apply ms_le_disj_union; [apply _| ..].
       + apply ms_le_sub. mss. 
       + apply ms_le_exp_mono; [lia | reflexivity]. }
     
     forward eapply (approx_expects_add (S k)) as ->.
     { by intros [??]%elem_of_filter. } 
     rewrite (gmultiset_disj_union_comm _ ((_ - _) *: _)) gmultiset_disj_union_assoc. 
-    apply ms_le_disj_union; revgoals. 
+    apply ms_le_disj_union; [apply _| ..]; revgoals. 
     + apply ms_le_exp_mono; [lia | reflexivity].
     + simpl. apply ms_le_exchange.
       * apply _. 
@@ -190,19 +194,19 @@ Section PhaseFuel.
     destruct STEP as [T|[T|[T|[T|T]]]]. 
     - destruct T as (?&?&T). inversion T; subst. 
       destruct δ1. simpl in *.
-      apply ms_le_disj_union.
+      apply ms_le_disj_union; [apply _| ..].
       + apply ms_le_sub. apply mset_map_sub. apply mset_filter_subseteq_mono. mss.
       + apply ms_le_exp_mono; [lia | reflexivity].
     - destruct T as (?&?&?&?&T).
       eapply exchange_cp_ms_le; eauto. 
     - destruct T as (?&T). inversion T; subst.
       destruct δ1. simpl in *.
-      apply ms_le_disj_union.
+      apply ms_le_disj_union; [apply _| ..].
       + apply ms_le_sub. apply mset_map_sub. mss. 
       + apply ms_le_exp_mono; [lia | reflexivity].
     - destruct T as (?&T). inversion T; subst.
       destruct δ1. simpl in *.  
-      apply ms_le_disj_union.
+      apply ms_le_disj_union; [apply _| ..].
       + apply ms_le_sub. apply mset_map_sub. mss. 
       + apply ms_le_exp_mono; [lia | reflexivity].
     - destruct T as (?&?&?&?&T). eapply create_ep_ms_le; eauto. 
@@ -243,7 +247,7 @@ Section PhaseFuel.
     rewrite /PF'.
     inversion FORK; subst. 
     destruct δ1. simpl in *.
-    apply ms_le_disj_union.
+    apply ms_le_disj_union; [apply _| ..].
     + apply ms_le_sub. apply mset_map_sub. mss. 
     + apply ms_le_exp_mono; [lia | reflexivity].
   Qed.
@@ -285,7 +289,7 @@ Section PhaseFuel.
               (PF' ((LIM_STEPS + 2) * i + LIM_STEPS + 1) mf)) as LE. 
     { inversion FSTEP as [? FORK | ]. 
       2: { subst mf.
-           rewrite /PF'. apply ms_le_disj_union.
+           rewrite /PF'. apply ms_le_disj_union; [apply _| ..].
            - reflexivity.
            - apply ms_le_exp_mono; [lia | reflexivity]. }
       destruct FORK as (?&?&?). 
@@ -310,7 +314,7 @@ Section PhaseFuel.
     rewrite /PF'. 
     inversion STEP; subst.
     destruct δ1. simpl in *.
-    apply ms_le_disj_union.
+    apply ms_le_disj_union; [apply _| ..].
     + apply ms_le_sub. apply mset_map_sub.
       apply mset_filter_subseteq_mono. mss. 
     + apply ms_le_exp_mono; [lia | reflexivity].
@@ -326,7 +330,7 @@ Section PhaseFuel.
     inversion STEP; subst.
     destruct δ1. simpl in *.
     
-    eapply ms_le_lt_disj_union. 
+    eapply ms_le_lt_disj_union; [apply _| ..].
     2: { apply ms_le_exp_mono; [ | reflexivity]. apply Nat.le_succ_diag_r. }
     
     apply strict_spec_alt.

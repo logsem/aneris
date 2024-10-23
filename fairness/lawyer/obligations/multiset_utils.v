@@ -89,7 +89,7 @@ End GmultisetUtils.
 Section MultisetOrder.
   Context `{Countable A}.
   Context (R: relation A).
-  Context (PO: PartialOrder R).   
+  Context {PO: PartialOrder R}.
 
   (* reflexive version of Huet and Oppen definition *)
   Definition ms_le (X Y: gmultiset A) :=
