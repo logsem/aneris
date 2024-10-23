@@ -162,11 +162,13 @@ Section EoFin.
     Ltac pure_step_cases := pure_step || (iApply wp_value; []) || wp_bind (RecV _ _ _ _)%V.
     Ltac pure_steps := repeat (pure_step_cases; []).
 
+    Definition ex_ith_sig (n i: nat) (s: SignalId): iProp Σ :=
+      ∃ l, sgn EO_OP s l (Some $ Nat.ltb i n) (H3 := oGS) ∗ ⌜ lvl2nat l = i ⌝. 
+
     Definition smap_repr K n (smap: gmap nat SignalId): iProp Σ :=
       own eofin_smap (● (to_agree <$> smap: gmapUR nat (agreeR SignalId))) ∗
       ⌜ dom smap = set_seq 0 K ⌝ ∗
-      ([∗ map] i ↦ s ∈ smap, ∃ l, sgn EO_OP s l (Some $ Nat.ltb i n) (H3 := oGS) ∗ ⌜ lvl2nat l = i ⌝). 
-
+      ([∗ map] i ↦ s ∈ smap, ex_ith_sig n i s). 
 
     Definition eofin_inv_inner l M (BOUND: M < LIM) : iProp Σ :=
       ∃ (n: nat) (smap: gmap nat SignalId), 
@@ -213,6 +215,34 @@ Section EoFin.
       rewrite H1. apply to_agree_inj in H2. by rewrite H2.
     Qed.
 
+    (* TODO: move *)
+    Global Instance BMU_proper:
+      Proper (equiv ==> eq ==> eq ==> equiv ==> equiv) (BMU EO_OP (oGS := oGS)).
+    Proof using. solve_proper. Qed. 
+
+    Lemma smap_create_ep i K n s smap π τ:
+      ⊢ ith_sig i s -∗ 
+         smap_repr K n smap -∗ 
+         cp EO_OP π d1 (H3 := oGS) -∗
+         th_phase_ge EO_OP τ π (H3 := oGS) -∗
+         BMU EO_OP ∅ τ 1 
+           (ep EO_OP s π d0 (H3 := oGS) ∗ smap_repr K n smap ∗
+            th_phase_ge EO_OP τ π (H3 := oGS) ∗ ith_sig i s) (oGS := oGS).
+    Proof using.
+      iIntros "ITH SR CP PH".
+      rewrite /smap_repr. iDestruct "SR" as "(AUTH & %DOM & SIGS)".
+      iDestruct (ith_sig_in with "[$] [$]") as "%ITH".
+      rewrite {2 5}(map_split smap i) ITH. simpl. rewrite big_sepM_union.
+      2: { apply map_disjoint_singleton_l_2. apply lookup_delete. }
+      iDestruct "SIGS" as "[SIG SIGS]". rewrite big_sepM_singleton.
+      rewrite {1}/ex_ith_sig. iDestruct "SIG" as "(%l & SIG & %LVLi)".
+      iApply OU_BMU.
+      iDestruct (create_ep_upd with "[$] [$] [$]") as "OU"; [apply d01_lt| ].
+      iApply (OU_wand with "[-OU]"); [| by iFrame].
+      iIntros "(EP & SIG & PH)".
+      iApply BMU_intro. iFrame. iSplitR; [done| ].
+      iExists _. by iFrame.
+    Qed.
 
     Lemma restore_map (smap: gmap nat SignalId) (s : SignalId) (m : nat) lm B
       (DOM: dom smap = set_seq 0 (B `min` (m + 2)))
@@ -316,24 +346,151 @@ Section EoFin.
       rewrite DOM. f_equal. symmetry. by apply Nat.min_l.
     Qed.
 
+    Definition thread_spec τ l B π Φ: iProp Σ :=
+      ∀ a,
+           even_res a ∗ cp_mul EO_OP π d1 (S (B - a)) (H3 := oGS) ∗ 
+           th_phase_ge EO_OP τ π (H3 := oGS) ∗
+           (if a <? B
+            then ∃ s0 : SignalId, ith_sig a s0 ∗ obls EO_OP τ {[s0]} (H3 := oGS)
+            else obls EO_OP τ ∅ (H3 := oGS)) -∗
+           ▷ (∀ x : base_lit, obls EO_OP τ ∅ (H3 := oGS) -∗ Φ #x) -∗
+           WP thread_prog #l #a #B @τ {{ v, Φ v }}. 
 
-    Lemma thread_spec τ n l B (BOUND: B < LIM) π s:
-      {{{ eofin_inv l B BOUND ∗ even_res n ∗
-          
-          (* cp_mul EO_OP π d0 100 (H3 := oGS) ∗ *)
-          cp_mul EO_OP π d1 (S (B - n)) (H3 := oGS) ∗ (* overestimation *)
-          exc_lb EO_OP 20 (H3 := oGS) ∗ 
+    Lemma thread_advance τ (l: loc) B (BOUND : B < LIM) π
+      (Φ: val → iPropI Σ)
+      (m: nat)
+      (H0 : (if Nat.even m then m else m + 1) < B)
+      (s : SignalId)
+      (smap : gmap nat SignalId)
+      (EVEN : Nat.even m)
+      :
+        (□ thread_spec τ l B π Φ) -∗
+        even_res (if Nat.even m then m else m + 1) -∗
+        ith_sig (if Nat.even m then m else m + 1) s -∗
+        obls EO_OP τ {[s]} (H3 := oGS) -∗
+        (∀ x, obls EO_OP τ ∅ (H3 := oGS) -∗ Φ #x) -∗
+        cp_mul EO_OP π d1 (B - (if Nat.even m then m else m + 1)) (H3 := oGS) -∗
+        th_phase_ge EO_OP τ π (H3 := oGS)-∗
+        cp_mul EO_OP π d0 12 (H3 := oGS)-∗
+        l ↦ #m -∗
+        thread_auth eofin_even (if Nat.even m then m else m + 1) -∗
+        thread_auth eofin_odd (if Nat.odd m then m else m + 1) -∗
+        smap_repr (B `min` (m + 2)) m smap -∗
+        (▷ eofin_inv_inner l B BOUND ={⊤ ∖ ↑nroot.@"eofin",⊤}=∗ emp) -∗
+  WP CmpXchg #l #(if Nat.even m then m else (m + 1)%nat)
+       #((if Nat.even m then m else (m + 1)%nat) + 1)
+  @ τ; ⊤ ∖ ↑nroot.@"eofin" {{ v, |={⊤ ∖ ↑nroot.@"eofin",⊤}=>
+                                   WP if: Snd v
+                                      then thread_prog #l
+                                             (#(if Nat.even m
+                                                then m
+                                                else (m + 1)%nat) + #2) #B
+                                      else thread_prog #l
+                                             #(if Nat.even m
+                                               then m
+                                               else (m + 1)%nat) #B @τ
+                                   {{ v, Φ v }} }}.
+    Proof using OBLS_AMU.
+      iIntros "#IH TH SN OB POST CPS1 PH CPS L EVEN ODD SR CLOS".
+      
+      pose proof (Is_true_true_1 _ EVEN) as E.
+      rewrite E.
+      pose proof (Nat.negb_even m) as O. rewrite E in O. simpl in O. rewrite -O. 
+      
+      iApply sswp_MU_wp; [done| ]. 
+      iApply (wp_cmpxchg_suc with "[$]"); try done.
+      { econstructor. done. }
+      iNext. iIntros "L".
+      
+      iDestruct "SR" as "(SM & %DOM & SIGS)". 
+      iDestruct (ith_sig_in with "[$] [$]") as %IN. 
+      iDestruct (big_sepM_delete with "SIGS") as "[SG SIGS]"; eauto.
+      iDestruct "SG" as (lm) "(SG & %LVL)".
+      rewrite Nat.ltb_irrefl. 
+      
+      iApply OBLS_AMU; [by rewrite nclose_nroot| ]. 
+      iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH". 
+      
+      iApply OU_BMU.
+      iDestruct (OU_set_sig with "OB [SG]") as "OU".
+      { apply elem_of_singleton. reflexivity. }
+      { by iFrame. }
+      iApply (OU_wand with "[-OU]"); [| done]. iIntros "(SIG & OBLS)".
+      rewrite (subseteq_empty_difference_L {[ s ]}); [| done].        
+      
+      iPoseProof (BMU_smap_restore with "[$] [$] [$] [$]") as "BMU"; eauto.
+      iApply (BMU_lower _ _ _ 1); [lia| ].
+      iApply (BMU_wand with "[-BMU] [$]"). iIntros "COND".
+      
+      iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
+      iSplitR "CP".
+      2: { do 2 iExists _. iFrame. done. }
+      iApply wp_value.
+      
+      iMod (thread_update _ _ _ (m + 2) with "EVEN [$]") as "[EVEN TH]". 
+      
+      assert (S (B - (m + 2)) <= B - m) as LE.
+      { destruct (Nat.even m); lia. }
+      apply Nat.le_sum in LE as [? LE].
+      rewrite LE.
+      iDestruct (cp_mul_split with "CPS1") as "[? ?]". 
+      
+      destruct (Nat.le_gt_cases B (m + 2)).
+      - iDestruct "COND" as "[COND | CC]".
+        2: { iMod "CC" as "[% ?]". lia. }
+        iDestruct "COND" as "(% & OBLS & SM)".
+        
+        iMod ("CLOS" with "[EVEN ODD SM L]") as "?".
+        { rewrite /eofin_inv_inner. iNext. iExists (m + 1), smap.
+          rewrite even_plus1_negb odd_plus1_negb E -O. simpl. 
+          rewrite -Nat.add_assoc. rewrite Nat2Z.inj_add. 
+          iFrame.
+          rewrite Nat.min_l; [| done]. rewrite Nat.min_l; [| lia]. done. }
+        
+        iModIntro.
+        wp_bind (Snd _)%E.           
+        pure_steps.
+        
+        wp_bind (_ + _)%E. pure_step. iApply wp_value.
+        
+        replace (Z.add (Z.of_nat m) 2) with (Z.of_nat (m + 2)) by lia.
+        iApply ("IH" with "[-POST]"). 
+        2: by iFrame. 
+        iFrame.
+        rewrite (proj2 (PeanoNat.Nat.ltb_ge _ _)); [ | lia]. 
+        iFrame "#∗".
+      - iDestruct "COND" as "[CC | COND]".
+        { iDestruct "CC" as "(% & ? & ?)". lia. }
+        iClear "SN". 
+        iMod "COND" as "[% (%s' & %lm' & SM & SN & OBLS & %LVL')]".
+        iMod ("CLOS" with "[EVEN ODD SM L]") as "?".
+        { rewrite /eofin_inv_inner. iNext. iExists (m + 1), _.
+          rewrite even_plus1_negb odd_plus1_negb E -O. simpl. 
+          rewrite -Nat.add_assoc. rewrite Nat2Z.inj_add. 
+          iFrame. rewrite -Nat.add_assoc. simpl. iFrame. }
+        
+        iModIntro.
+        wp_bind (Snd _)%E.           
+        pure_steps.
+        
+        wp_bind (_ + _)%E. pure_step. iApply wp_value.
+        
+        replace (Z.add (Z.of_nat m) 2) with (Z.of_nat (m + 2)) by lia. 
+        iApply ("IH" with "[-POST]"); [| by iFrame].
+        rewrite (proj2 (PeanoNat.Nat.ltb_lt _ _)); [ | lia].
+        iFrame "#∗".
+        iExists _. iFrame. 
+    Qed.
 
-          th_phase_ge EO_OP τ π (H3 := oGS) ∗
-          (if (Nat.ltb n B) then ith_sig n s else ⌜ True ⌝) ∗ 
-          obls EO_OP τ (if (Nat.ltb n B) then {[ s ]} else ∅) (H3 := oGS) }}}
-        thread_prog #l #n #B @ τ
-      {{{ x, RET #x; obls EO_OP τ ∅ (H3 := oGS) }}}.
+
+    Lemma thread_spec_holds τ l B (BOUND: B < LIM) π Φ:
+      eofin_inv l B BOUND -∗ exc_lb EO_OP 20 (H3 := oGS) -∗
+      □ thread_spec τ l B π Φ. 
     Proof.
-      iIntros (Φ).
-      iLöb as "IH" forall (n s). 
+      iIntros "#INV #EB". iModIntro. 
+      iLöb as "IH". 
 
-      iIntros "(#INV & TH & CPS1 & #EB & PH & SN & OB) POST".
+      rewrite {2}/thread_spec. iIntros (n) "(TH & CPS1 & PH & SN_OB) POST".
       rewrite /thread_prog.
       
       wp_bind (RecV _ _ _ _)%V.
@@ -362,7 +519,8 @@ Section EoFin.
         rewrite (proj2 (Nat.ltb_ge _ _)); done. }
       
       rewrite bool_decide_false; [| lia].
-      rewrite (proj2 (Nat.ltb_lt _ _)); [| done]. 
+      rewrite (proj2 (Nat.ltb_lt _ _)); [| done].
+      iDestruct "SN_OB" as (s) "[SN OB]". 
       pure_steps.
       wp_bind (_ + _)%E. pure_steps.  
       wp_bind (CmpXchg _ _ _)%E.
@@ -370,97 +528,50 @@ Section EoFin.
       iApply wp_atomic. 
       iInv "INV" as ">inv" "CLOS". iModIntro.
       rewrite {1}/eofin_inv_inner.
-      iDestruct "inv" as (m smap) "(L & EVEN & ODD & SM & %DOM & SIGS)".
+      iDestruct "inv" as (m smap) "(L & EVEN & ODD & SR)".
       iDestruct (thread_agree with "EVEN [$]") as %<-.
       destruct (even_or_odd m) as [EVEN | ODD].
-      - pose proof (Is_true_true_1 _ EVEN) as E.
-        rewrite E.
-        pose proof (Nat.negb_even m) as O. rewrite E in O. simpl in O. rewrite -O. 
+      -
+        (* TODO: why iApply doesn't work? *)
+        iPoseProof (thread_advance with "[$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$]") as "FOO".
+        1, 2: eauto.
+        
+        pose proof (Is_true_true_1 _ EVEN) as E. rewrite E.
+        iApply (wp_wand with "[$]"). set_solver.         
+      - pose proof (Is_true_true_1 _ ODD) as O.
+        rewrite O.
+        pose proof (Nat.negb_odd m) as E. rewrite O in E. simpl in E. rewrite -E. 
 
         iApply sswp_MU_wp; [done| ]. 
-        iApply (wp_cmpxchg_suc with "[$]"); try done.
+        iApply (wp_cmpxchg_fail with "[$]"); try done.
+        { intros [=]. lia. }
         { econstructor. done. }
         iNext. iIntros "L".
 
-        iDestruct (ith_sig_in with "[$] [$]") as %IN. 
-        iDestruct (big_sepM_delete with "SIGS") as "[SG SIGS]"; eauto.
-        iDestruct "SG" as (lm) "(SG & %LVL)".
-        rewrite Nat.ltb_irrefl. 
-
         iApply OBLS_AMU; [by rewrite nclose_nroot| ]. 
-        iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH". 
-
-        iApply OU_BMU.
-        iDestruct (OU_set_sig with "OB [SG]") as "OU".
-        { apply elem_of_singleton. reflexivity. }
-        { by iFrame. }
-        iApply (OU_wand with "[-OU]"); [| done]. iIntros "(SIG & OBLS)".
-        rewrite (subseteq_empty_difference_L {[ s ]}); [| done].        
-
-        iPoseProof (BMU_smap_restore with "[$] [$] [$] [$]") as "BMU"; eauto.
-        iApply (BMU_lower _ _ _ 1); [lia| ].
-        iApply (BMU_wand with "[-BMU] [$]"). iIntros "COND".
+        iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH".
+        assert (B - (m + 1) = S (B - (m + 2))) as LE.
+        { destruct (Nat.even m); lia. }
+        rewrite LE.
+        iDestruct (cp_mul_take with "CPS1") as "[CPS1 CP1]".
+        iPoseProof (smap_create_ep with "[$] [$] [$] [$]") as "BMU"; eauto.
+        iApply (BMU_weaken with "[-BMU] [$]"); [lia| set_solver| ].
+        iIntros "(EP & SR & PH & SN)". 
 
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
         iSplitR "CP".
         2: { do 2 iExists _. iFrame. done. }
         iApply wp_value.
 
-        iMod (thread_update _ _ _ (m + 2) with "EVEN [$]") as "[EVEN TH]". 
+        iMod ("CLOS" with "[EVEN ODD SR L]") as "?".
+        { rewrite /eofin_inv_inner. iNext. iExists m, smap.
+          rewrite -E O. iFrame. }
+        iModIntro.
 
-        assert (S (B - (m + 2)) <= B - m) as LE.
-        { destruct (Nat.even m); lia. }
-        apply Nat.le_sum in LE as [? LE].
-        rewrite LE.
-        iDestruct (cp_mul_split with "CPS1") as "[? ?]". 
+        wp_bind (Snd _)%E. pure_steps.
 
-        destruct (Nat.le_gt_cases B (m + 2)).
-        + iDestruct "COND" as "[COND | CC]".
-          2: { iMod "CC" as "[% ?]". lia. }
-          iDestruct "COND" as "(% & OBLS & SM)".
-
-          iMod ("CLOS" with "[EVEN ODD SM L]") as "?".
-          { rewrite /eofin_inv_inner. iNext. iExists (m + 1), smap.
-            rewrite even_plus1_negb odd_plus1_negb E -O. simpl. 
-            rewrite -Nat.add_assoc. rewrite Nat2Z.inj_add. 
-            iFrame.
-            rewrite Nat.min_l; [| done]. rewrite Nat.min_l; [| lia]. done. }
-
-          iModIntro.
-          wp_bind (Snd _)%E.           
-          pure_steps.
-
-          wp_bind (_ + _)%E. pure_step. iApply wp_value.
-
-          replace (Z.add (Z.of_nat m) 2) with (Z.of_nat (m + 2)) by lia. 
-          iApply ("IH" with "[-POST]"). 
-          2: by iFrame. 
-          iFrame.
-          rewrite (proj2 (PeanoNat.Nat.ltb_ge _ _)); [ | lia]. 
-          iFrame "#∗".
-        + iDestruct "COND" as "[CC | COND]".
-          { iDestruct "CC" as "(% & ? & ?)". lia. }
-          iClear "SN". 
-          iMod "COND" as "[% (%s' & %lm' & SM & SN & OBLS & %LVL')]".
-          iMod ("CLOS" with "[EVEN ODD SM L]") as "?".
-          { rewrite /eofin_inv_inner. iNext. iExists (m + 1), _.
-            rewrite even_plus1_negb odd_plus1_negb E -O. simpl. 
-            rewrite -Nat.add_assoc. rewrite Nat2Z.inj_add. 
-            iFrame. rewrite -Nat.add_assoc. simpl. iFrame. }
-          
-          iModIntro.
-          wp_bind (Snd _)%E.           
-          pure_steps.
-
-          wp_bind (_ + _)%E. pure_step. iApply wp_value.
-
-          replace (Z.add (Z.of_nat m) 2) with (Z.of_nat (m + 2)) by lia. 
-          iApply ("IH" with "[-POST]"); [| by iFrame].
-          rewrite (proj2 (PeanoNat.Nat.ltb_lt _ _)); [ | lia].
-          iFrame "#∗". 
-      - admit.
+        admit.
     Admitted. 
-
 
   End Threads.
 

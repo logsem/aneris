@@ -186,21 +186,31 @@ Section ProgramLogic.
       iExists _. iFrame.
     Qed.
 
+    Lemma BMU_weaken ζ E1 E2 m1 m2 P1 P2
+      (LE: m1 <= m2)
+      (SUB: E1 ⊆ E2):
+      ⊢ (P1 -∗ P2) -∗ BMU E1 ζ m1 P1 -∗ BMU E2 ζ m2 P2.
+    Proof using.
+      rewrite /BMU.
+      iIntros "IMPL BMU". iIntros "**".
+      iApply fupd_mask_mono; [apply SUB| ].
+      iMod ("BMU" with "[$]") as (?) "(? & % & ?)". iModIntro.
+      iExists _. iFrame. iSplitR.
+      { iPureIntro. lia. }
+      by iApply "IMPL".
+    Qed.
+
     Lemma BMU_wand E ζ b (P Q : iProp Σ):
       ⊢ (P -∗ Q) -∗ BMU E ζ b P -∗ BMU E ζ b Q.
     Proof using.
-      rewrite /BMU. iIntros "PQ BMU **".
-      iMod ("BMU" with "[$]") as "(%&?&?&?)". iModIntro. 
-      iExists _. iFrame. by iApply "PQ". 
+      iIntros "**". by iApply (BMU_weaken with "[$]"). 
     Qed.
 
     Lemma BMU_lower E ζ m n P (LE: m <= n):
       ⊢ BMU E ζ m P -∗ BMU E ζ n P.
     Proof using.
-      rewrite /BMU.
-      iIntros "BMU". iIntros "**". 
-      iMod ("BMU" with "[$]") as (?) "(? & % & ?)". iModIntro.
-      iExists _. iFrame. iPureIntro. lia.
+      clear -LE OM. 
+      iIntros "**". iApply (BMU_weaken); try done. set_solver. 
     Qed.
 
     Lemma BMU_AMU E ζ b (P : iProp Σ) π
