@@ -150,13 +150,16 @@ Section EoFin.
 
     Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS _ EM _ (↑ nroot)}.
 
+    Ltac MU_by_burn_cp :=
+      iApply OBLS_AMU; [by rewrite nclose_nroot| ];
+      iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH";
+      BMU_burn_cp. 
+
     Ltac pure_step :=
       iApply sswp_MU_wp; [done| ];
       iApply sswp_pure_step; [done| ]; simpl;
       iNext;
-      iApply OBLS_AMU; [by rewrite nclose_nroot| ];
-      iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH";
-      BMU_burn_cp
+      MU_by_burn_cp
     . 
 
     Ltac pure_step_cases := pure_step || (iApply wp_value; []) || wp_bind (RecV _ _ _ _)%V.
@@ -481,6 +484,76 @@ Section EoFin.
         iFrame "#∗".
         iExists _. iFrame. 
     Qed.
+
+    
+  (* "EB" : exc_lb EO_OP 20 *)
+  (* "IH" : thread_spec τ l B π Φ *)
+  (* --------------------------------------□ *)
+  (* "TH" : even_res (m + 1) *)
+  (* "OB" : obls EO_OP τ {[s]} *)
+  (* "POST" : ∀ x : base_lit, obls EO_OP τ ∅ -∗ Φ #x *)
+  (* "CPS1" : cp_mul EO_OP π d1 (B - (m + 2)) *)
+  (* "EP" : ep EO_OP s π d0 *)
+  (* "SN" : ith_sig (m + 1) s *)
+  (* _ : emp *)
+  (* --------------------------------------∗ *)
+  (* WP thread_prog #l @τ {{ v, WP v #(m + 1)%nat #B @τ {{ v0, Φ v0 }} }} *)
+    Lemma wait_iter τ l (n B: nat) π
+      (LT: n < B)
+      (BOUND: B < LIM):
+      {{{ eofin_inv l B BOUND ∗ 
+          cp_mul EO_OP π d0 20 (H3 := oGS) ∗ th_phase_ge EO_OP τ π (H3 := oGS) ∗
+          even_res n }}}
+        thread_prog #l #n #B @τ
+      {{{ v, RET v; ⌜ False ⌝ }}}.
+    Proof using.
+      iIntros (Φ). iLöb as "#IH".
+      iIntros "(#INV & CPS & PH & EV) POST". rewrite /thread_prog.
+
+      wp_bind (RecV _ _ _ _)%V. pure_steps.
+      wp_bind (_ ≤ _)%E. pure_steps.
+      rewrite bool_decide_false; [| lia]. pure_steps.
+      fold thread_prog.
+      wp_bind (_ + _)%E. pure_steps.
+
+      wp_bind (CmpXchg _ _ _)%E.
+      iApply wp_atomic. 
+      iInv "INV" as ">inv" "CLOS". iModIntro.
+      rewrite {1}/eofin_inv_inner.
+      iDestruct "inv" as (m smap) "(L & EVEN & ODD & SR)".
+      iDestruct (thread_agree with "EVEN [$]") as %<-.
+      destruct (even_or_odd m) as [EVEN | ODD].
+      - pose proof (Is_true_true_1 _ EVEN) as E. rewrite E.
+        iApply sswp_MU_wp; [done| ].
+        iApply (wp_cmpxchg_suc with "[$]"); try done.
+        { econstructor. done. }
+        iNext. iIntros "L".
+        MU_by_burn_cp. 
+        pure_steps.
+
+        (* TODO: formulate and prove thread_advance without recursion;
+           introduce a helper rule for recursive functions
+         *)
+        admit.
+      - pose proof (Is_true_true_1 _ ODD) as O.
+        rewrite O.
+        pose proof (Nat.negb_odd m) as E. rewrite O in E. simpl in E. rewrite -E. 
+
+        iApply sswp_MU_wp; [done| ]. 
+        iApply (wp_cmpxchg_fail with "[$]"); try done.
+        { intros [=]. lia. }
+        { econstructor. done. }
+        iNext. iIntros "L".
+        rewrite -E in LT. rewrite Nat.min_r; [| lia].
+ 
+      
+      
+      
+      (* iApply sswp_MU_wp; [done| ].  *)
+      (* iApply sswp_pure_step; [done| ]; simpl.  *)
+    Abort.       
+      
+    
 
 
     Lemma thread_spec_holds τ l B (BOUND: B < LIM) π Φ:
