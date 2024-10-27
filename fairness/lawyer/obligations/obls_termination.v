@@ -109,7 +109,7 @@ Section Termination.
     rewrite mset_map_singleton. simpl. 
     
     rewrite -gmultiset_disj_union_assoc. apply ms_le_disj_union; [apply _| ..].
-    { apply ms_le_refl. }
+    { reflexivity. }
     rewrite (union_difference_singleton_L _ _ EP).
     
     rewrite filter_union_L.
@@ -125,7 +125,7 @@ Section Termination.
     { apply ms_le_exp_mono; [lia | reflexivity]. }
     
     move SET_BOUND at bottom. specialize_full SET_BOUND; [by eauto| ].
-    eapply ms_le_Proper; [reflexivity| ..| apply ms_le_refl].
+    eapply ms_le_Proper; [reflexivity| ..| reflexivity].
     rewrite -gmultiset_scalar_mul_S_r. f_equiv. lia.
   Qed.
 
@@ -1201,7 +1201,7 @@ Section Termination.
     
     (* rewrite mset_map_disj_union. *)
     rewrite -gmultiset_disj_union_assoc. apply ms_le_disj_union; [apply _| ..].
-    { apply ms_le_refl. }
+    { reflexivity. }
     rewrite (union_difference_singleton_L _ _ EP).
     
     rewrite (union_comm_L {[ _ ]} _).
@@ -1213,7 +1213,7 @@ Section Termination.
     { apply ms_le_exp_mono; [lia | reflexivity]. }
     
     move SET_BOUND at bottom. specialize_full SET_BOUND; [by eauto| ].
-    eapply ms_le_Proper; [reflexivity| ..| apply ms_le_refl].
+    eapply ms_le_Proper; [reflexivity| ..| reflexivity].
     rewrite -gmultiset_scalar_mul_S_r. f_equiv. lia.
   Qed.
   

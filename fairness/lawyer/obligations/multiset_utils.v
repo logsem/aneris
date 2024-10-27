@@ -31,7 +31,11 @@ Section GmultisetUtils.
   
   Lemma gmultiset_split_exact (X Y: gmultiset A):
     X = (X ∖ Y) ⊎ (X ∩ Y). 
-  Proof using. mss. Qed. 
+  Proof using. mss. Qed.
+
+  Lemma gmultiset_disj_union_difference_split (X Y Z: gmultiset A):
+    (X ⊎ Y) ∖ Z = X ∖ (Z ∖ Y) ⊎ Y ∖ Z.
+  Proof using. mss. Show Proof. Qed. 
 
   Lemma gmultiset_split (X Y: gmultiset A):
     exists I X' Y', X = X' ⊎ I /\ Y = Y' ⊎ I /\ X' ## Y'.
@@ -163,64 +167,6 @@ Section MultisetOrder.
       eexists. repeat split; eauto. apply Rab.
   Qed.
 
-  Global Instance ms_le_PreOrder: PreOrder ms_le.
-  Proof using. Admitted.
-
-  Global Instance ms_le_AntiSymm: AntiSymm eq ms_le.
-  Proof using.
-    red. intros ?? LE1 LE2.
-    red in LE1, LE2. apply gmultiset_eq. intros a.
-    (* TODO: consider the maximal element with differing multiplicity *)
-    (* destruct (Nat.lt_trichotomy (multiplicity a x) (multiplicity a y)) as [?|[?|?]]; eauto. *)
-    (* - specialize (LE2 _ H0). *)
-  Admitted.
-
-  Lemma empty_ms_le X: ms_le ∅ X.
-  Proof using.
-    red. intros ?. rewrite multiplicity_empty. lia.
-  Qed.
-
-  Lemma ms_le_empty X: ms_le X ∅ <-> X = ∅. 
-  Proof using.
-    destruct (decide (X = ∅)) as [->| NEQ].
-    { done. }
-    split; [| done]. intros LE.
-    apply gmultiset_choose in NEQ as [x IN].
-    red in LE. setoid_rewrite multiplicity_empty in LE. 
-    specialize (LE x ltac:(by apply elem_of_multiplicity)).
-    destruct LE as (?&?&?). lia.
-  Qed. 
-
-  Lemma no_ms_lt_empty X: ¬ ms_lt X ∅. 
-  Proof using.
-    intros [LE NE]%strict_spec_alt. apply ms_le_empty in LE. done.
-  Qed. 
-
-  (* TODO: generalize, move *)
-  Lemma multiset_difference_empty (X: gmultiset A):
-    X ∖ ∅ = X. 
-  Proof using. clear R PO. mss. Qed. 
-
-  Lemma ms_le_sub X Y (SUB: X ⊆ Y):
-    ms_le X Y. 
-  Proof using.
-    clear PO. 
-    red. mss. 
-  Qed.
-
-  (* TODO: should be a part of PartialOrder proof *)
-  Lemma ms_le_refl X:
-    ms_le X X.
-  Proof using.
-  Admitted. 
-    
-
-  Lemma ms_le_diff X Y:
-    ms_le (X ∖ Y) X.
-  Proof using.
-    red. intros ?. rewrite multiplicity_difference. lia.
-  Qed.
-
   Lemma ms_le_equiv'    
     X Y:
     ms_le X Y <-> ms_le_dm X Y.
@@ -292,6 +238,80 @@ Section MultisetOrder.
       apply not_elem_of_multiplicity. intros ?%DISJ; eauto.
   Qed. 
 
+  Global Instance ms_le_PreOrder: PreOrder ms_le.
+  Proof using.
+    split.
+    - red. intros g. apply ms_le_equiv. tauto.
+    - red. intros M N P. 
+
+      rewrite !ms_le_equiv'.
+      rewrite /ms_le_dm. intros (X&Y&SUB1&->&DOM1) (U&V&SUB2&->&DOM2).
+      apply gmultiset_disj_union_difference in SUB2.
+      remember (P ∖ U) as W. subst P. clear HeqW.
+      (* do 2 eexists. repeat split. *)
+      (* + admit. *)
+      (* + rewrite (gmultiset_disj_union_comm W). *)
+      (*   rewrite gmultiset_disj_union_difference_split. *)
+      (*   rewrite gmultiset_disj_union_difference_split.  *)
+        
+  Admitted.
+
+  Global Instance ms_le_AntiSymm: AntiSymm eq ms_le.
+  Proof using.
+    red. intros ??.
+
+    rewrite !ms_le_equiv'. rewrite /ms_le_dm. 
+    intros (X&Y&SUB1&->&DOM1) (U&V&SUB2&->&DOM2). 
+    apply gmultiset_disj_union_difference in SUB1.
+    remember (y ∖ X) as K. clear HeqK. clear SUB1 y.
+    apply gmultiset_disj_union_difference in SUB2.
+    remember (K ⊎ Y) as T. clear SUB2.
+    
+    (* TODO: consider the maximal element with differing multiplicity *)
+    (* destruct (Nat.lt_trichotomy (multiplicity a x) (multiplicity a y)) as [?|[?|?]]; eauto. *)
+    (* - specialize (LE2 _ H0). *)
+  Admitted.
+
+  Lemma empty_ms_le X: ms_le ∅ X.
+  Proof using.
+    red. intros ?. rewrite multiplicity_empty. lia.
+  Qed.
+
+  Lemma ms_le_empty X: ms_le X ∅ <-> X = ∅. 
+  Proof using.
+    destruct (decide (X = ∅)) as [->| NEQ].
+    { done. }
+    split; [| done]. intros LE.
+    apply gmultiset_choose in NEQ as [x IN].
+    red in LE. setoid_rewrite multiplicity_empty in LE. 
+    specialize (LE x ltac:(by apply elem_of_multiplicity)).
+    destruct LE as (?&?&?). lia.
+  Qed. 
+
+  Lemma no_ms_lt_empty X: ¬ ms_lt X ∅. 
+  Proof using.
+    intros [LE NE]%strict_spec_alt. apply ms_le_empty in LE. done.
+  Qed. 
+
+  (* TODO: generalize, move *)
+  Lemma multiset_difference_empty (X: gmultiset A):
+    X ∖ ∅ = X. 
+  Proof using. clear R PO. mss. Qed. 
+
+  Lemma ms_le_sub X Y (SUB: X ⊆ Y):
+    ms_le X Y. 
+  Proof using.
+    clear PO. 
+    red. mss. 
+  Qed.
+
+  Lemma ms_le_diff X Y:
+    ms_le (X ∖ Y) X.
+  Proof using.
+    red. intros ?. rewrite multiplicity_difference. lia.
+  Qed.
+
+
   Lemma ms_le_disj_union X1 Y1 X2 Y2
     (LE1: ms_le X1 Y1) (LE2: ms_le X2 Y2):
     ms_le (X1 ⊎ X2) (Y1 ⊎ Y2).
@@ -345,7 +365,7 @@ Section MultisetOrder.
     remember (X ∖ {[+ u +]}) as V.
     rewrite gmultiset_disj_union_comm in INu. 
     rewrite INu. clear INu HeqV X.
-    eapply ms_le_disj_union; [apply ms_le_refl| ..].
+    eapply ms_le_disj_union; [reflexivity| ..].
     red. intros ?. rewrite multiplicity_scalar_mul !multiplicity_singleton'.
     destruct (decide (a = v)) as [->|?]; [| lia].
     intros. eexists. split; [apply LTuv| ].
