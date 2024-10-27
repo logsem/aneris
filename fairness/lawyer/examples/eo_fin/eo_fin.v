@@ -195,11 +195,10 @@ Section EoFin.
     Definition ith_sig (i: nat) (s: SignalId): iProp Σ :=
       own eofin_smap (◯ {[ i := to_agree s ]}). 
 
-    Definition ith_sig_in i s (smap: gmap nat SignalId):
-      ⊢ ith_sig i s -∗ own eofin_smap (● (to_agree <$> smap: gmapUR nat (agreeR SignalId))) -∗ 
-         ⌜ smap !! i = Some s ⌝.
+    Definition ith_sig_in i s K n (smap: gmap nat SignalId):
+      ⊢ ith_sig i s -∗ smap_repr K n smap -∗ ⌜ smap !! i = Some s ⌝.
     Proof.
-      iIntros "S SM". iCombine "SM S" as "SM".
+      iIntros "S (SM & ? & ?)". iCombine "SM S" as "SM".
       iDestruct (own_valid with "SM") as %V.
       apply auth_both_valid_discrete in V as [V ?].
       apply singleton_included_l in V. destruct V as (x & ITH & LE).
@@ -218,32 +217,55 @@ Section EoFin.
       rewrite H1. apply to_agree_inj in H2. by rewrite H2.
     Qed.
 
+    Definition ith_sig_sgn i s K n (smap: gmap nat SignalId):
+      ⊢ ith_sig i s -∗ smap_repr K n smap -∗ ∃ l, sgn _ s l None (H3 := oGS) ∗ ⌜ lvl2nat l = i ⌝. 
+    Proof.
+      iIntros "S SR".
+      iDestruct (ith_sig_in with "[$] [$]") as "%ITH". 
+      iDestruct "SR" as "(SM & % & ?)".
+      iDestruct (big_sepM_lookup with "[$]") as "ITH"; eauto.
+      rewrite /ex_ith_sig. iDestruct "ITH" as "(%l & SG & %LVL)".
+      iExists _. iSplitL; [| done].
+      by iDestruct (sgn_get_ex with "[$]") as "[??]". 
+    Qed.
+
     (* TODO: move *)
     Global Instance BMU_proper:
       Proper (equiv ==> eq ==> eq ==> equiv ==> equiv) (BMU EO_OP (oGS := oGS)).
     Proof using. solve_proper. Qed. 
 
-    Lemma smap_create_ep i K n s smap π τ:
-      ⊢ ith_sig i s -∗ 
-         smap_repr K n smap -∗ 
+    Lemma smap_create_ep i K n smap π τ
+      (LT: i < K):
+      ⊢ smap_repr K n smap -∗ 
          cp EO_OP π d1 (H3 := oGS) -∗
          th_phase_ge EO_OP τ π (H3 := oGS) -∗
          BMU EO_OP ∅ τ 1 
-           (ep EO_OP s π d0 (H3 := oGS) ∗ smap_repr K n smap ∗
-            th_phase_ge EO_OP τ π (H3 := oGS) ∗ ith_sig i s) (oGS := oGS).
+           (∃ s, ith_sig i s ∗
+             ep EO_OP s π d0 (H3 := oGS) ∗ smap_repr K n smap ∗
+            th_phase_ge EO_OP τ π (H3 := oGS)) (oGS := oGS).
     Proof using.
-      iIntros "ITH SR CP PH".
+      iIntros "SR CP PH".
       rewrite /smap_repr. iDestruct "SR" as "(AUTH & %DOM & SIGS)".
-      iDestruct (ith_sig_in with "[$] [$]") as "%ITH".
-      rewrite {2 5}(map_split smap i) ITH. simpl. rewrite big_sepM_union.
-      2: { apply map_disjoint_singleton_l_2. apply lookup_delete. }
-      iDestruct "SIGS" as "[SIG SIGS]". rewrite big_sepM_singleton.
+      (* iDestruct (ith_sig_in with "[$] [$]") as "%ITH". *)
+      assert (i ∈ dom smap) as [s ITH]%elem_of_dom.
+      { rewrite DOM. apply elem_of_set_seq. lia. } 
+      rewrite {2 5}(map_split smap i) ITH /=.
+      setoid_rewrite big_sepM_union.
+      2, 3: apply map_disjoint_singleton_l_2; by apply lookup_delete.
+      iDestruct "SIGS" as "[SIG SIGS]". setoid_rewrite big_sepM_singleton.
       rewrite {1}/ex_ith_sig. iDestruct "SIG" as "(%l & SIG & %LVLi)".
       iApply OU_BMU.
-      iDestruct (create_ep_upd with "[$] [$] [$]") as "OU"; [apply d01_lt| ].
+      iDestruct (create_ep_upd with "[$] [$] [$]") as "OU"; [apply d01_lt| ].      
       iApply (OU_wand with "[-OU]"); [| by iFrame].
       iIntros "(EP & SIG & PH)".
-      iApply BMU_intro. iFrame. iSplitR; [done| ].
+      iMod (own_update with "AUTH") as "X". 
+      { apply auth_update_dfrac_alloc. 
+        2: { apply singleton_included_l with (i := i).
+             rewrite lookup_fmap ITH. eexists. split; [| reflexivity].
+             simpl. reflexivity. }
+        apply _. }
+      iApply BMU_intro. iDestruct "X" as "[? ITH]". 
+      iExists _. iFrame. iSplitR; [done| ].
       iExists _. by iFrame.
     Qed.
 
@@ -405,8 +427,8 @@ Section EoFin.
       { econstructor. done. }
       iNext. iIntros "L".
       
-      iDestruct "SR" as "(SM & %DOM & SIGS)". 
-      iDestruct (ith_sig_in with "[$] [$]") as %IN. 
+      iDestruct (ith_sig_in with "[$] [$]") as %IN.
+      iDestruct "SR" as "(SM & %DOM & SIGS)".
       iDestruct (big_sepM_delete with "SIGS") as "[SG SIGS]"; eauto.
       iDestruct "SG" as (lm) "(SG & %LVL)".
       rewrite Nat.ltb_irrefl. 
@@ -627,9 +649,11 @@ Section EoFin.
         { destruct (Nat.even m); lia. }
         rewrite LE.
         iDestruct (cp_mul_take with "CPS1") as "[CPS1 CP1]".
-        iPoseProof (smap_create_ep with "[$] [$] [$] [$]") as "BMU"; eauto.
+        iPoseProof (smap_create_ep m with "[$] [$] [$]") as "BMU"; eauto.
+        { lia. }
         iApply (BMU_weaken with "[-BMU] [$]"); [lia| set_solver| ].
-        iIntros "(EP & SR & PH & SN)". 
+        iIntros "(%sw & SW & EP & SR & PH)".
+        iDestruct (ith_sig_sgn with "[$] [$]") as "(%lw & #SGW & %LVLw)". 
 
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
         iSplitR "CP".
