@@ -273,10 +273,61 @@ Section trace_proof.
     destruct b.
     - iDestruct (own_trans γ T' (trans ++ [Cm s true]) with "[$Hinv]") as ">(Hinv & Hsub)".
       iModIntro.
-      (* iFrame.
+      iSplitR "Hsub"; last (iIntros; iFrame).
       iExists (T' ++ [trans ++ [Cm s true]]).
-      iSplit; *)
-      admit.
+      iSplit.
+      + iPureIntro.
+        rewrite com_trans_eq4 in Hin_in; last done.
+        intros t.
+        split; intros Hin.
+        * rewrite elem_of_app in Hin.
+          destruct Hin as [Hin|Hin].
+          -- apply com_trans_imp1.
+             set_solver.
+          -- rewrite /comTrans.
+             rewrite List.filter_app.
+             simpl.
+             rewrite last_snoc elem_of_app.
+             set_solver.
+        * rewrite /comTrans in Hin.
+          rewrite List.filter_app in Hin.
+          rewrite elem_of_app in Hin.
+          destruct Hin as [Hin|Hin].
+          -- rewrite elem_of_app; left.
+             apply Hin_in.
+             rewrite /comTrans List.filter_app; set_solver.
+          -- simpl in Hin.
+             rewrite last_snoc in Hin.
+             rewrite elem_of_cons in Hin.
+             destruct Hin as [Hin|Hin]; first set_solver.
+             rewrite elem_of_app; left.
+             apply Hin_in.
+             rewrite /comTrans List.filter_app; set_solver.
+      + iSplit; first iFrame.
+        iPureIntro.
+        rewrite com_trans_eq4 in Hinv_pure; last done.
+        intros trans' s' k v Hin Hrd_in Hnot.
+        rewrite elem_of_app in Hin.
+        destruct Hin as [Hin|Hin].
+        * destruct (Hinv_pure trans' s' k v) as (trans'' & Htrans'_in & Hlatest); 
+            try done; first set_solver.
+          exists trans''.
+          split; last done.
+          by apply com_trans_imp1.
+        * rewrite elem_of_cons in Hin.
+          destruct Hin as [Hin|Hin].
+          -- subst.
+             rewrite com_trans_eq4 in Hreads; last done.
+             destruct (Hreads s' k v) as (trans'' & Htrans'_in & Hlatest).
+             1, 2 : set_solver.
+             exists trans''.
+             split; last done.
+             by apply com_trans_imp1.
+          -- destruct (Hinv_pure trans' s' k v) as (trans'' & Htrans'_in & Hlatest); 
+              try done; first set_solver.
+             exists trans''.
+             split; last done.
+             by apply com_trans_imp1.
     - iModIntro.
       iSplit; last by iIntros (Hfalse).
       iExists T'.
@@ -295,20 +346,11 @@ Section trace_proof.
         iPureIntro.
         intros trans' s' k v Hin Hrd_in Hnot.
         rewrite elem_of_app in Hin.
-        destruct Hin as [Hin|Hin].
-        * assert (trans' ∈ T1 ++ trans :: T2) as Hin'; first set_solver.
-          specialize (Hinv_pure trans' s' k v Hin' Hrd_in Hnot).
-          destruct Hinv_pure as (trans'' & Htrans'_in & Hlatest).
-          exists trans''.
-          split; last done.
-          rewrite /comTrans List.filter_app.
-          rewrite /comTrans in Htrans'_in.
-          set_solver.
-        * rewrite elem_of_cons in Hin.
-          destruct Hin as [Hin|Hin].
-          -- admit.
-          -- admit.
-  Admitted.
+        rewrite -com_trans_eq3; last done.
+        destruct Hin as [Hin|Hin]; first set_solver.
+        rewrite elem_of_cons in Hin.
+        destruct Hin as [Hin|Hin]; set_solver.
+  Qed.
 
   Lemma inv_ext_rc_cm_imp2 γ T s b :
     GlobalInvExtRC γ T ==∗
@@ -1039,7 +1081,7 @@ Section trace_proof.
       (∃ trans', trans' ∈ T' ∧ com_true trans' ∧ latest_write_trans k v trans')⌝%I) 
       as "%Hread_res_3".
     {
-      iDestruct "Htrans_res'" as "(Htrans_res' & _)".
+      iDestruct "Htrans_res'" as "(%Tinv & %Hcom_imp & Htrans_res' & %Hread_res)".
       iAssert (∀ v, ⌜v ∈ V⌝ → ∃ trans, ⌜trans ∈ T'⌝ ∗ 
         ⌜latest_write_trans k v trans⌝ ∗⌜com_true trans⌝)%I 
         with "[Htrans_res']" as "%Hkey_trans'".
@@ -1050,9 +1092,8 @@ Section trace_proof.
         iFrame "#".
         iDestruct (own_trans_in with "[$Htrans_res' $Htrans_sub]") as "(_ & _ & %Hin_com)".
         iPureIntro.
-        rewrite /comTrans elem_of_list_In filter_In in Hin_com.
-        rewrite elem_of_list_In.
-        set_solver.
+        assert (trans' ∈ comTrans T') as Hin_trans'; first set_solver.
+        by apply com_trans_imp2.
       }
       iPureIntro.
       intros v ->.
@@ -2303,9 +2344,11 @@ Section trace_proof.
       iExists [].
       iSplitL "Htrans Htrans_sub".
       {
-        iSplit; last iPureIntro; last set_solver.
+        iExists [].
         rewrite /OwnTrans.
         iFrame.
+        simpl.
+        iPureIntro; set_solver.
       }
       iExists [], [], [([], ∅)].
       iFrame.

@@ -2061,6 +2061,63 @@ Proof.
   destruct op; last set_solver; simpl; by rewrite app_nil_r.
 Qed. 
 
+Lemma com_trans_eq3 T1 T2 trans s:
+  (∃ op, op ∈ trans ∧ last trans = Some op ∧ isCmOp op = false) →
+  comTrans (T1 ++ trans :: T2) = comTrans (T1 ++ (trans ++ [Cm s false]) :: T2).
+Proof.
+  intros Hop.
+  rewrite /comTrans.
+  do 2 rewrite List.filter_app.
+  simpl.
+  rewrite last_snoc.
+  destruct Hop as (op' & _ & Heq & Hcm_op).
+  rewrite Heq.
+  rewrite /isCmOp in Hcm_op.
+  destruct op'; set_solver.
+Qed.
+
+Lemma com_trans_eq4 T1 T2 trans :
+  (∃ op, op ∈ trans ∧ last trans = Some op ∧ isCmOp op = false) →
+  comTrans (T1 ++ trans :: T2) = comTrans (T1 ++ T2).
+Proof.
+  intros Hop.
+  rewrite /comTrans.
+  do 2 rewrite List.filter_app.
+  simpl.
+  destruct Hop as (op' & _ & Heq & Hcm_op).
+  rewrite Heq.
+  rewrite /isCmOp in Hcm_op.
+  destruct op'; set_solver.
+Qed.
+
+Lemma com_trans_imp1 T1 T2 trans t:
+  t ∈ comTrans (T1 ++ T2) →
+  t ∈ comTrans (T1 ++ trans :: T2).
+Proof.
+  rewrite /comTrans.
+  do 2 rewrite List.filter_app.
+  do 2 rewrite elem_of_app.
+  intros Hin.
+  simpl.
+  destruct Hin as [Hin|Hin]; first set_solver.
+  right.
+  destruct (last trans) as [op|]; last set_solver.
+  destruct op; try done.
+  destruct b; set_solver.
+Qed.
+
+Lemma com_trans_imp2 t T :
+  t ∈ comTrans T →
+  t ∈ T.
+Proof.
+  induction T as [|h tail IH]; first (simpl; set_solver).
+  simpl.
+  destruct (last h) as [op|]; last set_solver.
+  destruct op.
+  1, 2 : set_solver.
+  destruct b; set_solver.
+Qed.
+
 Lemma based_on_add1 op exec T1 T2 trans :
   ¬is_cm_op op →
   (∃ op, op ∈ trans ∧ last trans = Some op ∧ isCmOp op = false) →
