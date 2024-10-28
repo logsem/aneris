@@ -490,15 +490,64 @@ Section ObligationsRepr.
       rewrite gmultiset_difference_diag. set_solver.
     Qed. 
       
-    Lemma expect_sig_upd ζ sid π d l R
+    (* Lemma expect_sig_upd ζ sid π d l R *)
+    (*   : *)
+    (*   ⊢ ep sid π d -∗ sgn sid l (Some false) -∗ obls ζ R -∗ *)
+    (*     sgns_level_gt R l -∗ th_phase_ge ζ π -∗ *)
+    (*     OU ζ (cp π d ∗ sgn sid l (Some false) ∗ obls ζ R ∗ th_phase_ge ζ π). *)
+    (* Proof using H1 H0. *)
+    (*   rewrite /OU /OU'. iIntros "#EP SIG OBLS #SIGS_LT PH %δ MSI". *)
+    (*   iDestruct (sigs_msi_exact with "[$] [$]") as %Sζ. *)
+    (*   iDestruct (th_phase_msi_ge with "[$] [$]") as %(? & ? & ?). *)
+    (*   iDestruct (ep_msi_in with "[$] [$]") as %EP.  *)
+    (*   iDestruct (obls_sgn_lt_locale_obls with "[$] [$] [$]") as %LT.  *)
+
+    (*   rewrite {1}/obls_msi. iDestruct "MSI" as "(CPS&?&?&?&?&?)". *)
+    (*   destruct δ. simpl in *. *)
+    (*   iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _ _).  *)
+    (*   iRevert "CPS". iFrame. simpl. iIntros "CPS". *)
+
+    (*   rewrite /cp /cps_repr /eps_repr.  *)
+    (*   rewrite bi.sep_comm -bi.sep_assoc. *)
+    (*   iSplitR. *)
+    (*   { iPureIntro. *)
+    (*     red. do 5 right. do 3 eexists.  *)
+    (*     erewrite (f_equal (expects_ep _ _ _)). *)
+    (*     { econstructor; eauto. } *)
+    (*     simpl. reflexivity. } *)
+
+    (*   rewrite bi.sep_comm. *)
+    (*   rewrite -own_op.  *)
+    (*   iApply own_update; [| by iFrame]. *)
+    (*   apply auth_update_alloc. *)
+    (*   eapply local_update_proper. *)
+    (*   1: reflexivity. *)
+    (*   2: eapply gmultiset_local_update_alloc. *)
+    (*   f_equiv. rewrite gmultiset_disj_union_left_id. set_solver. *)
+    (* Qed. *)
+
+    Lemma th_phase_msi_align δ ζ π:
+      ⊢ obls_msi δ -∗ th_phase_ge ζ π -∗
+        obls_msi δ ∗ th_phase_ge ζ (default π (ps_phases OP δ !! ζ)). 
+    Proof using.
+      iIntros "? ?". 
+      iDestruct (th_phase_msi_ge_strong with "[$] [$]") as "[? L]".
+      iDestruct "L" as (?) "[? [%F ?]]".
+      rewrite F. simpl. iFrame.
+      rewrite /th_phase_ge. iExists _. iFrame. done.      
+    Qed.
+
+    Lemma expect_sig_upd ζ sid π π__e d l R
+      (PH_EXP: phase_le π__e π)
       :
-      ⊢ ep sid π d -∗ sgn sid l (Some false) -∗ obls ζ R -∗
+      ⊢ ep sid π__e d -∗ sgn sid l (Some false) -∗ obls ζ R -∗
         sgns_level_gt R l -∗ th_phase_ge ζ π -∗
-        OU ζ (∃ π', cp π' d ∗ sgn sid l (Some false) ∗ obls ζ R ∗ th_phase_ge ζ π ∗ ⌜ phase_le π π' ⌝).
+        OU ζ (∃ π', cp π' d ∗ sgn sid l (Some false) ∗ obls ζ R ∗ th_phase_ge ζ π' ∗ ⌜ phase_le π π' /\ phase_le π__e π'⌝).
     Proof using H1 H0.
       rewrite /OU /OU'. iIntros "#EP SIG OBLS #SIGS_LT PH %δ MSI".
       iDestruct (sigs_msi_exact with "[$] [$]") as %Sζ.
       iDestruct (th_phase_msi_ge with "[$] [$]") as %(? & ? & ?).
+      iDestruct (th_phase_msi_align with "[$] [$]") as "[MSI PH]". rewrite H4. simpl.
       iDestruct (ep_msi_in with "[$] [$]") as %EP. 
       iDestruct (obls_sgn_lt_locale_obls with "[$] [$] [$]") as %LT. 
 
@@ -513,11 +562,16 @@ Section ObligationsRepr.
       { iPureIntro.
         red. do 5 right. do 3 eexists. 
         erewrite (f_equal (expects_ep _ _ _)).
-        { econstructor; eauto. }
-        simpl. reflexivity. }
+        { econstructor.
+          { apply H4. }
+          { etrans; [apply PH_EXP | apply H5]. }
+          all: eauto. }
+        done. }
 
       rewrite bi.sep_comm.
-      iApply bi.sep_exist_l. iExists x. rewrite bi.sep_assoc. iSplitL; [| done].
+      iApply bi.sep_exist_l. iExists x. rewrite bi.sep_assoc. iSplitL "CPS". 
+      2: { iFrame. iPureIntro. split; try done.
+           etrans; eauto. } 
       rewrite -own_op. 
       iApply own_update; [| by iFrame].
       apply auth_update_alloc.
