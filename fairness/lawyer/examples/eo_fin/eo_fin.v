@@ -7,29 +7,13 @@ From trillium.fairness Require Import locales_helpers utils.
 From trillium.fairness.lawyer Require Import program_logic sub_action_em.
 From trillium.fairness.lawyer.obligations Require Import obligations_model obls_utils obligations_resources obligations_logic obligations_em.
 From trillium.fairness.heap_lang Require Export heap_lang_defs tactics notation sswp_logic locales_helpers_hl.
+From trillium.fairness.lawyer.examples Require Import bounded_nat.
 
 
 Close Scope Z.
 
-(* Definition EODegree n := Fin.t (S n). *)
-(* Definition EOLevel n := Fin.t (S n). *)
-Definition EODegree n := { i | i < n }. 
-Definition EOLevel n := { i | i < n }.
-
-
-Definition bounded_nat_le n (x y: { i | i < n }) := `x <= `y. 
-
-(* TODO: move? *)
-Instance nat_bounded_PO n: PartialOrder (bounded_nat_le n).
-Proof using.
-  split.
-  - split.
-    + red. intros. red. reflexivity.
-    + red. intros [??] [??] [??]. rewrite /bounded_nat_le. simpl. lia.
-  - red. intros [??] [??]. rewrite /bounded_nat_le. simpl.
-    intros. assert (x = x0) by lia. subst.
-    assert (l0 = l) by apply Nat.lt_pi. congruence.
-Qed. 
+Definition EODegree n := bounded_nat n. 
+Definition EOLevel n := bounded_nat n.
 
 
 Section EoFin.
@@ -46,8 +30,8 @@ Section EoFin.
 
   Let OM := ObligationsModel EO_OP.
 
-  Let EOLevelOfe := sigO (fun i => i < LIM).
-  Let EODegreeOfe := sigO (fun i => i < NUM_DEG).
+  Let EOLevelOfe := BNOfe LIM. 
+  Let EODegreeOfe := BNOfe NUM_DEG. 
 
   Instance EO_lvl_LeibnizEquiv: LeibnizEquiv EOLevelOfe.
   Admitted. 
@@ -121,35 +105,11 @@ Section EoFin.
       apply excl_auth_update.
     Qed.
 
-    Definition lvl2nat {X} (l: EOLevel X): nat := proj1_sig l. 
+    Definition lvl2nat {X} (l: EOLevel X) := bn2nat _ l. 
 
-    (* Definition nth_lvl (n: nat) {M: nat} (BOUND: M < LIM) (LE: n <= M): EOLevel LIM := *)
-    (*   exist _ n (Nat.le_lt_trans _ _ _ LE BOUND). *)
-
-    (* Definition nth_lvl' (n: nat) {M: nat} (BOUND: M < LIM) (LE: n < M): EOLevel LIM := *)
-    (*   (* exist _ n (Nat.lt_trans _ _ _ LE BOUND). *) *)
-    (*   nth_lvl n BOUND (Nat.lt_le_incl _ _ LE).  *)
-
-    Definition nth_deg (n: nat) (LT: n < NUM_DEG): EODegree NUM_DEG :=
-      exist _ n LT. 
-
-    Definition d0 := nth_deg 0 (Nat.lt_0_succ _). 
-    Definition d1 := nth_deg 1 (proj1 (Nat.succ_lt_mono _ _) (Nat.lt_0_succ _)).
-
-    (* Lemma lt_2_ND: 2 < NUM_DEG. Proof using. lia. Qed.  *)
-    Definition d2 := nth_deg 2 ltac:(lia). 
-
-    Lemma d01_lt: deg_lt _ d0 d1.
-    Proof.
-      red. apply strict_spec_alt. split; try done.
-      unfold d0, d1. simpl. red. simpl. lia. 
-    Qed.
-
-    Lemma d12_lt: deg_lt _ d1 d2.
-    Proof.
-      red. apply strict_spec_alt. split; try done.
-      unfold d1, d2. simpl. red. simpl. lia. 
-    Qed.
+    Definition d0 := ith_bn NUM_DEG 0 ltac:(lia).
+    Definition d1 := ith_bn NUM_DEG 1 ltac:(lia). 
+    Definition d2 := ith_bn NUM_DEG 2 ltac:(lia). 
 
     Ltac BMU_burn_cp :=
       iApply BMU_intro;
@@ -278,7 +238,8 @@ Section EoFin.
       iDestruct "SIGS" as "[SIG SIGS]". setoid_rewrite big_sepM_singleton.
       rewrite {1}/ex_ith_sig. iDestruct "SIG" as "(%l & SIG & %LVLi)".
       iApply OU_BMU.
-      iDestruct (create_ep_upd with "[$] [$] [$]") as "OU"; [apply d12_lt| ].
+      iDestruct (create_ep_upd with "[$] [$] [$]") as "OU".
+      { apply (ith_bn_lt _ 1). lia. }
       iApply (OU_wand with "[-OU]"); [| by iFrame].
       iIntros "(EP & SIG & PH)".
       iMod (own_update with "AUTH") as "X". 
@@ -321,7 +282,7 @@ Section EoFin.
         - rewrite (proj2 (PeanoNat.Nat.ltb_ge _ _)); [done | ].
           apply PeanoNat.Nat.ltb_ge in LT. lia. }
       destruct H2; [| done]. rewrite H2. done.
-    Qed.       
+    Qed.
 
     Lemma BMU_smap_restore
   (τ : locale heap_lang)
@@ -585,7 +546,7 @@ Section EoFin.
       iApply OU_BMU.
       iDestruct (exchange_cp_upd with "CP1 [$] [$]") as "OU".
       { reflexivity. }
-      { apply d01_lt. }
+      { apply (ith_bn_lt _ 0). lia. } 
       iApply (OU_wand with "[-OU]"); [| by iFrame]. iIntros "[CPS PH]". 
       BMU_burn_cp.
       pure_steps. 
@@ -658,6 +619,11 @@ Section EoFin.
         iFrame "#∗". iExists _. iSplit; [| iApply "OBLS_LT"].
     Admitted.
 
+    Lemma d12_lt: strict (bounded_nat_le _) d1 d2.
+    Proof using. apply ith_bn_lt. lia. Qed. 
+    Lemma d01_lt: strict (bounded_nat_le _) d0 d1.
+    Proof using. apply ith_bn_lt. lia. Qed. 
+
     Lemma thread_spec_holds τ l B (BOUND: B < LIM) π Φ:
       eofin_inv l B BOUND -∗ exc_lb EO_OP 20 (H3 := oGS) -∗
       □ thread_spec τ l B π Φ. 
@@ -678,7 +644,7 @@ Section EoFin.
       iApply OU_BMU.
       iDestruct (exchange_cp_upd with "[$] [$] [$]") as "OU".
       { reflexivity. }
-      { apply d12_lt. }
+      { etrans; [apply d01_lt| apply d12_lt]. }
       iApply (OU_wand with "[-OU]"); [| by iFrame]. iIntros "[CPS PH]". 
       BMU_burn_cp. 
       
