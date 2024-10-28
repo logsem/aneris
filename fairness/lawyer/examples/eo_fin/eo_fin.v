@@ -1,7 +1,5 @@
 From iris.proofmode Require Import tactics coq_tactics.
 From iris.algebra Require Import auth gmap gset excl excl_auth.
-(* From iris.base_logic Require Export gen_heap. *)
-(* From trillium.program_logic Require Export weakestpre adequacy ectx_lifting. *)
 From iris.base_logic.lib Require Import invariants.
 From trillium.fairness Require Import locales_helpers utils.
 From trillium.fairness.lawyer Require Import program_logic sub_action_em.
@@ -36,14 +34,9 @@ Section EoFin.
   Instance EO_lvl_LeibnizEquiv: LeibnizEquiv EOLevelOfe.
   Admitted. 
 
-  (* Definition EO_EM := @ObligationsEM EODegreeOfe EOLevelOfe _ _ _ heap_lang _ _ _ EO_OP.  *)
-  (* Context `{hGS: @heapGS Σ _ EO_EM}. *)
-  (* Let oGS : ObligationsGS EO_OP Σ := heap_fairnessGS (heapGS := hGS). *)
-
   Context `{EM: ExecutionModel heap_lang M}. 
   Context `{hGS: @heapGS Σ _ EM}.
 
-  (* Let OAM := ObligationsAM OP.  *)
   Let ASEM := ObligationsASEM EO_OP.
   Context {oGS: @asem_GS _ _ ASEM Σ}. 
   
@@ -65,9 +58,6 @@ Section EoFin.
 
   Class EoFinPreG Σ := {
       eofin_threads_PreG :> inG Σ (excl_authR natO);
-      (* (* TODO: abstract over signal id type? *) *)
-      (* eofin_sigs :> inG Σ (excl_authR natO); *)
-      (* eofin_toks :> inG Σ (exclR unitO); *)
       eofin_sigs :> inG Σ (authUR (gmapUR nat (agreeR SignalId)));
   }.
   
@@ -80,15 +70,13 @@ Section EoFin.
   Section Threads.
     Context `{EoFinG Σ}.
     
-    Definition thread_auth γ (n: nat): iProp Σ :=
-      own γ (●E n).
+    Definition thread_auth γ (n: nat): iProp Σ := own γ (●E n).
 
-    Definition thread_frag γ (n: nat): iProp Σ :=
-      own γ (◯E n).
+    Definition thread_frag γ (n: nat): iProp Σ := own γ (◯E n).
 
     Lemma thread_agree γ n1 n2:
       thread_auth γ n1-∗ thread_frag γ n2 -∗ ⌜ n1 = n2 ⌝. 
-    Proof.
+    Proof using.
       rewrite /thread_frag /thread_auth.
       iIntros "HA HB". iCombine "HB HA" as "H".      
       iDestruct (own_valid with "H") as "%Hval".
@@ -98,7 +86,7 @@ Section EoFin.
     Lemma thread_update γ n1 n2 n':
       thread_auth γ n1 -∗ thread_frag γ n2 ==∗
       thread_auth γ n' ∗ thread_frag γ n'. 
-    Proof.
+    Proof using.
       rewrite /thread_frag /thread_auth.
       iIntros "HA HB". iCombine "HB HA" as "H".
       rewrite -!own_op. iApply own_update; [| by iFrame].
@@ -110,6 +98,10 @@ Section EoFin.
     Definition d0 := ith_bn NUM_DEG 0 ltac:(lia).
     Definition d1 := ith_bn NUM_DEG 1 ltac:(lia). 
     Definition d2 := ith_bn NUM_DEG 2 ltac:(lia). 
+    Lemma d12_lt: strict (bounded_nat_le _) d1 d2.
+    Proof using. apply ith_bn_lt. lia. Qed. 
+    Lemma d01_lt: strict (bounded_nat_le _) d0 d1.
+    Proof using. apply ith_bn_lt. lia. Qed.
 
     Ltac BMU_burn_cp :=
       iApply BMU_intro;
@@ -145,10 +137,8 @@ Section EoFin.
     Definition eofin_inv_inner l M (BOUND: M < LIM) : iProp Σ :=
       ∃ (n: nat) (smap: gmap nat SignalId), 
           l ↦ #n ∗
-          thread_auth eofin_even
-            (if Nat.even n then n else n + 1) ∗
-          thread_auth eofin_odd
-            (if Nat.odd n then n else n + 1) ∗
+          thread_auth eofin_even (if Nat.even n then n else n + 1) ∗
+          thread_auth eofin_odd (if Nat.odd n then n else n + 1) ∗
           smap_repr (min M (n + 2)) n smap
     .
 
@@ -212,11 +202,6 @@ Section EoFin.
       iFrame. iIntros. iFrame. done.
     Qed.  
 
-    (* TODO: move *)
-    Global Instance BMU_proper:
-      Proper (equiv ==> eq ==> eq ==> equiv ==> equiv) (BMU EO_OP (oGS := oGS)).
-    Proof using. solve_proper. Qed. 
-
     Lemma smap_create_ep i K n smap π τ
       (LT: i < K):
       ⊢ smap_repr K n smap -∗ 
@@ -229,9 +214,8 @@ Section EoFin.
     Proof using.
       iIntros "SR CP PH".
       rewrite /smap_repr. iDestruct "SR" as "(AUTH & %DOM & SIGS)".
-      (* iDestruct (ith_sig_in with "[$] [$]") as "%ITH". *)
       assert (i ∈ dom smap) as [s ITH]%elem_of_dom.
-      { rewrite DOM. apply elem_of_set_seq. lia. } 
+      { rewrite DOM. apply elem_of_set_seq. lia. }
       rewrite {2 5}(map_split smap i) ITH /=.
       setoid_rewrite big_sepM_union.
       2, 3: apply map_disjoint_singleton_l_2; by apply lookup_delete.
@@ -284,17 +268,11 @@ Section EoFin.
       destruct H2; [| done]. rewrite H2. done.
     Qed.
 
-    Lemma BMU_smap_restore
-  (τ : locale heap_lang)
-  (B : nat)
-  (BOUND : B < LIM)
-  (s : SignalId)
-  (m : nat)
-  (smap : gmap nat SignalId)
-  (DOM : dom smap = set_seq 0 (B `min` (m + 2)))
-  (IN : smap !! m = Some s)
-  (lm : sigO (λ i : nat, i < LIM))
-  (LVL : lvl2nat lm = m):
+    Lemma BMU_smap_restore τ B (BOUND: B < LIM) s m smap
+      (DOM : dom smap = set_seq 0 (B `min` (m + 2)))
+      (IN : smap !! m = Some s)
+      (lm : sigO (λ i : nat, i < LIM))
+      (LVL : lvl2nat lm = m):
         ⊢
   obls EO_OP τ ∅ (H3 := oGS) -∗
   ([∗ map] k↦y ∈ delete m smap, ∃ l0 : sigO (λ i : nat, i < LIM),
@@ -365,9 +343,7 @@ Section EoFin.
            ▷ (∀ x : base_lit, obls EO_OP τ ∅ (H3 := oGS) -∗ Φ #x) -∗
            WP thread_prog #l #a #B @τ {{ v, Φ v }}. 
 
-    Lemma thread_advance τ (l: loc) B (BOUND : B < LIM) π
-      (Φ: val → iPropI Σ)
-      (m: nat)
+    Lemma thread_advance τ (l: loc) B (BOUND : B < LIM) π Φ m
       (H0 : (if Nat.even m then m else m + 1) < B)
       (s : SignalId)
       (smap : gmap nat SignalId)
@@ -490,34 +466,6 @@ Section EoFin.
         iFrame "#∗".
         iExists _. iFrame. 
     Qed.
-
-    (* TODO: move *)
-    Global Instance th_phase_ge_Proper:
-      Proper (eq ==> (flip phase_le) ==> bi_entails) (th_phase_ge EO_OP (H3 := oGS)).
-    Proof using.
-      red. intros ??-> ???.
-      rewrite /th_phase_ge. iIntros "(% & ? & %)".
-      iExists _. iFrame. iPureIntro. etrans; eauto.
-    Qed. 
-
-
-    
-  (* "EB" : exc_lb EO_OP 20 *)
-  (* "IH" : thread_spec τ l B π Φ *)
-  (* --------------------------------------□ *)
-  (* "TH" : even_res (m + 1) *)
-  (* "OB" : obls EO_OP τ {[s]} *)
-  (* "POST" : ∀ x : base_lit, obls EO_OP τ ∅ -∗ Φ #x *)
-  (* "CPS1" : cp_mul EO_OP π d1 (B - (m + 2)) *)
-  (* "SN" : ith_sig (m + 1) s *)
-  (* _ : emp *)
-  (* --------------------------------------∗ *)
-  (* WP thread_prog #l @τ {{ v, WP v #(m + 1)%nat #B @τ {{ v0, Φ v0 }} }} *)
-    Instance lvl2nat_inj N: Inj eq eq (@lvl2nat N).
-    Proof using.
-      intros [??] [??]. simpl. intros ->.
-      f_equal. apply Nat.lt_pi.
-    Qed.
     
     Lemma wait_iter τ l (n B: nat) π π__e sw R
       (LT: n < B)
@@ -613,16 +561,10 @@ Section EoFin.
           rewrite -E O. iFrame. }
         iModIntro.
 
-        (* assert (phase_le π__e π') by (by etrans).  *)
         wp_bind (Snd _)%E. pure_step. iApply wp_value. pure_step.
         iApply ("IH" $! π' with "[] [-POST] [$]"); [done| ]. 
         iFrame "#∗". iExists _. iSplit; [| iApply "OBLS_LT"].
     Admitted.
-
-    Lemma d12_lt: strict (bounded_nat_le _) d1 d2.
-    Proof using. apply ith_bn_lt. lia. Qed. 
-    Lemma d01_lt: strict (bounded_nat_le _) d0 d1.
-    Proof using. apply ith_bn_lt. lia. Qed. 
 
     Lemma thread_spec_holds τ l B (BOUND: B < LIM) π Φ:
       eofin_inv l B BOUND -∗ exc_lb EO_OP 20 (H3 := oGS) -∗

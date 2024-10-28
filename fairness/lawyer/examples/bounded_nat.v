@@ -37,4 +37,10 @@ Section BoundedNat.
 
   Definition bn2nat (b: bounded_nat) := proj1_sig b. 
 
+  Global Instance lvl2nat_inj: Inj eq eq bn2nat.
+  Proof using.
+    intros [??] [??]. simpl. intros ->.
+    f_equal. apply Nat.lt_pi.
+  Qed.
+    
 End BoundedNat.

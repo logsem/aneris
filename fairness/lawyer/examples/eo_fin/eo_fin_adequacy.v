@@ -5,6 +5,7 @@ From trillium.fairness.heap_lang Require Import simulation_adequacy.
 From trillium.fairness.lawyer Require Import sub_action_em action_model.
 From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_em obls_fairness_preservation obligations_am obligations_fin_branch obls_termination.
 From trillium.fairness.lawyer.examples.eo_fin Require Import eo_fin.
+From trillium.fairness.lawyer.examples Require Import bounded_nat.
 
 
 Section EOFinAdequacy.
@@ -34,7 +35,7 @@ Section EOFinAdequacy.
       locale_step
       (@mtrans M).
 
-  (* TODO: move? *)
+  (* TODO: move *)
   Instance fin_ofe_lt n:
     finite.Finite (Ofe {i : natO | i < n} sig_ofe_mixin).
   Proof using.
@@ -45,7 +46,7 @@ Section EOFinAdequacy.
     intros. apply elem_of_seq. lia.
   Qed.  
 
-  (* TODO: move? *)
+  (* TODO: move *)
   Lemma fin_wf n: wf (strict (bounded_nat_le n)).
   Proof using.
     eapply (well_founded_lt_compat _ proj1_sig).
@@ -305,7 +306,8 @@ Section EOFinAdequacy.
 
     iApply (no_obls_live_tids with "[$] [$] [$]"). done.  
   Qed.
-      
+
+  (* TODO: move *)
   Instance sig_lt_LE n: 
     LeibnizEquiv (sigO (λ i : nat, i < n)).
   Proof using.

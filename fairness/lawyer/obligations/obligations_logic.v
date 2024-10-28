@@ -178,6 +178,10 @@ Section ProgramLogic.
       iExists _. iFrame. iPureIntro. lia.
     Qed. 
 
+    Global Instance BMU_proper:
+      Proper (equiv ==> eq ==> eq ==> equiv ==> equiv) BMU.
+    Proof using. solve_proper. Qed. 
+
     Lemma BMU_frame E ζ b (P Q : iProp Σ):
       ⊢ P -∗ BMU E ζ b Q -∗ BMU E ζ b (P ∗ Q).
     Proof using. 

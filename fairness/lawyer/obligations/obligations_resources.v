@@ -256,6 +256,14 @@ Section ObligationsRepr.
       iPureIntro. eauto. 
     Qed.
 
+    Global Instance th_phase_ge_Proper:
+      Proper (eq ==> (flip phase_le) ==> bi_entails) th_phase_ge.
+    Proof using.
+      red. intros ??-> ???.
+      rewrite /th_phase_ge. iIntros "(% & ? & %)".
+      iExists _. iFrame. iPureIntro. etrans; eauto.
+    Qed.
+
     Lemma exc_lb_msi_bound δ n:
       ⊢ obls_msi δ -∗ exc_lb n -∗ ⌜ n <= ps_exc_bound OP δ ⌝.
     Proof using.
