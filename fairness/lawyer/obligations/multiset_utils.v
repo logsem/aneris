@@ -35,7 +35,7 @@ Section GmultisetUtils.
 
   Lemma gmultiset_disj_union_difference_split (X Y Z: gmultiset A):
     (X ⊎ Y) ∖ Z = X ∖ (Z ∖ Y) ⊎ Y ∖ Z.
-  Proof using. mss. Show Proof. Qed. 
+  Proof using. mss. Qed. 
 
   Lemma gmultiset_split (X Y: gmultiset A):
     exists I X' Y', X = X' ⊎ I /\ Y = Y' ⊎ I /\ X' ## Y'.
