@@ -1,5 +1,6 @@
 From iris.proofmode Require Import tactics coq_tactics.
 From iris.base_logic.lib Require Import invariants.
+From trillium.prelude Require Import finitary.
 
 
 Section BoundedNat.
@@ -43,4 +44,29 @@ Section BoundedNat.
     f_equal. apply Nat.lt_pi.
   Qed.
     
+  Global Instance sig_lt_LE: 
+    LeibnizEquiv (sigO (λ i, i < N)).
+  Proof using.
+    red. intros [??] [??]. simpl.
+    rewrite sig_equiv_def. simpl.
+    rewrite leibniz_equiv_iff. intros ->.
+    f_equal. apply Nat.lt_pi.
+  Qed. 
+
+  Global Instance fin_ofe_lt: finite.Finite BNOfe.
+  Proof using.
+    unshelve eapply (@finite.surjective_finite {i | i < N}).
+    { exact id. }
+    2: by apply _.
+    eapply (finitary.in_list_finite (seq 0 N)).
+    intros. apply elem_of_seq. lia.
+  Qed.  
+
+  Lemma fin_wf: wf (strict bounded_nat_le).
+  Proof using.
+    eapply (well_founded_lt_compat _ proj1_sig).
+    intros [??] [??]. rewrite strict_spec. rewrite /bounded_nat_le.
+    simpl. lia.
+  Qed.     
+
 End BoundedNat.

@@ -31,9 +31,6 @@ Section EoFin.
   Let EOLevelOfe := BNOfe LIM. 
   Let EODegreeOfe := BNOfe NUM_DEG. 
 
-  Instance EO_lvl_LeibnizEquiv: LeibnizEquiv EOLevelOfe.
-  Admitted. 
-
   Context `{EM: ExecutionModel heap_lang M}. 
   Context `{hGS: @heapGS Σ _ EM}.
 

@@ -35,25 +35,6 @@ Section EOFinAdequacy.
       locale_step
       (@mtrans M).
 
-  (* TODO: move *)
-  Instance fin_ofe_lt n:
-    finite.Finite (Ofe {i : natO | i < n} sig_ofe_mixin).
-  Proof using.
-    unshelve eapply (@finite.surjective_finite {i : nat | i < n}).
-    { exact id. }
-    2: by apply _.
-    eapply (finitary.in_list_finite (seq 0 n)).
-    intros. apply elem_of_seq. lia.
-  Qed.  
-
-  (* TODO: move *)
-  Lemma fin_wf n: wf (strict (bounded_nat_le n)).
-  Proof using.
-    eapply (well_founded_lt_compat _ proj1_sig).
-    intros [??] [??]. rewrite strict_spec. rewrite /bounded_nat_le.
-    simpl. lia.
-  Qed.     
-
   Lemma eofin_sim_rel_FB: rel_finitary eofin_sim_rel.
   Proof using.
     clear. red. intros extr mtr [tp' σ'] oζ. 
@@ -306,16 +287,6 @@ Section EOFinAdequacy.
 
     iApply (no_obls_live_tids with "[$] [$] [$]"). done.  
   Qed.
-
-  (* TODO: move *)
-  Instance sig_lt_LE n: 
-    LeibnizEquiv (sigO (λ i : nat, i < n)).
-  Proof using.
-    red. intros [??] [??]. simpl.
-    rewrite sig_equiv_def. simpl.
-    rewrite leibniz_equiv_iff. intros ->.
-    f_equal. apply Nat.lt_pi.
-  Qed. 
 
   Theorem eofin_terminates
     (N : nat)
