@@ -111,10 +111,11 @@ Section EoFin.
 
     Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS _ EM _ (↑ nroot)}.
 
-    Ltac MU_by_burn_cp :=
+    Ltac MU_by_BMU :=
       iApply OBLS_AMU; [by rewrite nclose_nroot| ];
-      iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH";
-      BMU_burn_cp.
+      iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH". 
+
+    Ltac MU_by_burn_cp := MU_by_BMU; BMU_burn_cp.
 
     Ltac pure_step_hl := 
       iApply sswp_MU_wp; [done| ];
@@ -341,7 +342,7 @@ Section EoFin.
             then ∃ s0 : SignalId, ith_sig a s0 ∗ obls EO_OP τ {[s0]} (H3 := oGS)
             else obls EO_OP τ ∅ (H3 := oGS)) -∗
            ▷ (∀ x : base_lit, obls EO_OP τ ∅ (H3 := oGS) -∗ Φ #x) -∗
-           WP thread_prog #l #a #B @τ {{ v, Φ v }}. 
+           WP thread_prog #l #a #B @τ {{ v, Φ v }}.       
 
     Lemma thread_advance τ (l: loc) B (BOUND : B < LIM) π Φ m
       (H0 : (if Nat.even m then m else m + 1) < B)
@@ -393,10 +394,7 @@ Section EoFin.
       iDestruct "SG" as (lm) "(SG & %LVL)".
       rewrite Nat.ltb_irrefl. 
       
-      iApply OBLS_AMU; [by rewrite nclose_nroot| ]. 
-      iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH". 
-      
-      iApply OU_BMU.
+      MU_by_BMU. iApply OU_BMU.
       iDestruct (OU_set_sig with "OB [SG]") as "OU".
       { apply elem_of_singleton. reflexivity. }
       { by iFrame. }
@@ -485,13 +483,8 @@ Section EoFin.
       iIntros "(#INV & CP1 & PH & #SW & OBLS & (%lw & %LW & #OBLS_LT) & #EXP & #EB & EV) POST".
       rewrite /thread_prog.
 
-      wp_bind (RecV _ _ _ _)%V.
-      iApply sswp_MU_wp; [done| ]. 
-      iApply sswp_pure_step; [done| ]; simpl. 
-      iNext.
-      iApply OBLS_AMU; [by rewrite nclose_nroot| ]. 
-      iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH".
-      iApply OU_BMU.
+      wp_bind (RecV _ _ _ _)%V. pure_step_hl.
+      MU_by_BMU. iApply OU_BMU.
       iDestruct (exchange_cp_upd with "CP1 [$] [$]") as "OU".
       { reflexivity. }
       { apply (ith_bn_lt _ 0). lia. } 
@@ -532,10 +525,7 @@ Section EoFin.
         iNext. iIntros "L".
         rewrite Nat.min_r; [| lia].
 
-        iApply OBLS_AMU; [by rewrite nclose_nroot| ]. 
-        iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH".
-
-        iApply OU_BMU.
+        MU_by_BMU. iApply OU_BMU.
         rewrite Nat.add_sub. 
         iDestruct (smap_repr_split with "[$] [$]") as "[SIGW SR]".
         rewrite {1}/ex_ith_sig. iDestruct "SIGW" as "(%lw' & SIGW & %LW')".
@@ -576,14 +566,9 @@ Section EoFin.
       rewrite {2}/thread_spec. iIntros (n) "(TH & CPS1 & PH & SN_OB) POST".
       rewrite /thread_prog.
       
-      wp_bind (RecV _ _ _ _)%V.
-      iApply sswp_MU_wp; [done| ]. 
-      iApply sswp_pure_step; [done| ]; simpl. 
-      iNext.
-      iApply OBLS_AMU; [by rewrite nclose_nroot| ]. 
-      iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH".
-      iDestruct (cp_mul_take with "CPS1") as "[CPS1 CP1]".
-      iApply OU_BMU.
+      wp_bind (RecV _ _ _ _)%V. pure_step_hl.
+      MU_by_BMU. iApply OU_BMU.
+      iDestruct (cp_mul_take with "CPS1") as "[CPS1 CP1]".      
       iDestruct (exchange_cp_upd with "[$] [$] [$]") as "OU".
       { reflexivity. }
       { etrans; [apply d01_lt| apply d12_lt]. }
@@ -631,8 +616,7 @@ Section EoFin.
         { econstructor. done. }
         iNext. iIntros "L".
 
-        iApply OBLS_AMU; [by rewrite nclose_nroot| ]. 
-        iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH".
+        MU_by_BMU. 
         assert (B - (m + 1) = S (B - (m + 2))) as LE.
         { destruct (Nat.even m); lia. }
         rewrite LE.
