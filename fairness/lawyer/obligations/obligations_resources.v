@@ -315,7 +315,7 @@ Section ObligationsRepr.
     Let OU' (R: ProgressState OP -> Locale -> ProgressState OP -> Prop) ζ P: iProp Σ :=
       ∀ δ, obls_msi δ ==∗ ∃ δ', obls_msi δ' ∗ ⌜ R δ ζ δ'⌝ ∗ P. 
 
-    Definition OU := OU' (loc_step OP). 
+    Definition OU := OU' (loc_step OP).
 
     Lemma OU_wand ζ P Q:
       (P -∗ Q) -∗ OU ζ P -∗ OU ζ Q.
@@ -323,9 +323,24 @@ Section ObligationsRepr.
       iIntros "PQ OU".
       rewrite /OU /OU'. iIntros "**".
       iSpecialize ("OU" with "[$]"). iMod "OU" as "(%&?&?&?)". iModIntro.
-      iExists _. iFrame. by iApply "PQ". 
+      iExists _. iFrame. by iApply "PQ".
     Qed.
         
+    Global Instance OU_entails ζ:
+      Proper (bi_entails ==> bi_entails) (OU ζ).
+    Proof using.
+      intros ???. iIntros "OU".
+      iApply (OU_wand with "[] [$]").
+      iApply H4. 
+    Qed.
+
+    Global Instance OU_equiv ζ:
+      Proper (equiv ==> equiv) (OU ζ).
+    Proof using.
+      intros ?? [PQ QP]%bi.equiv_entails.
+      iSplit; iApply OU_entails; [iApply PQ | iApply QP].  
+    Qed.
+
     Lemma OU_create_sig ζ R l:
       ⊢ obls ζ R -∗ OU ζ (∃ sid, sgn sid l (Some false) ∗ obls ζ (R ∪ {[ sid ]})).
     Proof using.
