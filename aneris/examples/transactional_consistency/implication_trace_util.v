@@ -249,9 +249,6 @@ Section trace_proof_util.
   
   Definition com_true (trans : list operation) : Prop := ∃ s, last trans = Some (Cm s true).
 
-  Definition latest_write_trans (k : Key) (v : val) (trans : list operation) : Prop := 
-    ∃ s, (Wr s k v) ∈ trans ∧ ¬(∃ s' v', rel_list trans (Wr s k v) (Wr s' k v')).
-
   Definition tag_eq (e1 e2 : val) : Prop := ∃ tag, tagOfEvent e1 = Some tag ∧ tagOfEvent e2 = Some tag.
 
   Definition no_emit_with_address (sa : socket_address) (ltrace : list val) (extract : val → option val)  : Prop := 
@@ -323,120 +320,6 @@ Section trace_proof_util.
     intros (tag_cm & b & ->).
     by simpl in Hop_cm.
   Qed.
-
-  (* Lemma applyTransaction_insert_eq k k1 v1 v s trans : 
-
-
-    applyTransaction (<[k:=v]> <[k1:=v1]> s) trans = ∅.
-  Proof.
-    simpl.
-    rewrite /applyTransaction.
-    simpl.
-    simpl.
-    generalize dependent k. 
-    generalize dependent v. 
-    generalize dependent s. 
-    induction trans; intros s v k.
-    - admit.
-    - simpl.
-      destruct a; simpl; try done.
-      specialize (IHtrans (<[k0:=v0]> s) v k).
-      rewrite -IHtrans.
-
-      rewrite -I
-  Admitted. *)
-  (* Search ({[_:=_]}). *)
-
-  Lemma applyTransaction_insert_eq s trans :
-    applyTransaction s trans = (applyTransaction ∅ trans) ∪ s.
-  Proof.
-    generalize dependent s. 
-    induction trans as [|op trans IH]; intros s.
-    - simpl.
-      (* Search (_ ∪ ∅). *)
-      admit.
-    - simpl.
-      destruct op; simpl; try done.
-      rewrite (IH (<[k:=v]> ∅)).
-      rewrite insert_empty.
-      rewrite (IH (<[k:=v]> s)).
-      rewrite insert_union_singleton_l.
-      admit.
-  Admitted.
-
-  Lemma latest_write_apply k v trans s :
-    latest_write_trans k v trans →
-    (applyTransaction s trans) !! k = Some v.
-  Proof.
-    generalize dependent s.
-    induction trans as [|op trans IH].
-    - rewrite /latest_write_trans.
-      set_solver.
-    - intros s Hlatest.
-      destruct Hlatest as (sig & Hin & Hnot).
-      rewrite elem_of_cons in Hin.
-      destruct Hin as [<-| Hin].
-      + simpl.
-        admit.
-        (* rewrite applyTransaction_insert_eq. *)
-        (* by rewrite lookup_insert. *)
-      + assert (latest_write_trans k v trans) as Hlatest'.
-        {
-          admit.
-        }
-        specialize (IH s Hlatest').
-        destruct op; simpl; try done.
-        rewrite applyTransaction_insert_eq.
-        apply lookup_union_Some_l.
-        Search ((_ ∪ _) !! _ = Some _).
-        rewrite applyTransaction_insert_eq.
-        rewrite lookup_insert_ne; first done.
-        intros Hfalse.
-        apply Hnot.
-        admit.
-  Admitted.
-
-  Lemma latest_write_read exec T k v trans test : 
-    valid_execution test exec →
-    based_on exec T →
-    trans ∈ T →
-    latest_write_trans k v trans →
-    ∃ s, s ∈ (split exec).2 ∧ s !! k = Some v. 
-  Proof.
-    intros (Hvalid & _ & _) Hbased Hin Hlatest.
-    rewrite /based_on in Hbased.
-    assert (trans ∈ (split exec).1) as Hin'; first set_solver.
-    apply elem_of_list_lookup_1 in Hin'.
-    destruct Hin' as (i & Hin').
-    pose proof Hin' as Hlength.
-    apply lookup_lt_Some in Hlength.
-    rewrite split_length_l in Hlength.
-    destruct (exec !! i) as [(trans', s)|] eqn:Hlookup.
-    - exists s. 
-      assert (trans = trans') as <-.
-      {
-        induction exec using list_ind; first set_solver.
-        admit.
-      }
-      split.
-      + admit.
-      + 
-        destruct (exec !! (i -1)%nat) as [p_prior|] eqn:Hlookup_prior.
-        * assert (applyTransaction p_prior.2 (trans, s).1 = (trans, s).2) as Heq_apply.
-          {
-            eapply (Hvalid (i -1)%nat); try done.
-            assert (i%nat = (i - 1 + 1)%nat) as <-; last done.
-            admit.
-          }
-          simpl in Heq_apply.
-          rewrite -Heq_apply.
-          by apply latest_write_apply.
-        * admit.
-    - apply lookup_ge_None_1 in Hlookup.
-      exfalso.
-      (* lia. *)
-      admit.
-  Admitted.
 
   Lemma com_trans_in trans T : 
     trans ∈ T →

@@ -66,6 +66,8 @@ Definition is_cm_op (op : operation) : Prop := ∃ s b, op = Cm s b.
 
 Definition isCmOp (op : operation) : bool := match op with | Cm _ _ => true | _ => false end.
 
+Definition isWrOp (op : operation) (k : Key) : bool := match op with | Wr _ k _ => true | _ => false end. 
+
 Definition valid_transactions (T : list transaction) : Prop := 
   (* Transactions satisfy the baseline transaction contraints *)
   (∀ t, t ∈ T → valid_transaction t) ∧
@@ -82,28 +84,23 @@ Definition execution : Type := list (transaction * state).
 
 Definition commitTest : Type := execution -> transaction -> Prop.
 
-Definition applyTransaction (s : state) (t : transaction) : state := 
-  foldl (λ s op, match op with | Wr sig k v => <[k := v]> s | _ => s end) s t.
+ Definition latest_write_trans (k : Key) (v : val) (trans : transaction) : Prop := 
+    ∃ s, (Wr s k v) ∈ trans ∧ ¬(∃ s' v', rel_list trans (Wr s k v) (Wr s' k v')).
 
-Definition applied_transaction (s1 s2 : state) (t : transaction) : state :=
+Definition applied_transaction (s1 s2 : state) (trans : transaction) : Prop :=
   (∀ k v, s2 !! k = Some v → 
-    (∀ v', latest_write_trans k v' trans → v = v') ∧ (¬(∃ sig v', (Wr sig k v' ∈ t)) → s1 !! k = Some v)) ∧
-  (∀ k, ((∃ sig v, (Wr sig k v) ∈ t) ∨ k ∈ dom s2) → k ∈ dom s1).
+    (∀ v', latest_write_trans k v' trans → v = v') ∧ (¬(∃ sig v', (Wr sig k v' ∈ trans)) → s1 !! k = Some v)) ∧
+  (∀ k, ((∃ sig v, (Wr sig k v) ∈ trans) ∨ k ∈ dom s1) → k ∈ dom s2).
 
-Definition extendExecution (e : execution) (t : transaction) : execution :=
-  match (last e) with 
-    | Some s => e ++ [(t, applyTransaction s.2 t)] 
-    | None => [(t, applyTransaction ∅ t)] 
-  end.
-
-Definition optionalExtendExecution (e : execution) (t : transaction) : execution :=
-  match (last t) with | Some (Cm _ true) => extendExecution e t | _ => e end.
+Definition optional_applied_transaction (exec : execution) (s : state) (trans : transaction) : Prop :=
+  (∃ s' t', last exec = Some (t', s') ∧ applied_transaction s' s trans) ∨ 
+  (last exec = None ∧ applied_transaction ∅ s trans).
 
 Definition valid_execution (test : commitTest) (exec : execution) : Prop :=
   (* Transitions are valid *)
   (∀ i e1 e2, exec !! i = Some e1 → 
               exec !! (i + 1) = Some e2 →
-              applyTransaction e1.2 e2.1 = e2.2) ∧
+              applied_transaction e1.2 e2.2 e2.1) ∧
   (* Initial state is valid *)
   (exec !! 0 = Some ([], ∅)) ∧
   (* The commit test is satisfied *)
@@ -470,6 +467,181 @@ Proof.
   set_solver.
 Qed.
 
+Lemma applied_transaction_exists s t : 
+  ∃ s', applied_transaction s s' t.
+Proof.
+  generalize dependent s.
+  induction t as [|op t IH]; intros s.
+  - exists s.
+    rewrite /applied_transaction /latest_write_trans.
+    set_solver.
+  - destruct op as [|sig k v|].
+    + destruct (IH s) as (s' & Happl1 & Happl2).
+      exists s'.
+      split; last set_solver.
+      rewrite /latest_write_trans.
+      intros k' v Hlookup.
+      specialize (Happl1 k' v Hlookup).
+      split; last set_solver.
+      intros v' (sig' & Hwr_in & Hnot).
+      destruct Happl1 as (Happl1 & _).
+      apply Happl1.
+      exists sig'.
+      split; first set_solver.
+      intros (sig'' & v'' & (i & j & Hlt & Hlookup_i & Hlookup_j)).
+      apply Hnot.
+      exists sig'', v''.
+      exists (S i), (S j).
+      split_and!; first lia.
+      1, 2 : rewrite lookup_cons_Some; right; simpl.
+      1, 2 : split; first lia.
+      1 : by assert (i = i - 0) as <-; first lia.
+      by assert (j = j - 0) as <-; first lia.
+    + assert (Decision (∃ op, op ∈ t ∧ (λ op, isWrOp op k = true) op)) as Hdec_pre.
+      {
+        apply list_exist_dec.
+        apply _.
+      }
+      destruct (IH s) as (s' & IH').
+      destruct (decide (∃ op, op ∈ t ∧ (λ op, isWrOp op k = true) op)) as [Hdec | Hdec].
+      * exists s'.
+        split.
+        -- intros k' v' Hlookup. 
+           split.
+           ++ admit.
+           ++ intros Hnot.
+           admit.
+        -- admit.
+      * exists (<[k := v]> s').
+        split.
+        -- admit.
+        -- admit.
+    + destruct (IH s) as (s' & Happl1 & Happl2).
+      exists s'.
+      split; last set_solver.
+      rewrite /latest_write_trans.
+      intros k' v Hlookup.
+      specialize (Happl1 k' v Hlookup).
+      split; last set_solver.
+      intros v' (sig' & Hwr_in & Hnot).
+      destruct Happl1 as (Happl1 & _).
+      apply Happl1.
+      exists sig'.
+      split; first set_solver.
+      intros (sig'' & v'' & (i & j & Hlt & Hlookup_i & Hlookup_j)).
+      apply Hnot.
+      exists sig'', v''.
+      exists (S i), (S j).
+      split_and!; first lia.
+      1, 2 : rewrite lookup_cons_Some; right; simpl.
+      1, 2 : split; first lia.
+      1 : by assert (i = i - 0) as <-; first lia.
+      by assert (j = j - 0) as <-; first lia.
+Admitted.
+
+Lemma optional_applied_transaction_exists exec t : 
+  ∃ s, optional_applied_transaction exec s t.
+Proof.
+  destruct (last exec) as [(t', s') |] eqn:Hlast.
+  - destruct (applied_transaction_exists s' t) as (s & Happlied).
+    exists s.
+    left.
+    set_solver.
+  - destruct (applied_transaction_exists ∅ t) as (s & Happlied).
+    exists s.
+    right.
+    set_solver.
+Qed.
+
+Lemma split_lookup_eq (exec : execution) i p1 p1' p2 :
+  (split exec).1 !! i = Some p1' →
+  exec !! i = Some (p1, p2) → 
+  p1 = p1'.
+Proof.
+  generalize dependent i.
+  induction exec as [|(h1, h2) exec IH].
+  - simpl. 
+    set_solver.
+  - intros i Hlookup1 Hlookup2.
+    assert ((h1, h2) :: exec = [(h1, h2)] ++ exec) as Heq_cons_app; first set_solver.
+    rewrite Heq_cons_app in Hlookup1.
+    rewrite split_split in Hlookup1.
+    simpl in Hlookup1.
+    rewrite lookup_cons_Some in Hlookup2.
+    destruct Hlookup2 as [(Heq_i & Heq_h)|(Hlength & Hlookup2)].
+    + subst.
+      assert (h1 :: (split exec).1 = [h1] ++ (split exec).1) as Heq_cons_app'; first set_solver.
+      rewrite Heq_cons_app' in Hlookup1.
+      rewrite lookup_app_Some in Hlookup1.
+      destruct Hlookup1 as [Hlookup1 | Hfalse]; first set_solver.
+      simpl in Hfalse.
+      lia.
+    + assert (h1 :: (split exec).1 = [h1] ++ (split exec).1) as Heq_cons_app'; first set_solver.
+      rewrite Heq_cons_app' in Hlookup1.
+      rewrite lookup_app_Some in Hlookup1.
+      destruct Hlookup1 as [Hfalse | Hlookup1]; last set_solver.
+      rewrite list_lookup_singleton_Some in Hfalse.
+      lia.
+Qed.
+
+Lemma latest_write_read exec T k v trans test : 
+  valid_execution test exec →
+  based_on exec T →
+  trans ∈ T →
+  latest_write_trans k v trans →
+  ∃ s, s ∈ (split exec).2 ∧ s !! k = Some v. 
+Proof.
+  intros (Hvalid & Hzero & _) Hbased Hin Hlatest.
+  rewrite /based_on in Hbased.
+  assert (trans ∈ (split exec).1) as Hin'; first set_solver.
+  apply elem_of_list_lookup_1 in Hin'.
+  destruct Hin' as (i & Hin').
+  pose proof Hin' as Hlength.
+  apply lookup_lt_Some in Hlength.
+  rewrite split_length_l in Hlength.
+  destruct (exec !! i) as [(trans', s)|] eqn:Hlookup.
+  - exists s.
+    assert (trans' = trans) as ->; first by eapply split_lookup_eq.
+    split.
+    + apply elem_of_list_In.
+      assert ((trans, s).2 = s) as <-; first by simpl.
+      apply in_split_r.
+      apply elem_of_list_In.
+      apply elem_of_list_lookup.
+      set_solver.
+    + destruct (exec !! (pred i)) as [p_prior|] eqn:Hlookup_prior.
+      * assert (applied_transaction p_prior.2 (trans, s).2 (trans, s).1) as (Happlied1 & Happlied2).
+        {
+          eapply (Hvalid (pred i)); try done.
+          assert ((pred i + 1) = i) as ->; last done.
+          rewrite PeanoNat.Nat.add_1_r.
+          apply Nat.succ_pred.
+          intro Hfalse.
+          subst.
+          rewrite /latest_write_trans in Hlatest.
+          assert ([] = trans) as <-; last set_solver.
+          rewrite Hlookup in Hzero.
+          by inversion Hzero.
+        }
+        simpl in Happlied1, Happlied2.
+        destruct (s !! k) as [v'|] eqn:Hlookup_state; first set_solver.
+        exfalso.
+        assert (k ∈ dom s) as Hdom. 
+        {
+          apply Happlied2.
+          left.
+          rewrite /latest_write_trans in Hlatest.
+          set_solver.
+        }
+        rewrite elem_of_dom Hlookup_state in Hdom.
+        rewrite /is_Some in Hdom; set_solver.
+      * apply lookup_ge_None_1 in Hlookup_prior.
+        lia.
+  - apply lookup_ge_None_1 in Hlookup.
+    exfalso.
+    lia.
+Qed.
+
 Lemma exists_execution : 
   ∀ T, (∀ t, t ∈ T → t ≠ []) → 
     ∃ E, based_on E (comTrans T) ∧ valid_execution commit_test_ru E.
@@ -501,7 +673,8 @@ Proof.
     destruct o; try done.
     destruct b; try done.
     destruct (last E) as [p|] eqn:Heq.
-    + exists (E ++ [(t, applyTransaction p.2 t)]).
+    + destruct (applied_transaction_exists p.2 t) as (s' & Happly).
+      exists (E ++ [(t, s')]).
       split.
       * rewrite /based_on.
         intro t'.
@@ -518,16 +691,9 @@ Proof.
         -- intro Hin. 
            rewrite elem_of_cons in Hin.
            destruct Hin as [-> | Hin].
-           ++ assert ((t, applyTransaction p.2 t).1 = t) as <-; first set_solver.
-              split.
-              ** rewrite elem_of_list_In.
-                 apply in_split_l.
-                 simpl.
-                 rewrite -elem_of_list_In.
-                 set_solver.
-              ** simpl.
-                 apply Himp.
-                 set_solver.
+           ++ rewrite split_split.
+              simpl.
+              set_solver.
            ++ split.
               ** specialize (Hbased t'). 
                  apply Hbased in Hin as (Hin & _).
@@ -556,7 +722,7 @@ Proof.
            ++ destruct Hlookup2 as (Hlength & <-).
               simpl.
               assert (p = p1) as ->; last done.
-              assert (length (E ++ [(t, applyTransaction p.2 t)]) = i + 2) as Hlength'.
+              assert (length (E ++ [(t, s')]) = i + 2) as Hlength'.
               {
                 rewrite app_length.
                 rewrite -Hlength.
@@ -2143,11 +2309,11 @@ Proof.
   by rewrite -com_trans_eq2.
 Qed.
 
-Lemma based_on_add3 s b exec T :
+(* Lemma based_on_add3 s b exec T :
   based_on exec (comTrans T) →
   based_on (optionalExtendExecution exec [Cm s b]) (comTrans (T ++ [[Cm s b]])).
-Proof.
-  intros Hbased.
+Proof. *)
+  (* intros Hbased.
   rewrite /optionalExtendExecution /comTrans.
   rewrite List.filter_app.
   simpl.
@@ -2188,14 +2354,15 @@ Proof.
            set_solver.
   - rewrite app_nil_r.
     by rewrite /comTrans in Hbased.
-Qed.
+Qed. *)
+(* Admitted. *)
 
-Lemma based_on_add4 s b exec T1 T2 trans :
+(* Lemma based_on_add4 s b exec T1 T2 trans :
   (∃ op, op ∈ trans ∧ last trans = Some op ∧ isCmOp op = false) ->
   based_on exec (comTrans (T1 ++ trans :: T2)) →
   based_on (optionalExtendExecution exec (trans ++ [Cm s b])) (comTrans (T1 ++ (trans ++ [Cm s b]) :: T2)).
-Proof.
-  intros Hop Hbased.
+Proof. *)
+  (* intros Hop Hbased.
   rewrite /optionalExtendExecution /comTrans.
   rewrite List.filter_app.
   simpl.
@@ -2280,14 +2447,15 @@ Proof.
     rewrite Heq in Hbased.
     rewrite /isCmOp in Hcm.
     destruct op; simpl; set_solver.
-Qed.
+Qed. *)
+(* Admitted. *)
 
-Lemma extendExecution_imp i e1 e2 exec trans s :
+(* Lemma extendExecution_imp i e1 e2 exec trans s :
   valid_execution commit_test_rc exec →
   extendExecution exec (trans ++ [Cm s true]) !! i = Some e1 → 
   extendExecution exec (trans ++ [Cm s true]) !! (i + 1) = Some e2 → 
-  applyTransaction e1.2 e2.1 = e2.2.
-Proof.
+  applyTransaction e1.2 e2.2 e2.1.
+Proof. 
   intros Hvalid.
   rewrite /extendExecution.
   destruct Hvalid as (Hvalid & _).
@@ -2307,7 +2475,7 @@ Proof.
   + rewrite list_lookup_singleton_Some in Hlookup_e1.
     rewrite list_lookup_singleton_Some in Hlookup_e2.
     lia.
-Qed.
+Qed. *)
 
 Lemma valid_trace_pre T tag t e lt exec test : 
   lin_trace_of lt t →

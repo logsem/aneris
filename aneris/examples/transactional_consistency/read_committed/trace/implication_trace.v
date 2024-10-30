@@ -127,22 +127,92 @@ Section trace_proof.
 
   (** Helper lemmas *)
 
-  Lemma valid_execution_rc_imp exec s b trans T : 
+  Lemma valid_execution_rc_imp exec s st trans T :
+    optional_applied_transaction exec st (trans ++ [Cm s true]) →
     based_on exec T →
-    (trans ++ [Cm s b]) ∉ T →
+    (trans ++ [Cm s true]) ∉ T →
     (∀ s k v, Rd s k (Some v) ∈ trans → 
-      ¬ (∃ s', Wr s' k v ∈ trans) → 
+      ¬ (∃ s' v', rel_list trans (Wr s' k v') (Rd s k (Some v))) → 
       ∃ trans', trans' ∈ T ∧ latest_write_trans k v trans') →
     valid_execution commit_test_rc exec →
-    valid_execution commit_test_rc (optionalExtendExecution exec (trans ++ [Cm s b])).
+    valid_execution commit_test_rc (exec ++ [((trans ++ [Cm s true]), st)]).
   Proof.
-    intros Hbased Hnin Hreads Hvalid.
-    rewrite /optionalExtendExecution.
-    rewrite last_snoc.
-    destruct b; simpl; last done.
-    split; first (intros; by eapply extendExecution_imp).
-    rewrite /extendExecution.
-    simpl.
+    intros Happl Hbased Hnin Hreads Hvalid.
+    split_and!.
+    - admit.
+    - destruct Hvalid as (_ & Hvalid & _).
+      rewrite lookup_app_Some.
+      set_solver.
+    - intros t Hin.
+      rewrite split_split in Hin.
+      simpl in Hin.
+      rewrite elem_of_app in Hin.
+      pose proof Hvalid as Hvalid'.
+      destruct Hvalid as (_ & _ & Hvalid).
+      destruct Hin as [Hin|Hin].
+      + intros tag c k ov i Hlookup Hrd_in Hnot Hsome.
+        specialize (Hvalid t Hin tag c k ov i).
+        rewrite split_split in Hlookup.
+        simpl in Hlookup.
+        rewrite lookup_app_Some in Hlookup.
+        destruct Hlookup as [Hlookup| Hlookup].
+        * destruct (Hvalid Hlookup Hrd_in Hnot Hsome) as (st' & j & Hleq & Hlookup_j & Hlookup_k).
+          exists st', j.
+          split_and!; try done.
+          rewrite split_split; simpl.
+          rewrite lookup_app_Some.
+          set_solver.
+        * exfalso.
+          apply Hnin.
+          destruct Hlookup as (_ & Hlookup).
+          rewrite list_lookup_singleton_Some in Hlookup.
+          destruct Hlookup as (_ & Hlookup).
+          rewrite Hlookup.
+          apply (Hbased t).
+          split; first done.
+          rewrite -Hlookup; intros Hfalse. 
+          destruct trans; set_solver.
+      +  assert (t = trans ++ [Cm s true]) as ->; first set_solver.
+         intros tag c k ov i Hlookup Hrd_in Hnot (v & ->).
+         assert (Rd (tag, c) k (Some v) ∈ trans) as Hrd_in'; first set_solver.
+         destruct (Hreads (tag, c) k v Hrd_in') as (trans' & Hin' & Hlatest).
+         {
+            intros (s' & v' & Hrel).
+            apply Hnot.
+            exists s', v'.
+            by apply rel_list_imp.
+         }
+         destruct (latest_write_read exec T k v trans' commit_test_rc) 
+          as (st' & Hin_st' & Hlookup_st'); try done.
+         rewrite elem_of_list_lookup in Hin_st'.
+         destruct Hin_st' as (j & Hlookup_j).
+         exists st', j.
+         split_and!; try done.
+         * rewrite split_split in Hlookup.
+           simpl in Hlookup. 
+           rewrite lookup_app_Some in Hlookup.
+           destruct Hlookup as [Hlookup|Hlookup].
+           -- exfalso.
+              apply Hnin.
+              apply (Hbased (trans ++ [Cm s true])).
+              split.
+              ++ apply elem_of_list_lookup. 
+                 eauto.
+              ++ intros Hfalse; destruct trans; set_solver.
+              destruct trans; set_solver.
+           -- apply lookup_lt_Some in Hlookup_j.
+              rewrite split_length_r in Hlookup_j.
+              rewrite split_length_l in Hlookup.
+              lia.
+         * rewrite split_split.
+           simpl.
+           rewrite lookup_app_Some.
+           set_solver.
+    (* {
+      admit.
+    }
+    split
+    (* split; first (intros; by eapply extendExecution_imp). *)
     destruct (last exec) as [p|] eqn:Hlast; simpl.
     - split.
       + destruct Hvalid as (_ & Hvalid & _).
@@ -188,7 +258,7 @@ Section trace_proof.
     - apply last_None in Hlast.
       subst.
       rewrite /valid_execution in Hvalid.
-      set_solver.
+      set_solver. *)
   Admitted.
 
   Lemma inv_ext_rc_wr_imp1 γ T1 T2 trans s k v :
@@ -635,7 +705,7 @@ Section trace_proof.
       {
         iModIntro.
         iExists (T1 ++ (trans ++ [Cm (tag1, c) b]) :: T2); iFrame.
-        iExists t', (lt' ++ [(#tag1, (c, (#"CmLin", #b)))%V]), (optionalExtendExecution exec' (trans ++ [Cm (tag1, c) b])).
+        iExists t', (lt' ++ [(#tag1, (c, (#"CmLin", #b)))%V]), _.
         iFrame.
         iSplit.
         + iPureIntro.
@@ -648,7 +718,7 @@ Section trace_proof.
             by apply trans_add_non_empty.
           * iSplit.
             -- iPureIntro.
-              by apply extraction_of_add2.
+                by apply extraction_of_add2.
             -- iSplit.
               ++ iPureIntro.
                   apply (valid_transactions_add2 _ _ tag1 _ _ c); try done;
@@ -667,10 +737,12 @@ Section trace_proof.
                         set_solver.
                     --- by exists t'.
                   ** iSplit.
-                    --- iPureIntro. 
-                        apply based_on_add4; set_solver.
+                    --- iPureIntro.
+                        admit.
+                        (* apply based_on_add4; set_solver. *)
                     --- iSplit.
-                        +++ iPureIntro; eapply valid_execution_rc_imp; try done.
+                        +++ admit.
+                            (* iPureIntro; eapply valid_execution_rc_imp; try done.
                             intros Hfalse.
                             apply Hnot_lin_in.
                             exists (toLinEvent (Cm (tag1, c) b)).
@@ -678,7 +750,7 @@ Section trace_proof.
                             destruct Hex' as (_ & Hex' & _).
                             split; last done.
                             apply (Hex' (trans ++ [Cm (tag1, c) b]) (Cm (tag1, c) b)); last set_solver.
-                            by apply com_trans_imp2.
+                            by apply com_trans_imp2. *)
                         +++ iApply (trace_state_resources_commit_lin2 clients c tag1 lt' T1 T2 trans sa 
                               s γ γmstate γmname extract b mc mstate mname m' with 
                               "[//][//][//][//][//][//][//][//][][Hkeys_conn2][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
@@ -805,7 +877,7 @@ Section trace_proof.
         iModIntro.
         iExists (T' ++ [[Cm (tag1, c) b]]).
         iFrame.
-        iExists t', (lt' ++ [(#tag1, (c, (#"CmLin", #b)))%V]), (optionalExtendExecution exec' [Cm (tag1, c) b]).
+        iExists t', (lt' ++ [(#tag1, (c, (#"CmLin", #b)))%V]), _.
         iFrame.
         iSplit.
         - iPureIntro.
@@ -847,10 +919,12 @@ Section trace_proof.
                        set_solver.
                     ** by exists t'.
                   ++ iSplit.
-                    ** iPureIntro; by apply based_on_add3.
+                    ** admit.
+                       (* iPureIntro; by apply based_on_add3. *)
                     ** iSplit.
                        --- iPureIntro.
-                           assert ([Cm (tag1, c) b] = [] ++ [Cm (tag1, c) b]) as ->; first set_solver.
+                           admit.
+                           (* assert ([Cm (tag1, c) b] = [] ++ [Cm (tag1, c) b]) as ->; first set_solver.
                            eapply valid_execution_rc_imp; try done; last set_solver.
                            simpl.
                            intros Hfalse.
@@ -860,7 +934,7 @@ Section trace_proof.
                            destruct Hex' as (_ & Hex' & _).
                            split; last done.
                            apply (Hex' [Cm (tag1, c) b] (Cm (tag1, c) b)); last set_solver.
-                           by apply com_trans_imp2.
+                           by apply com_trans_imp2. *)
                        --- iApply (trace_state_resources_commit_lin1 clients c tag1 lt' T' sa 
                              s γ γmstate γmname extract b mc mstate mname m' with 
                              "[//][//][//][//][//][//][//][][Hkeys_conn2][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
