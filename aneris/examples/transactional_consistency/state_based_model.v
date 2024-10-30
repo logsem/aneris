@@ -85,6 +85,11 @@ Definition commitTest : Type := execution -> transaction -> Prop.
 Definition applyTransaction (s : state) (t : transaction) : state := 
   foldl (λ s op, match op with | Wr sig k v => <[k := v]> s | _ => s end) s t.
 
+Definition applied_transaction (s1 s2 : state) (t : transaction) : state :=
+  (∀ k v, s2 !! k = Some v → 
+    (∀ v', latest_write_trans k v' trans → v = v') ∧ (¬(∃ sig v', (Wr sig k v' ∈ t)) → s1 !! k = Some v)) ∧
+  (∀ k, ((∃ sig v, (Wr sig k v) ∈ t) ∨ k ∈ dom s2) → k ∈ dom s1).
+
 Definition extendExecution (e : execution) (t : transaction) : execution :=
   match (last e) with 
     | Some s => e ++ [(t, applyTransaction s.2 t)] 
@@ -116,6 +121,7 @@ Definition read_state (c : val) (k : Key) (ov : option val) (i : nat)
 
 Definition pre_read (exec : execution) (t : transaction) : Prop :=
   ∀ tag c k ov i, (split exec).1 !! i = Some t → (Rd (tag, c) k ov) ∈ t → 
+    (¬ ∃ s v, rel_list t (Wr s k v) (Rd (tag, c) k ov)) → (∃ v, ov = Some v) →
     ∃ s, read_state c k ov i exec s.
 
 Definition commit_test_rc : commitTest := 
@@ -2274,6 +2280,33 @@ Proof.
     rewrite Heq in Hbased.
     rewrite /isCmOp in Hcm.
     destruct op; simpl; set_solver.
+Qed.
+
+Lemma extendExecution_imp i e1 e2 exec trans s :
+  valid_execution commit_test_rc exec →
+  extendExecution exec (trans ++ [Cm s true]) !! i = Some e1 → 
+  extendExecution exec (trans ++ [Cm s true]) !! (i + 1) = Some e2 → 
+  applyTransaction e1.2 e2.1 = e2.2.
+Proof.
+  intros Hvalid.
+  rewrite /extendExecution.
+  destruct Hvalid as (Hvalid & _).
+  simpl.
+  intros Hlookup_e1 Hlookup_e2.
+  destruct (last exec) as [p|] eqn:Hlast.
+  + rewrite lookup_snoc_Some in Hlookup_e1.
+    rewrite lookup_snoc_Some in Hlookup_e2.
+    destruct Hlookup_e2 as [Hlookup_e2|(Hlength & <-)].
+    * destruct Hlookup_e1 as [Hlookup_e1|Hlookup_e1]; last lia.
+      set_solver.
+    * destruct Hlookup_e1 as [Hlookup_e1|Hlookup_e1]; last lia.
+      simpl.
+      rewrite last_lookup in Hlast.
+      assert (i = Init.Nat.pred (length exec)) as Heq; first lia.
+      assert (e1 = p) as ->; set_solver.
+  + rewrite list_lookup_singleton_Some in Hlookup_e1.
+    rewrite list_lookup_singleton_Some in Hlookup_e2.
+    lia.
 Qed.
 
 Lemma valid_trace_pre T tag t e lt exec test : 
