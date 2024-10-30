@@ -64,12 +64,53 @@ Section EoFin.
       eofin_smap: gname;
   }.
 
-  Section Threads.
-    Context `{EoFinG Σ}.
-    
-    Definition thread_auth γ (n: nat): iProp Σ := own γ (●E n).
+  Definition lvl2nat {X} (l: EOLevel X) := bn2nat _ l. 
 
+  Definition d0 := ith_bn NUM_DEG 0 ltac:(lia).
+  Definition d1 := ith_bn NUM_DEG 1 ltac:(lia). 
+  Definition d2 := ith_bn NUM_DEG 2 ltac:(lia). 
+  Lemma d12_lt: strict (bounded_nat_le _) d1 d2.
+  Proof using. apply ith_bn_lt. lia. Qed. 
+  Lemma d01_lt: strict (bounded_nat_le _) d0 d1.
+  Proof using. apply ith_bn_lt. lia. Qed.
+  
+  Ltac BMU_burn_cp :=
+    iApply BMU_intro;
+    iDestruct (cp_mul_take with "CPS") as "[CPS CP]";
+    iSplitR "CP";
+    [| do 2 iExists _; iFrame; iPureIntro; done]. 
+  
+  Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS _ EM _ (↑ nroot)}.
+  
+  Ltac MU_by_BMU :=
+    iApply OBLS_AMU; [by rewrite nclose_nroot| ];
+    iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH". 
+  
+  Ltac MU_by_burn_cp := MU_by_BMU; BMU_burn_cp.
+  
+  Ltac pure_step_hl := 
+    iApply sswp_MU_wp; [done| ];
+    iApply sswp_pure_step; [done| ]; simpl;
+    iNext.
+  
+  Ltac pure_step := pure_step_hl; MU_by_burn_cp.   
+  Ltac pure_step_cases := pure_step || (iApply wp_value; []) || wp_bind (RecV _ _ _ _)%V.
+  Ltac pure_steps := repeat (pure_step_cases; []).
+
+
+  Section ThreadResources.
+    Context {PRE: EoFinPreG Σ}.
+
+    Definition thread_auth γ (n: nat): iProp Σ := own γ (●E n).
     Definition thread_frag γ (n: nat): iProp Σ := own γ (◯E n).
+
+    Lemma thread_res_alloc n:
+      ⊢ |==> ∃ γ, thread_auth γ n ∗ thread_frag γ n.
+    Proof using.
+      iMod (own_alloc (●E n ⋅  ◯E n)) as (?) "[A F]".
+      { by apply auth_both_valid_2. }
+      iExists _. by iFrame.
+    Qed.       
 
     Lemma thread_agree γ n1 n2:
       thread_auth γ n1-∗ thread_frag γ n2 -∗ ⌜ n1 = n2 ⌝. 
@@ -90,48 +131,21 @@ Section EoFin.
       apply excl_auth_update.
     Qed.
 
-    Definition lvl2nat {X} (l: EOLevel X) := bn2nat _ l. 
+  End ThreadResources.
 
-    Definition d0 := ith_bn NUM_DEG 0 ltac:(lia).
-    Definition d1 := ith_bn NUM_DEG 1 ltac:(lia). 
-    Definition d2 := ith_bn NUM_DEG 2 ltac:(lia). 
-    Lemma d12_lt: strict (bounded_nat_le _) d1 d2.
-    Proof using. apply ith_bn_lt. lia. Qed. 
-    Lemma d01_lt: strict (bounded_nat_le _) d0 d1.
-    Proof using. apply ith_bn_lt. lia. Qed.
+  Definition ex_ith_sig (n i: nat) (s: SignalId): iProp Σ :=
+    ∃ l, sgn EO_OP s l (Some $ Nat.ltb i n) (H3 := oGS) ∗ ⌜ lvl2nat l = i ⌝. 
+  
+  Definition smap_repr' {PRE: EoFinPreG Σ} γ K n (smap: gmap nat SignalId): iProp Σ :=
+    own γ (● (to_agree <$> smap: gmapUR nat (agreeR SignalId))) ∗
+    ⌜ dom smap = set_seq 0 K ⌝ ∗
+    ([∗ map] i ↦ s ∈ smap, ex_ith_sig n i s).
 
-    Ltac BMU_burn_cp :=
-      iApply BMU_intro;
-      iDestruct (cp_mul_take with "CPS") as "[CPS CP]";
-      iSplitR "CP";
-      [| do 2 iExists _; iFrame; iPureIntro; done]. 
+  Section Threads.
+    Context `{EoFinG Σ}.
 
-    Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS _ EM _ (↑ nroot)}.
-
-    Ltac MU_by_BMU :=
-      iApply OBLS_AMU; [by rewrite nclose_nroot| ];
-      iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH". 
-
-    Ltac MU_by_burn_cp := MU_by_BMU; BMU_burn_cp.
-
-    Ltac pure_step_hl := 
-      iApply sswp_MU_wp; [done| ];
-      iApply sswp_pure_step; [done| ]; simpl;
-      iNext.
-
-    Ltac pure_step := pure_step_hl; MU_by_burn_cp. 
-
-    Ltac pure_step_cases := pure_step || (iApply wp_value; []) || wp_bind (RecV _ _ _ _)%V.
-    Ltac pure_steps := repeat (pure_step_cases; []).
-
-    Definition ex_ith_sig (n i: nat) (s: SignalId): iProp Σ :=
-      ∃ l, sgn EO_OP s l (Some $ Nat.ltb i n) (H3 := oGS) ∗ ⌜ lvl2nat l = i ⌝. 
-
-    Definition smap_repr K n (smap: gmap nat SignalId): iProp Σ :=
-      own eofin_smap (● (to_agree <$> smap: gmapUR nat (agreeR SignalId))) ∗
-      ⌜ dom smap = set_seq 0 K ⌝ ∗
-      ([∗ map] i ↦ s ∈ smap, ex_ith_sig n i s).
-
+    Definition smap_repr := smap_repr' eofin_smap. 
+    
     Definition threads_auth n: iProp Σ := 
       thread_auth eofin_even (if Nat.even n then n else n + 1) ∗
       thread_auth eofin_odd (if Nat.odd n then n else n + 1). 
@@ -142,9 +156,6 @@ Section EoFin.
 
     Definition eofin_inv l M BOUND: iProp Σ :=
       inv (nroot .@ "eofin") (eofin_inv_inner l M BOUND).
-
-    Definition even_res n: iProp Σ :=
-      thread_frag eofin_even n.
 
     Definition ith_sig (i: nat) (s: SignalId): iProp Σ :=
       own eofin_smap (◯ {[ i := to_agree s ]}).
@@ -189,7 +200,7 @@ Section EoFin.
     Proof using.
       iIntros "#ITH SR".
       iDestruct (ith_sig_in with "[$] [$]") as "%ITH".
-      rewrite /smap_repr. iDestruct "SR" as "(SM & % & SR)".
+      rewrite /smap_repr /smap_repr'. iDestruct "SR" as "(SM & % & SR)".
       rewrite {2 5}(map_split smap i) ITH /=.
       rewrite !big_sepM_union.
       2: apply map_disjoint_singleton_l_2; by apply lookup_delete.
@@ -198,18 +209,19 @@ Section EoFin.
     Qed.
 
     (* TODO: use bupd in definition of OU *)
-    Lemma smap_create_ep i K n smap π τ
+    Lemma smap_create_ep i K n smap π π__cp τ
+      (PH_LE: phase_le π__cp π)
       (LT: i < K):
       ⊢ smap_repr K n smap -∗ 
-         cp EO_OP π d2 (H3 := oGS) -∗
+         cp EO_OP π__cp d2 (H3 := oGS) -∗
          th_phase_ge EO_OP τ π (H3 := oGS) -∗
          |==> OU EO_OP τ
            (∃ s, ith_sig i s ∗
-             ep EO_OP s π d1 (H3 := oGS) ∗ smap_repr K n smap ∗
+             ep EO_OP s π__cp d1 (H3 := oGS) ∗ smap_repr K n smap ∗
             th_phase_ge EO_OP τ π (H3 := oGS)) (H3 := oGS).
     Proof using.
       iIntros "SR CP PH".
-      rewrite /smap_repr. iDestruct "SR" as "(AUTH & %DOM & SIGS)".
+      rewrite /smap_repr /smap_repr'. iDestruct "SR" as "(AUTH & %DOM & SIGS)".
       assert (i ∈ dom smap) as [s ITH]%elem_of_dom.
       { rewrite DOM. apply elem_of_set_seq. lia. }
       rewrite {2 5}(map_split smap i) ITH /=.
@@ -217,8 +229,10 @@ Section EoFin.
       2, 3: apply map_disjoint_singleton_l_2; by apply lookup_delete.
       iDestruct "SIGS" as "[SIG SIGS]". setoid_rewrite big_sepM_singleton.
       rewrite {1}/ex_ith_sig. iDestruct "SIG" as "(%l & SIG & %LVLi)".
-      iDestruct (create_ep_upd with "[$] [$] [$]") as "OU".
+      iDestruct (create_ep_upd with "[$] [$] [PH]") as "OU".
       { apply (ith_bn_lt _ 1). lia. }
+      { done. }
+      { done. }
       iMod (own_update with "AUTH") as "X". 
       { apply auth_update_dfrac_alloc. 
         2: { apply singleton_included_l with (i := i).
@@ -374,20 +388,6 @@ Section EoFin.
         tr_cond_neg n: cond (S n) = negb (cond n); 
     }.
 
-    Lemma even_thread_resource: ThreadResource even_res Nat.even.
-    Proof using.
-      split.
-      - iIntros (??) "[E ?] TH".
-        by iDestruct (thread_agree with "E TH") as "%".
-      - iIntros (??) "[E ?] TH".        
-        iMod (thread_update with "E TH") as "[E TH]". iFrame.
-        apply Is_true_true_1 in Cn. rewrite -Nat.negb_even Cn. simpl.
-        iModIntro. rewrite /threads_auth.
-        rewrite -Nat.negb_even !Nat.even_add Cn. simpl.
-        rewrite -Nat.add_assoc. iFrame.
-      - intros. by rewrite even_succ_negb.
-    Qed. 
-
     Lemma thread_spec_holds τ l B (BOUND: B < LIM) (π π2: Phase) n
       (PH_LE2: phase_le π2 π)
       `(ThreadResource th_res cond)
@@ -397,14 +397,14 @@ Section EoFin.
            th_res n ∗
            cp_mul _ π2 d2 (B - n) (H3 := oGS) ∗
            cp_mul _ π d0 20 (H3 := oGS) ∗
-           (cp _ π d2 (H3 := oGS) ∨ ∃ sw π__e, ith_sig (n - 1) sw ∗ ep _ sw π__e d1 (H3 := oGS) ∗ ⌜ phase_le π__e π ⌝) ∗
+           (cp _ π2 d2 (H3 := oGS) ∨ ∃ sw π__e, ith_sig (n - 1) sw ∗ ep _ sw π__e d1 (H3 := oGS) ∗ ⌜ phase_le π__e π ⌝) ∗
            th_phase_ge EO_OP τ π (H3 := oGS) ∗
            (if n <? B
             then ∃ s, ith_sig n s ∗ obls EO_OP τ {[s]} (H3 := oGS)
             else obls EO_OP τ ∅ (H3 := oGS)) }}}
         thread_prog #l #n #B @ τ
       {{{ v, RET v; obls EO_OP τ ∅ (H3 := oGS) }}}.       
-    Proof using OBLS_AMU.
+    Proof using OBLS_AMU. 
       iIntros (Φ). iLöb as "IH" forall (π π2 n PH_LE2). 
       iIntros "(#INV & #EB & TH & CPS2 & CPS & EXTRA & PH & SN_OB) POST".
       rewrite {2}/thread_prog.
@@ -562,9 +562,9 @@ Section EoFin.
           iApply (OU_wand with "[-OU]"); [| done]. iIntros "(%sw & #SW & #EP & SR & PH)".
           (* rewrite -E in H0. *)
           rewrite Nat.min_r; [| lia].
-
+          
           iDestruct (ith_sig_expect with "[$] [$] [$] [$] [$] [$]") as "OU".
-          { reflexivity. }
+          { done. }
           { reflexivity. }
           iApply OU_BMU.
           iApply (OU_wand with "[-OU]"); [| done].
@@ -584,8 +584,12 @@ Section EoFin.
             rewrite Nat.min_r; [| lia]. iFrame. }
           iModIntro.
           wp_bind (Snd _)%E.
-          do 3 pure_step_cases. 
-          iApply ("IH" $! π' with "[] [-POST]"); [..| by iFrame]. 
+
+          pure_step_hl.
+          MU_by_BMU. BMU_burn_cp.
+          
+          do 2 pure_step_cases. 
+          iApply ("IH" $! π' π2 with "[] [-POST]"); [..| by iFrame]. 
           { iPureIntro. etrans; [apply PH_LE2 | apply PH_LE']. }
           replace (B - (m + 1)) with (S (B - (m + 2))) by lia. 
           iFrame "#∗". 
@@ -628,8 +632,209 @@ Section EoFin.
                iExists _. iFrame "#∗". }
           iRight. rewrite Nat.add_sub.
           do 2 iExists _. iFrame "#∗". done.
+    Time Qed. 
+
+    Lemma thread_spec_wrapper τ l B (BOUND: B < LIM) (π π2: Phase) n
+      (PH_LE2: phase_le π2 π)
+      `(ThreadResource th_res cond)
+
+      :
+      {{{ eofin_inv l B BOUND ∗ exc_lb EO_OP 20 (H3 := oGS) ∗
+           th_res n ∗
+           cp_mul _ π2 d2 (S (B - n)) (H3 := oGS) ∗
+           cp_mul _ π d0 20 (H3 := oGS) ∗           
+           th_phase_ge EO_OP τ π (H3 := oGS) ∗
+           (if n <? B
+            then ∃ s, ith_sig n s ∗ obls EO_OP τ {[s]} (H3 := oGS)
+            else obls EO_OP τ ∅ (H3 := oGS)) }}}
+        thread_prog #l #n #B @ τ
+      {{{ v, RET v; obls EO_OP τ ∅ (H3 := oGS) }}}.       
+    Proof using OBLS_AMU.
+      iIntros (Φ). iIntros "(#INV & #EB & TH & CPS2 & CPS & PH & SN_OB) POST".
+      iDestruct (cp_mul_take with "CPS2") as "[??]".
+      iApply (thread_spec_holds with "[-POST] [$]"); eauto.
+      iFrame "#∗".
     Qed. 
 
+    Definition even_res n: iProp Σ := thread_frag eofin_even n.
+    Definition odd_res n: iProp Σ := thread_frag eofin_odd n.
+
+    Lemma even_thread_resource: ThreadResource even_res Nat.even.
+    Proof using.
+      split.
+      - iIntros (??) "[E ?] TH".
+        by iDestruct (thread_agree with "E TH") as "%".
+      - iIntros (??) "[E ?] TH".        
+        iMod (thread_update with "E TH") as "[E TH]". iFrame.
+        apply Is_true_true_1 in Cn. rewrite -Nat.negb_even Cn. simpl.
+        iModIntro. rewrite /threads_auth.
+        rewrite -Nat.negb_even !Nat.even_add Cn. simpl.
+        rewrite -Nat.add_assoc. iFrame.
+      - intros. by rewrite even_succ_negb.
+    Qed.
+
+    Lemma odd_thread_resource: ThreadResource odd_res Nat.odd.
+    Proof using.
+      split.
+      - iIntros (??) "[? O] TH".
+        by iDestruct (thread_agree with "O TH") as "%".
+      - iIntros (??) "[? O] TH".        
+        iMod (thread_update with "O TH") as "[O TH]". iFrame.
+        apply Is_true_true_1 in Cn. rewrite -Nat.negb_odd Cn. simpl.
+        iModIntro. rewrite /threads_auth.
+        rewrite -Nat.negb_odd !Nat.odd_add Cn. simpl.
+        rewrite -Nat.add_assoc. iFrame.
+      - intros. by rewrite odd_succ_negb.
+    Qed.    
+
   End Threads.
+
+  Section MainProof.
+    Context {PRE: EoFinPreG Σ}.
+
+    (* TODO: move *)
+    Lemma map_nat_agree_valid {A: ofe} (m: gmap nat A):
+      ✓ ((to_agree <$> m): gmapUR nat (agreeR A)).
+    Proof using.
+      red. intros k.
+      destruct lookup eqn:L; [| done].
+      apply lookup_fmap_Some in L. 
+      destruct L as (a&<-&?). 
+      done.
+    Qed.      
+
+    (* TODO: parametrize smap_repr with the lower bound *)
+    Lemma alloc_inv l (* (i: nat) *) B (LT: B < LIM) τ
+      (i := 0):
+      obls _ τ ∅ (H3 := oGS) -∗ l ↦ #i ==∗ 
+        BMU _ ⊤ τ 2 (|={∅}=> ∃ (eoG: EoFinG Σ),
+                       even_res (if Nat.even i then i else i + 1) ∗
+                       odd_res (if Nat.even i then i + 1 else i) ∗
+                       eofin_inv l B LT ∗
+                       obls _ τ ∅ (H3 := oGS)
+        ) (oGS := oGS).
+    Proof using.
+      iIntros "OB L".
+      iMod (thread_res_alloc i) as "(%γ & AUTH & FRAG)".
+      iMod (thread_res_alloc (i + 1)) as "(%γ' & AUTH' & FRAG')".
+      
+      set (m := min B (i + 2)).
+      iAssert (BMU EO_OP ⊤ τ 2 (|==> ∃ γ smap, smap_repr' γ m i smap ∗ obls _ τ ∅ (H3 := oGS)))%I with "[OB]" as "-#SR".
+      { 
+        assert (m <= i \/ m = i + 1 \/ m = i + 2) as [LE | [EQ | EQ]] by lia; revgoals.
+        - iApply OU_BMU.
+          assert (i < LIM) as Di by lia. 
+          unshelve iDestruct (OU_create_sig with "[$]") as "OU".
+          { eexists. apply Di. }
+          iApply (OU_wand with "[-OU] [$]"). iIntros "(%si & SGi & OBLS)". 
+
+          iApply OU_BMU.
+          assert (i + 1 < LIM) as Di' by lia. 
+          unshelve iDestruct (OU_create_sig with "[$]") as "OU".
+          { eexists. apply Di'. }
+          iApply (OU_wand with "[-OU] [$]"). iIntros "(%si' & SGi' & OBLS)".
+
+          iApply BMU_intro.
+          set (smap0 := {[ i := si; i + 1 := si']}: gmap nat SignalId).
+          iMod (own_alloc (● ((to_agree <$> smap0): gmapUR nat (agreeR SignalId)) ⋅ ◯ _)) as (?) "[A F]".
+          { apply auth_both_valid_2; [| reflexivity]. apply map_nat_agree_valid. }
+          iModIntro. do 2 iExists _. iSplitR "OBLS"; [| admit].
+          rewrite /smap_repr'. iFrame.
+          iSplitR.
+          { subst smap0. iPureIntro. rewrite !dom_insert_L.
+            subst m. subst i. 
+            rewrite EQ. simpl. set_solver. }
+          subst smap0. rewrite !big_sepM_insert; try set_solver.
+          rewrite big_sepM_empty. rewrite /ex_ith_sig.
+          rewrite bi.sep_assoc. iSplitL; [| done]. iSplitL "SGi".
+          + iExists _. rewrite (proj2 (PeanoNat.Nat.ltb_ge _ _)); [| lia].
+            iFrame. done. 
+          + iExists _. rewrite (proj2 (PeanoNat.Nat.ltb_ge _ _)); [| lia].
+            iFrame. done.
+        - iApply OU_BMU.
+          assert (i < LIM) as Di by lia. 
+          unshelve iDestruct (OU_create_sig with "[$]") as "OU".
+          { eexists. apply Di. }
+          iApply (OU_wand with "[-OU] [$]"). iIntros "(%si & SGi & OBLS)".
+
+          iApply BMU_intro.
+          set (smap0 := {[ i := si]}: gmap nat SignalId).
+          iMod (own_alloc (● ((to_agree <$> smap0): gmapUR nat (agreeR SignalId)) ⋅ ◯ _)) as (?) "[A F]".
+          { apply auth_both_valid_2; [| reflexivity]. apply map_nat_agree_valid. }
+          iModIntro. do 2 iExists _. iSplitR "OBLS"; [| admit].
+          rewrite /smap_repr'. iFrame.
+          iSplitR.
+          { subst smap0. iPureIntro. rewrite !dom_insert_L.
+            subst m. subst i. 
+            rewrite EQ. simpl. set_solver. }
+          subst smap0. rewrite !big_sepM_insert; try set_solver.
+          rewrite big_sepM_empty. rewrite /ex_ith_sig.
+          iSplitL; [| done].
+          iExists _. rewrite (proj2 (PeanoNat.Nat.ltb_ge _ _)); [| lia].
+          iFrame. done.
+        - iApply BMU_intro.
+          set (smap0 := ∅: gmap nat SignalId).
+          iMod (own_alloc (● ((to_agree <$> smap0): gmapUR nat (agreeR SignalId)) ⋅ ◯ _)) as (?) "[A F]".
+          { apply auth_both_valid_2; [| reflexivity]. apply map_nat_agree_valid. }
+          iModIntro. do 2 iExists _. iSplitR "OB"; [| admit].
+          rewrite /smap_repr'. iFrame.
+          iSplitR.
+          { subst smap0. iPureIntro. 
+            subst m. subst i.
+            assert (B = 0) as -> by lia. simpl.  
+            set_solver. }
+          subst smap0. rewrite big_sepM_empty. done. }
+
+      (* iMod "SR" as (γ__sr smap) "BMU". iModIntro. *)
+      iApply (BMU_wand with "[-SR] [$]"). 
+      iIntros "X". iMod "X" as "(%γ__sr & %smap & SR & OB)".
+      
+      set (eoG := {| 
+          eofin_even := (if Nat.even i then γ else γ');
+          eofin_odd := (if Nat.even i then γ' else γ);
+          eofin_smap := γ__sr
+      |}).
+      iExists eoG. iFrame.
+      iApply inv_alloc. iNext.
+      rewrite /eofin_inv_inner. do 2 iExists _. iFrame.
+    Qed. 
+
+    Theorem main_spec τ π (i B: nat):
+      {{{ exc_lb EO_OP 20 (H3 := oGS) ∗
+           cp_mul _ π d2 (S (2 * B)) (H3 := oGS) ∗
+           th_phase_ge EO_OP τ π (H3 := oGS) ∗
+           obls EO_OP τ ∅ (H3 := oGS) }}}
+      start #i #B @ τ
+      {{{ v, RET v; obls EO_OP τ ∅ (H3 := oGS) }}}.
+    Proof using.
+      iIntros (Φ). iIntros "(#EB & CPS2 & PH & OB) POST". rewrite /start.
+      iDestruct (cp_mul_take with "CPS2") as "[CPS2 CP]". 
+
+      wp_bind (RecV _ _ _ _)%V.
+      pure_step_hl.
+      MU_by_BMU.
+      iApply OU_BMU.
+      iDestruct (exchange_cp_upd with "[$] [$] [$]") as "OU". 
+      { reflexivity. }
+      { etrans; [apply d01_lt| apply d12_lt]. }
+      iApply (OU_wand with "[-OU]"); [| by iFrame]. iIntros "[CPS PH]".
+      BMU_burn_cp.
+
+      
+      pure_steps.
+      wp_bind (ref _)%E.
+      (* iApply wp_atomic.       *)
+      iApply sswp_MU_wp; [done| ]. iApply wp_alloc.
+      iNext.
+      iIntros "%l L _". 
+      assert (B < LIM) as LT by admit.
+      
+      iPoseProof (inv_alloc (nroot .@ "eofin") ⊤ (eofin_inv_inner l B LT)) as "-#inv".
+      iMod "inv" as "inv". 
+      iNext. 
+      
+  End MainProof.
+
+
 
 End EoFin.

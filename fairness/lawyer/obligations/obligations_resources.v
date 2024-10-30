@@ -467,10 +467,11 @@ Section ObligationsRepr.
     Qed.
 
     (* TODO: ? use duplicable "signal exists" resource *)
-    Lemma create_ep_upd ζ π d d' sid l ov (DEG: deg_lt _ d' d) 
+    Lemma create_ep_upd ζ π π__cp d d' sid l ov (DEG: deg_lt _ d' d)
+      (PH_LE: phase_le π__cp π)
       :
-      ⊢ cp π d -∗ sgn sid l ov -∗ th_phase_ge ζ π -∗ 
-        OU ζ (ep sid π d' ∗ sgn sid l ov ∗ th_phase_ge ζ π).
+      ⊢ cp π__cp d -∗ sgn sid l ov -∗ th_phase_ge ζ π -∗ 
+        OU ζ (ep sid π__cp d' ∗ sgn sid l ov ∗ th_phase_ge ζ π).
     Proof using H1 H0.
       rewrite /OU /OU'. iIntros "CP SIG PH %δ MSI".
       iDestruct (sigs_msi_in with "[$] [$]") as %[v Sζ].
@@ -481,14 +482,15 @@ Section ObligationsRepr.
       iCombine "CPS CP" as "CPS".
       iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _ _). 
       iRevert "CPS EPS". iFrame. simpl. iIntros "CPS EPS".
-
+ 
       rewrite bi.sep_comm -!bi.sep_assoc.
       iSplitR.
       { iPureIntro.
-        red. do 4 right. left. exists sid. do 3 eexists. 
+        red. do 4 right. left. exists sid, π__cp. do 2 eexists. 
         erewrite (f_equal (creates_ep _ _ _)).
         { econstructor; eauto.
-          simpl. by apply elem_of_dom. }
+          - simpl. by apply elem_of_dom.
+          - etrans; eauto. }
         simpl. reflexivity. }
 
       rewrite /ep. rewrite /cps_repr /eps_repr. 
@@ -511,7 +513,7 @@ Section ObligationsRepr.
       1: reflexivity.
       2: { apply gmultiset_local_update_dealloc. reflexivity. }
       rewrite gmultiset_difference_diag. set_solver.
-    Qed. 
+    Qed.
       
     (* Lemma expect_sig_upd ζ sid π d l R *)
     (*   : *)
