@@ -132,19 +132,16 @@ Section EoFin.
       ⌜ dom smap = set_seq 0 K ⌝ ∗
       ([∗ map] i ↦ s ∈ smap, ex_ith_sig n i s).
 
+    Definition threads_auth n: iProp Σ := 
+      thread_auth eofin_even (if Nat.even n then n else n + 1) ∗
+      thread_auth eofin_odd (if Nat.odd n then n else n + 1). 
+
     Definition eofin_inv_inner l M (BOUND: M < LIM) : iProp Σ :=
       ∃ (n: nat) (smap: gmap nat SignalId), 
-          l ↦ #n ∗
-          thread_auth eofin_even (if Nat.even n then n else n + 1) ∗
-          thread_auth eofin_odd (if Nat.odd n then n else n + 1) ∗
-          smap_repr (min M (n + 2)) n smap
-    .
+          l ↦ #n ∗ threads_auth n ∗ smap_repr (min M (n + 2)) n smap.
 
     Definition eofin_inv l M BOUND: iProp Σ :=
       inv (nroot .@ "eofin") (eofin_inv_inner l M BOUND).
-
-    Lemma add1_helper {x y: nat}: x < y -> x + 1 <= y.
-    Proof. lia. Qed.
 
     Definition even_res n: iProp Σ :=
       thread_frag eofin_even n.
@@ -331,21 +328,6 @@ Section EoFin.
       rewrite DOM. f_equal. symmetry. by apply Nat.min_l.
     Qed.
 
-  (* "SW" :  *)
-  (* "EP" :  *)
-  (* --------------------------------------□ *)
-  (* "TH" : even_res (m + 1) *)
-  (* "CPS2" : cp_mul EO_OP π d2 (S (B - (m + 2))) *)
-  (* "SN" : ith_sig (m + 1) s *)
-  (* "OB" : obls EO_OP τ {[s]} *)
-  (* "POST" : ∀ v : val, obls EO_OP τ ∅ -∗ Φ v *)
-  (* "CPS" : cp_mul EO_OP π d0 12 *)
-  (* "EVEN" : thread_auth eofin_even (m + 1) *)
-  (* "ODD" : thread_auth eofin_odd m *)
-  (* "CLOS" : ▷ eofin_inv_inner l B BOUND ={⊤ ∖ ↑nroot.@"eofin",⊤}=∗ emp *)
-  (* "L" : l ↦ #m *)
-  (* "SR" :  *)
-
     (* TODO: generalize, move *)
     Lemma lvl_lt_equiv (l1 l2: EOLevel LIM):
       lvl_lt EO_OP l1 l2 <-> bn2nat _ l1 < bn2nat _ l2.
@@ -356,8 +338,7 @@ Section EoFin.
       - intros [? ?]. apply PeanoNat.Nat.le_neq. split; auto.
         intros ->. destruct H1. f_equal. apply Nat.lt_pi.
       - intros ?. split; [lia| ]. intros ?. inversion H1. subst. lia.
-    Qed. 
-
+    Qed.
     
     Lemma ith_sig_expect i sw m τ π π__e N smap s
       (PH_EXP: phase_le π__e π)
@@ -383,12 +364,37 @@ Section EoFin.
       iExists _. iFrame. iSplitL; [| done].
       iApply "SR". iExists _.
       rewrite (proj2 (Nat.ltb_ge _ _)); [| done]. by iFrame.
+    Qed.
+
+    Record ThreadResource (th_res: nat -> iProp Σ) (cond: nat -> bool) := {
+        tr_agree (n1 n2: nat): threads_auth n1-∗ th_res n2 -∗
+                              ⌜ n2 = if (cond n1) then n1 else (n1 + 1)%nat ⌝;
+        tr_update (n: nat) (Cn: cond n):
+          threads_auth n-∗ th_res n ==∗ threads_auth (n + 1) ∗ th_res (n + 2);
+        tr_cond_neg n: cond (S n) = negb (cond n); 
+    }.
+
+    Lemma even_thread_resource: ThreadResource even_res Nat.even.
+    Proof using.
+      split.
+      - iIntros (??) "[E ?] TH".
+        by iDestruct (thread_agree with "E TH") as "%".
+      - iIntros (??) "[E ?] TH".        
+        iMod (thread_update with "E TH") as "[E TH]". iFrame.
+        apply Is_true_true_1 in Cn. rewrite -Nat.negb_even Cn. simpl.
+        iModIntro. rewrite /threads_auth.
+        rewrite -Nat.negb_even !Nat.even_add Cn. simpl.
+        rewrite -Nat.add_assoc. iFrame.
+      - intros. by rewrite even_succ_negb.
     Qed. 
 
     Lemma thread_spec_holds τ l B (BOUND: B < LIM) (π π2: Phase) n
-      (PH_LE2: phase_le π2 π):
+      (PH_LE2: phase_le π2 π)
+      `(ThreadResource th_res cond)
+      :
       {{{ eofin_inv l B BOUND ∗ exc_lb EO_OP 20 (H3 := oGS) ∗
-           even_res n ∗
+           (* even_res n ∗ *)
+           th_res n ∗
            cp_mul _ π2 d2 (B - n) (H3 := oGS) ∗
            cp_mul _ π d0 20 (H3 := oGS) ∗
            (cp _ π d2 (H3 := oGS) ∨ ∃ sw π__e, ith_sig (n - 1) sw ∗ ep _ sw π__e d1 (H3 := oGS) ∗ ⌜ phase_le π__e π ⌝) ∗
@@ -423,13 +429,13 @@ Section EoFin.
       iApply wp_atomic. 
       iInv "INV" as ">inv" "CLOS". iModIntro. 
       rewrite {1}/eofin_inv_inner.
-      iDestruct "inv" as (m smap) "(L & EVEN & ODD & SR)".
-      iDestruct (thread_agree with "EVEN [$]") as %<-.
-      destruct (even_or_odd m) as [EVEN | ODD].
+      iDestruct "inv" as (m smap) "(L & AUTH & SR)".
+      iDestruct (tr_agree with "[$] TH") as %EQ; eauto. subst n. 
+      destruct (cond m) eqn:Cm. 
       -
-        pose proof (Is_true_true_1 _ EVEN) as E.
-        rewrite E.
-        pose proof (Nat.negb_even m) as O. rewrite E in O. simpl in O. rewrite -O. 
+        (* pose proof (Is_true_true_1 _ EVEN) as E. *)
+        (* rewrite E. *)
+        (* pose proof (Nat.negb_even m) as O. rewrite E in O. simpl in O. rewrite -O.  *)
         
         iApply sswp_MU_wp; [done| ]. 
         iApply (wp_cmpxchg_suc with "[$]"); try done.
@@ -459,18 +465,18 @@ Section EoFin.
         2: { do 2 iExists _. iFrame. done. }
         iApply wp_value.
         
-        iMod (thread_update _ _ _ (m + 2) with "EVEN [$]") as "[EVEN TH]". 
+        iMod (tr_update with "[$] TH") as "[AUTH TH]"; eauto. 
 
-        rewrite E in H0.
-        
+        (* rewrite E in H0. *)
+
         destruct (Nat.le_gt_cases B (m + 2)). 
         + iDestruct "COND" as "[COND | CC]".
           2: { iMod "CC" as "[% ?]". lia. }
           iDestruct "COND" as "(% & OBLS & SM)".
           
-          iMod ("CLOS" with "[EVEN ODD SM L]") as "?".
+          iMod ("CLOS" with "[AUTH SM L]") as "?".
           { rewrite /eofin_inv_inner. iNext. iExists (m + 1), smap.
-            rewrite even_plus1_negb odd_plus1_negb E -O. simpl. 
+            (* rewrite even_plus1_negb odd_plus1_negb E -O. simpl.  *)
             rewrite -Nat.add_assoc. rewrite Nat2Z.inj_add. 
             iFrame.
             rewrite Nat.min_l; [| done]. rewrite Nat.min_l; [| lia]. done. }
@@ -493,11 +499,11 @@ Section EoFin.
           { iDestruct "CC" as "(% & ? & ?)". lia. }
           iClear "SN".  
           iMod "COND" as "[% (%s' & %lm' & SM & SN & OBLS & %LVL')]". 
-          iMod ("CLOS" with "[EVEN ODD SM L]") as "?".
+          iMod ("CLOS" with "[AUTH SM L]") as "?".
           { rewrite /eofin_inv_inner. iNext. iExists (m + 1), _.
-            rewrite even_plus1_negb odd_plus1_negb E -O. simpl. 
+            (* rewrite even_plus1_negb odd_plus1_negb E -O. simpl.  *)
             rewrite -Nat.add_assoc. rewrite Nat2Z.inj_add. 
-            iFrame. rewrite -Nat.add_assoc. simpl. iFrame. }
+            iFrame. }
           
           iModIntro.
           wp_bind (Snd _)%E.           
@@ -533,9 +539,10 @@ Section EoFin.
           replace (m + 2) with (S (m + 1)) by lia.
           iFrame. 
           iExists _. iFrame. 
-      - pose proof (Is_true_true_1 _ ODD) as O.
-        rewrite O.
-        pose proof (Nat.negb_odd m) as E. rewrite O in E. simpl in E. rewrite -E. 
+      -
+        (* pose proof (Is_true_true_1 _ ODD) as O. *)
+        (* rewrite O. *)
+        (* pose proof (Nat.negb_odd m) as E. rewrite O in E. simpl in E. rewrite -E.  *)
 
         iApply sswp_MU_wp; [done| ]. 
         iApply (wp_cmpxchg_fail with "[$]"); try done.
@@ -543,8 +550,7 @@ Section EoFin.
         { econstructor. done. }
         iNext. iIntros "L".
 
-        assert (B - (m + 1) = S (B - (m + 2))) as LE.
-        { destruct (Nat.even m); lia. }
+        assert (B - (m + 1) = S (B - (m + 2))) as LE by lia. 
         rewrite LE.
 
         iDestruct "EXTRA" as "[CP2' | EXP]". 
@@ -554,7 +560,8 @@ Section EoFin.
           { lia. }
           iApply OU_BMU.
           iApply (OU_wand with "[-OU]"); [| done]. iIntros "(%sw & #SW & #EP & SR & PH)".
-          rewrite -E in H0. rewrite Nat.min_r; [| lia].  
+          (* rewrite -E in H0. *)
+          rewrite Nat.min_r; [| lia].
 
           iDestruct (ith_sig_expect with "[$] [$] [$] [$] [$] [$]") as "OU".
           { reflexivity. }
@@ -572,10 +579,9 @@ Section EoFin.
  
           iApply wp_value.
 
-          iMod ("CLOS" with "[EVEN ODD SR L]") as "?".
+          iMod ("CLOS" with "[AUTH SR L]") as "?".
           { rewrite /eofin_inv_inner. iNext. iExists m, smap.
-            rewrite Nat.min_r; [| lia].
-            rewrite -E O. iFrame. }
+            rewrite Nat.min_r; [| lia]. iFrame. }
           iModIntro.
           wp_bind (Snd _)%E.
           do 3 pure_step_cases. 
@@ -607,10 +613,9 @@ Section EoFin.
  
           iApply wp_value.
 
-          iMod ("CLOS" with "[EVEN ODD SR L]") as "?".
+          iMod ("CLOS" with "[AUTH SR L]") as "?".
           { rewrite /eofin_inv_inner. iNext. iExists m, smap.
-            rewrite Nat.min_r; [| lia].
-            rewrite -E O. iFrame. }
+            rewrite Nat.min_r; [| lia]. iFrame. }
           iModIntro.
           wp_bind (Snd _)%E.
           do 3 pure_step_cases. 
