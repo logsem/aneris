@@ -199,13 +199,13 @@ Section Termination.
       preserved_by OP (loc_step_of OP τ) (fun δ => sig_st_le st (ps_sigs _ δ !! sid)).
     Proof using.
       do 2 red. intros δ1 δ2 SIG_LE STEP.
-      pose proof (next_sig_id_fresh _ δ1) as FRESH.  
+      pose proof (next_sig_id_fresh (default ∅ (ps_obls _ δ1 !! τ) ∪ (dom $ ps_sigs _ δ1))) as FRESH.
       inv_loc_step STEP; destruct δ1; try done; simpl in *.
       - subst new_sigs0.
         destruct (decide (sid = s0)) as [-> | ?].
         2: { rewrite lookup_insert_ne. apply SIG_LE. done. }
         rewrite lookup_insert.
-        apply not_elem_of_dom_1 in FRESH. rewrite FRESH in SIG_LE.
+        apply not_elem_of_union, proj2, not_elem_of_dom_1 in FRESH. rewrite FRESH in SIG_LE.
         by destruct st as [[??]|]; done.
       - subst new_sigs0.
         destruct (decide (sid = x)) as [-> | ?].
@@ -540,12 +540,14 @@ Section Termination.
       simpl in STEP. destruct STEP as [-> ?]. 
       destruct b; try done. eauto. }
 
-    red. 
-    inv_loc_step STEP; destruct δ1; try (right; done); simpl in *.
+    red.
+    pose proof (@next_sig_id_fresh (default ∅ (ps_obls _ δ1 !! τ) ∪ (dom $ ps_sigs _ δ1))) as FRESH. 
+    inv_loc_step STEP; destruct δ1; try (right; done).
     - right. subst new_obls0.
       destruct AB as (?&?&?&?&?).
       destruct (decide (sid = s0)) as [-> | OLD].
-      + edestruct @next_sig_id_fresh.
+      + destruct FRESH. 
+        apply elem_of_union. right. 
         eapply om_wf_obls_are_sigs; eauto. simpl.
         eapply flatten_gset_spec. eexists. split; eauto.
         eapply elem_of_map_img; eauto.
@@ -558,7 +560,8 @@ Section Termination.
         * exists τ. rewrite lookup_insert. simpl. eexists. split; eauto.
           set_solver.
         * exists x0. rewrite lookup_insert_ne; [| done]. eauto.
-    - destruct (decide (x = sid)) as [-> | NEQ].
+    - simpl in *.
+      destruct (decide (x = sid)) as [-> | NEQ].
       { left. subst new_sigs0. rewrite lookup_insert. eauto. }
       right. move AB at bottom. destruct AB as (?&?&?&?&?).
       destruct (decide (x0 = τ)) as [-> | NEQ'].

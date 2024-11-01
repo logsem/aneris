@@ -87,11 +87,12 @@ Section Model.
     let new_cps := ps_cps ps ∖ {[+ (π, δ) +]} ⊎ n *: {[+ (π, δ') +]} in
     exchanges_cp ps θ (update_cps new_cps ps) π δ δ' n.
 
-  Definition next_sig_id ps: SignalId :=
-    list_max (elements $ dom $ ps_sigs ps) + 1. 
+  Definition next_sig_id (R: gset SignalId): SignalId :=
+    (* list_max (elements $ dom $ ps_sigs ps) + 1.  *)
+    list_max (elements R) + 1.
 
-  Lemma next_sig_id_fresh ps:
-    next_sig_id ps ∉ dom (ps_sigs ps).
+  Lemma next_sig_id_fresh R:
+    next_sig_id R ∉ R.
   Proof using. 
     rewrite /next_sig_id. 
     intros IN. apply elem_of_elements, elem_of_list_In in IN.
@@ -106,7 +107,7 @@ Section Model.
   Inductive creates_signal: PS -> Locale -> PS -> Level -> Prop :=
   | cs_step ps θ l
       (DOM: θ ∈ dom $ ps_obls ps):
-    let s := next_sig_id ps in
+    let s := next_sig_id (default ∅ (ps_obls ps !! θ) ∪ (dom $ ps_sigs ps)) in
     let new_sigs := <[ s := (l, false) ]> (ps_sigs ps) in
     let cur_loc_obls := default ∅ (ps_obls ps !! θ) in
     let new_obls := <[ θ := cur_loc_obls ∪ {[ s ]} ]> (ps_obls ps) in
@@ -650,17 +651,19 @@ Section Model.
           ** simpl. done.
           ** simpl. rewrite EQ2. done.
         * apply disjoint_singleton_l. subst s0.
-          intros IN. edestruct next_sig_id_fresh.
-          apply OS. simpl. apply flatten_gset_spec. eexists. split; eauto.
-          eapply elem_of_map_img; eauto. 
+          intros IN. destruct (next_sig_id_fresh (default ∅ (ps_obls0 !! τ) ∪ dom ps_sigs0)).
+          apply elem_of_union_r. 
+          apply OS. simpl. apply flatten_gset_spec. eexists.
+          split; eauto. eapply elem_of_map_img; eauto.
       + subst g0. apply disjoint_union_r. split.
         * symmetry. eapply disjoint_proper. 
           3: eapply DPI; eauto.
           ** simpl. done.
           ** simpl. rewrite EQ1. done.
         * symmetry. apply disjoint_singleton_l. subst s0.
-          intros IN. edestruct next_sig_id_fresh.
-          apply OS. simpl. apply flatten_gset_spec. eexists. split; eauto.
+          intros IN. edestruct (next_sig_id_fresh (default ∅ (ps_obls0 !! τ) ∪ dom ps_sigs0)).
+          apply elem_of_union_r. apply OS. simpl.
+          apply flatten_gset_spec. eexists. split; eauto.
           eapply elem_of_map_img; eauto. 
       + forward eapply (DPI _ _ NEQ); eauto. simpl. rewrite EQ1 EQ2. set_solver.  
     - subst new_ps. red. simpl. intros τ1 τ2 NEQ.

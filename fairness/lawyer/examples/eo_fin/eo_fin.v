@@ -312,7 +312,7 @@ Section EoFin.
         exists lm'. done. }
       iDestruct (OU_create_sig with "OBLS") as "FOO".
       iApply (OU_wand with "[-FOO]"); [| by iFrame].
-      iIntros "(%s' & SG & OBLS)". rewrite union_empty_l_L.
+      iIntros "(%s' & SG & OBLS & %NEW)". rewrite union_empty_l_L.
       iApply BMU_intro. iRight. iSplitR; [done| ].
       rewrite PeanoNat.Nat.min_r in DOM; [| lia].
       iMod (own_update with "SM") as "SM".
@@ -707,39 +707,62 @@ Section EoFin.
     Lemma alloc_inv l (* (i: nat) *) B (LT: B < LIM) τ
       (i := 0):
       obls _ τ ∅ (H3 := oGS) -∗ l ↦ #i ==∗ 
-        BMU _ ⊤ τ 2 (|={∅}=> ∃ (eoG: EoFinG Σ),
+        BMU _ ⊤ τ 2 (|={∅}=> ∃ (eoG: EoFinG Σ) (sigs: list SignalId),
                        even_res (if Nat.even i then i else i + 1) ∗
                        odd_res (if Nat.even i then i + 1 else i) ∗
                        eofin_inv l B LT ∗
-                       obls _ τ ∅ (H3 := oGS)
+                       obls _ τ (list_to_set sigs) (H3 := oGS) ∗
+                       ⌜ length sigs = min 2 (B - i) ⌝ ∗
+                       ([∗ set] k ∈ set_seq i (B `min` (i + 2)), ∃ s, ith_sig k s ∗ ⌜ s ∈ sigs ⌝)
         ) (oGS := oGS).
-    Proof using.
+    Proof using OBLS_AMU PRE.
       iIntros "OB L".
       iMod (thread_res_alloc i) as "(%γ & AUTH & FRAG)".
       iMod (thread_res_alloc (i + 1)) as "(%γ' & AUTH' & FRAG')".
       
       set (m := min B (i + 2)).
-      iAssert (BMU EO_OP ⊤ τ 2 (|==> ∃ γ smap, smap_repr' γ m i smap ∗ obls _ τ ∅ (H3 := oGS)))%I with "[OB]" as "-#SR".
+      iAssert (BMU EO_OP ⊤ τ 2 
+                 (|==> ∃ γ smap, smap_repr' γ m i smap ∗
+                                 let sigs := map_img smap in
+                                 obls _ τ sigs (H3 := oGS) ∗
+                                 ⌜ size sigs = min 2 (B - i) ⌝ ∗
+                                 own γ (◯ ((to_agree <$> smap): gmapUR nat _))
+              ))%I with "[OB]" as "-#SR".
       { 
         assert (m <= i \/ m = i + 1 \/ m = i + 2) as [LE | [EQ | EQ]] by lia; revgoals.
         - iApply OU_BMU.
           assert (i < LIM) as Di by lia. 
           unshelve iDestruct (OU_create_sig with "[$]") as "OU".
           { eexists. apply Di. }
-          iApply (OU_wand with "[-OU] [$]"). iIntros "(%si & SGi & OBLS)". 
+          iApply (OU_wand with "[-OU] [$]"). iIntros "(%si & SGi & OBLS & _)". 
 
           iApply OU_BMU.
           assert (i + 1 < LIM) as Di' by lia. 
           unshelve iDestruct (OU_create_sig with "[$]") as "OU".
           { eexists. apply Di'. }
-          iApply (OU_wand with "[-OU] [$]"). iIntros "(%si' & SGi' & OBLS)".
+          iApply (OU_wand with "[-OU] [$]"). iIntros "(%si' & SGi' & OBLS & %NEW)".
 
           iApply BMU_intro.
           set (smap0 := {[ i := si; i + 1 := si']}: gmap nat SignalId).
           iMod (own_alloc (● ((to_agree <$> smap0): gmapUR nat (agreeR SignalId)) ⋅ ◯ _)) as (?) "[A F]".
           { apply auth_both_valid_2; [| reflexivity]. apply map_nat_agree_valid. }
-          iModIntro. do 2 iExists _. iSplitR "OBLS"; [| admit].
+          iModIntro. iExists _, _. iFrame. 
+          replace (map_img smap0) with ({[ si; si' ]}: gset SignalId).
+          2: { subst smap0.
+               rewrite map_img_insert_L. rewrite delete_notin; set_solver. }
+
           rewrite /smap_repr'. iFrame.
+          (* rewrite !bi.sep_assoc. iSplitL.  *)
+          (* 2: { subst smap0. simpl.. *)
+          (*      iApply big_sepS_impl.  *)
+          
+          iSplitR "OBLS".
+          2: { 
+               iSplitL "OBLS".
+               { iApply obls_proper; [| by iFrame]. set_solver. }
+               rewrite size_union.
+               2: { set_solver. }
+               rewrite !size_singleton. iPureIntro. lia. }
           iSplitR.
           { subst smap0. iPureIntro. rewrite !dom_insert_L.
             subst m. subst i. 
@@ -755,13 +778,18 @@ Section EoFin.
           assert (i < LIM) as Di by lia. 
           unshelve iDestruct (OU_create_sig with "[$]") as "OU".
           { eexists. apply Di. }
-          iApply (OU_wand with "[-OU] [$]"). iIntros "(%si & SGi & OBLS)".
+          iApply (OU_wand with "[-OU] [$]"). iIntros "(%si & SGi & OBLS & _)".
 
           iApply BMU_intro.
           set (smap0 := {[ i := si]}: gmap nat SignalId).
           iMod (own_alloc (● ((to_agree <$> smap0): gmapUR nat (agreeR SignalId)) ⋅ ◯ _)) as (?) "[A F]".
           { apply auth_both_valid_2; [| reflexivity]. apply map_nat_agree_valid. }
-          iModIntro. do 2 iExists _. iSplitR "OBLS"; [| admit].
+          iModIntro. iExists _, _. iFrame. iSplitR "OBLS".
+          2: { replace (map_img smap0) with ({[ si ]}: gset SignalId).
+               2: { set_solver. }
+               iSplitL. 
+               { iApply obls_proper; [| by iFrame]. set_solver. }
+               iPureIntro. rewrite size_singleton. lia. }
           rewrite /smap_repr'. iFrame.
           iSplitR.
           { subst smap0. iPureIntro. rewrite !dom_insert_L.
@@ -776,7 +804,9 @@ Section EoFin.
           set (smap0 := ∅: gmap nat SignalId).
           iMod (own_alloc (● ((to_agree <$> smap0): gmapUR nat (agreeR SignalId)) ⋅ ◯ _)) as (?) "[A F]".
           { apply auth_both_valid_2; [| reflexivity]. apply map_nat_agree_valid. }
-          iModIntro. do 2 iExists _. iSplitR "OB"; [| admit].
+          iModIntro. iExists _, _. iFrame. iSplitR "OB".
+          2: { subst smap0. rewrite map_img_empty_L size_empty.
+               iSplitL; [set_solver| ]. iPureIntro. lia. }
           rewrite /smap_repr'. iFrame.
           iSplitR.
           { subst smap0. iPureIntro. 
@@ -787,17 +817,32 @@ Section EoFin.
 
       (* iMod "SR" as (γ__sr smap) "BMU". iModIntro. *)
       iApply (BMU_wand with "[-SR] [$]"). 
-      iIntros "X". iMod "X" as "(%γ__sr & %smap & SR & OB)".
+      iIntros "X". iMod "X" as "(%γ__sr & %smap & SR & OB & %SIZE & #F)".
       
       set (eoG := {| 
           eofin_even := (if Nat.even i then γ else γ');
           eofin_odd := (if Nat.even i then γ' else γ);
           eofin_smap := γ__sr
       |}).
-      iExists eoG. iFrame.
-      iApply inv_alloc. iNext.
-      rewrite /eofin_inv_inner. do 2 iExists _. iFrame.
-    Qed. 
+      iExists eoG, _. iFrame. iApply fupd_frame_r.
+      rewrite bi.sep_comm. rewrite -bi.sep_assoc. iSplitL "OB".  
+      { iApply obls_proper; [| by iFrame]. apply list_to_set_elements. }
+      iSplit. 
+      2: { iApply inv_alloc. iNext. 
+           rewrite /eofin_inv_inner. do 2 iExists _. iFrame. }
+      iSplit.
+      { by rewrite length_size. } 
+      rewrite /smap_repr'. iDestruct "SR" as "(?&%DOM&SIGS)".
+      
+      iApply big_sepS_forall. iIntros (k IN).
+      rewrite -DOM in IN. apply elem_of_dom in IN as [s IN]. 
+      rewrite /ith_sig. iExists _. iSplit.
+      2: { iPureIntro. apply elem_of_elements. eapply elem_of_map_img; eauto. }
+      iApply (own_mono with "F").
+      apply auth_frag_mono.
+      apply singleton_included_l. eexists.
+      rewrite lookup_fmap IN. simpl. split; [reflexivity| ]. done.
+    Qed.
 
     Theorem main_spec τ π (i B: nat):
       {{{ exc_lb EO_OP 20 (H3 := oGS) ∗

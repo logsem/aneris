@@ -342,10 +342,12 @@ Section ObligationsRepr.
     Qed.
 
     Lemma OU_create_sig ζ R l:
-      ⊢ obls ζ R -∗ OU ζ (∃ sid, sgn sid l (Some false) ∗ obls ζ (R ∪ {[ sid ]})).
+      ⊢ obls ζ R -∗ OU ζ (∃ sid, sgn sid l (Some false) ∗ obls ζ (R ∪ {[ sid ]}) ∗
+                                 ⌜ sid ∉ R ⌝).
     Proof using.
+      clear H1 H0 H. 
       rewrite /OU /OU'. iIntros "OB %δ MSI".
-      set (sid := next_sig_id _ δ).
+      set (sid := next_sig_id (R ∪ (dom $ ps_sigs _ δ))).
       iDestruct (obls_msi_exact with "[$] [$]") as %Rζ. 
       rewrite {1}/obls_msi. iDestruct "MSI" as "(?&SIGS&OBLS&?&?&?)".
       destruct δ. simpl. iFrame. simpl in *.
@@ -359,7 +361,7 @@ Section ObligationsRepr.
            red. do 2 right. left. exists l. 
            erewrite (f_equal (creates_signal _ _ _)).
            { econstructor; eauto. simpl. eapply elem_of_dom; eauto. }
-           simpl. reflexivity. }
+           simpl. reflexivity. }      
 
       iMod (own_update with "[OB OBLS]") as "X".
       2: iCombine "OBLS OB" as "?"; iFrame.
@@ -368,19 +370,25 @@ Section ObligationsRepr.
         intros ? RR. apply lookup_fmap_Some in RR as (R_&?&Rζ_).
         rewrite Rζ in Rζ_. inversion Rζ_. subst R_. subst.
         apply exclusive_local_update with (x' := Excl (R ∪ {[sid]})). done. }
-      rewrite Rζ. simpl. iDestruct "X" as "[??]".
+      rewrite Rζ. simpl. iDestruct "X" as "[OBLS ?]".
       rewrite bi.sep_exist_r. iApply bupd_exist. iExists sid. 
       rewrite -fmap_insert. iFrame.
 
+      rewrite bi.sep_comm. rewrite bi.sep_assoc. iSplitL.
+      2: { iPureIntro. eapply not_elem_of_weaken. 
+           { by intros IN%next_sig_id_fresh. }
+           set_solver. }
+      
       rewrite -own_op. iApply own_update; [| by iFrame].
-      rewrite cmra_comm. apply auth_update_alloc. 
+      apply auth_update_alloc. 
       eapply local_update_proper.
       1: reflexivity.
       2: eapply alloc_local_update.
       { rewrite /sig_map_repr. rewrite insert_empty fmap_insert. reflexivity. }
       2: done.
       apply not_elem_of_dom.
-      subst sid. rewrite dom_fmap_L. apply next_sig_id_fresh. 
+      subst sid. rewrite dom_fmap_L.
+      eapply not_elem_of_weaken; [apply next_sig_id_fresh| ]. set_solver. 
     Qed.
 
     (* TODO: do we need to generalize to "optional v" instead? *)

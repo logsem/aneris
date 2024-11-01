@@ -321,7 +321,9 @@ Section ProgramLogic.
       iApply OU_BMU. iApply (OU_wand with "[CONT]").
       { setoid_rewrite bi.wand_curry. rewrite -bi.exist_wand_forall.
         iFrame. }
-      iPoseProof (OU_create_sig with "OB") as "OU". done.
+      iPoseProof (OU_create_sig with "OB") as "OU".
+      iApply (OU_wand with "[-OU] [$]").
+      iIntros "(%&?&?&?)". iExists _. iFrame. 
     Qed. 
 
   End BMU.
@@ -398,7 +400,7 @@ Section TestProg.
     iApply OU_BMU.
     iDestruct (OU_create_sig _ _ _ l with "[$]") as "OU".
     iApply (OU_wand with "[-OU]"); [| done].
-    iIntros "(%sid & SIG & OBLS)".
+    iIntros "(%sid & SIG & OBLS & %NEW)".
     iApply BMU_intro.
     iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
     iSplitR "CP". 
