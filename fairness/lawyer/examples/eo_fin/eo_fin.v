@@ -705,15 +705,16 @@ Section EoFin.
 
     (* TODO: parametrize smap_repr with the lower bound *)
     Lemma alloc_inv l (* (i: nat) *) B (LT: B < LIM) τ
-      (i := 0):
-      obls _ τ ∅ (H3 := oGS) -∗ l ↦ #i ==∗ 
-        BMU _ ⊤ τ 2 (|={∅}=> ∃ (eoG: EoFinG Σ) (sigs: list SignalId),
-                       even_res (if Nat.even i then i else i + 1) ∗
-                       odd_res (if Nat.even i then i + 1 else i) ∗
-                       eofin_inv l B LT ∗
-                       obls _ τ (list_to_set sigs) (H3 := oGS) ∗
-                       ⌜ length sigs = min 2 (B - i) ⌝ ∗
-                       ([∗ set] k ∈ set_seq i (B `min` (i + 2)), ∃ s, ith_sig k s ∗ ⌜ s ∈ sigs ⌝)
+      (i := 0)
+      :
+      obls _ τ ∅ (H3 := oGS) -∗ l ↦ #i -∗ 
+        BMU _ ⊤ τ 2 (|={∅}=> ∃ (eoG: EoFinG Σ) (sigs: gset SignalId),
+                       even_res (if Nat.even i then i else i + 1) (H := eoG)∗
+                       odd_res (if Nat.even i then i + 1 else i) (H := eoG) ∗
+                       eofin_inv l B LT (H := eoG) ∗
+                       obls _ τ sigs (H3 := oGS) ∗
+                       ⌜ size sigs = min 2 (B - i) ⌝ ∗
+                       ([∗ set] k ∈ set_seq i (2 `min` (B - i)), ∃ s, ith_sig k s ∗ ⌜ s ∈ sigs ⌝)
         ) (oGS := oGS).
     Proof using OBLS_AMU PRE.
       iIntros "OB L".
@@ -825,26 +826,26 @@ Section EoFin.
           eofin_smap := γ__sr
       |}).
       iExists eoG, _. iFrame. iApply fupd_frame_r.
-      rewrite bi.sep_comm. rewrite -bi.sep_assoc. iSplitL "OB".  
-      { iApply obls_proper; [| by iFrame]. apply list_to_set_elements. }
+      rewrite bi.sep_comm. rewrite -bi.sep_assoc. 
+      iSplit; [done| ]. 
       iSplit. 
       2: { iApply inv_alloc. iNext. 
            rewrite /eofin_inv_inner. do 2 iExists _. iFrame. }
-      iSplit.
-      { by rewrite length_size. } 
       rewrite /smap_repr'. iDestruct "SR" as "(?&%DOM&SIGS)".
-      
+
+      subst i. rewrite PeanoNat.Nat.sub_0_r. rewrite PeanoNat.Nat.sub_0_r in SIZE.
       iApply big_sepS_forall. iIntros (k IN).
-      rewrite -DOM in IN. apply elem_of_dom in IN as [s IN]. 
+      rewrite -SIZE in IN. apply elem_of_dom in IN as [s IN]. 
       rewrite /ith_sig. iExists _. iSplit.
-      2: { iPureIntro. apply elem_of_elements. eapply elem_of_map_img; eauto. }
+      2: { iPureIntro. eapply elem_of_map_img; eauto. }
       iApply (own_mono with "F").
       apply auth_frag_mono.
       apply singleton_included_l. eexists.
       rewrite lookup_fmap IN. simpl. split; [reflexivity| ]. done.
     Qed.
 
-    Theorem main_spec τ π (i B: nat):
+    Theorem main_spec τ π (B: nat) (LT: B < LIM)
+      (i := 0):
       {{{ exc_lb EO_OP 20 (H3 := oGS) ∗
            cp_mul _ π d2 (S (2 * B)) (H3 := oGS) ∗
            th_phase_ge EO_OP τ π (H3 := oGS) ∗
@@ -864,19 +865,38 @@ Section EoFin.
       { etrans; [apply d01_lt| apply d12_lt]. }
       iApply (OU_wand with "[-OU]"); [| by iFrame]. iIntros "[CPS PH]".
       BMU_burn_cp.
-
       
       pure_steps.
       wp_bind (ref _)%E.
       (* iApply wp_atomic.       *)
-      iApply sswp_MU_wp; [done| ]. iApply wp_alloc.
-      iNext.
-      iIntros "%l L _". 
-      assert (B < LIM) as LT by admit.
+      iApply sswp_MU_wp_fupd; [done| ]. iApply wp_alloc.
+      iModIntro.
+      iNext. iIntros "%l L _".
+      iPoseProof (alloc_inv _ _ LT with "[$] [$]") as "BMU". 
+      MU_by_BMU. iApply (BMU_weaken with "[-BMU] [$]"); [lia| done| ]. iIntros "INV".
+      (* TODO: make a tactic, remove duplication *)
+      iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
+      iSplitR "CP".
+      2: { do 2 iExists _. iFrame. done. }
+      iApply wp_value.
+      iApply fupd_mask_mono; [apply empty_subseteq| ].
+      iMod "INV" as "(% & %sigs & RE & RO & #INV & OB & %SIG_LEN & #SIGS)".
+      clear PRE. 
+      iModIntro.
+
+      assert (0 = i) as II by done. rewrite {2 5 6 7 8 10 11 13}II.
+      rewrite {2}II in SIG_LEN.
+      revert SIG_LEN.
+      clear II. generalize i. clear i. intros i SIG_LEN. 
+
+      wp_bind (Rec _ _ _)%V. pure_steps.
+
+      iAssert (∃ γ γ', thread_frag γ i ∗ thread_frag γ' (i + 1))%I with "[RE RO]" as "(%γ & %γ' & RES & RES')".
+      { destruct (Nat.even i); do 2 iExists _; iFrame. }
+
       
-      iPoseProof (inv_alloc (nroot .@ "eofin") ⊤ (eofin_inv_inner l B LT)) as "-#inv".
-      iMod "inv" as "inv". 
-      iNext. 
+
+      
       
   End MainProof.
 
