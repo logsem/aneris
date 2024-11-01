@@ -58,20 +58,19 @@ Section FiniteBranching.
   Lemma creates_signal_next_states δ ℓ:
     list_approx (fun δ' => exists τ, creates_signal OP δ τ δ' ℓ).
   Proof using.
-    set (s := next_sig_id _ δ). 
-    set (new_sigs := <[ s := (ℓ, false) ]> (ps_sigs _ δ)).
-    set (add_obl := 
-           fun τ =>
+    set (new_st τ :=
+           let s := next_sig_id (default ∅ (ps_obls _ δ !! τ) ∪ (dom $ ps_sigs _ δ)) in
+           let new_sigs := <[ s := (ℓ, false) ]> (ps_sigs _ δ) in
+           let add_obl := 
              let cur_loc_obls := default ∅ (ps_obls _ δ !! τ) in
-             <[ τ := cur_loc_obls ∪ {[ s ]} ]> (ps_obls _ δ)). 
-    set (new_obls := map add_obl (elements $ dom $ ps_obls _ δ)).
-    exists (map (flip (update_obls OP) (update_sigs OP new_sigs δ)) new_obls).
+             <[ τ := cur_loc_obls ∪ {[ s ]} ]> (ps_obls _ δ) in
+           update_obls OP add_obl $ update_sigs OP new_sigs δ). 
+    exists (map new_st (elements $ dom $ ps_obls _ δ)).
     intros ? (?& STEP).
     inversion STEP; subst; simpl in *. simpl.
     apply elem_of_list_In. apply in_map_iff. eexists. split; [reflexivity|].
-    subst new_obls1. apply elem_of_list_In.
-    subst new_obls. apply elem_of_list_In, in_map_iff. eexists. split; [reflexivity|].
-    apply elem_of_list_In, elem_of_elements. done.
+    subst new_obls0. apply elem_of_list_In.
+    by apply elem_of_elements. 
   Qed.
 
   Lemma sets_signal_next_states δ:
