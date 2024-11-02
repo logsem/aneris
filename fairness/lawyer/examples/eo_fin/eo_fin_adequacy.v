@@ -259,8 +259,8 @@ Section EOFinAdequacy.
        @em_thread_post heap_lang _ _ eofinΣ
          (@heap_fairnessGS eofinΣ
             _
-            _ Hinv) 0) (start #N) σ1
-    (@init_om_state _ _ _ _ _ 10 (EO_OP LIM) ([start #N], σ1)).
+            _ Hinv) 0) (start #0 #N) σ1
+    (@init_om_state _ _ _ _ _ 10 (EO_OP LIM) ([start #0 #N], σ1)).
   Proof using.
     rewrite /rel_always_holds0.
     
@@ -291,9 +291,9 @@ Section EOFinAdequacy.
   Theorem eofin_terminates
     (N : nat)
     (HN: N > 1)
-    (LIM_NZ: 0 < LIM)
+    (LIM_NZ: N < LIM)
     (extr : heap_lang_extrace)
-    (Hexfirst : (trfirst extr).1 = [start #N]):
+    (Hexfirst : (trfirst extr).1 = [start #(0%nat) #N]):
     (* (∀ tid, fair_ex tid extr) -> terminating_trace extr. *)
     extrace_fairly_terminating extr. 
   Proof.
@@ -312,10 +312,33 @@ Section EOFinAdequacy.
       apply init_om_state_init. }
     
     apply FAIR_TERM.
-    { done. }
+    { lia. }
     red. intros ?. iStartProof. iIntros "[HEAP INIT] !>".
     iSplitL.
-    - admit.
+    - simpl. 
+      iApply (main_spec with "[-]"); try done.
+      5: { simpl. iNext. iIntros (_) "X". iApply "X". }
+      3: { simpl. iIntros (? _) "X". iApply "X". }
+      { apply AMU_lift_top. }
+      { intros. rewrite /AMU_lift_MU__f.
+        rewrite -nclose_nroot.
+        apply AMU_lift_top. }
+      rewrite /obls_init_resource. subst s1. simpl.
+      rewrite EX0. rewrite locales_of_cfg_simpl. rewrite size_set_seq. simpl.
+      rewrite union_empty_r_L. simpl. rewrite elements_singleton. simpl.
+      rewrite insert_union_singleton_l. rewrite map_union_empty.
+      iDestruct "INIT" as "(CPS & SIGS & OB & EPS & PH & EB)".
+      rewrite /cps_repr /sig_map_repr /eps_repr /phases_repr /obls_map_repr. 
+      rewrite map_fmap_singleton fmap_empty.
+      rewrite !gset_to_gmap_singleton. 
+      rewrite map_fmap_singleton.      
+      iFrame.
+      rewrite !bi.sep_assoc. iSplitR "PH". 
+      2: { iExists _.
+           rewrite /phases_repr. rewrite map_fmap_singleton. iFrame.
+           done. }
+      admit. 
+      
     - subst s1. rewrite EX0. iApply om_sim_RAH. 
   Admitted. 
 
