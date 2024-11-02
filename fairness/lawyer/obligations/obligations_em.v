@@ -2,7 +2,7 @@ From iris.proofmode Require Import tactics.
 From stdpp Require Import namespaces.
 From iris.algebra Require Import auth gmap gset excl gmultiset big_op mono_nat.
 From trillium.fairness Require Import fairness locales_helpers execution_model.
-From trillium.fairness.lawyer.obligations Require Import obligations_model obls_utils obligations_resources.
+From trillium.fairness.lawyer.obligations Require Import obligations_model obls_utils obligations_resources multiset_utils.
 
 
 Section ObligationsEM.
@@ -128,21 +128,23 @@ Section ObligationsEM.
   Definition init_phases (n: nat): list Phase :=
     (fun i => ext_phase phase0 i) <$> seq 0 n. 
 
-  Definition init_om_state (c: cfg Λ): mstate OM := {|
-      ps_cps := ∅;
+  Definition init_om_state (c: cfg Λ) (degs: gmultiset Degree) (eb: nat)
+    : mstate OM := {|
+      ps_cps := mset_map (pair phase0) degs;
       ps_sigs := ∅;
       ps_obls := gset_to_gmap ∅ (locales_of_cfg c);
       ps_eps := ∅;
       ps_phases := list_to_map $ zip (elements $ locales_of_cfg c) (init_phases (size $ locales_of_cfg c));
-      ps_exc_bound := 1;
+      ps_exc_bound := eb;
   |}.
 
-  Lemma init_om_thown (c: cfg Λ):
-    threads_own_obls c (init_om_state c).
+  Lemma init_om_thown (c: cfg Λ) ds eb:
+    threads_own_obls c (init_om_state c ds eb).
   Proof.
     red. simpl. by rewrite dom_gset_to_gmap.
   Qed.
 
+  (* TODO: move *)
   Lemma length_size `{Countable K} (g: gset K):
     length (elements g) = size g.
   Proof.
@@ -150,8 +152,8 @@ Section ObligationsEM.
     rewrite size_list_to_set; [done| ]. apply NoDup_elements.
   Qed.
 
-  Lemma init_om_dpo (c: cfg Λ):
-    dom_phases_obls _ (init_om_state c).
+  Lemma init_om_dpo (c: cfg Λ) ds eb:
+    dom_phases_obls _ (init_om_state c ds eb).
   Proof.
     red. simpl. rewrite dom_list_to_map_L. simpl.
     rewrite fst_zip.
@@ -160,9 +162,19 @@ Section ObligationsEM.
     rewrite seq_length. rewrite length_size. lia.
   Qed. 
 
-  From trillium.fairness Require Import locales_helpers.
-  Lemma init_om_state_init e σ:
-    obls_is_init_st ([e], σ) (init_om_state (([e], σ))).
+  Lemma init_phases_helper e σ:
+    list_to_map $ zip 
+      (elements (locales_of_cfg ([e], σ)))
+      (init_phases (size (locales_of_cfg ([e], σ)))) 
+    = ({[locale_of [] e := ext_phase phase0 0]}: gmap Locale Phase).
+  Proof using.
+    rewrite locales_of_cfg_singleton. rewrite size_singleton.
+    rewrite elements_singleton. simpl.
+    set_solver.
+  Qed. 
+
+  Lemma init_om_state_init e σ ds eb:
+    obls_is_init_st ([e], σ) (init_om_state (([e], σ)) ds eb).
   Proof.
     red. rewrite locales_of_cfg_singleton.
     eexists. split; [eauto| ].
@@ -171,12 +183,17 @@ Section ObligationsEM.
     rewrite /init_om_state. split.
     - apply init_om_dpo.
     - red. simpl. set_solver.
-    - red. rewrite locales_of_cfg_singleton. rewrite size_singleton.
-      simpl. rewrite elements_singleton.
-      rewrite /init_phases. simpl.
-      intros ?????. rewrite !insert_empty.
-      rewrite !lookup_singleton_Some. set_solver.
-    - red. simpl. set_solver.
+    - red. rewrite init_phases_helper. simpl.
+      intros ?????. rewrite !lookup_singleton_Some. set_solver.
+    - red. rewrite init_phases_helper. simpl.
+      intros (?&?&[??]& P). revert P.  
+      rewrite lookup_singleton_Some.
+      rewrite elem_of_mset_map. simpl.
+      intros ([<- <-] & (?&[=]&?) & LT). subst.
+      pose proof (phase_lt_fork phase0 0) as LT'.
+      apply strict_spec in LT.
+      rewrite strict_spec in LT. destruct LT as [? N].
+      destruct N. apply LT'. 
     - red. simpl. set_solver.
     - red. simpl.
       rewrite locales_of_cfg_singleton. rewrite gset_to_gmap_singleton.

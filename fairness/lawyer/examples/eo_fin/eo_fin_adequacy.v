@@ -3,7 +3,7 @@ From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import locales_helpers comp_utils trace_lookup fairness fin_branch.
 From trillium.fairness.heap_lang Require Import simulation_adequacy.
 From trillium.fairness.lawyer Require Import sub_action_em action_model.
-From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_em obls_fairness_preservation obligations_am obligations_fin_branch obls_termination.
+From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_em obls_fairness_preservation obligations_am obligations_fin_branch obls_termination multiset_utils.
 From trillium.fairness.lawyer.examples.eo_fin Require Import eo_fin.
 From trillium.fairness.lawyer.examples Require Import bounded_nat.
 
@@ -205,8 +205,8 @@ Section EOFinAdequacy.
 
 
   (* TODO: move *)
-  Lemma om_live_tids_init e σ:
-      om_live_tids OP id locale_enabled ([e], σ) (init_om_state (EO_OP LIM) ([e], σ)).
+  Lemma om_live_tids_init e σ ds eb:
+      om_live_tids OP id locale_enabled ([e], σ) (init_om_state (EO_OP LIM) ([e], σ) ds eb).
   Proof using. 
     red. intros ?.
     rewrite /has_obls. simpl. 
@@ -250,7 +250,7 @@ Section EOFinAdequacy.
 
   Lemma om_sim_RAH 
     {Hinv: @heapGS eofinΣ M EM}
-    σ1 N:
+    σ1 N ds eb:
   ⊢
   rel_always_holds0 
     (@eofin_sim_rel) NotStuck
@@ -260,7 +260,7 @@ Section EOFinAdequacy.
          (@heap_fairnessGS eofinΣ
             _
             _ Hinv) 0) (start #0 #N) σ1
-    (@init_om_state _ _ _ _ _ 10 (EO_OP LIM) ([start #0 #N], σ1)).
+    (@init_om_state _ _ _ _ _ 10 (EO_OP LIM) ([start #0 #N], σ1) ds eb).
   Proof using.
     rewrite /rel_always_holds0.
     
@@ -288,7 +288,7 @@ Section EOFinAdequacy.
     iApply (no_obls_live_tids with "[$] [$] [$]"). done.  
   Qed.
 
-  Theorem eofin_terminates
+  Lemma eofin_terminates_impl
     (N : nat)
     (HN: N > 1)
     (LIM_NZ: N < LIM)
@@ -300,9 +300,12 @@ Section EOFinAdequacy.
     assert (heapGpreS eofinΣ EM) as HPreG.
     { apply _. }
 
-    destruct (trfirst extr) as [tp_ σ1] eqn:EX0. simpl in *. subst tp_.                
+    destruct (trfirst extr) as [tp_ σ1] eqn:EX0. simpl in *. subst tp_.
     
-    set (s1 := init_om_state (EO_OP LIM) (trfirst extr)). 
+    set (s1 := init_om_state (EO_OP LIM) (trfirst extr)
+               ((2 * N + 5) *: {[+ d2 +]} ⊎ 50 *: {[+ d0 +]})
+                 20
+        ). 
     
     unshelve epose proof (simple_om_simulation_adequacy_terminate eofinΣ NotStuck
                   _ _ _ _
@@ -324,9 +327,10 @@ Section EOFinAdequacy.
         rewrite -nclose_nroot.
         apply AMU_lift_top. }
       rewrite /obls_init_resource. subst s1. simpl.
-      rewrite EX0. rewrite locales_of_cfg_simpl. rewrite size_set_seq. simpl.
-      rewrite union_empty_r_L. simpl. rewrite elements_singleton. simpl.
-      rewrite insert_union_singleton_l. rewrite map_union_empty.
+      rewrite EX0.
+      rewrite init_phases_helper. 
+      rewrite locales_of_cfg_simpl. simpl.
+      rewrite union_empty_r_L. simpl. 
       iDestruct "INIT" as "(CPS & SIGS & OB & EPS & PH & EB)".
       rewrite /cps_repr /sig_map_repr /eps_repr /phases_repr /obls_map_repr. 
       rewrite map_fmap_singleton fmap_empty.
@@ -336,10 +340,34 @@ Section EOFinAdequacy.
       rewrite !bi.sep_assoc. iSplitR "PH". 
       2: { iExists _.
            rewrite /phases_repr. rewrite map_fmap_singleton. iFrame.
-           done. }
-      admit. 
-      
+           iPureIntro. apply phase_lt_fork. }
+      rewrite mset_map_disj_union.
+      rewrite auth_frag_op.
+      iDestruct (own_op with "CPS") as "[CPS2 CPS0]".
+      iSplitL "CPS2".
+      + rewrite /cp_mul.
+        iApply (own_mono with "[$]").
+        apply auth_frag_mono.
+        rewrite mset_map_mul mset_map_singleton.
+        apply gmultiset.gmultiset_included. 
+        apply scalar_mul_le. lia.
+      + iApply (own_mono with "CPS0").
+        apply auth_frag_mono.
+        rewrite mset_map_mul mset_map_singleton.
+        apply gmultiset.gmultiset_included. 
+        apply scalar_mul_le. lia.
     - subst s1. rewrite EX0. iApply om_sim_RAH. 
-  Admitted. 
+  Qed. 
 
 End EOFinAdequacy.
+
+(* TODO: try to get rid of N restriction *)
+Theorem eofin_terminates N (N1: 1 < N):
+  forall extr,
+    (trfirst extr).1 = [start #0%nat #N] → 
+    extrace_fairly_terminating extr.
+Proof using.
+  intros.
+  eapply eofin_terminates_impl with (LIM := N + 1); eauto.
+  lia.
+Qed. 
