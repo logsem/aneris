@@ -900,7 +900,7 @@ Section EoFin.
            obls EO_OP τ ∅ (H3 := oGS) }}}
       start #(0%nat) #B @ τ
       {{{ v, RET v; obls EO_OP τ ∅ (H3 := oGS) }}}.
-    Proof using.
+    Proof using PRE OBLS_AMU__f OBLS_AMU NO_OBS_POST.
       iIntros (Φ). iIntros "(#EB & CPS2 & CPS_FORK & PH & OB) POST". rewrite /start.
       iDestruct (cp_mul_take with "CPS2") as "[CPS2 CP]". 
 
@@ -1021,16 +1021,156 @@ Section EoFin.
         rewrite -PeanoNat.Nat.sub_succ_l; [| lia]. simpl. rewrite Nat.sub_0_r.
         iDestruct (cp_mul_take with "CPS2'") as "[CPS2 ?]". 
         iFrame "CPS2". iFrame "#∗".
+        Unshelve. 2: exact #(). 
         iSplitL "PH".
         { by erewrite <- LT'. }
         rewrite (proj2 (PeanoNat.Nat.ltb_lt _ _)); [ | lia].
         iExists _. by iFrame.
-      - 
+      - simpl in SIGS_LEN. 
+        destruct sigs as [| si [|]]; try by (simpl in SIGS_LEN; lia).
 
-      
+        rewrite !big_sepL_cons. simpl. rewrite union_empty_r_L.  
+        iDestruct "SIGS" as "(ITH & _)". 
+
+        iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
+        iApply sswp_MUf_wp. iIntros (τ'). iApply (MU__f_wand with "[-CP PH OB]").
+        2: { iApply OBLS_AMU__f; [done| ]. 
+             iApply (BMU_AMU__f with "[-PH]"); [reflexivity| ..].
+             2: by iFrame. 
+             
+             iIntros "PH".
+             (* TODO: change BMU_burn_cp*)
+             iApply BMU_intro. iFrame "PH OB".
+             iSplitR "CP".
+             2: { do 2 iExists _. iFrame. done. }
+             iAccu. }
+
+        iIntros "[? (%π1 & %π2 & PH1 & OB1 & PH3 & OB2 & [%LT1 %LT2])]".
+        Unshelve. 2: exact {[ si ]}.
+
+        rewrite difference_diag_L. rewrite intersection_idemp_L.
+        iSplitL "RE CPS2 CPS_FORK PH3 OB2".
+        { iApply (thread_spec_wrapper with "[-]").
+          { reflexivity. }
+          { apply even_thread_resource. }
+          2: { iNext. iIntros (v) "OB". by iApply NO_OBS_POST. }
+          rewrite Nat.sub_0_r. iFrame "CPS2". iFrame "#∗".
+          iSplitL "PH3".
+          { apply strict_include in LT2. by erewrite <- LT2. }
+          rewrite (proj2 (PeanoNat.Nat.ltb_lt _ _)); [ | lia].
+          iExists _. by iFrame. }
+
+        apply strict_include in LT1. iRename "PH1" into "PH".
+        wp_bind (Rec _ _ _)%V. pure_step.
+        iApply wp_value. pure_step.
+
+        iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
+        iApply sswp_MUf_wp. iIntros (τ''). iApply (MU__f_wand with "[-CP PH OB1]").
+        2: { iApply OBLS_AMU__f; [done| ]. 
+             iApply (BMU_AMU__f with "[-PH]"); [reflexivity| ..].
+             2: by iFrame. 
+             
+             iIntros "PH".
+             (* TODO: change BMU_burn_cp*)
+             iApply BMU_intro. iFrame "PH OB1".
+             iSplitR "CP".
+             2: { do 2 iExists _. iFrame. done. }
+             iAccu. }
+
+        iIntros "[? (%π3 & %π4 & PH1 & OB1 & PH3 & OB2 & [%LT3 %LT4])]".
+        Unshelve. 2: exact ∅.
+        rewrite difference_diag_L. rewrite intersection_idemp_L.
+
+        iSplitR "POST OB1".
+        2: { by iApply "POST". }
+        
+        apply strict_include in LT4. iRename "PH3" into "PH".
+        wp_bind (_ + _)%E. rewrite Nat2Z.inj_0.
+        assert (phase_le π π4) as LT' by (by etrans). 
+        do 2 pure_step_cases.
+        replace (0 + 1)%Z with 1%Z; [| done].
+        replace 1%Z with (Z.of_nat 1%nat); [| done].         
+        iApply (thread_spec_wrapper with "[-]").
+        { reflexivity. }
+        { apply odd_thread_resource. }
+        2: { iNext. iIntros (v) "OB". by iApply NO_OBS_POST. }
+        simpl. 
+        iDestruct (cp_mul_take with "CPS2'") as "[CPS2 ?]". 
+        iFrame "CPS2". iFrame "#∗".
+        by erewrite <- LT'.
+        Unshelve. exact #(). 
+      - simpl in SIGS_LEN. 
+        destruct sigs as [| ]; try by (simpl in SIGS_LEN; lia).
+
+        simpl. 
+
+        iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
+        iApply sswp_MUf_wp. iIntros (τ'). iApply (MU__f_wand with "[-CP PH OB]").
+        2: { iApply OBLS_AMU__f; [done| ]. 
+             iApply (BMU_AMU__f with "[-PH]"); [reflexivity| ..].
+             2: by iFrame. 
+             
+             iIntros "PH".
+             (* TODO: change BMU_burn_cp*)
+             iApply BMU_intro. iFrame "PH OB".
+             iSplitR "CP".
+             2: { do 2 iExists _. iFrame. done. }
+             iAccu. }
+
+        iIntros "[? (%π1 & %π2 & PH1 & OB1 & PH3 & OB2 & [%LT1 %LT2])]".
+        Unshelve. 2: exact ∅.
+
+        rewrite difference_diag_L. rewrite intersection_idemp_L.
+        iSplitL "RE CPS2 CPS_FORK PH3 OB2".
+        { iApply (thread_spec_wrapper with "[-]").
+          { reflexivity. }
+          { apply even_thread_resource. }
+          2: { iNext. iIntros (v) "OB". by iApply NO_OBS_POST. }
+          rewrite Nat.sub_0_r. iFrame "CPS2". iFrame "#∗".
+          apply strict_include in LT2. by erewrite <- LT2. }
+
+        apply strict_include in LT1. iRename "PH1" into "PH".
+        wp_bind (Rec _ _ _)%V. pure_step.
+        iApply wp_value. pure_step.
+
+        iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
+        iApply sswp_MUf_wp. iIntros (τ''). iApply (MU__f_wand with "[-CP PH OB1]").
+        2: { iApply OBLS_AMU__f; [done| ]. 
+             iApply (BMU_AMU__f with "[-PH]"); [reflexivity| ..].
+             2: by iFrame. 
+             
+             iIntros "PH".
+             (* TODO: change BMU_burn_cp*)
+             iApply BMU_intro. iFrame "PH OB1".
+             iSplitR "CP".
+             2: { do 2 iExists _. iFrame. done. }
+             iAccu. }
+
+        iIntros "[? (%π3 & %π4 & PH1 & OB1 & PH3 & OB2 & [%LT3 %LT4])]".
+        Unshelve. 2: exact ∅.
+        rewrite difference_diag_L. rewrite intersection_idemp_L.
+
+        iSplitR "POST OB1".
+        2: { by iApply "POST". }
+        
+        apply strict_include in LT4. iRename "PH3" into "PH".
+        wp_bind (_ + _)%E. rewrite Nat2Z.inj_0.
+        assert (phase_le π π4) as LT' by (by etrans). 
+        do 2 pure_step_cases.
+        replace (0 + 1)%Z with 1%Z; [| done].
+        replace 1%Z with (Z.of_nat 1%nat); [| done].         
+        replace 0%Z with (Z.of_nat 0%nat); [| done].         
+        iApply (thread_spec_wrapper with "[-]").
+        { reflexivity. }
+        { apply odd_thread_resource. }
+        2: { iNext. iIntros (v) "OB". by iApply NO_OBS_POST. }
+        simpl. 
+        (* iDestruct (cp_mul_take with "CPS2'") as "[CPS2 ?]".  *)
+        iFrame "CPS2'". iFrame "#∗".
+        by erewrite <- LT'.
+        Unshelve. exact #().
+    Qed.
       
   End MainProof.
-
-
 
 End EoFin.
