@@ -603,34 +603,34 @@ Section UptoStutter.
     rewrite label_lookup_0. congruence.  
   Qed.
 
-  Lemma upto_stutter_trace_lookup' {btr : trace St L} {str : trace S' L'} 
-    (n : nat) st st' l:
-    upto_stutter Us Usls btr str →
-    str !! n = Some (st, Some (l, st')) ->
-    (* Usls st ℓ st' = Some l -> *)
-      ∃ (n' : nat) δ1 ℓ δ2 , btr !! n' = Some (δ1, Some (ℓ, δ2)) /\
-                           Us δ1 = st /\ Us δ2 = st' /\ Usls δ1 ℓ δ2 = Some l.
-  Proof.
-    intros UPTO NTH.
-    pose proof (trace_has_len btr) as [? LEN].
-    apply trace_lookup_after_strong in NTH as (atr' & AFTER & A0). 
-    forward eapply (upto_stutter_after _ _ n UPTO); eauto.
-    intros (n' & str' & AFTER' & UPTOn).
-    exists n'.
-    rewrite -(Nat.add_0_r n'). erewrite <- trace_lookup_after; eauto.
-    punfold UPTOn; [| by apply upto_stutter_mono].
-    inversion UPTOn; subst; try congruence.
-    2: { rewrite trace_lookup_0_cons. simpl in *.
-         do 3 eexists. split; [reflexivity| ..].
-         repeat split; eauto.
-         pclearbot. 
-         by eapply upto_stutter_trfirst in H5. } 
-    rewrite trace_lookup_0_cons.
-    simpl in *. subst.
-    (* assume that dec_unless holds for btr,
-       prove that eventually there will be a step.
-       Try to reuse similar argument from inftraces.destutter_spec_ind ? *)
-  Admitted. 
+  (* Lemma upto_stutter_trace_lookup' {btr : trace St L} {str : trace S' L'}  *)
+  (*   (n : nat) st st' l: *)
+  (*   upto_stutter Us Usls btr str → *)
+  (*   str !! n = Some (st, Some (l, st')) -> *)
+  (*   (* Usls st ℓ st' = Some l -> *) *)
+  (*     ∃ (n' : nat) δ1 ℓ δ2 , btr !! n' = Some (δ1, Some (ℓ, δ2)) /\ *)
+  (*                          Us δ1 = st /\ Us δ2 = st' /\ Usls δ1 ℓ δ2 = Some l. *)
+  (* Proof. *)
+  (*   intros UPTO NTH. *)
+  (*   pose proof (trace_has_len btr) as [? LEN]. *)
+  (*   apply trace_lookup_after_strong in NTH as (atr' & AFTER & A0).  *)
+  (*   forward eapply (upto_stutter_after _ _ n UPTO); eauto. *)
+  (*   intros (n' & str' & AFTER' & UPTOn). *)
+  (*   exists n'. *)
+  (*   rewrite -(Nat.add_0_r n'). erewrite <- trace_lookup_after; eauto. *)
+  (*   punfold UPTOn; [| by apply upto_stutter_mono]. *)
+  (*   inversion UPTOn; subst; try congruence. *)
+  (*   2: { rewrite trace_lookup_0_cons. simpl in *. *)
+  (*        do 3 eexists. split; [reflexivity| ..]. *)
+  (*        repeat split; eauto. *)
+  (*        pclearbot.  *)
+  (*        by eapply upto_stutter_trfirst in H5. }  *)
+  (*   rewrite trace_lookup_0_cons. *)
+  (*   simpl in *. subst. *)
+  (*   (* assume that dec_unless holds for btr, *)
+  (*      prove that eventually there will be a step. *)
+  (*      Try to reuse similar argument from inftraces.destutter_spec_ind ? *) *)
+  (* Abort.  *)
 
   Lemma upto_stutter_state_lookup {btr : trace St L} {str : trace S' L'} n' st':
     upto_stutter Us Usls btr str

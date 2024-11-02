@@ -816,11 +816,9 @@ Section CoPsetOrdering.
     generalize dependent C. induction i.
     { simpl. intros. subst. apply coPset_least_in. }
     simpl. intros.
-  (*   ospecialize * (IHi _ _). *)
-  (*   { apply Heqc. } *)
-  (*   set_solver. *)
-  (* Qed.  *)
-  Admitted. 
+    specialize (IHi _ _ _ Heqc).
+    set_solver.
+  Qed. 
 
   Lemma coPset_nth_disj_neq C1 C2 INF1 INF2 n1 n2
     (DISJ: C1 ## C2):
@@ -833,24 +831,23 @@ Section CoPsetOrdering.
 
   Lemma coPset_nth_next_lt C INF i:
     (coPset_nth C INF i < coPset_nth C INF (S i))%positive.
-  Proof.
-  (*   remember (coPset_nth C INF i) as m. remember (coPset_nth C INF (S i)) as m'. *)
-  (*   generalize dependent C. generalize dependent m. generalize dependent m'.  *)
-  (*   induction i. *)
-  (*   { simpl. intros. *)
-  (*     pose proof (coPset_least_spec C INF). *)
-  (*     assert (m' ∈ C) as IN'. *)
-  (*     { subst m'. eapply elem_of_weaken; [apply coPset_least_in| ]. set_solver. } *)
-  (*     red in H. apply proj2 in H. ospecialize (H m' IN'). *)
-  (*     rewrite -Heqm in H. apply Positive_as_OT.le_lteq in H as [? | ?]; [lia| ]. *)
-  (*     rewrite -Heqm in Heqm'. *)
-  (*     pose proof (coPset_least_in _ (coPset_sub1_helper C INF m)). *)
-  (*     set_solver. } *)
-  (*   intros. *)
-  (*   pose proof (coPset_sub1_helper C INF (coPset_least C INF)) as INF'. *)
-  (*   eapply IHi; eauto.  *)
-  (* Qed.  *)
-  Admitted. 
+  Proof using.
+    remember (coPset_nth C INF i) as m. remember (coPset_nth C INF (S i)) as m'.
+    generalize dependent C. generalize dependent m. generalize dependent m'.
+    induction i.
+    { simpl. intros.
+      pose proof (coPset_least_spec C INF).
+      assert (m' ∈ C) as IN'.
+      { subst m'. eapply elem_of_weaken; [apply coPset_least_in| ]. set_solver. }
+      red in H. apply proj2 in H. specialize (H m' IN').
+      rewrite -Heqm in H. apply Positive_as_OT.le_lteq in H as [? | ?]; [lia| ].
+      rewrite -Heqm in Heqm'.
+      pose proof (coPset_least_in _ (coPset_sub1_helper C INF m)).
+      set_solver. }
+    intros.
+    pose proof (coPset_sub1_helper C INF (coPset_least C INF)) as INF'.
+    eapply IHi; eauto.
+  Qed.
 
   Lemma coPset_nth_lt C INF i j (LT: i < j):
     (coPset_nth C INF i < coPset_nth C INF j)%positive.
@@ -892,17 +889,17 @@ Section CoPsetOrdering.
     set (m' := coPset_least (C ∖ {[ m ]}) (coPset_sub1_helper C INF m)).
     assert (m' ∈ C ∖ {[ m ]}) as IN'.
     { subst m'. apply coPset_least_in. }
-  (*   ospecialize * (IH (Pos.to_nat p - Pos.to_nat m') _ _ (coPset_sub1_helper C INF m)). *)
-  (*   { subst d. enough (Pos.to_nat m < Pos.to_nat m'); [lia| ]. *)
-  (*     apply Pos2Nat.inj_lt.  *)
-  (*     subst m m'. apply (coPset_nth_lt C INF 0 1). lia. } *)
-  (*   { apply elem_of_difference. split; auto.  *)
-  (*     apply not_elem_of_singleton. intros ->. lia. } *)
-  (*   { eauto. } *)
-  (*   { lia. } *)
-  (*   destruct IH as [n' EQ']. exists (S n'). simpl. set_solver. *)
-  (* Qed.        *)
-  Admitted. 
+    assert (Pos.to_nat p - Pos.to_nat m' < d) as LT'.
+    { subst d. enough (Pos.to_nat m < Pos.to_nat m'); [lia| ].
+      apply Pos2Nat.inj_lt.
+      subst m m'. apply (coPset_nth_lt C INF 0 1). lia. }
+    assert (p ∈ C ∖ {[m]}) as IN''.
+    { apply elem_of_difference. split; auto.
+      apply not_elem_of_singleton. intros ->. lia. }
+    specialize (IH (Pos.to_nat p - Pos.to_nat m') LT' _ (coPset_sub1_helper C INF m) IN''
+               _ ltac:(done) ltac:(done)).
+    destruct IH as [n' EQ']. exists (S n'). simpl. set_solver.
+  Qed.
 
 End CoPsetOrdering.
 
