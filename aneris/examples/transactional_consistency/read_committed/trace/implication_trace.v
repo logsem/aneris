@@ -67,7 +67,8 @@ Section trace_proof.
   Definition GlobalInvExtRC (γ : gname) (T : list transaction) : iProp Σ := 
     ∃ T', ⌜∀ t, t ∈ T' ↔ t ∈ (comTrans T)⌝ ∗ OwnTrans γ T' ∗ 
       ⌜∀ trans s k v, trans ∈ T → (Rd s k (Some v)) ∈ trans → 
-        ¬(∃ s, (Wr s k v) ∈ trans) → ∃ trans', trans' ∈ (comTrans T) ∧ latest_write_trans k v trans'⌝.
+        ¬ (∃ s' v', rel_list trans (Wr s' k v') (Rd s k (Some v))) →
+         ∃ trans', trans' ∈ (comTrans T) ∧ latest_write_trans k v trans'⌝.
 
   (** Wrapped resources  *)
   Global Program Instance wrapped_resources (γtrans γmstate γmlin γmpost γmname γl : gname) (clients : gset socket_address) 
@@ -139,7 +140,12 @@ Section trace_proof.
   Proof.
     intros Happl Hbased Hnin Hreads Hvalid.
     split_and!.
-    - admit.
+    - destruct Happl as [(s' & t' & Hlast & Happl)|Hfalse].
+      + intros i eq e2. 
+        eapply extend_execution_imp; try done.
+      + rewrite /valid_execution in Hvalid.
+        rewrite last_None in Hfalse.
+        set_solver.
     - destruct Hvalid as (_ & Hvalid & _).
       rewrite lookup_app_Some.
       set_solver.
@@ -199,7 +205,6 @@ Section trace_proof.
               ++ apply elem_of_list_lookup. 
                  eauto.
               ++ intros Hfalse; destruct trans; set_solver.
-              destruct trans; set_solver.
            -- apply lookup_lt_Some in Hlookup_j.
               rewrite split_length_r in Hlookup_j.
               rewrite split_length_l in Hlookup.
@@ -208,58 +213,7 @@ Section trace_proof.
            simpl.
            rewrite lookup_app_Some.
            set_solver.
-    (* {
-      admit.
-    }
-    split
-    (* split; first (intros; by eapply extendExecution_imp). *)
-    destruct (last exec) as [p|] eqn:Hlast; simpl.
-    - split.
-      + destruct Hvalid as (_ & Hvalid & _).
-        rewrite lookup_snoc_Some.
-        left.
-        destruct exec as [|h t]; first set_solver.
-        split; last done.
-        rewrite cons_length.
-        lia.
-      + rewrite split_split.
-        simpl.
-        intros t Hin.
-        destruct Hvalid as (_ & _ & Hvalid).
-        rewrite elem_of_app in Hin.
-        destruct Hin as [Hin|Hin].
-        * intros tag c k ov i Hlookup Hrd_in Hnot Hsome.
-          specialize (Hvalid t Hin tag c k ov i).
-          rewrite split_split in Hlookup.
-          simpl in Hlookup.
-          rewrite lookup_app_Some in Hlookup.
-          destruct Hlookup as [Hlookup| Hlookup].
-          -- destruct (Hvalid Hlookup Hrd_in Hnot Hsome) as (st & j & Hleq & Hlookup_j & Hlookup_k).
-             exists st, j.
-             split_and!; try done.
-             rewrite split_split; simpl.
-             rewrite lookup_app_Some.
-             set_solver.
-          -- exfalso.
-             apply Hnin.
-             destruct Hlookup as (_ & Hlookup).
-             rewrite list_lookup_singleton_Some in Hlookup.
-             destruct Hlookup as (_ & Hlookup).
-             rewrite Hlookup.
-             apply (Hbased t).
-             split; first done.
-             rewrite -Hlookup; intros Hfalse. 
-             destruct trans; set_solver.
-        * assert (t = trans ++ [Cm s true]) as ->; first set_solver.
-          intros tag c k ov i Hlookup Hrd_in Hnot (v & ->).
-
-          rewrite /read_state.
-          admit.
-    - apply last_None in Hlast.
-      subst.
-      rewrite /valid_execution in Hvalid.
-      set_solver. *)
-  Admitted.
+  Qed.
 
   Lemma inv_ext_rc_wr_imp1 γ T1 T2 trans s k v :
     ⌜∃ op, op ∈ trans ∧ last trans = Some op ∧ isCmOp op = false⌝ -∗
@@ -270,13 +224,22 @@ Section trace_proof.
     rewrite /GlobalInvExtRC.
     rewrite -com_trans_eq1; try done.
     - iExists T'.
-      iFrame. 
+      iFrame.
       iPureIntro.
       intros trans' s' k' v' Hin.
       rewrite elem_of_app in Hin.
       destruct Hin as [Hin|Hin]; first set_solver.
       rewrite elem_of_cons in Hin.
-      destruct Hin as [Hin|Hin]; set_solver.
+      destruct Hin as [Hin|Hin]; last set_solver.
+      rewrite Hin.
+      intros Hrd_in Hnot.
+      eapply (Himp trans); first set_solver.
+      + rewrite elem_of_app in Hrd_in.
+        destruct Hrd_in as [Hrd_in|Hrd_in]; set_solver.
+      + intros (s'' & v'' & Hrel).
+        apply Hnot.
+        exists s'', v''.
+        by apply rel_list_imp.
     - rewrite /is_cm_op.
       set_solver.
   Qed.
@@ -310,7 +273,7 @@ Section trace_proof.
     iIntros "%Hop %Hread_res (%T' & Hin_in & Hown & %Himp)".
     rewrite /GlobalInvExtRC.
     rewrite -com_trans_eq1; try done.
-    - iExists T'. 
+    - iExists T'.
       iFrame.
       iPureIntro.
       intros trans' s' k' v' Hin.
@@ -320,14 +283,31 @@ Section trace_proof.
       destruct Hin as [->|Hin]; last set_solver.
       intros Hrd_in Hnot.
       rewrite elem_of_app in Hrd_in.
-      destruct Hrd_in as [Hrd_in|Hrd_in]; first set_solver.
-      assert (k = k') as <-; first set_solver.
-      assert (wo = Some v') as ->; first set_solver.
-      destruct (Hread_res v') as [Hfalse|(trans' & Htrans'_in & Htrans'_cm & Hlatest)]; 
-        try done; first set_solver.
-      exists trans'.
-      split; last done.
-      by apply com_trans_in.
+      destruct Hrd_in as [Hrd_in|Hrd_in].
+      + apply (Himp trans s'); try done; first set_solver.
+        intros (s'' & v'' & Hrel).
+        apply Hnot.
+        exists s'', v''.
+        by apply rel_list_imp.
+      + assert (k = k') as <-; first set_solver.
+        assert (wo = Some v') as ->; first set_solver.
+        destruct (Hread_res v') as [(s'' & Hwr_in)|(trans' & Htrans'_in & Htrans'_cm & Hlatest)]; try done.
+        * exfalso.
+          apply Hnot.
+          exists s'', v'.
+          assert (s = s') as <-; first set_solver.
+          rewrite elem_of_list_lookup in Hwr_in.
+          destruct Hwr_in as (i & Hwr_in).
+          exists i, (Init.Nat.pred (length (trans ++ [Rd s k (Some v')]))).
+          split_and!.
+          -- apply lookup_lt_Some in Hwr_in.
+             rewrite last_length.
+             by simpl.
+          -- by apply lookup_app_l_Some.
+          -- by rewrite -last_lookup last_snoc.
+        * exists trans'.
+          split; last done.
+          by apply com_trans_in.
     - rewrite /is_cm_op.
       set_solver.
   Qed.
@@ -363,8 +343,9 @@ Section trace_proof.
   Lemma inv_ext_rc_cm_imp1 γ T1 T2 trans s b :
     ⌜∃ op, op ∈ trans ∧ last trans = Some op ∧ isCmOp op = false⌝ ∗
     GlobalInvExtRC γ (T1 ++ trans :: T2) ∗ 
-    ⌜∀ s k v, (Rd s k (Some v)) ∈ trans → ¬(∃ s, (Wr s k v) ∈ trans) → 
-      ∃ trans', trans' ∈ comTrans (T1 ++ trans :: T2) ∧ latest_write_trans k v trans'⌝ ==∗
+    ⌜∀ s k v, (Rd s k (Some v)) ∈ trans → 
+      ¬ (∃ s' v', rel_list trans (Wr s' k v') (Rd s k (Some v))) →
+      ∃ trans', trans' ∈ comTrans (T1 ++ trans :: T2) ∧ latest_write_trans k v trans'⌝  ==∗
     GlobalInvExtRC γ (T1 ++ (trans ++ [Cm s b]) :: T2) ∗ 
     (⌜b = true⌝ → OwnTransSub γ (trans ++ [Cm s b])).
   Proof.
@@ -417,11 +398,14 @@ Section trace_proof.
           destruct Hin as [Hin|Hin].
           -- subst.
              rewrite com_trans_eq4 in Hreads; last done.
-             destruct (Hreads s' k v) as (trans'' & Htrans'_in & Hlatest).
-             1, 2 : set_solver.
-             exists trans''.
-             split; last done.
-             by apply com_trans_imp1.
+             destruct (Hreads s' k v) as (trans'' & Htrans'_in & Hlatest); first set_solver.
+            ++ intros (s'' & v'' & Hrel).
+               apply Hnot.
+               exists s'', v''.
+               by apply rel_list_imp.
+            ++ exists trans''.
+               split; last done.
+               by apply com_trans_imp1.
           -- destruct (Hinv_pure trans' s' k v) as (trans'' & Htrans'_in & Hlatest); 
               try done; first set_solver.
              exists trans''.
@@ -448,7 +432,13 @@ Section trace_proof.
         rewrite -com_trans_eq3; last done.
         destruct Hin as [Hin|Hin]; first set_solver.
         rewrite elem_of_cons in Hin.
-        destruct Hin as [Hin|Hin]; set_solver.
+        destruct Hin as [Hin|Hin]; last set_solver.
+        subst.
+        eapply (Hreads s'); first set_solver.
+        intros (s'' & v'' & Hrel).
+        apply Hnot.
+        exists s'', v''.
+        by apply rel_list_imp.
   Qed.
 
   Lemma inv_ext_rc_cm_imp2 γ T s b :
@@ -668,7 +658,8 @@ Section trace_proof.
       op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans)) 
         as [(trans & Htrans_in & Hop)|Hdec].
     - destruct (elem_of_list_split _ _ Htrans_in) as (T1 & T2 & ->).
-      iAssert (⌜∀ s0 k v, Rd s0 k (Some v) ∈ trans → ¬ (∃ s1, Wr s1 k v ∈ trans) → 
+      iAssert (⌜∀ s0 k v, Rd s0 k (Some v) ∈ trans → 
+        ¬ (∃ s' v', rel_list trans (Wr s' k v') (Rd s0 k (Some v))) →
         ∃ trans', trans' ∈ comTrans (T1 ++ trans :: T2) ∧ latest_write_trans k v trans'⌝)%I as "%Htrans_reads".
       {
         iDestruct "Htrans_res'" as "(%Tinv & _ & _ & %Hinv_pure)".
@@ -705,7 +696,9 @@ Section trace_proof.
       {
         iModIntro.
         iExists (T1 ++ (trans ++ [Cm (tag1, c) b]) :: T2); iFrame.
-        iExists t', (lt' ++ [(#tag1, (c, (#"CmLin", #b)))%V]), _.
+        destruct (optional_applied_transaction_exists exec' (trans ++ [Cm (tag1, c) b])) as (st & Happl).
+        iExists t', (lt' ++ [(#tag1, (c, (#"CmLin", #b)))%V]), 
+          (optionalExtendExecution exec' (trans ++ [Cm (tag1, c) b]) st).
         iFrame.
         iSplit.
         + iPureIntro.
@@ -737,20 +730,20 @@ Section trace_proof.
                         set_solver.
                     --- by exists t'.
                   ** iSplit.
-                    --- iPureIntro.
-                        admit.
-                        (* apply based_on_add4; set_solver. *)
+                    --- iPureIntro; apply based_on_add4; set_solver.
                     --- iSplit.
-                        +++ admit.
-                            (* iPureIntro; eapply valid_execution_rc_imp; try done.
+                        +++ iPureIntro.
+                            rewrite /optionalExtendExecution last_snoc.
+                            destruct b; last done.
+                            eapply valid_execution_rc_imp; try done.
                             intros Hfalse.
                             apply Hnot_lin_in.
-                            exists (toLinEvent (Cm (tag1, c) b)).
+                            exists (toLinEvent (Cm (tag1, c) true)).
                             simpl.
                             destruct Hex' as (_ & Hex' & _).
                             split; last done.
-                            apply (Hex' (trans ++ [Cm (tag1, c) b]) (Cm (tag1, c) b)); last set_solver.
-                            by apply com_trans_imp2. *)
+                            apply (Hex' (trans ++ [Cm (tag1, c) true]) (Cm (tag1, c) true)); last set_solver.
+                            by apply com_trans_imp2.
                         +++ iApply (trace_state_resources_commit_lin2 clients c tag1 lt' T1 T2 trans sa 
                               s γ γmstate γmname extract b mc mstate mname m' with 
                               "[//][//][//][//][//][//][//][//][][Hkeys_conn2][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
@@ -877,7 +870,9 @@ Section trace_proof.
         iModIntro.
         iExists (T' ++ [[Cm (tag1, c) b]]).
         iFrame.
-        iExists t', (lt' ++ [(#tag1, (c, (#"CmLin", #b)))%V]), _.
+        destruct (optional_applied_transaction_exists exec' [Cm (tag1, c) b]) as (st & Happl).
+        iExists t', (lt' ++ [(#tag1, (c, (#"CmLin", #b)))%V]), 
+          (optionalExtendExecution exec' [Cm (tag1, c) b] st).
         iFrame.
         iSplit.
         - iPureIntro.
@@ -919,22 +914,21 @@ Section trace_proof.
                        set_solver.
                     ** by exists t'.
                   ++ iSplit.
-                    ** admit.
-                       (* iPureIntro; by apply based_on_add3. *)
+                    ** iPureIntro; apply based_on_add3; set_solver.
                     ** iSplit.
                        --- iPureIntro.
-                           admit.
-                           (* assert ([Cm (tag1, c) b] = [] ++ [Cm (tag1, c) b]) as ->; first set_solver.
+                           destruct b; last done.
+                           assert ([Cm (tag1, c) true] = [] ++ [Cm (tag1, c) true]) as ->; first set_solver.
                            eapply valid_execution_rc_imp; try done; last set_solver.
                            simpl.
                            intros Hfalse.
                            apply Hnot_lin_in.
-                           exists (toLinEvent (Cm (tag1, c) b)).
+                           exists (toLinEvent (Cm (tag1, c) true)).
                            simpl.
                            destruct Hex' as (_ & Hex' & _).
                            split; last done.
-                           apply (Hex' [Cm (tag1, c) b] (Cm (tag1, c) b)); last set_solver.
-                           by apply com_trans_imp2. *)
+                           apply (Hex' [Cm (tag1, c) true] (Cm (tag1, c) true)); last set_solver.
+                           by apply com_trans_imp2.
                        --- iApply (trace_state_resources_commit_lin1 clients c tag1 lt' T' sa 
                              s γ γmstate γmname extract b mc mstate mname m' with 
                              "[//][//][//][//][//][//][//][][Hkeys_conn2][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
