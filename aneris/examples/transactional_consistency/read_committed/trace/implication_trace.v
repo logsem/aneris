@@ -79,7 +79,7 @@ Section trace_proof.
       OwnMemKey k V :=  (OwnMemKey k V ∗ 
                         (∀ v, ⌜v ∈ V⌝ → ∃ trans, OwnTransSub γtrans trans ∗ ⌜latest_write_trans k v trans⌝ ∗ ⌜com_true trans⌝) ∗
                         (∀ v, ⌜v ∈ V⌝ → ∃ lh tag c, OwnLinHist γl lh ∗ 
-                        ⌜(#(LitString tag), (c, (#"WrLin", (#(LitString k), v))))%V ∈ lh⌝))%I;
+                          ⌜(#(LitString tag), (c, (#"WrLin", (#(LitString k), v))))%V ∈ lh⌝))%I;
       OwnLocalKey k c ov := (OwnLocalKey k c ov ∗ ∃ (sa : socket_address) γ, ghost_map_elem γmname sa DfracDiscarded (γ, c) ∗ 
                              ⌜extract c = Some #sa⌝ ∗ (⌜k ∈ KVS_keys⌝ → ghost_map_elem γ k (DfracOwn 1%Qp) ov) ∗ ⌜sa ∈ clients⌝
                              ∗ ⌜∀ v, ov = Some v → k ∈ KVS_keys⌝)%I;
@@ -638,6 +638,7 @@ Section trace_proof.
     iAssert ([∗ map] k↦ov ∈ mc, ⌜∀ v : val, ov = Some v → 
       ∃ trans, (open_trans trans c T') ∧ latest_write_trans k v trans⌝)%I as "#Hcm_sep_in".
     {
+      
       admit.
     } 
     assert (Decision (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation), 
@@ -665,7 +666,7 @@ Section trace_proof.
         iDestruct "Htrans_res'" as "(%Tinv & _ & _ & %Hinv_pure)".
         iPureIntro; set_solver.
       }
-      iMod (inv_ext_rc_cm_imp1 with "[$Htrans_res']") as "(Htrans_res' & #Hsub)".
+      iMod (inv_ext_rc_cm_imp1 _ _ _ _ (tag1, c) b with "[$Htrans_res']") as "(Htrans_res' & #Hsub)".
       {
         iSplit; last done.
         iPureIntro; set_solver.
@@ -686,7 +687,52 @@ Section trace_proof.
           iSplit; first done.
           do 2 rewrite big_sepM2_sep.
           iFrame.
-          admit.
+          iDestruct (big_sepM2_sepM_2 with "[$Hkeys2][$Hcm_sep_in]") as "Hkeys2"; first done.
+          iDestruct (big_sepM2_sepM_2 with "[$Hkeys3][$Hcm_sep_in]") as "Hkeys3"; first done.
+          iSplitL "Hkeys2".
+          + iApply (big_sepM2_wand with "[$Hkeys2]").
+            iApply big_sepM2_intro; first done.
+            iModIntro.
+            iIntros (k V ov Hlookup1 Hlookup2) "(Hexists_sub & %Hopen_latest) %v %Hin".
+            rewrite /commit_event in Hin.
+            destruct ov as [v'|].
+            * rewrite elem_of_union in Hin.
+              destruct Hin as [Hin|Hin]. 
+              -- iDestruct ("Hexists_sub" $! v Hin) as "(%trans' & Htrans'_sub)".
+                 iExists trans'.
+                 iFrame.
+              -- assert (v = v') as <-; first set_solver.
+                 iExists (trans ++ [Cm (tag1, c) true]).
+                 destruct (Hopen_latest v) as (trans' & Htrans'_open & Htrans'_latest); first done.
+                 assert (trans = trans') as ->; first by eapply trans_eq.
+                 iSplitR; first by iApply "Hsub".
+                 iPureIntro.
+                 rewrite /com_true last_snoc.
+                 split; last set_solver.
+                 destruct Htrans'_latest as (sig & Hwr_in & Hnot).
+                 exists sig.
+                 split; first set_solver.
+                 intros (sig' & v' & Hrel).
+                 apply Hnot.
+                 exists sig', v'.
+                 eapply (rel_list_last_neq _ _ _ (Cm (tag1, c) true)); set_solver.
+            * iDestruct ("Hexists_sub" $! v Hin) as "(%trans' & Htrans'_sub)".
+              iExists trans'.
+              iFrame.
+          + iApply (big_sepM2_wand with "[$Hkeys3]").
+            iApply big_sepM2_intro; first done.
+            iModIntro.
+            iIntros (k V ov Hlookup1 Hlookup2) "(Hlin_hist & Hopen_latest) %v %Hin".
+            destruct ov as [v'|].
+            * rewrite elem_of_union in Hin.
+              destruct Hin as [Hin|Hin].
+              -- iDestruct ("Hlin_hist" $! v Hin) as "(%lh' & %tag' & %c' & Hown_lin')".
+                 iExists lh', tag', c'.
+                 iFrame.
+              -- admit.
+            * iDestruct ("Hlin_hist" $! v Hin) as "(%lh' & %tag' & %c' & Hown_lin')".
+              iExists lh', tag', c'.
+              iFrame.
         - iRight.
           iSplit; first done.
           do 2 (rewrite big_sepM_sep; iFrame).

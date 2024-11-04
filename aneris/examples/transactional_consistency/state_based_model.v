@@ -64,10 +64,6 @@ Definition connOfTrans (t : transaction) : option val :=
 
 Definition is_cm_op (op : operation) : Prop := ∃ s b, op = Cm s b.
 
-Definition isCmOp (op : operation) : bool := match op with | Cm _ _ => true | _ => false end.
-
-Definition isWrOp (op : operation) (k : Key) : bool := match op with | Wr _ k' _ => bool_decide (k = k') | _ => false end. 
-
 Definition valid_transactions (T : list transaction) : Prop := 
   (* Transactions satisfy the baseline transaction contraints *)
   (∀ t, t ∈ T → valid_transaction t) ∧
@@ -91,13 +87,6 @@ Definition applied_transaction (s1 s2 : state) (trans : transaction) : Prop :=
   (∀ k v, s2 !! k = Some v → 
     (∀ v', latest_write_trans k v' trans → v = v') ∧ (¬(∃ sig v', (Wr sig k v' ∈ trans)) → s1 !! k = Some v)) ∧
   (∀ k, ((∃ sig v, (Wr sig k v) ∈ trans) ∨ k ∈ dom s1) → k ∈ dom s2).
-
-Definition optional_applied_transaction (exec : execution) (s : state) (trans : transaction) : Prop :=
-  (∃ s' t', last exec = Some (t', s') ∧ applied_transaction s' s trans) ∨ 
-  (last exec = None ∧ applied_transaction ∅ s trans).
-
-Definition optionalExtendExecution (e : execution) (t : transaction) (s : state) : execution :=
-  match (last t) with | Some (Cm _ true) => e ++ [(t, s)] | _ => e end.
 
 Definition valid_execution (test : commitTest) (exec : execution) : Prop :=
   (* Transitions are valid *)
@@ -360,7 +349,20 @@ Definition valid_trace_rc : list val → Prop := valid_trace commit_test_rc.
 
 Definition valid_trace_si : list val → Prop := valid_trace commit_test_si.
 
-(** Helper lemmas and definitions related to the state-based model *)
+(** Helper definitions related to the state-based model *)
+
+Definition optional_applied_transaction (exec : execution) (s : state) (trans : transaction) : Prop :=
+  (∃ s' t', last exec = Some (t', s') ∧ applied_transaction s' s trans) ∨ 
+  (last exec = None ∧ applied_transaction ∅ s trans).
+
+Definition optionalExtendExecution (e : execution) (t : transaction) (s : state) : execution :=
+  match (last t) with | Some (Cm _ true) => e ++ [(t, s)] | _ => e end.
+
+Definition isCmOp (op : operation) : bool := match op with | Cm _ _ => true | _ => false end.
+
+Definition isWrOp (op : operation) (k : Key) : bool := match op with | Wr _ k' _ => bool_decide (k = k') | _ => false end.
+
+(** Helper lemmas related to the state-based model *)
 
 Lemma valid_trace_ru_empty : valid_trace_ru [].
 Proof.
@@ -411,7 +413,6 @@ Lemma rel_list_imp {A : Type} (l : list A) e1 e2 e :
 Proof.
   rewrite /rel_list.
   intros (i & j & Hlt & Hlookup_i & Hlookup_j).
-  eauto.
   exists i, j.
   split_and!; try done; by apply lookup_app_l_Some.
 Qed.
