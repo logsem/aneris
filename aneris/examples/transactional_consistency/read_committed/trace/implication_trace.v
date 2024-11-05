@@ -649,7 +649,88 @@ Section trace_proof.
     iAssert ([∗ map] k↦ov ∈ mc, ⌜∀ v : val, ov = Some v → 
       ∃ trans, (open_trans trans c T') ∧ latest_write_trans k v trans⌝)%I as "#Hcm_sep_in".
     {
-      admit.
+      iAssert ((∀ v k, ⌜mc !! k = Some (Some v)⌝ → ⌜latest_write c k (Some v) T'⌝)%I) as "%Hsome_latest".
+      {
+        iIntros (v k Hlookup).
+        iAssert (ghost_map_elem γ k (DfracOwn 1%Qp) (Some v) ∗ ⌜k ∈ KVS_keys⌝)%I 
+          with "[Hkeys_conn2]" as "(Hkey_internal & %Hk_in_KVS)".
+        {
+          rewrite -(insert_delete mc k (Some v)).
+          2 : done.
+          rewrite insert_union_singleton_l.
+          rewrite big_sepM_union.
+          2 : {
+            apply map_disjoint_spec.
+            intros i ov1 ov2 Hlookup1 Hlookup2.
+            rewrite lookup_singleton_Some in Hlookup1.
+            destruct Hlookup1 as (Heq & _).
+            rewrite Heq in Hlookup2.
+            by rewrite lookup_delete in Hlookup2.
+          }
+          rewrite big_sepM_singleton.
+          iDestruct "Hkeys_conn2" as "((%sa' & %γ' & #Hsa'_pointer' & %Hextract_sa' & Hkey & %Hsa'_in & %Himp & _) & _)".
+          iAssert (⌜k ∈ KVS_keys⌝)%I as "#Hk_in"; first (iPureIntro; set_solver).
+          iFrame "#".
+          destruct (decide (sa = sa')) as [<- | Hfalse]; last set_solver.
+          iAssert (⌜γ = γ'⌝%I) as "<-"; last by iApply "Hkey".
+          iAssert ((⌜(γ', c) = (γ, c)⌝)%I) as "%Heq_pair"; last (iPureIntro; set_solver).
+          iApply (ghost_map_elem_agree sa γmname _ _ (γ', c) (γ, c) with "[$Hsa'_pointer'][$Hsa'_pointer]").
+        }
+        iDestruct (@ghost_map_lookup with "[$Hmap_m][$Hkey_internal]") as "%Hlookup_m".
+        iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & Hactive_eq & -> & %Hopen_tail &
+            Hkeys & Hkey_info)".
+        destruct (decide (k ∈ domain ∩ KVS_keys)) as [Hk_in_dom|Hk_nin_dom].
+        - iAssert (⌜latest_write c k (Some v) T'⌝%I) as "%Hlatest_write"; 
+            first iApply "Hkey_info"; try done.
+        - assert ((KVS_keys ∖ (domain ∩ KVS_keys)) = 
+              {[k]} ∪ ((KVS_keys ∖ (domain ∩ KVS_keys)) ∖ {[k]})) as Heq_k_keys'.
+          {
+            apply union_difference_L.
+            set_solver.
+          }
+          rewrite Heq_k_keys'.
+          rewrite (big_sepS_union _ {[k]} ((KVS_keys ∖ (domain ∩ KVS_keys)) ∖ {[k]})); 
+            last set_solver.
+          iDestruct "Hkeys" as "(Hkeys_k & _)".
+          rewrite big_sepS_singleton.
+          iDestruct "Hkeys_k" as "(%ov & Hkeys_k)".
+          iCombine "Hkeys_k" "Hkey_internal" as "Hfalse".
+          iDestruct (ghost_map_elem_valid with "Hfalse") as "%Hfalse".
+          by rewrite dfrac_valid_own in Hfalse.
+      }
+      iApply big_sepM_intro.
+      iModIntro.
+      iPureIntro.
+      iIntros (k ov Hlookup v Heq).
+      destruct (Hsome_latest v k) as [Hfalse|(v' & trans' & tag' & Heq_some & Hopen & Hwr_in & Hop)]. 
+      1, 2 : set_solver.
+      exists trans'.
+      split; first done.
+      exists (tag', c).
+      assert (v = v') as <-; first set_solver.
+      split; first set_solver.
+      intros (sig' & v' & (i & j & Hlt & Hlookup_i & Hlookup_j)).
+      assert (Wr sig' k v' ∈ trans') as Hwr_in'.
+      {
+        apply elem_of_list_lookup.
+        set_solver.
+      }
+      destruct Hopen as (_ & Htrans'_in & _).
+      destruct Hvalid_trans' as (Hvalid_trans' & _).
+      destruct (Hvalid_trans' trans' Htrans'_in) as (_ & _ & Hvalid_eq & _).
+      assert (rel_list trans' (Wr sig' k v') (Wr (tag', c) k v)) as (i' & j' & Hlt' & Hlookup_i' & Hlookup_j').
+      {
+        eapply (Hop (Wr sig' k v') Hwr_in').
+        exists sig', v'.
+        split; first done.
+        intros Hfalse.
+        rewrite Hfalse in Hlookup_j.
+        assert (i = j) as Heq_i_j; last lia.
+        eapply Hvalid_eq; set_solver.
+      }
+      assert (i = j') as Heq_i_j'; first (eapply Hvalid_eq; set_solver).
+      assert (i' = j) as Heq_i'_j; first (eapply Hvalid_eq; set_solver).
+      lia.
     } 
     assert (Decision (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation), 
       op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans)) 
@@ -1053,7 +1134,7 @@ Section trace_proof.
       }
       iModIntro.
       by wp_pures.
-  Admitted.
+  Qed.
 
   Lemma read_implication γtrans γmstate γmlin γmpost γmname γl clients (res : RC_resources Mdl Σ) 
   (lib : KVS_transaction_api) : 
