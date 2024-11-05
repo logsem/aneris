@@ -413,14 +413,6 @@ Section GmultisetLtWf.
   (*   rewrite /flatten_gset. set_solver. *)
   (* Qed.  *)
 
-  Lemma flatten_mset_singleton `{Countable K} (S: gmultiset K):
-    flatten_mset {[+ S +]} = S. 
-  Proof.
-    rewrite /flatten_mset.
-    rewrite gmultiset_elements_singleton. simpl. rewrite app_nil_r.
-  (* Qed.  *)
-  Admitted.
-
   (* TODO: move*)
   Lemma list_to_set_disj_elements `{Countable K} (g: gmultiset K):
     list_to_set_disj (elements g) = g.
@@ -444,12 +436,18 @@ Section GmultisetLtWf.
     rewrite IHl. done.
   Qed. 
 
+  Lemma flatten_mset_singleton `{Countable K} (S: gmultiset K):
+    flatten_mset {[+ S +]} = S. 
+  Proof.
+    rewrite /flatten_mset.
+    rewrite gmultiset_elements_singleton. simpl. rewrite app_nil_r.
+    apply list_to_set_disj_elements. 
+  Qed.
+
   Section MapImgMs.
     Context `{Countable K, Countable A}.
 
     Definition map_img_ms (m: gmap K (gmultiset A)): gmultiset A :=
-      (* [^ disj_union map] k↦v ∈ m, v.  *)
-      (* big_opMS *)
       list_to_set_disj $ concat ((elements ∘ snd) <$> (map_to_list m)).
 
     Lemma map_img_ms_empty: map_img_ms ∅ = ∅.
@@ -744,7 +742,7 @@ Section GmultisetLtWf.
     {[+ a +]} ## X <-> a ∉ X. 
   Proof using. clear llt R PO. mss. Qed.
 
-  Lemma dominates_over_lt_ext1 L B
+  Lemma dominates_over_lt_ext_crt L B
     (* (DISJ: L ## B) *)
     (DOM: dominates_over R B L):
     clos_refl_perm lt_ext (elements L) (elements B).
@@ -880,23 +878,17 @@ Section GmultisetLtWf.
     assert (L ≠ B) as NEQ' by mss. clear NEQ.
     rewrite gmultiset_disj_union_comm.
     rewrite !gmultiset_elements_disj_union. apply lt_ext_frame.
-    pose proof (gmultiset_split_exact L B) as EQ1.
-    pose proof (gmultiset_split_exact B L) as EQ2.
-    rewrite EQ1 {3}EQ2. rewrite gmultiset_intersection_comm. 
-    rewrite !gmultiset_elements_disj_union. apply lt_ext_frame.
-    apply dominates_over_lt_ext; [mss| ].
-    rewrite EQ1 {1}EQ2 in DOM.
-    rewrite gmultiset_intersection_comm in DOM. 
-    eapply dominates_minus; eauto.
-  Qed. 
+
+    apply dominates_over_lt_ext_crt in DOM. destruct DOM; eauto.
+    destruct NEQ'. eapply gmultiset_elements_equiv; eauto. 
+  Qed.
 
   Theorem ms_lt_wf (WF: wf (strict R)):
     wf (ms_lt R).
-  Proof using.
-    eapply wf_projected with (f := elements); [| apply lt_ext_wf]. 
-    
-    
-  Admitted.      
+  Proof using PO.
+    eapply wf_projected with (f := elements); [| apply lt_ext_wf].
+    intros. by apply ms_lt_ext.
+  Qed. 
 
 
 End GmultisetLtWf.
