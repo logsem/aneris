@@ -732,6 +732,17 @@ Section GmultisetLtWf.
       rewrite elem_of_list_to_set_disj. set_solver.
   Qed.
       
+  Lemma gmultiset_disjoint_symm (X Y: gmultiset A):
+    X ## Y <-> Y ## X.
+  Proof using. clear llt R PO. mss. Qed.
+
+  Lemma disj_union_disjoint (X Y Z: gmultiset A):
+    X ⊎ Y ## Z <-> X ## Z /\ Y ## Z.
+  Proof using. clear llt R PO. mss. Qed.
+
+  Lemma gmultiset_singleton_disjoint (X: gmultiset A) (a: A):
+    {[+ a +]} ## X <-> a ∉ X. 
+  Proof using. clear llt R PO. mss. Qed.
 
   Lemma dominates_over_lt_ext1 L B
     (* (DISJ: L ## B) *)
@@ -739,9 +750,112 @@ Section GmultisetLtWf.
     clos_refl_perm lt_ext (elements L) (elements B).
   Proof using.
     assert (exists (ds: gmap A (gmultiset A)), dom ds ⊆ dom B /\ map_img_ms ds = L /\ (forall b, dominates_over R {[+ b +]} (default ∅ (ds !! b))) /\ mmap_disj ds) as (ds & SUB_B & IMG & DOMds & DISJ). 
-    { clear -DOM.
-      admit. 
-    }
+     { clear -DOM.
+      revert DOM. pattern L. apply gmultiset_ind; clear L.
+      { intros. exists ∅. repeat split; try set_solver. done. }
+      intros a L IH DOM'.
+      assert (dominates_over R B L).
+      { red. intros. eapply DOM'. set_solver. }
+      specialize (IH ltac:(eauto)).
+      
+      destruct IH as (ds & SUB & IMG & DOM & DISJ).
+      destruct (decide (map_Exists (fun k v => a ∈ v) ds)).
+      2: { 
+        red in DOM'. specialize (DOM' a ltac:(mss)). destruct DOM' as (b & Bb & Rab).
+        exists (<[ b := default ∅ (ds !! b) ⊎ {[+ a +]} ]> ds).
+        repeat split.
+        - rewrite dom_insert_L. apply union_subseteq. split; auto.
+        apply singleton_subseteq_l. by apply gmultiset_elem_of_dom.
+        - rewrite map_img_ms_insert.
+          rewrite IMG.
+          destruct lookup eqn:DSb; simpl; [| mss].
+          enough (g ⊆ L).
+          { mss. }
+          subst L. rewrite {1}(map_split ds b). rewrite DSb. simpl.
+          rewrite map_img_ms_union.
+          2: { apply map_disjoint_dom; set_solver. }
+          rewrite map_img_ms_singleton. mss.
+        - intros c. red. intros v.
+          destruct (decide (c = b)) as [-> | NEQ].
+          { rewrite lookup_insert. simpl.
+            rewrite gmultiset_elem_of_disj_union.
+            repeat setoid_rewrite gmultiset_elem_of_singleton.
+            intros [IN | ->]; eexists; split; eauto. 
+            destruct (ds !! b) eqn:DSb; [| set_solver].
+            simpl in IN.
+            specialize (DOM b). rewrite DSb in DOM. simpl in DOM.
+            red in DOM. specialize (DOM _ IN). set_solver. }
+          rewrite lookup_insert_ne; [| done].
+          setoid_rewrite gmultiset_elem_of_singleton.
+          intros IN; eexists; split; eauto. 
+          destruct (ds !! c) eqn:DSc; [| set_solver].
+          simpl in IN.
+          specialize (DOM c). rewrite DSc in DOM. simpl in DOM.
+          red in DOM. specialize (DOM _ IN). set_solver.
+        - red. intros ?????.
+          assert (forall k Sk, k ≠ b -> ds !! k = Some Sk -> default ∅ (ds !! b) ## Sk).
+          { intros. destruct (ds !! b) eqn:DSb; simpl; [| mss].
+            eapply DISJ; [apply not_eq_sym| ..]; eauto. } 
+        
+          destruct (decide (k1 = b)), (decide (k2 = b)); subst; try done. 
+          all: try rewrite lookup_insert; simpl.
+          all: repeat try (rewrite lookup_insert_ne; [| done]).
+          + intros [=] ?. subst. apply disj_union_disjoint. split; eauto.
+            apply gmultiset_singleton_disjoint. intros ?.
+            destruct n. eexists. eauto.
+          + intros ? [=]. subst. apply gmultiset_disjoint_symm.
+            apply disj_union_disjoint. split; eauto.
+            apply gmultiset_singleton_disjoint. intros ?.
+            destruct n. eexists. eauto.
+          + intros. eapply DISJ; [apply NEQ| ..]; eauto. }
+
+      destruct m as (b & aas & DSb & INa).
+      exists (<[ b := aas ⊎ {[+ a +]} ]> ds).
+        repeat split.
+        - rewrite dom_insert_L. apply union_subseteq. split; auto.
+          apply singleton_subseteq_l.
+          apply SUB. eapply elem_of_dom; eauto. 
+        - rewrite map_img_ms_insert.
+          rewrite IMG. rewrite DSb. simpl.  
+          enough (aas ⊆ L).
+          { mss. }
+          subst L. rewrite {1}(map_split ds b). rewrite DSb. simpl.
+          rewrite map_img_ms_union.
+          2: { apply map_disjoint_dom; set_solver. }
+          rewrite map_img_ms_singleton. mss.
+        - intros c. red. intros v.
+          destruct (decide (c = b)) as [-> | NEQ].
+          { rewrite lookup_insert. simpl.
+            rewrite gmultiset_elem_of_disj_union.
+            repeat setoid_rewrite gmultiset_elem_of_singleton.
+            intros [IN | ->]; eexists; split; eauto.
+            + simpl in IN.
+              specialize (DOM b). rewrite DSb in DOM. simpl in DOM.
+              red in DOM. specialize (DOM _ IN). set_solver.
+            + specialize (DOM b). rewrite DSb in DOM. simpl in DOM.
+              red in DOM. specialize (DOM _ INa). set_solver. }
+          rewrite lookup_insert_ne; [| done].
+          setoid_rewrite gmultiset_elem_of_singleton.
+          intros IN; eexists; split; eauto. 
+          destruct (ds !! c) eqn:DSc; [| set_solver].
+          simpl in IN.
+          specialize (DOM c). rewrite DSc in DOM. simpl in DOM.
+          red in DOM. specialize (DOM _ IN). set_solver.
+        - red. intros ?????.
+          assert (forall k Sk, k ≠ b -> ds !! k = Some Sk -> aas ## Sk).
+          { intros. eapply DISJ; [apply not_eq_sym| ..]; eauto. } 
+          assert (forall k Sk, k ≠ b -> ds !! k = Some Sk -> a ∈ Sk -> False).
+          { mss. } 
+        
+          destruct (decide (k1 = b)), (decide (k2 = b)); subst; try done. 
+          all: try rewrite lookup_insert; simpl.
+          all: repeat try (rewrite lookup_insert_ne; [| done]).
+          + intros [=] ?. subst. apply disj_union_disjoint. split; eauto.
+            apply gmultiset_singleton_disjoint. intros ?. eauto. 
+          + intros ? [=]. subst. apply gmultiset_disjoint_symm.
+            apply disj_union_disjoint. split; eauto.
+            apply gmultiset_singleton_disjoint. intros ?. eauto. 
+          + intros. eapply DISJ; [apply NEQ| ..]; eauto. }
     rewrite -IMG. etrans. 
     { by apply build_steps. }
     trans (elements $ g2m (dom ds)). 
@@ -751,43 +865,8 @@ Section GmultisetLtWf.
          apply SUB_B in e. apply gmultiset_elem_of_dom in e.
          rewrite elem_of_multiplicity in e. lia. }         
          
-    right. rewrite g2m_elements. done. 
-    eapply lt_ext_crt_subseteq. 
-    
-    destruct (decide (B = ∅)) as [-> | NE_B].
-    { apply empty_dominates_over in DOM. subst. right. }
-    red in DOM.
-    apply gmultiset_choose in NE_B as [b0 IN].
-    assert (forall l, {b | l ∈ L -> b ∈ B /\ strict R l b}) as choose_dom.
-    { intros. destruct (decide (l ∈ L)).
-      2: { exists b0. done. }
-      specialize (DOM _ e). apply choice in DOM.
-      2: { intros. solve_decision. 
-      
-    choice
-    left. 
-    apply Operators_Properties.clos_trans_t1n_iff, Operators_Properties.clos_trans_tn1_iff.
-    assert (llt (elements L) [b]) as LTb.
-    { econstructor. 
-    
-    apply gmultiset_disj_union_difference' in IN.
-    remember (B ∖ {[+ b +]}) as M. clear HeqM. 
-    apply tn1_trans
-    eapply lt_ext1_intro with (x := b) (
-
-        red in DOM.
-
-  Admitted. 
-
-  (* Lemma dominates_over_lt_ext L B *)
-  (*   (DISJ: L ## B) *)
-  (*   (DOM: dominates_over R B L): *)
-  (*   lt_ext (elements L) (elements B). *)
-  (* Proof using. *)
-  (*   red in DOM. *)
-    
-  (* Admitted.  *)
-
+    right. rewrite g2m_elements. done.
+  Qed. 
 
   Lemma ms_lt_ext X Y
     (LT: ms_lt R X Y):
