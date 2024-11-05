@@ -162,15 +162,6 @@ End MSO.
 
 Require Import Relation_Operators.
 
-(* (* TODO: move *) *)
-(* Lemma clos_trans_ind1: *)
-(*   ∀ (A : Type) (R : relation A) (P : A → A → Prop), *)
-(*     (∀ x y : A, R x y → P x y) *)
-(*     → (∀ x y z : A, *)
-(*          clos_trans A R x y → P x y → clos_trans A R y z → P y z → P x z) *)
-(*       → ∀ x a : A, clos_trans A R x a → P x a *)
-
-
 
 From stdpp Require Import gmultiset.
 From trillium.fairness.lawyer.obligations Require Import multiset_utils.
@@ -199,10 +190,6 @@ Proof using.
     eapply t1n_trans; eauto.
 Qed.
 
-(* (* TODO: move *) *)
-(* Inductive clos_refl {A: Type} (R: relation A) (E: relation A) (x: A) : A -> Prop := *)
-(* | r_step (y:A) : R x y -> clos_refl x y *)
-(* | r_refl (Exy: E x y) : clos_refl x y. *)
 
   
 (* TODO: move *)
@@ -222,80 +209,11 @@ Proof using.
   - symmetry in Ex, Ey. eapply clos_trans_1n_proper_impl; eauto.
 Qed. 
 
-(* (* TODO: move *) *)
-(* Global Instance clos_trans_n1_proper_impl {A: Type} (R: relation A) *)
-(*   (E: relation A) *)
-(*   {REFL_E: Reflexive E} *)
-(*   (PR: Proper (E ==> E ==> impl) R): *)
-(*   Proper (E ==> E ==> impl) (clos_trans_n1 _ R). *)
-(* Proof using. *)
-(*   red. intros x1 x2 Ex y1 y2 Ey. intros TR. *)
-(*   generalize dependent x2. generalize dependent y2. *)
-(*   induction TR. *)
-(*   + intros. econstructor. eapply PR; [..| apply H]; done. *)
-(*   + intros y2 Ez x2 Ex. *)
-(*     rename x into x1. *)
-(*     rename y2 into z2. rename z into z1. *)
-(*     rename y into y1. *)
-(*     eapply PR in H; eauto.      *)
-(*     specialize (IHTR _ Ez). *)
-(*     specialize (IHTR _ ltac:(reflexivity)). *)
-(*     eapply t1n_trans; eauto. *)
-(* Qed. *)
-
-(* (* TODO: move *) *)
-(* Global Instance clos_trans_n1_proper_iff {A: Type} (R: relation A) *)
-(*   (E: relation A) *)
-(*   {SYM_E: Symmetric E} *)
-(*   {REFL_E: Reflexive E} *)
-(*   (PR: Proper (E ==> E ==> iff) R): *)
-(*   Proper (E ==> E ==> iff) (clos_trans_n1 _ R). *)
-(* Proof using. *)
-(*   red. *)
-(*   assert (Proper (E ==> E ==> impl) R). *)
-(*   { intros ???????. symmetry in H, H0.  *)
-(*     eapply PR; eauto. } *)
-(*   intros x1 x2 Ex y1 y2 Ey. split; intros.  *)
-(*   - eapply clos_trans_n1_proper_impl; eauto. *)
-(*   - symmetry in Ex, Ey. eapply clos_trans_1n_proper_impl; eauto. *)
-(* Qed.  *)
-
 Lemma clos_trans_tn1_t1n_iff {A : Type} (R : relation A) (x y : A):
   clos_trans_n1 A R x y ↔ clos_trans_1n A R x y.
 Proof using.
   by rewrite -Operators_Properties.clos_trans_t1n_iff Operators_Properties.clos_trans_tn1_iff.
 Qed. 
-
-(* Lemma clos_trans_n1_opt {A: Type} (R: relation A) x y z *)
-(*   (CR1': clos_trans_n1 _ R x y \/ x = y) *)
-(*   (R2: R y z): *)
-(*   clos_trans_n1 _ R x z. *)
-(* Proof using. *)
-(*   destruct CR1'. *)
-(*   - eapply tn1_trans; eauto. *)
-(*   - subst. eapply tn1_step; eauto. *)
-(* Qed.  *)
-                        
-
-(* (* TODO: move *) *)
-(* Global Instance clos_refl_proper_iff {A: Type} (R: relation A) *)
-(*   (E: relation A) *)
-(*   {SYM_E: Symmetric E} *)
-(*   {TRANS_E: Transitive E} *)
-(*   (PR: Proper (E ==> E ==> iff) R): *)
-(*   Proper (E ==> E ==> iff) (clos_refl _ R). *)
-(* Proof using. *)
-(*   red. *)
-(*   intros x1 x2 Ex y1 y2 Ey. split; intros. *)
-(*   - inversion H; subst. *)
-(*     + left. eapply PR; eauto. *)
-(*     + left. symmetry in Ex, Ey. *)
-(*       eapply PR; [apply Ex| ..]; eauto. *)
-(*   - inversion H; subst. *)
-(*     + clear REFL_E. left. eapply PR; eauto. *)
-(*     + left.  *)
-(*       eapply PR; [apply Ex| ..]; eauto. *)
-(* Qed.  *)
 
 Section GmultisetLtWf.
   Context `{Countable A}. 
@@ -305,8 +223,25 @@ Section GmultisetLtWf.
   Let llt := (@lt_ext1 A (strict R)).
   Definition lt_ext: relation (list A) := clos_trans_1n _ llt. 
 
-  Lemma lt_ext_wf: wf lt_ext.
-  Proof using. Admitted.
+  Global Instance lt_ext_trans: Transitive lt_ext.
+  Proof using.
+    red. intros ???.
+    rewrite /lt_ext. 
+    rewrite -!Operators_Properties.clos_trans_t1n_iff.
+    intros. eapply t_trans; eauto.
+  Qed. 
+
+  Lemma lt_ext_wf (WF: wf (strict R)): wf lt_ext.
+  Proof using.
+    pose proof @well_founded_lt_ext1.
+    specialize (@H0 _ _ ltac:(eauto) WF).
+    rewrite /lt_ext. 
+    red in H0.  
+    red. intros.
+    constructor. 
+    eapply Acc_impl. 
+
+Admitted.
 
   Lemma lt_ext1_frame (L B D: list A)
     (LT: llt L B):
@@ -367,23 +302,6 @@ Section GmultisetLtWf.
       by apply gmultiset_elem_of_elements.
   Qed. 
 
-  (* Lemma lt_ext1_extend (L B: list A) (l b: A) *)
-  (*   (LT: llt L B) *)
-  (*   (Rlb: R l b) *)
-  (*   (INb: b ∈ B): *)
-  (*   llt (l :: L) B. *)
-  (* Proof using. *)
-  (*   inversion LT. *)
-  (*   destruct (decide (x = b)) as [-> | NEQ]. *)
-  (*   - eapply lt_ext1_intro with (x := x) (X := X ++ D) (Y := Y); eauto. *)
-
-
-  (*   eapply lt_ext1_intro with (x := x) (X := X ++ D) (Y := Y); eauto. *)
-  (*   - rewrite H0. by rewrite app_assoc. *)
-  (*   - by rewrite H1. *)
-  (* Qed. *)
-
-
   (* TODO: move *)
   Definition flatten_mset `{Countable K} (ss: gmultiset (gmultiset K)): gmultiset K :=
     list_to_set_disj (concat (map elements (elements ss))).
@@ -406,12 +324,6 @@ Section GmultisetLtWf.
 
   Lemma flatten_mset_empty `{Countable K}: flatten_mset (∅: gmultiset (gmultiset K)) = ∅.
   Proof using. mss. Qed. 
-
-  (* Lemma flatten_mset_disj_union `{Countable K} (S1 S2: gset (gmultiset K)): *)
-  (*   flatten_mset (S1 ⊎ S2) = flatten_mset S1 ⊎ flatten_mset S2. *)
-  (* Proof. *)
-  (*   rewrite /flatten_gset. set_solver. *)
-  (* Qed.  *)
 
   (* TODO: move*)
   Lemma list_to_set_disj_elements `{Countable K} (g: gmultiset K):
@@ -605,13 +517,6 @@ Section GmultisetLtWf.
     dominates_over R X ∅.
   Proof using. clear. set_solver. Qed.
 
-  (* Lemma lt_ext_a L1 B1 L2 B2 *)
-  (*   (LT1: lt_ext L1 B1) *)
-  (*   (LT2: lt_ext L2 B2): *)
-  (*   lt_ext (L1 ++ B1) (L2 ++ B2). *)
-  (* Proof using. *)
-  (* lt_ext *)
-
   Definition mmap_disj `{Countable K, Countable V} (tm: gmap K (gmultiset V)) :=
     forall (k1 k2: K) (S1 S2: gmultiset V) (NEQ: k1 ≠ k2),
       tm !! k1 = Some S1 -> tm !! k2 = Some S2 -> S1 ## S2.
@@ -675,14 +580,6 @@ Section GmultisetLtWf.
       replace (b :: elements (dom U)) with ([b] ++ elements (dom U)) by done.
       by apply lt_ext1_frame.
   Qed.
-
-  Global Instance lt_ext_trans: Transitive lt_ext.
-  Proof using.
-    red. intros ???.
-    rewrite /lt_ext. 
-    rewrite -!Operators_Properties.clos_trans_t1n_iff.
-    intros. eapply t_trans; eauto.
-  Qed. 
 
   Global Instance clos_refl_perm_lt_ext_trans:
     Transitive (clos_refl_perm lt_ext).
