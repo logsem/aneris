@@ -732,6 +732,45 @@ Section ExtractSomes.
 
 End ExtractSomes.
 
+Section TmapDisj.
+  Context `{Countable K} `{Countable V}. 
+
+  Definition tmap_disj (tm: gmap K (gset V)) :=
+    forall (k1 k2: K) (S1 S2: gset V) (NEQ: k1 ≠ k2),
+      tm !! k1 = Some S1 -> tm !! k2 = Some S2 -> S1 ## S2.
+
+  Lemma forall_prod_helper {A B: Type} (P: A -> B -> Prop):
+    (forall a b, P a b) <-> (forall ab: A * B, P ab.1 ab.2).
+  Proof.
+    split; [by eauto|]. intros PP ??.
+    apply (PP (a, b)).
+  Qed.    
+  
+  Global Instance tmap_disj_dec tm: Decision (tmap_disj tm).
+  Proof.
+    set pairs := let d := elements (dom tm) in
+                 k1 ← d; k2 ← d;
+                 if (decide (k1 = k2)) then [] else [(k1, k2)]. 
+    set alt := Forall (fun '(k1, k2) => (default ∅ (tm !! k1)) ## (default ∅ (tm !! k2))) pairs.
+    apply Decision_iff_impl with (P := alt); [| solve_decision].
+    rewrite /alt. rewrite Forall_forall. 
+    rewrite /pairs.
+    repeat setoid_rewrite elem_of_list_bind.
+    repeat setoid_rewrite elem_of_elements.
+    rewrite /tmap_disj.
+    repeat setoid_rewrite elem_of_dom.
+    rewrite forall_prod_helper. apply forall_proper. intros [k1 k2]. simpl.
+    erewrite ex_det_iff with (a := k1).
+    2: { intros ?. erewrite ex_det_iff with (a := k2).
+         2: { intros ?. destruct decide; set_solver. }
+         destruct decide; set_solver. }
+    erewrite ex_det_iff with (a := k2).
+    2: { intros ?. destruct decide; set_solver. }
+    destruct decide; [set_solver| ].
+    destruct (tm !! k1), (tm !! k2); set_solver.
+  Qed. 
+
+End TmapDisj.
 
 Require Import ClassicalFacts.
 
