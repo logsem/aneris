@@ -126,8 +126,9 @@ Definition parent_state (exec : execution) (t : transaction) (s : state) : Prop 
   ∃ i t' s', exec !! i = Some (t' , s) ∧ exec !! (i + 1) = Some (t, s').
 
 Definition no_conf (exec : execution) (t : transaction) (s : state) : Prop := 
-  ¬(∃ k, (∃ sig v, Wr sig k v ∈ t) ∧ 
-         (∀ sp, parent_state exec t sp → s !! k ≠ sp !! k)). 
+  ∀ i j, (split exec).2 !! i = Some s → (split exec).1 !! j = Some t → 
+    ∀ i' t', i < i' < j → (split exec).1 !! i' = Some t' → 
+      ∀ k, (∃ sig v, Wr sig k v ∈ t) → ¬ (∃ sig v, Wr sig k v ∈ t').
 
 Definition commit_test_si : commitTest := 
   λ exec trans, ∃ s, s ∈ (split exec).2 ∧ 
