@@ -216,7 +216,8 @@ Proof using.
 Qed. 
 
 Section GmultisetLtWf.
-  Context `{Countable A}. 
+  Context `{ED: EqDecision A}. 
+  Context {CNT: Countable A}. 
   Context (R: relation A).
   Context {PO: PartialOrder R}.
 
@@ -232,16 +233,21 @@ Section GmultisetLtWf.
   Qed. 
 
   Lemma lt_ext_wf (WF: wf (strict R)): wf lt_ext.
-  Proof using.
-    pose proof @well_founded_lt_ext1.
-    specialize (@H0 _ _ ltac:(eauto) WF).
-    rewrite /lt_ext. 
-    red in H0.  
-    red. intros.
-    constructor. 
-    eapply Acc_impl. 
-
-Admitted.
+  Proof using ED.
+    eapply Morphisms_Prop.well_founded_morphism.
+    { red. red. red. intros ??. symmetry. apply clos_trans_tn1_t1n_iff. }
+        
+    red. intros b.
+    pattern b. eapply well_founded_ind; clear b. 
+    { unshelve eapply well_founded_lt_ext1; [..| eauto]. done. }
+    intros b IH.
+    constructor. intros a CTab.
+    induction CTab.
+    { by apply IH. }
+    apply IHCTab.
+    specialize (IH _ H). inversion IH.
+    intros. apply H0. by left.
+  Qed. 
 
   Lemma lt_ext1_frame (L B D: list A)
     (LT: llt L B):
@@ -249,8 +255,8 @@ Admitted.
   Proof using.
     inversion LT.
     eapply lt_ext1_intro with (x := x) (X := X ++ D) (Y := Y); eauto.
-    - rewrite H0. by rewrite app_assoc.
-    - by rewrite H1.
+    - rewrite H. by rewrite app_assoc.
+    - by rewrite H0.
   Qed.
 
   Lemma lt_ext_frame L B D
@@ -290,15 +296,15 @@ Admitted.
     - intros. eapply lt_ext1_intro with (X := nil).
       + by rewrite app_nil_r.
       + reflexivity.
-      + intros. apply elem_of_list_In in H1.
-        rewrite gmultiset_elem_of_elements in H1. set_solver.
-    - intros [?] **. eexists. split.
+      + intros ? IN. apply elem_of_list_In in IN.
+        rewrite gmultiset_elem_of_elements in IN. set_solver.
+    - intros [?] ? IN. eexists. split.
       { apply gmultiset_elem_of_singleton. reflexivity. }
       destruct X.
-      2: { apply Permutation_length_1_inv in H1. done. }
-      apply Permutation_length_1 in H1. subst.
-      rewrite app_nil_r in H0.
-      apply H2. apply elem_of_list_In. rewrite -H0.
+      2: { apply Permutation_length_1_inv in H0. done. }
+      apply Permutation_length_1 in H0. subst.
+      rewrite app_nil_r in H.
+      apply H1. apply elem_of_list_In. rewrite -H.
       by apply gmultiset_elem_of_elements.
   Qed. 
 
@@ -315,8 +321,8 @@ Admitted.
     setoid_rewrite in_map_iff. 
     repeat setoid_rewrite <- elem_of_list_In.
     split.
-    - intros (?&(l&<-&?)&?).
-      apply gmultiset_elem_of_elements in H1, H2. 
+    - intros (?&(l&<-&INls)&INkl).
+      apply gmultiset_elem_of_elements in INls, INkl. 
       eauto. 
     - intros (s&?&?). exists (elements s).
       split; [eexists; split| ]; eauto; by apply gmultiset_elem_of_elements. 
@@ -371,9 +377,9 @@ Admitted.
       clear dependent R.
       split; [set_solver| ].
       revert m2. pattern m1. apply gmultiset_ind; clear m1.
-      { intros. rewrite gmultiset_elements_empty in H2.
-        apply Permutation_nil in H2.
-        by apply gmultiset_elements_empty_inv in H2. }
+      { intros ? EQ. rewrite gmultiset_elements_empty in EQ. 
+        apply Permutation_nil in EQ.
+        by apply gmultiset_elements_empty_inv in EQ. }
       intros k aa IH m2 EQUIV.
       rewrite gmultiset_elements_disj_union in EQUIV.
       rewrite gmultiset_elements_singleton in EQUIV. simpl in EQUIV.
@@ -571,12 +577,12 @@ Admitted.
 
     rewrite FRESH. simpl. rewrite gmultiset_difference_empty. 
 
-    red in IH. destruct IH.
+    red in IH. destruct IH as [CT | PERM].
     - eapply tn1_trans; eauto.
       apply clos_trans_tn1_t1n_iff.
       do 2 rewrite (Permutation_app_comm (elements aa)).
       eapply lt_ext_frame; eauto.
-    - eapply tn1_step. rewrite H4. 
+    - eapply tn1_step. rewrite PERM. 
       replace (b :: elements (dom U)) with ([b] ++ elements (dom U)) by done.
       by apply lt_ext1_frame.
   Qed.
@@ -584,11 +590,11 @@ Admitted.
   Global Instance clos_refl_perm_lt_ext_trans:
     Transitive (clos_refl_perm lt_ext).
   Proof using.
-    red. rewrite /clos_refl_perm /Relation_Operators.union. intros.
-    destruct H0, H1. 
+    red. rewrite /clos_refl_perm /Relation_Operators.union.
+    intros ??? [CTxy | PERMxy] [CTyz | PERMyz].
     - left. etrans; eauto.
-    - left. by rewrite -H1. 
-    - left. by rewrite H0.
+    - left. by rewrite -PERMyz. 
+    - left. by rewrite PERMxy.
     - right. etrans; eauto.
   Qed.
 
@@ -613,18 +619,18 @@ Admitted.
     clear llt R PO. 
     rewrite /g2m.
     destruct (decide (a ∈ g)).
-    - assert (g = {[ a ]} ∪ g ∖ {[ a ]}).
-      { apply set_eq. intros.
-        rewrite elem_of_union elem_of_singleton elem_of_difference.
-        destruct (decide (x ∈ g)), (decide (x = a)); subst; set_solver. }
-      rewrite H0. rewrite elements_disj_union; [| set_solver].
-      rewrite list_to_set_disj_app. rewrite multiplicity_disj_union.
-      rewrite elements_singleton. simpl. rewrite gmultiset_disj_union_right_id.
-      rewrite multiplicity_singleton. 
-      rewrite (proj1 (not_elem_of_multiplicity _ _)); [lia| ].
-      rewrite elem_of_list_to_set_disj. set_solver.
-    - rewrite (proj1 (not_elem_of_multiplicity _ _)); [lia| ].
-      rewrite elem_of_list_to_set_disj. set_solver.
+    2: { rewrite (proj1 (not_elem_of_multiplicity _ _)); [lia| ].
+         rewrite elem_of_list_to_set_disj. set_solver. }
+    assert (g = {[ a ]} ∪ g ∖ {[ a ]}) as ->.
+    { apply set_eq. intros.
+      rewrite elem_of_union elem_of_singleton elem_of_difference.
+      destruct (decide (x ∈ g)), (decide (x = a)); subst; set_solver. }
+    rewrite elements_disj_union; [| set_solver].
+    rewrite list_to_set_disj_app. rewrite multiplicity_disj_union.
+    rewrite elements_singleton. simpl. rewrite gmultiset_disj_union_right_id.
+    rewrite multiplicity_singleton. 
+    rewrite (proj1 (not_elem_of_multiplicity _ _)); [lia| ].
+    rewrite elem_of_list_to_set_disj. set_solver.
   Qed.
       
   Lemma gmultiset_disjoint_symm (X Y: gmultiset A):
@@ -783,9 +789,8 @@ Admitted.
   Theorem ms_lt_wf (WF: wf (strict R)):
     wf (ms_lt R).
   Proof using PO.
-    eapply wf_projected with (f := elements); [| apply lt_ext_wf].
+    eapply wf_projected with (f := elements); [| apply lt_ext_wf; done].
     intros. by apply ms_lt_ext.
   Qed. 
-
 
 End GmultisetLtWf.
