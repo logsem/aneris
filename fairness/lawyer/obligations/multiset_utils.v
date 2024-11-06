@@ -1,6 +1,7 @@
 From iris.proofmode Require Import tactics.
 From iris.algebra Require Import gset gmultiset.
 (* From stdpp Require Import relations. *)
+From trillium.fairness Require Import lemmas.
 
 Ltac mss := multiset_solver. 
 
@@ -87,6 +88,117 @@ Section GmultisetUtils.
     3: rewrite decide_False; [| set_solver].
     all: subst; lia.
   Qed. 
+
+  Section MultisetFilter.
+    Context (P : A → Prop). 
+    Context `{∀ x, Decision (P x)}. 
+
+    Definition mset_filter (g: gmultiset A): gmultiset A :=
+      list_to_set_disj $ filter P $ elements g. 
+
+    Lemma mset_filter_spec g:
+      forall a, a ∈ mset_filter g <-> a ∈ g /\ P a.
+    Proof using.
+      intros. rewrite /mset_filter.
+      rewrite elem_of_list_to_set_disj elem_of_list_filter.
+      rewrite gmultiset_elem_of_elements. tauto.
+    Qed.
+
+    Lemma mset_filter_empty:
+      mset_filter ∅ = ∅. 
+    Proof using. mss. Qed.
+
+    Lemma mset_filter_disj_union x y:
+      mset_filter (x ⊎ y) = mset_filter x ⊎ mset_filter y.
+    Proof using.
+      rewrite /mset_filter.
+      rewrite -list_to_set_disj_app. rewrite -filter_app. 
+      apply list_to_set_disj_perm. apply filter_Permutation.
+      apply gmultiset_elements_disj_union.
+    Qed.
+
+    Lemma mset_filter_singleton a:
+      mset_filter {[+ a +]} = if (decide (P a)) then {[+ a +]} else ∅.
+    Proof using.
+      rewrite /mset_filter. rewrite gmultiset_elements_singleton.
+      rewrite filter_cons !filter_nil.
+      destruct decide; mss.
+    Qed. 
+
+    Lemma mset_filter_multiplicity g (a: A):
+      multiplicity a (mset_filter g) =
+      if (decide (P a)) then multiplicity a g else 0.
+    Proof using. 
+      revert a. pattern g. apply gmultiset_ind; clear g. 
+      { intros ?. rewrite mset_filter_empty multiplicity_empty.
+        destruct decide; auto. }
+      intros x g IH a.
+      rewrite mset_filter_disj_union mset_filter_singleton.
+      rewrite !multiplicity_disj_union. rewrite multiplicity_singleton'. 
+      rewrite IH. 
+      destruct (decide (P x)), (decide (P a)); try rewrite multiplicity_singleton'.
+      - lia.
+      - rewrite decide_False; [| by intros ->]. lia.
+      - rewrite decide_False; [| by intros ->].
+        rewrite multiplicity_empty. lia.
+      - rewrite multiplicity_empty. lia.
+    Qed.
+
+    Lemma mset_filter_True g
+      (FALSE: forall a, a ∈ g -> P a):
+      mset_filter g = g.
+    Proof using.
+      apply gmultiset_eq. intros a.
+      rewrite mset_filter_multiplicity.
+      destruct (decide (a ∈ g)).
+      { rewrite decide_True; eauto. }
+      rewrite (proj1 (not_elem_of_multiplicity _ _) _); auto.
+      destruct decide; done. 
+    Qed.
+
+    Lemma mset_filter_False g
+      (FALSE: forall a, a ∈ g -> ¬ P a):
+      mset_filter g = ∅.
+    Proof using.
+      destruct (decide (mset_filter g = ∅)) as [| NE]; [done| ]. 
+      apply gmultiset_choose in NE as [? IN].
+      apply mset_filter_spec in IN as [??]. set_solver.
+    Qed. 
+
+    Lemma mset_filter_subseteq_mono:
+      Proper (subseteq ==> subseteq) mset_filter.
+    Proof using.
+      red. intros ????.
+      rewrite !mset_filter_multiplicity.
+      destruct decide; mss.
+    Qed. 
+
+    Lemma mset_filter_difference x y:
+      mset_filter (x ∖ y) = mset_filter x ∖ mset_filter y.
+    Proof using.
+      apply gmultiset_eq. intros a.
+      rewrite !multiplicity_difference !mset_filter_multiplicity !multiplicity_difference.
+      destruct decide; mss. 
+    Qed.
+
+    Lemma mset_filter_mul_comm g n:
+      mset_filter (n *: g) = n *: mset_filter g.
+    Proof using.
+      apply gmultiset_eq. intros ?.
+      rewrite multiplicity_scalar_mul.
+      rewrite !mset_filter_multiplicity.
+      destruct decide; try mss. 
+      by rewrite multiplicity_scalar_mul.
+    Qed.
+
+    Lemma mset_filter_sub g:
+      mset_filter g ⊆ g.
+    Proof using.
+      do 2 red. intros. rewrite mset_filter_multiplicity.
+      destruct decide; lia.
+    Qed. 
+
+  End MultisetFilter.
 
 End GmultisetUtils.
 
@@ -258,21 +370,14 @@ Section MultisetOrder.
     exists z. split; [mss| ]. etrans; eauto.
   Qed.
 
-  Global Instance ms_le_AntiSymm: AntiSymm eq ms_le.
-  Proof using.
-    red. intros ??.
-
-    rewrite !ms_le_equiv'. rewrite /ms_le_dm. 
-    intros (X&Y&SUB1&->&DOM1) (U&V&SUB2&->&DOM2). 
-    apply gmultiset_disj_union_difference in SUB1.
-    remember (y ∖ X) as K. clear HeqK. clear SUB1 y.
-    apply gmultiset_disj_union_difference in SUB2.
-    remember (K ⊎ Y) as T. clear SUB2.
+  (* Lemma ms_le_minus (X Y D: gmultiset A) *)
+  (*   (DOM': ms_le (X ⊎ D) (Y ⊎ D)): *)
+  (*   ms_le X Y. *)
+  (* Proof using PO. *)
+  (*   apply ms_le_equiv' in DOM'. *)
+  (*   destruct DOM' as (B1&L1&SUB1&EQ&DOM1).  *)
     
-    (* TODO: consider the maximal element with differing multiplicity *)
-    (* destruct (Nat.lt_trichotomy (multiplicity a x) (multiplicity a y)) as [?|[?|?]]; eauto. *)
-    (* - specialize (LE2 _ H0). *)
-  Admitted.
+  
 
   Lemma empty_ms_le X: ms_le ∅ X.
   Proof using.
@@ -281,17 +386,152 @@ Section MultisetOrder.
 
   Lemma ms_le_empty X: ms_le X ∅ <-> X = ∅. 
   Proof using.
+    clear PO. 
     destruct (decide (X = ∅)) as [->| NEQ].
-    { done. }
+    { split; [done| ]. intros. apply empty_ms_le. }
     split; [| done]. intros LE.
     apply gmultiset_choose in NEQ as [x IN].
     red in LE. setoid_rewrite multiplicity_empty in LE. 
     specialize (LE x ltac:(by apply elem_of_multiplicity)).
     destruct LE as (?&?&?). lia.
-  Qed. 
+  Qed.
+
+  (* TODO: move *)
+  Lemma gmultiset_subseteq_empty (X: gmultiset A):
+    X ⊆ ∅ <-> X = ∅.
+  Proof using. clear. mss. Qed.  
+
+  (* TODO: refactor! *)
+  Global Instance ms_le_AntiSymm: AntiSymm eq ms_le.
+  Proof using PO.
+    red. intros X Y.
+
+    intros LE1 LE2.
+    set (same_muls a := multiplicity a X = multiplicity a Y). 
+    destruct (decide (Forall same_muls (elements (X ⊎ Y)))).
+    { apply gmultiset_eq. intros.
+      destruct (decide (x ∈ X ⊎ Y)).
+      - pattern x. eapply List.Forall_forall; eauto.
+        apply elem_of_list_In, gmultiset_elem_of_elements. mss.
+      - etrans; [| symmetry]; apply not_elem_of_multiplicity; mss. }
+
+    apply not_Forall_Exists in n; [| solve_decision].
+    apply List.Exists_exists in n as (a & IN & NEQ). red in NEQ.
+
+
+    assert (exists (B: gmultiset A) (d: A),
+               multiplicity d X ≠ multiplicity d Y /\
+               B ⊆ mset_filter (not ∘ same_muls) (X ⊎ Y) /\
+               forall b, b ∈ B -> strict R b d) as (B & d & NEQd & SUB & LTd).
+    { exists ∅, a. repeat split; try mss. }
+    clear dependent a.
+    remember (size (mset_filter (not ∘ same_muls) (X ⊎ Y)) - size B) as n.
+    generalize dependent B. generalize dependent d. induction n.
+    { intros.
+      symmetry in Heqn. apply Nat.sub_0_le in Heqn.
+      pose proof SUB as SIZE%gmultiset_subseteq_size.
+      apply gmultiset_disj_union_difference in SUB.
+      rewrite SUB in Heqn, SIZE. rewrite gmultiset_size_disj_union in Heqn, SIZE.
+      assert (size (mset_filter (not ∘ same_muls) (X ⊎ Y) ∖ B) = 0) by lia.
+      apply gmultiset_size_empty_iff in H0.
+      rewrite gmultiset_empty_no_elements in H0.
+
+    assert (exists h, h ∈ X ⊎ Y /\ strict R d h /\ ¬ same_muls h) as (h1 & DOMh1 & Rdh1 & NEQh1).
+    { apply not_eq in NEQd as [LT | LT]. 
+      - specialize (LE2 _ LT) as (h&?&?). exists h. repeat split.
+        + apply elem_of_multiplicity. rewrite multiplicity_disj_union. lia.
+        + done.
+        + intros ?.
+          eapply partial_order_anti_symm in H1; eauto. specialize (H1 H3).
+          subst. lia.
+        + rewrite /same_muls. lia.
+      - specialize (LE1 _ LT) as (h&?&?). exists h. repeat split.
+        + apply elem_of_multiplicity. rewrite multiplicity_disj_union. lia.
+        + done.
+        + intros ?.
+          eapply partial_order_anti_symm in H1; eauto. specialize (H1 H3).
+          subst. lia.
+        + rewrite /same_muls. lia. }
+
+    assert (h1 ∈ mset_filter (not ∘ same_muls) (X ⊎ Y)) as IN1.
+    { by apply mset_filter_spec. }
+    apply gmultiset_disj_union_difference' in IN1.
+
+    assert (h1 ∉ B) as NINh1.
+    { intros INh. specialize (LTd _ INh).
+      rewrite strict_spec in LTd. apply proj2 in LTd.
+      destruct LTd. apply Rdh1. }
+
+    destruct (H0 h1).
+    mss. }
+    
+    intros. 
+
+    assert (exists h, h ∈ X ⊎ Y /\ strict R d h /\ ¬ same_muls h) as (h1 & DOMh1 & Rdh1 & NEQh1).
+    { apply not_eq in NEQd as [LT | LT]. 
+      - specialize (LE2 _ LT) as (h&?&?). exists h. repeat split.
+        + apply elem_of_multiplicity. rewrite multiplicity_disj_union. lia.
+        + done.
+        + intros ?.
+          eapply partial_order_anti_symm in H0; eauto. specialize (H0 H2).
+          subst. lia.
+        + rewrite /same_muls. lia.
+      - specialize (LE1 _ LT) as (h&?&?). exists h. repeat split.
+        + apply elem_of_multiplicity. rewrite multiplicity_disj_union. lia.
+        + done.
+        + intros ?.
+          eapply partial_order_anti_symm in H0; eauto. specialize (H0 H2).
+          subst. lia.
+        + rewrite /same_muls. lia. }
+    assert (exists h2, h2 ∈ X ⊎ Y /\ strict R h1 h2 /\ ¬ same_muls h2) as (h2 & DOMh2 & Rh12 & NEQh2).
+    { apply not_eq in NEQh1 as [LT | LT]. 
+      - specialize (LE2 _ LT) as (h&?&?). exists h. repeat split.
+        + apply elem_of_multiplicity. rewrite multiplicity_disj_union. lia.
+        + done.
+        + intros ?.
+          eapply partial_order_anti_symm in H0; eauto. specialize (H0 H2).
+          subst. lia.
+        + rewrite /same_muls. lia.
+      - specialize (LE1 _ LT) as (h&?&?). exists h. repeat split.
+        + apply elem_of_multiplicity. rewrite multiplicity_disj_union. lia.
+        + done.
+        + intros ?.
+          eapply partial_order_anti_symm in H0; eauto. specialize (H0 H2).
+          subst. lia.
+        + rewrite /same_muls. lia. }
+
+    assert (h1 ∈ mset_filter (not ∘ same_muls) (X ⊎ Y)) as IN1.
+    { by apply mset_filter_spec. }
+    apply gmultiset_disj_union_difference' in IN1.
+
+    assert (h1 ∉ B) as NINh1.
+    { intros INh. specialize (LTd _ INh).
+      rewrite strict_spec in LTd. apply proj2 in LTd.
+      destruct LTd. apply Rdh1. }
+    
+    assert (h2 ∈ mset_filter (not ∘ same_muls) (X ⊎ Y)) as IN2.
+    { by apply mset_filter_spec. }
+    (* apply gmultiset_disj_union_difference' in IN2. *)
+
+    assert (h2 ∉ B) as NINh2.
+    { intros INh. specialize (LTd _ INh).
+      rewrite strict_spec in LTd. apply proj2 in LTd.
+      destruct LTd. trans h1; [apply Rdh1 | apply Rh12]. }
+    
+    specialize (IHn h2 ltac:(done) (B ⊎ {[+ h1 +]})). specialize_full IHn.
+    { rewrite IN1. mss. }
+    { intros ?. rewrite gmultiset_elem_of_disj_union gmultiset_elem_of_singleton.
+      intros [IN | ->]; try done.
+      trans d.
+      { by apply LTd. }
+      trans h1; [apply Rdh1 | apply Rh12]. }
+    { rewrite IN1. rewrite !gmultiset_size_disj_union !gmultiset_size_singleton.
+      rewrite IN1 in Heqn. rewrite !gmultiset_size_disj_union !gmultiset_size_singleton in Heqn. lia. }
+    done. 
+  Qed.
 
   Lemma no_ms_lt_empty X: ¬ ms_lt X ∅. 
-  Proof using.
+  Proof using PO.
     intros [LE NE]%strict_spec_alt. apply ms_le_empty in LE. done.
   Qed. 
 
@@ -377,11 +617,6 @@ Section MultisetOrder.
     rewrite decide_True; [lia| done].
   Qed.  
 
-  Theorem ms_lt_wf (WF: wf (strict R)):
-    wf ms_lt.
-  Proof using.
-  Admitted.      
-
 End MultisetOrder.
 
 
@@ -454,109 +689,6 @@ Section MultisetDefs.
 
   End MultisetMap.
 
-  Section MultisetFilter.
-    Context (P : A → Prop). 
-    Context `{∀ x, Decision (P x)}. 
-
-    Definition mset_filter (g: gmultiset A): gmultiset A :=
-      list_to_set_disj $ filter P $ elements g. 
-
-    Lemma mset_filter_spec g:
-      forall a, a ∈ mset_filter g <-> a ∈ g /\ P a.
-    Proof using.
-      intros. rewrite /mset_filter.
-      rewrite elem_of_list_to_set_disj elem_of_list_filter.
-      rewrite gmultiset_elem_of_elements. tauto.
-    Qed.
-
-    Lemma mset_filter_empty:
-      mset_filter ∅ = ∅. 
-    Proof using. mss. Qed.
-
-    Lemma mset_filter_disj_union x y:
-      mset_filter (x ⊎ y) = mset_filter x ⊎ mset_filter y.
-    Proof using.
-      rewrite /mset_filter.
-      rewrite -list_to_set_disj_app. rewrite -filter_app. 
-      apply list_to_set_disj_perm. apply filter_Permutation.
-      apply gmultiset_elements_disj_union.
-    Qed.
-
-    Lemma mset_filter_singleton a:
-      mset_filter {[+ a +]} = if (decide (P a)) then {[+ a +]} else ∅.
-    Proof using.
-      rewrite /mset_filter. rewrite gmultiset_elements_singleton.
-      rewrite filter_cons !filter_nil.
-      destruct decide; mss.
-    Qed. 
-
-    Lemma mset_filter_multiplicity g (a: A):
-      multiplicity a (mset_filter g) =
-      if (decide (P a)) then multiplicity a g else 0.
-    Proof using. 
-      revert a. pattern g. apply gmultiset_ind; clear g. 
-      { intros ?. rewrite mset_filter_empty multiplicity_empty.
-        destruct decide; auto. }
-      intros x g IH a.
-      rewrite mset_filter_disj_union mset_filter_singleton.
-      rewrite !multiplicity_disj_union. rewrite multiplicity_singleton'. 
-      rewrite IH. 
-      destruct (decide (P x)), (decide (P a)); try rewrite multiplicity_singleton'.
-      - lia.
-      - rewrite decide_False; [| by intros ->]. lia.
-      - rewrite decide_False; [| by intros ->].
-        rewrite multiplicity_empty. lia.
-      - rewrite multiplicity_empty. lia.
-    Qed.
-
-    Lemma mset_filter_True g
-      (FALSE: forall a, a ∈ g -> P a):
-      mset_filter g = g.
-    Proof using.
-      apply gmultiset_eq. intros a.
-      rewrite mset_filter_multiplicity.
-      destruct (decide (a ∈ g)).
-      { rewrite decide_True; eauto. }
-      rewrite (proj1 (not_elem_of_multiplicity _ _) _); auto.
-      destruct decide; done. 
-    Qed.
-
-    Lemma mset_filter_False g
-      (FALSE: forall a, a ∈ g -> ¬ P a):
-      mset_filter g = ∅.
-    Proof using.
-      destruct (decide (mset_filter g = ∅)) as [| NE]; [done| ]. 
-      apply gmultiset_choose in NE as [? IN].
-      apply mset_filter_spec in IN as [??]. set_solver.
-    Qed. 
-
-    Lemma mset_filter_subseteq_mono:
-      Proper (subseteq ==> subseteq) mset_filter.
-    Proof using.
-      red. intros ????.
-      rewrite !mset_filter_multiplicity.
-      destruct decide; mss.
-    Qed. 
-
-    Lemma mset_filter_difference x y:
-      mset_filter (x ∖ y) = mset_filter x ∖ mset_filter y.
-    Proof using.
-      apply gmultiset_eq. intros a.
-      rewrite !multiplicity_difference !mset_filter_multiplicity !multiplicity_difference.
-      destruct decide; mss. 
-    Qed.
-
-    Lemma mset_filter_mul_comm g n:
-      mset_filter (n *: g) = n *: mset_filter g.
-    Proof using.
-      apply gmultiset_eq. intros ?.
-      rewrite multiplicity_scalar_mul.
-      rewrite !mset_filter_multiplicity.
-      destruct decide; try mss. 
-      by rewrite multiplicity_scalar_mul.
-    Qed. 
-
-  End MultisetFilter.
 
   Lemma mset_filter_disj_union_disj (P Q: A -> Prop) g
     `{∀ x, Decision (P x)} `{∀ x, Decision (Q x)}
