@@ -155,7 +155,7 @@ Section trace_proof.
       simpl in Hin.
       rewrite elem_of_app in Hin.
       pose proof Hvalid as Hvalid'.
-      destruct Hvalid as (_ & _ & Hvalid).
+      destruct Hvalid as (_ & _ & Hvalid & _).
       destruct Hin as [Hin|Hin].
       + intros tag c k ov i Hlookup Hrd_in Hnot Hsome.
         specialize (Hvalid t Hin tag c k ov i).
@@ -214,6 +214,21 @@ Section trace_proof.
            simpl.
            rewrite lookup_app_Some.
            set_solver.
+    - intros t1 t2 i j Hlookup_i Hlookup_j Heq.
+      rewrite split_split in Hlookup_i; simpl in Hlookup_i.
+      rewrite split_split in Hlookup_j; simpl in Hlookup_j.
+      rewrite lookup_snoc_Some in Hlookup_i.
+      rewrite lookup_snoc_Some in Hlookup_j.
+      destruct Hvalid as (_ & _ &  _ & Hvalid).
+      destruct Hlookup_i as [Hlookup_i|(Hlength_i & Heq_i)]; 
+        destruct Hlookup_j as [Hlookup_j|Hlookup_j].
+      1, 4 : set_solver.
+      all : subst.
+      all : exfalso.
+      all :   apply Hnin.
+      all :   apply Hbased.
+      all :   split; first (apply elem_of_list_lookup; set_solver).
+      all :   intros Hfalse; destruct trans; set_solver.
   Qed.
 
   Lemma inv_ext_rc_wr_imp1 γ T1 T2 trans s k v :
@@ -852,13 +867,14 @@ Section trace_proof.
                 by apply extraction_of_add2.
             -- iSplit.
               ++ iPureIntro.
-                  apply (valid_transactions_add2 _ _ tag1 _ _ c); try done;
-                    first by apply (extraction_of_not_tag trans lt' tag1 (T1 ++ trans :: T2)).
-                  destruct Hop as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
-                  exists op.
-                  split_and!; try done.
-                  intros (s' & b' & ->).
-                  set_solver.
+                  apply (valid_transactions_add2 _ _ tag1 _ _ c); try done.
+                  ** by eapply extraction_of_not_in.
+                  ** by apply (extraction_of_not_tag trans lt' tag1 (T1 ++ trans :: T2)).
+                  ** destruct Hop as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
+                     exists op.
+                     split_and!; try done.
+                     intros (s' & b' & ->).
+                     set_solver.
               ++ iSplit.
                   ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & Hact_eq & -> & 
                       %Hopen_start & Hrest)".
@@ -1028,7 +1044,8 @@ Section trace_proof.
               by apply extraction_of_add1.
             * iSplit.
               -- iPureIntro.
-                  apply (valid_transactions_add1 T' _ c); try done.
+                  apply (valid_transactions_add1 T' _ (Cm (tag1, c) b) c); try done.
+                  ++ by eapply extraction_of_not_in.
                   ++ set_solver.
                   ++ exists (Cm (tag1, c) b).
                     by simpl.
@@ -1397,8 +1414,9 @@ Section trace_proof.
                destruct wo; by apply extraction_of_add2.
             -- iSplit.
                ++ iPureIntro.
-                  apply (valid_transactions_add2 _ _ tag1 _ _ c); try done;
-                    first by apply (extraction_of_not_tag trans lt' tag1 (T1 ++ trans :: T2)).
+                  apply (valid_transactions_add2 _ _ tag1 _ _ c); try done.
+                  ** by eapply extraction_of_not_in.
+                  ** by apply (extraction_of_not_tag trans lt' tag1 (T1 ++ trans :: T2)).
                   ** intros s' k' ov' tag' v' Heq Hin_wr Hnot.
                      destruct Hkey_res as [(-> & Hdisj)| (Hneq & <-)].
                      --- exfalso. 
@@ -1514,7 +1532,8 @@ Section trace_proof.
                destruct wo; by apply extraction_of_add1.
             -- iSplit.
                ++ iPureIntro.
-                  apply (valid_transactions_add1 T' _ c); try done.
+                  apply (valid_transactions_add1 T' _ (Rd (tag1, c) k wo) c); try done.
+                  ** by eapply extraction_of_not_in.
                   ** set_solver.
                   ** exists (Rd (tag1, c) k wo).
                      by simpl.
@@ -1798,13 +1817,14 @@ Section trace_proof.
                by apply extraction_of_add2.
             -- iSplit.
                ++ iPureIntro.
-                  apply (valid_transactions_add2 _ _ tag1 _ _ c); try done;
-                    first by apply (extraction_of_not_tag trans lt' tag1 (T1 ++ trans :: T2)).
-                  destruct Hop as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
-                  exists op.
-                  split_and!; try done.
-                  intros (s' & b' & ->).
-                  set_solver.
+                  apply (valid_transactions_add2 _ _ tag1 _ _ c); try done.
+                  ** by eapply extraction_of_not_in.
+                  ** by apply (extraction_of_not_tag trans lt' tag1 (T1 ++ trans :: T2)).
+                  ** destruct Hop as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
+                     exists op.
+                     split_and!; try done.
+                     intros (s' & b' & ->).
+                     set_solver.
                ++ iSplit.
                   ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & 
                        %Hopen_start & Hrest)".
@@ -1848,7 +1868,8 @@ Section trace_proof.
                by apply extraction_of_add1.
             -- iSplit.
                ++ iPureIntro.
-                  apply (valid_transactions_add1 T' _ c); try done.
+                  apply (valid_transactions_add1 T' _ (Wr (tag1, c) k v) c); try done.
+                  ** by eapply extraction_of_not_in.
                   ** set_solver.
                   ** exists (Wr (tag1, c) k v).
                      by simpl.
@@ -2657,6 +2678,11 @@ Section trace_proof.
         - simpl.
           intros t Hin tag c k ov i _ Hfalse.
           assert (t = []) as ->; set_solver.
+        - simpl.
+          intros t1 t2 i j Hlookup_i Hlookup_j Heq.
+          rewrite list_lookup_singleton_Some in Hlookup_i.
+          rewrite list_lookup_singleton_Some in Hlookup_j.
+          lia.
       }
       iClear "Hinit_kvs Hinit_cli Hread Hstart Hwrite Hcom".
       iSplitR "Hghost_map_mlin Hghost_map_mpost".

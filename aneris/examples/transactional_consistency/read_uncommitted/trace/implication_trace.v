@@ -547,8 +547,9 @@ Section trace_proof.
                destruct wo; by apply extraction_of_add2.
             -- iSplit.
                ++ iPureIntro.
-                  apply (valid_transactions_add2 _ _ tag1 _ _ c); try done;
-                    first by apply (extraction_of_not_tag trans lt' tag1 (T1 ++ trans :: T2)).
+                  apply (valid_transactions_add2 _ _ tag1 _ _ c); try done.
+                  ** eapply extraction_of_not_in; try done.
+                  ** by apply (extraction_of_not_tag trans lt' tag1 (T1 ++ trans :: T2)).
                   ** intros s' k' ov' tag' v' Heq Hin_wr Hnot.
                      destruct Hkey_res as [(-> & Hdisj)| (Hneq & <-)].
                      --- exfalso. 
@@ -571,7 +572,7 @@ Section trace_proof.
                          exists tag_wr, v.
                          assert (trans = trans') as <-.
                          {
-                           destruct Hvalid_trans' as (_ & Hvalid_trans').
+                           destruct Hvalid_trans' as (_ & Hvalid_trans' & _).
                            destruct Hopen_trans as (op_last & Htrans'_in & Hlast' & Hconn_last' & Hcm_last').
                            rewrite elem_of_list_lookup in Htrans_in.
                            rewrite elem_of_list_lookup in Htrans'_in.
@@ -657,7 +658,8 @@ Section trace_proof.
                destruct wo; by apply extraction_of_add1.
             -- iSplit.
                ++ iPureIntro.
-                  apply (valid_transactions_add1 T' _ c); try done.
+                  apply (valid_transactions_add1 T' _ (Rd (tag1, c) k wo) c); try done.
+                  ** eapply extraction_of_not_in; try done.
                   ** set_solver.
                   ** exists (Rd (tag1, c) k wo).
                      by simpl.
@@ -936,13 +938,14 @@ Section trace_proof.
                by apply extraction_of_add2.
             -- iSplit.
                ++ iPureIntro.
-                  apply (valid_transactions_add2 _ _ tag1 _ _ c); try done;
-                    first by apply (extraction_of_not_tag trans lt' tag1 (T1 ++ trans :: T2)).
-                  destruct Hop as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
-                  exists op.
-                  split_and!; try done.
-                  intros (s' & b' & ->).
-                  set_solver.
+                  apply (valid_transactions_add2 _ _ tag1 _ _ c); try done.
+                  ** eapply extraction_of_not_in; try done.
+                  ** by apply (extraction_of_not_tag trans lt' tag1 (T1 ++ trans :: T2)).
+                  ** destruct Hop as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
+                    exists op.
+                    split_and!; try done.
+                    intros (s' & b' & ->).
+                    set_solver.
                ++ iSplit.
                   ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & 
                        %Hopen_start & Hrest)".
@@ -984,7 +987,8 @@ Section trace_proof.
                by apply extraction_of_add1.
             -- iSplit.
                ++ iPureIntro.
-                  apply (valid_transactions_add1 T' _ c); try done.
+                  apply (valid_transactions_add1 T' _ (Wr (tag1, c) k v) c); try done.
+                  ** eapply extraction_of_not_in; try done.
                   ** set_solver.
                   ** exists (Wr (tag1, c) k v).
                      by simpl.
@@ -1593,8 +1597,19 @@ Section trace_proof.
         op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans)) 
           as [(trans & Htrans_in & Hop)|Hdec].
       - destruct (elem_of_list_split _ _ Htrans_in) as (T1 & T2 & ->).
+        assert (valid_transactions (T1 ++ (trans ++ [Cm (tag1, c) b]) :: T2)) as Hvalid_trans_add.
+        {
+          apply (valid_transactions_add2 _ _ tag1 _ _ c); try done.
+          - by eapply extraction_of_not_in.
+          - by apply (extraction_of_not_tag trans lt' tag1 (T1 ++ trans :: T2)).
+          - destruct Hop as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
+            exists op.
+            split_and!; try done.
+            intros (s' & b' & ->).
+            set_solver.
+        }
         destruct (exists_execution (T1 ++ (trans ++ [Cm (tag1, c) b]) :: T2)) 
-          as (exec'' & Hbased'' & Hvalid_exec'').
+          as (exec'' & Hbased'' & Hvalid_exec''); try done.
         {
           intros trans' Hin.
           rewrite elem_of_app in Hin.
@@ -1621,37 +1636,47 @@ Section trace_proof.
           * iSplit.
             -- iPureIntro.
                by apply extraction_of_add2.
-            -- iSplit.
-               ++ iPureIntro.
-                  apply (valid_transactions_add2 _ _ tag1 _ _ c); try done;
-                    first by apply (extraction_of_not_tag trans lt' tag1 (T1 ++ trans :: T2)).
-                  destruct Hop as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
-                  exists op.
+            -- iSplit; first by iPureIntro.
+               iSplit.
+               ++ iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & Hact_eq & -> & 
+                    %Hopen_start & Hrest)".
+                  iPureIntro.
+                  apply (valid_sequence_wr_rd_cm_lin _ _ tag1 c tail); try done.
+                  ** rewrite /is_cm_lin_event.
+                     set_solver.
+                  ** by exists t'.
+               ++ iSplit; first by iPureIntro.
+                  iSplit; first by simpl.
+                  iApply (trace_state_resources_commit_lin2 clients c tag1 lt' T1 T2 trans sa 
+                    s γ γmstate γmname extract b mc mstate mname m' with 
+                    "[//][//][//][//][//][//][//][//][][$Hkeys_conn2][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
+                    [$Hmap_m][$Hdisj_trace_res][$Htrace_res]").
+                  iPureIntro.
+                  destruct Hinit as (e & Hin'' & Hconn'' & Hevent'').
+                  exists e.
                   split_and!; try done.
-                  intros (s' & b' & ->).
-                  set_solver.
-              ++ iSplit.
-                  ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & Hact_eq & -> & 
-                       %Hopen_start & Hrest)".
-                     iPureIntro.
-                     apply (valid_sequence_wr_rd_cm_lin _ _ tag1 c tail); try done.
-                     --- rewrite /is_cm_lin_event.
-                         set_solver.
-                     --- by exists t'.
-                  ** iSplit.
-                     --- by iPureIntro.
-                     --- iSplit; first by simpl.
-                         iApply (trace_state_resources_commit_lin2 clients c tag1 lt' T1 T2 trans sa 
-                           s γ γmstate γmname extract b mc mstate mname m' with 
-                           "[//][//][//][//][//][//][//][//][][$Hkeys_conn2][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
-                           [$Hmap_m][$Hdisj_trace_res][$Htrace_res]").
-                         iPureIntro.
-                         destruct Hinit as (e & Hin'' & Hconn'' & Hevent'').
-                         exists e.
-                         split_and!; try done.
-                         apply elem_of_app; eauto.
-      - destruct (exists_execution (T' ++ [[Cm (tag1, c) b]])) 
-          as (exec'' & Hbased'' & Hvalid_exec''); first set_solver.
+                  apply elem_of_app; eauto.
+      - assert (valid_transactions (T' ++ [[Cm (tag1, c) b]])) as Hvalid_trans_add.
+        {
+          apply (valid_transactions_add1 T' _ (Cm (tag1, c) b) c); try done.
+          - by eapply extraction_of_not_in.
+          - set_solver.
+          - exists (Cm (tag1, c) b).
+            by simpl.
+          - apply valid_transaction_singleton.
+          - intros (t'' & Ht''_in & (op & Hop_in & Hop_last & Hop_conn & Hop_cm)).
+            apply Hdec.
+            exists t''.
+            split; first done.
+            exists op.
+            split_and!; try done.
+            rewrite /is_cm_op in Hop_cm.
+            destruct op; try done.
+            exfalso.
+            eauto.
+        }
+        destruct (exists_execution (T' ++ [[Cm (tag1, c) b]]))
+          as (exec'' & Hbased'' & Hvalid_exec''); first set_solver; try done.
         iExists (T' ++ [[Cm (tag1, c) b]]), t', (lt' ++ [(#tag1, (c, (#"CmLin", #b)))%V]), exec''.
         iFrame.
         iSplit.
@@ -1668,43 +1693,26 @@ Section trace_proof.
           * iSplit.
             -- iPureIntro.
                by apply extraction_of_add1.
-            -- iSplit.
-               ++ iPureIntro.
-                  apply (valid_transactions_add1 T' _ c); try done.
-                  ** set_solver.
-                  ** exists (Cm (tag1, c) b).
-                     by simpl.
-                  ** apply valid_transaction_singleton.
-                  ** intros (t'' & Ht''_in & (op & Hop_in & Hop_last & Hop_conn & Hop_cm)).
-                     apply Hdec.
-                     exists t''.
-                     split; first done.
-                     exists op.
-                     split_and!; try done.
-                     rewrite /is_cm_op in Hop_cm.
-                     destruct op; try done.
-                     exfalso.
-                     eauto.
-               ++ iSplit.
-                  ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & Hact_eq & -> & 
-                       %Hopen_start & Hrest)".
-                     iPureIntro.
-                     apply (valid_sequence_wr_rd_cm_lin _ _ tag1 c tail); try done.
-                     --- rewrite /is_cm_lin_event.
-                         set_solver.
-                     --- by exists t'.
-                  ** iSplit.
-                     --- by iPureIntro.
-                     --- iSplit; first by simpl.
-                         iApply (trace_state_resources_commit_lin1 clients c tag1 lt' T' sa 
-                           s γ γmstate γmname extract b mc mstate mname m' with 
-                           "[//][//][//][//][//][//][//][][$Hkeys_conn2][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
-                           [$Hmap_m][$Hdisj_trace_res][$Htrace_res]").
-                         iPureIntro.
-                         destruct Hinit as (e & Hin'' & Hconn'' & Hevent'').
-                         exists e.
-                         split_and!; try done.
-                         apply elem_of_app; eauto.
+            -- iSplit; first by iPureIntro.
+               iSplit.
+               ++ iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & Hact_eq & -> & 
+                    %Hopen_start & Hrest)".
+                  iPureIntro.
+                  apply (valid_sequence_wr_rd_cm_lin _ _ tag1 c tail); try done.
+                  ** rewrite /is_cm_lin_event.
+                     set_solver.
+                  ** by exists t'.
+               ++ iSplit; first by iPureIntro.
+                  iSplit; first by simpl. 
+                  iApply (trace_state_resources_commit_lin1 clients c tag1 lt' T' sa 
+                    s γ γmstate γmname extract b mc mstate mname m' with 
+                    "[//][//][//][//][//][//][//][][$Hkeys_conn2][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
+                    [$Hmap_m][$Hdisj_trace_res][$Htrace_res]").
+                  iPureIntro.
+                  destruct Hinit as (e & Hin'' & Hconn'' & Hevent'').
+                  exists e.
+                  split_and!; try done.
+                  apply elem_of_app; eauto.
     }
     iMod ("Hshift" with "[Hkeys1 Hkeys2 Hstate_pr Hstate]").
     {
@@ -1827,9 +1835,14 @@ Section trace_proof.
       {
         iPureIntro.
         split_and!; try done.
-        intros i e1 e2 _ Hfalse.
-        rewrite list_lookup_singleton_Some in Hfalse.
-        lia.
+        - intros i e1 e2 _ Hfalse.
+          rewrite list_lookup_singleton_Some in Hfalse.
+          lia.
+        - simpl.
+          intros t1 t2 i j Hlookup_i Hlookup_j Heq.
+          rewrite list_lookup_singleton_Some in Hlookup_i.
+          rewrite list_lookup_singleton_Some in Hlookup_j.
+          lia.
       }
       iClear "Hinit_kvs Hinit_cli Hread Hstart Hwrite Hcom".
       iSplitR "Hghost_map_mlin Hghost_map_mpost".

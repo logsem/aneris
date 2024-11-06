@@ -307,7 +307,7 @@ Section trace_proof_util.
     trans = trans'.
   Proof.
     intros Hopen_trans Hvalid_trans Hop.
-    destruct Hvalid_trans as (_ & Hvalid_trans).
+    destruct Hvalid_trans as (_ & Hvalid_trans & _).
     destruct Hopen_trans as (op_last & Htrans'_in & Hlast' & Hconn_last' & Hcm_last').
     assert (trans ∈ T1 ++ trans :: T2) as Htrans_in; first set_solver.
     rewrite elem_of_list_lookup in Htrans_in.
@@ -507,7 +507,7 @@ Section trace_proof_util.
     false.
   Proof.
     intros Hvalid_trans' Hop (trans' & Htrans'_in & Hop').
-    destruct Hvalid_trans' as (_ & Hvalid_trans').
+    destruct Hvalid_trans' as (_ & Hvalid_trans' & _).
     assert (length T1 = length T1) as Htrans_in'; first set_solver.
     apply (list_lookup_middle T1 T2 trans) in Htrans_in'.
     destruct Hop' as (op' & Hop'_in & Hop'_last & Hop'_conn & Hop'_cm).

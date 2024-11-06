@@ -53,7 +53,7 @@ Definition valid_transaction (t : transaction) : Prop :=
   (* No duplicate operations *)
   (∀ op1 op2 i j, t !! i = Some op1 → t !! j = Some op2 → op1 = op2 → i = j) ∧
   (* Read your own writes *)
-  (∀ tag c k ov tag1 v1, 
+  (∀ tag c k ov tag1 v1,
     rel_list t (Wr (tag1, c) k v1) (Rd (tag, c) k ov) →
     (¬∃ tag2 v2, rel_list t (Wr (tag1, c) k v1) (Wr (tag2, c) k v2) ∧
                  rel_list t (Wr (tag2, c) k v2) (Rd (tag, c) k ov)) →
@@ -72,8 +72,10 @@ Definition valid_transactions (T : list transaction) : Prop :=
                           last t1 = Some op1 → last t2 = Some op2 → 
                           connOfOp op1 = c → connOfOp op2 = c →
                           (¬is_cm_op op1) → (¬is_cm_op op2) →
-                          i = j).
-  
+                          i = j) ∧
+  (* No duplicate operations across transactions *)
+  (∀ op1 op2 t1 t2 i j, T !! i = Some t1 → T !! j = Some t2 → op1 ∈ t1 → op2 ∈ t2 → op1 = op2 → i = j).
+
 Definition state : Type := gmap Key val.
 
 Definition execution : Type := list (transaction * state).
@@ -90,13 +92,15 @@ Definition applied_transaction (s1 s2 : state) (trans : transaction) : Prop :=
 
 Definition valid_execution (test : commitTest) (exec : execution) : Prop :=
   (* Transitions are valid *)
-  (∀ i e1 e2, exec !! i = Some e1 → 
+  (∀ i e1 e2, exec !! i = Some e1 →
               exec !! (i + 1) = Some e2 →
               applied_transaction e1.2 e2.2 e2.1) ∧
   (* Initial state is valid *)
   (exec !! 0 = Some ([], ∅)) ∧
   (* The commit test is satisfied *)
-  (∀ t, t ∈ (split exec).1 → test exec t).
+  (∀ t, t ∈ (split exec).1 → test exec t) ∧
+  (* The same transaction is not applied twice *)
+  (∀ t1 t2 i j, (split exec).1 !! i = Some t1 → (split exec).1 !! j = Some t2 → t1 = t2 → i = j).
 
 (** Read Uncommitted  *)
 
@@ -373,10 +377,15 @@ Proof.
     /valid_sequence /unique_init_events /based_on /extraction_of); try set_solver.
   exists [], [([], ∅)].
   repeat (split_and!; try set_solver).
-  intros i.
-  destruct (decide (i = 0)) as [->|Hfalse]; first set_solver.
-  destruct i; first done.
-  set_solver.
+  - intros i.
+    destruct (decide (i = 0)) as [->|Hfalse]; first set_solver.
+    destruct i; first done.
+    set_solver.
+  - simpl.
+    intros t1 t2 i j Hlookup_i Hlookup_j Heq.
+    rewrite list_lookup_singleton_Some in Hlookup_i.
+    rewrite list_lookup_singleton_Some in Hlookup_j.
+    lia.
 Qed.
 
 Lemma valid_trace_rc_empty : valid_trace_rc [].
@@ -392,6 +401,11 @@ Lemma valid_trace_rc_empty : valid_trace_rc [].
     set_solver.
   - intros t Ht_in.
     assert (t = []) as ->; set_solver.
+  - simpl.
+    intros t1 t2 i j Hlookup_i Hlookup_j Heq.
+    rewrite list_lookup_singleton_Some in Hlookup_i.
+    rewrite list_lookup_singleton_Some in Hlookup_j.
+    lia.
 Qed.
 
 Lemma valid_trace_si_empty : valid_trace_si [].
@@ -407,6 +421,11 @@ Lemma valid_trace_si_empty : valid_trace_si [].
     set_solver.
   - intros t Ht_in.
     assert (t = []) as ->; set_solver.
+  - simpl.
+    intros t1 t2 i j Hlookup_i Hlookup_j Heq.
+    rewrite list_lookup_singleton_Some in Hlookup_i.
+    rewrite list_lookup_singleton_Some in Hlookup_j.
+    lia.
 Qed.
 
 Lemma rel_list_imp {A : Type} (l : list A) e1 e2 e : 
@@ -716,11 +735,99 @@ Proof.
     lia.
 Qed.
 
+Lemma com_trans_eq1 op T1 T2 trans:
+  ¬is_cm_op op →
+  (∃ op, op ∈ trans ∧ last trans = Some op ∧ isCmOp op = false) →
+  comTrans (T1 ++ trans :: T2) = comTrans (T1 ++ (trans ++ [op]) :: T2).
+Proof.
+  intros Hnot Hop.
+  rewrite /comTrans.
+  do 2 rewrite List.filter_app.
+  simpl.
+  destruct Hop as (op' & _ & Heq & Hcm_op).
+  rewrite Heq.
+  rewrite /isCmOp in Hcm_op.
+  rewrite /is_cm_op in Hnot.
+  destruct op'; last set_solver.
+  all : destruct op.
+  3, 6 : set_solver.
+  all : rewrite last_snoc; done.
+Qed.
+
+Lemma com_trans_eq2 op T :
+  ¬is_cm_op op →
+  comTrans T = comTrans (T ++ [[op]]).
+Proof.
+  intros Hnot.
+  rewrite /comTrans.
+  rewrite List.filter_app.
+  simpl.
+  rewrite /is_cm_op in Hnot.
+  destruct op; last set_solver; simpl; by rewrite app_nil_r.
+Qed. 
+
+Lemma com_trans_eq3 T1 T2 trans s:
+  (∃ op, op ∈ trans ∧ last trans = Some op ∧ isCmOp op = false) →
+  comTrans (T1 ++ trans :: T2) = comTrans (T1 ++ (trans ++ [Cm s false]) :: T2).
+Proof.
+  intros Hop.
+  rewrite /comTrans.
+  do 2 rewrite List.filter_app.
+  simpl.
+  rewrite last_snoc.
+  destruct Hop as (op' & _ & Heq & Hcm_op).
+  rewrite Heq.
+  rewrite /isCmOp in Hcm_op.
+  destruct op'; set_solver.
+Qed.
+
+Lemma com_trans_eq4 T1 T2 trans :
+  (∃ op, op ∈ trans ∧ last trans = Some op ∧ isCmOp op = false) →
+  comTrans (T1 ++ trans :: T2) = comTrans (T1 ++ T2).
+Proof.
+  intros Hop.
+  rewrite /comTrans.
+  do 2 rewrite List.filter_app.
+  simpl.
+  destruct Hop as (op' & _ & Heq & Hcm_op).
+  rewrite Heq.
+  rewrite /isCmOp in Hcm_op.
+  destruct op'; set_solver.
+Qed.
+
+Lemma com_trans_imp1 T1 T2 trans t:
+  t ∈ comTrans (T1 ++ T2) →
+  t ∈ comTrans (T1 ++ trans :: T2).
+Proof.
+  rewrite /comTrans.
+  do 2 rewrite List.filter_app.
+  do 2 rewrite elem_of_app.
+  intros Hin.
+  simpl.
+  destruct Hin as [Hin|Hin]; first set_solver.
+  right.
+  destruct (last trans) as [op|]; last set_solver.
+  destruct op; try done.
+  destruct b; set_solver.
+Qed.
+
+Lemma com_trans_imp2 t T :
+  t ∈ comTrans T →
+  t ∈ T.
+Proof.
+  induction T as [|h tail IH]; first (simpl; set_solver).
+  simpl.
+  destruct (last h) as [op|]; last set_solver.
+  destruct op.
+  1, 2 : set_solver.
+  destruct b; set_solver.
+Qed.
+
 Lemma exists_execution : 
-  ∀ T, (∀ t, t ∈ T → t ≠ []) → 
+  ∀ T, (∀ t, t ∈ T → t ≠ []) → valid_transactions T →
     ∃ E, based_on E (comTrans T) ∧ valid_execution commit_test_ru E.
 Proof.
-  intros T Himp.
+  intros T Himp Hvalid_trans.
   induction T as [|t T IH].
   - exists [([], ∅)].
     split.
@@ -733,14 +840,32 @@ Proof.
       split.
       * intros.
         destruct i; set_solver.
-      * split; set_solver.
+      * do 2 (split; first set_solver).
+        simpl.
+        intros t1 t2 i j Hlookup_i Hlookup_j Heq.
+        rewrite list_lookup_singleton_Some in Hlookup_i.
+        rewrite list_lookup_singleton_Some in Hlookup_j.
+        lia.
   - assert (∀ t : list operation, t ∈ T → t ≠ []) as Himp'.
     {
       intros t' Hin.
       apply Himp.
       set_solver.
     }
-    destruct (IH Himp') as [E (Hbased & Hexec)].
+    assert (valid_transactions T) as Hvalid_trans'.
+    {
+      rewrite /valid_transactions in Hvalid_trans.
+      split_and!; first set_solver.
+      - intros t1 t2 op1 op2 i j c Hlookup_i Hlookup_j Hlast1 Hlast2 Hconn1 Hconn2 Hcm1 Hcm2.
+        destruct Hvalid_trans as (_ & Hvalid_trans & _).
+        assert ((S i) = (S j)) as Heq; last lia.
+        eapply (Hvalid_trans); try done.
+      - intros op1 op2 t1 t2 i j Hlookup_i Hlookup_j Hop1 Hop2 Heq.
+        destruct Hvalid_trans as (_ & _ & Hvalid_trans).
+        assert ((S i) = (S j)) as Heq'; last lia.
+        eapply (Hvalid_trans); try done.
+    }
+    destruct (IH Himp' Hvalid_trans') as [E (Hbased & Hexec)].
     simpl.
     assert (∃ E0 : execution, based_on E0 (comTrans T) ∧ valid_execution commit_test_ru E0) as Hcase; first by exists E.
     destruct (last t); try done.
@@ -813,12 +938,72 @@ Proof.
               rewrite lookup_app_Some in Hlookup1.
               destruct Hlookup1 as [Heq_p1|(Hfalse & _)]; first set_solver.
               lia.
-        -- destruct Hexec as (_ & Hexec & _).
-           split.
+        -- destruct Hexec as (_ & Hexec1 & _ & Hexec2).
+           split_and!.
            ++ rewrite lookup_app_Some.
               by left.
            ++ intros.
               by rewrite /commit_test_ru.
+           ++ intros t1 t2 i j Hlookup_i Hlookup_j Heq_trans.
+              rewrite split_split in Hlookup_i; simpl in Hlookup_i.
+              rewrite split_split in Hlookup_j; simpl in Hlookup_j.
+              rewrite lookup_app_Some in Hlookup_i.
+              rewrite lookup_app_Some in Hlookup_j.
+              destruct Hvalid_trans as (_ & Hvalid_trans).
+              destruct Hlookup_i as [Hlookup_i|Hlookup_i].
+              ** destruct Hlookup_j as [Hlookup_j|Hlookup_j]; first set_solver.
+                 assert (t = t2) as Heq_trans'; 
+                  first (rewrite list_lookup_singleton_Some in Hlookup_j; set_solver).
+                 rewrite /based_on in Hbased.
+                 assert (t ∈ T) as Ht_in.
+                 {
+                   apply com_trans_imp2, Hbased.
+                   split; last set_solver. 
+                   apply elem_of_list_lookup; set_solver.
+                 }
+                 rewrite /valid_transactions in Hvalid_trans.
+                 rewrite elem_of_list_lookup in Ht_in.
+                 destruct Ht_in as (i' & Ht_in).
+                 assert ((t :: T) !! (S i') = Some t) as Hlookup_succ.
+                 { 
+                    apply lookup_cons_Some; right.
+                    split; first lia.
+                    simpl.
+                    by assert (i' = i' - 0) as <-; first lia.
+                 }
+                 assert ((t :: T) !! 0 = Some t) as Hlookup_zero; first set_solver.
+                 assert (0 = S i') as Hfalse; last lia.
+                 destruct t as [|h t]; first set_solver.
+                 assert (h ∈ h :: t) as Hin_h; first set_solver.
+                 eapply Hvalid_trans; try done.
+              ** destruct Hlookup_j as [Hlookup_j|Hlookup_j].
+                 --- assert (t = t1) as Heq_trans'; 
+                       first (rewrite list_lookup_singleton_Some in Hlookup_i; set_solver).
+                     rewrite /based_on in Hbased.
+                     assert (t ∈ T) as Ht_in.
+                     {
+                       apply com_trans_imp2, Hbased.
+                       split; last set_solver. 
+                       apply elem_of_list_lookup; set_solver.
+                     }
+                     rewrite /valid_transactions in Hvalid_trans.
+                     rewrite elem_of_list_lookup in Ht_in.
+                     destruct Ht_in as (i' & Ht_in).
+                     assert ((t :: T) !! (S i') = Some t) as Hlookup_succ.
+                     { 
+                       apply lookup_cons_Some; right.
+                       split; first lia.
+                       simpl.
+                       by assert (i' = i' - 0) as <-; first lia.
+                     }
+                     assert ((t :: T) !! 0 = Some t) as Hlookup_zero; first set_solver.
+                     assert (0 = S i') as Hfalse; last lia.
+                     destruct t as [|h t]; first set_solver.
+                     assert (h ∈ h :: t) as Hin_h; first set_solver.
+                     eapply Hvalid_trans; try done.
+                 --- rewrite list_lookup_singleton_Some in Hlookup_i.
+                     rewrite list_lookup_singleton_Some in Hlookup_j.
+                     lia.
     + exfalso.
       rewrite /valid_execution in Hexec.
       destruct Hexec as (_ & (Hfalse & _)).
@@ -1946,6 +2131,21 @@ Proof.
   by apply tag_event_op.
 Qed.
 
+Lemma extraction_of_not_in (tag : string) lt T op : 
+  tagOfOp op = tag →
+  (¬(∃ e, e ∈ lt ∧ tagOfEvent e = Some tag)) →
+  extraction_of lt T →
+  ¬ (∃ t', t' ∈ T ∧ op ∈ t').
+Proof.
+  intros Htag Hnot Hextract (t' & Ht_in & Hop_in).
+  apply Hnot.
+  destruct Hextract as (_ & Hextract & _).
+  specialize (Hextract t' op Ht_in Hop_in).
+  exists (toLinEvent op).
+  split; first done.
+  by apply tag_event_op.
+Qed.
+
 Lemma extraction_of_add_init_lin le lt T :
   is_in_lin_event le →
   extraction_of lt T →
@@ -1991,7 +2191,9 @@ Proof.
     apply (rel_singleton_false _ _ _ Hfalse).
 Qed.
 
-Lemma valid_transactions_add1 T t c :
+Lemma valid_transactions_add1 T t op c :
+  t = [op] →
+  (¬∃ t', t' ∈ T ∧ op ∈ t') →
   (∀ s k v, Rd s k (Some v) ∈ t → ∃ t' s', t' ∈ T ++ [t] ∧ Wr s' k v ∈ t') →
   (∃ op, head t = Some op ∧ connOfOp op = c) → 
   valid_transaction t →
@@ -2000,7 +2202,7 @@ Lemma valid_transactions_add1 T t c :
   valid_transactions T →
   valid_transactions (T ++ [t]).
 Proof.
-  intros Hread Hconn Hvalid Hnot Hvalid_trans.
+  intros Heq_op Hnin Hread Hconn Hvalid Hnot Hvalid_trans.
   split_and!.
   - intros t' Hin.
     rewrite elem_of_app in Hin.
@@ -2012,12 +2214,12 @@ Proof.
     destruct Hvalid as (_ & Hvalid).
     destruct Hconn as (op_h & Hhead & Hconn).
     assert (op_h ∈ t) as Hhead_in; first by apply head_Some_elem_of.
-    destruct Hvalid_trans as (_ & Hvalid_trans).
+    destruct Hvalid_trans as (_ & Hvalid_trans & _).
     rewrite lookup_app_Some in Hlookup_i.
     destruct Hlookup_i as [Hlookup_i | (Hlength_i & Hlookup_i)].
     + rewrite lookup_app_Some in Hlookup_j.
       destruct Hlookup_j as [Hlookup_j | (Hlength_j & Hlookup_j)].
-      * eapply Hvalid_trans; done.
+      * by eapply (Hvalid_trans).
       * rewrite list_lookup_singleton_Some in Hlookup_j.
         destruct Hlookup_j as (_ & <-).
         exfalso.
@@ -2058,6 +2260,27 @@ Proof.
         assert (j = length T) as ->; last lia.
         rewrite Nat.sub_0_le in Heq'.
         apply Nat.le_antisymm; done.
+  - intros op1 op2 t1 t2 i j Hlookup_i Hlookup_j Hop1 Hop2 Heq_op'.
+    rewrite lookup_snoc_Some in Hlookup_i.
+    rewrite lookup_snoc_Some in Hlookup_j.
+    destruct Hvalid_trans as (_ & _ & Hvalid_trans).
+    destruct Hlookup_i as [Hlookup_i|Hlookup_i].
+    + destruct Hlookup_j as [Hlookup_j|Hlookup_j]; first set_solver.
+      exfalso.
+      apply Hnin.
+      exists t1.
+      split; first (apply elem_of_list_lookup; set_solver).
+      destruct Hlookup_j as (_ & Heq_t2).
+      subst.
+      assert (op2 = op) as <-; set_solver.
+    + destruct Hlookup_j as [Hlookup_j|Hlookup_j]; last set_solver.
+      exfalso.
+      apply Hnin.
+      exists t2.
+      split; first (apply elem_of_list_lookup; set_solver).
+      destruct Hlookup_i as (_ & Heq_t1).
+      subst.
+      assert (op2 = op) as <-; set_solver.
 Qed.
 
 Lemma valid_transaction_add_op t op c tag : 
@@ -2166,6 +2389,7 @@ Proof.
 Qed.
 
 Lemma valid_transactions_add2 T1 T2 tag op t c :
+  (¬∃ t', t' ∈ (T1 ++ t :: T2) ∧ op ∈ t') →
   (¬∃op, op ∈ t ∧ tagOfOp op = tag) →
   tagOfOp op = tag →
   (∀ s k ov tag1 v1, op = Rd s k ov → (Wr (tag1, c) k v1) ∈ t →
@@ -2178,7 +2402,7 @@ Lemma valid_transactions_add2 T1 T2 tag op t c :
   valid_transactions (T1 ++ t :: T2) →
   valid_transactions (T1 ++ (t ++ [op]) :: T2).
 Proof.
-  intros Hnot Htag Hread Hconn Hlast Hvalid.
+  intros Hnin Hnot Htag Hread Hconn Hlast Hvalid.
   split_and!.
   - intros t' Ht'_in.
     destruct Hvalid as (Hvalid & _).
@@ -2190,7 +2414,7 @@ Proof.
     eapply valid_transaction_add_op; try done.
   - intros t1 t2 op1 op2 i j c' Hlookup_i Hlookup_j
       Hlast1 Hlast2 Hconn1 Hconn2 Hcm1 Hcm2.
-    destruct Hvalid as (_ & Hvalid).
+    destruct Hvalid as (_ & Hvalid & _).
     pose proof Hvalid as Hvalid'.
     specialize (Hvalid t1 t2 op1 op2 i j c').
     rewrite lookup_app_Some in Hlookup_i.
@@ -2274,94 +2498,98 @@ Proof.
            ++ eapply Hvalid; try done; apply lookup_app_Some; right.
               all : split; first lia.
               all : apply lookup_cons_Some; eauto.
-Qed.
-
-Lemma com_trans_eq1 op T1 T2 trans:
-  ¬is_cm_op op →
-  (∃ op, op ∈ trans ∧ last trans = Some op ∧ isCmOp op = false) →
-  comTrans (T1 ++ trans :: T2) = comTrans (T1 ++ (trans ++ [op]) :: T2).
-Proof.
-  intros Hnot Hop.
-  rewrite /comTrans.
-  do 2 rewrite List.filter_app.
-  simpl.
-  destruct Hop as (op' & _ & Heq & Hcm_op).
-  rewrite Heq.
-  rewrite /isCmOp in Hcm_op.
-  rewrite /is_cm_op in Hnot.
-  destruct op'; last set_solver.
-  all : destruct op.
-  3, 6 : set_solver.
-  all : rewrite last_snoc; done.
-Qed.
-
-Lemma com_trans_eq2 op T :
-  ¬is_cm_op op →
-  comTrans T = comTrans (T ++ [[op]]).
-Proof.
-  intros Hnot.
-  rewrite /comTrans.
-  rewrite List.filter_app.
-  simpl.
-  rewrite /is_cm_op in Hnot.
-  destruct op; last set_solver; simpl; by rewrite app_nil_r.
-Qed. 
-
-Lemma com_trans_eq3 T1 T2 trans s:
-  (∃ op, op ∈ trans ∧ last trans = Some op ∧ isCmOp op = false) →
-  comTrans (T1 ++ trans :: T2) = comTrans (T1 ++ (trans ++ [Cm s false]) :: T2).
-Proof.
-  intros Hop.
-  rewrite /comTrans.
-  do 2 rewrite List.filter_app.
-  simpl.
-  rewrite last_snoc.
-  destruct Hop as (op' & _ & Heq & Hcm_op).
-  rewrite Heq.
-  rewrite /isCmOp in Hcm_op.
-  destruct op'; set_solver.
-Qed.
-
-Lemma com_trans_eq4 T1 T2 trans :
-  (∃ op, op ∈ trans ∧ last trans = Some op ∧ isCmOp op = false) →
-  comTrans (T1 ++ trans :: T2) = comTrans (T1 ++ T2).
-Proof.
-  intros Hop.
-  rewrite /comTrans.
-  do 2 rewrite List.filter_app.
-  simpl.
-  destruct Hop as (op' & _ & Heq & Hcm_op).
-  rewrite Heq.
-  rewrite /isCmOp in Hcm_op.
-  destruct op'; set_solver.
-Qed.
-
-Lemma com_trans_imp1 T1 T2 trans t:
-  t ∈ comTrans (T1 ++ T2) →
-  t ∈ comTrans (T1 ++ trans :: T2).
-Proof.
-  rewrite /comTrans.
-  do 2 rewrite List.filter_app.
-  do 2 rewrite elem_of_app.
-  intros Hin.
-  simpl.
-  destruct Hin as [Hin|Hin]; first set_solver.
-  right.
-  destruct (last trans) as [op|]; last set_solver.
-  destruct op; try done.
-  destruct b; set_solver.
-Qed.
-
-Lemma com_trans_imp2 t T :
-  t ∈ comTrans T →
-  t ∈ T.
-Proof.
-  induction T as [|h tail IH]; first (simpl; set_solver).
-  simpl.
-  destruct (last h) as [op|]; last set_solver.
-  destruct op.
-  1, 2 : set_solver.
-  destruct b; set_solver.
+  - intros op1 op2 t1 t2 i j Hlookup_i Hlookup_j Hop1 Hop2 Heq_op.
+    destruct Hvalid as (_ & _ & Hvalid).
+    rewrite lookup_app_Some in Hlookup_i.
+    rewrite lookup_app_Some in Hlookup_j.
+    destruct Hlookup_i as [Hlookup_i|(Hlength_i & Hlookup_i)];
+      destruct Hlookup_j as [Hlookup_j|(Hlength_j & Hlookup_j)].
+    + eapply (Hvalid op1 op2 t1 t2 i j); try done; by eapply lookup_app_l_Some.
+    + rewrite lookup_cons_Some in Hlookup_j.
+      destruct Hlookup_j as [(Hlength_j' & Hlookup_j)|Hlookup_j].
+      * rewrite -Hlookup_j in Hop2.
+        rewrite elem_of_app in Hop2.
+        destruct Hop2 as [Hop2|Hop2].
+        -- eapply (Hvalid _ _ t1 t); try done.
+           ++ apply lookup_app_Some; set_solver.
+           ++ apply lookup_app_Some; right.
+              split; first done.
+              apply lookup_cons_Some; left; set_solver.
+        -- exfalso.
+           apply Hnin.
+           exists t1.
+           split.
+           ++ rewrite elem_of_app; left.
+              apply elem_of_list_lookup; eauto.
+           ++ assert (op2 = op) as ->; set_solver.
+      * eapply (Hvalid _ _ t1 t2); try done.
+        -- apply lookup_app_Some; set_solver.
+        -- apply lookup_app_Some; right.
+           split; first done.
+           apply lookup_cons_Some; set_solver.
+    + rewrite lookup_cons_Some in Hlookup_i.
+      destruct Hlookup_i as [(Hlength_i' & Hlookup_i)|Hlookup_i].
+      * rewrite -Hlookup_i in Hop1.
+        rewrite elem_of_app in Hop1.
+        destruct Hop1 as [Hop1|Hop1]. 
+        -- eapply (Hvalid _ _ t t2); try done.
+           ++ apply lookup_app_Some; right.
+              split; first done.
+              apply lookup_cons_Some; left; set_solver.
+           ++ apply lookup_app_Some; set_solver.
+        -- exfalso.
+           apply Hnin.
+           exists t2.
+           split.
+           ++ rewrite elem_of_app; left.
+              apply elem_of_list_lookup; eauto.
+           ++ assert (op1 = op) as ->; set_solver.
+      * eapply (Hvalid _ _ t1 t2); try done.
+        -- apply lookup_app_Some; right.
+           split; first done.
+           apply lookup_cons_Some; set_solver.
+        -- apply lookup_app_Some; set_solver.
+    + rewrite lookup_cons_Some in Hlookup_i.
+      rewrite lookup_cons_Some in Hlookup_j.
+      destruct Hlookup_i as [(Hlength_i' & Hlookup_i)|(Hlength_i' & Hlookup_i)];
+        destruct Hlookup_j as [(Hlength_j' & Hlookup_j)|(Hlength_j' & Hlookup_j)].
+      * lia.
+      * rewrite -Hlookup_i in Hop1.
+        rewrite elem_of_app in Hop1.
+        destruct Hop1 as [Hop1|Hop1]. 
+        -- eapply (Hvalid _ _ t t2); try done.
+           all : apply lookup_app_Some; right.
+           all : split; first done.
+           1 : apply lookup_cons_Some; left; set_solver.
+           apply lookup_cons_Some; right; set_solver.
+        -- exfalso.
+           apply Hnin.
+           exists t2.
+           split.
+           ++ rewrite elem_of_app; right.
+              rewrite elem_of_cons; right.
+              apply elem_of_list_lookup; eauto.
+           ++ assert (op1 = op) as ->; set_solver.
+      * rewrite -Hlookup_j in Hop2.
+        rewrite elem_of_app in Hop2.
+        destruct Hop2 as [Hop2|Hop2]. 
+        -- eapply (Hvalid _ _ t1 t); try done.
+           all : apply lookup_app_Some; right.
+           all : split; first done.
+           1 : apply lookup_cons_Some; right; set_solver.
+           apply lookup_cons_Some; left; set_solver.
+        -- exfalso.
+           apply Hnin.
+           exists t1.
+           split.
+           ++ rewrite elem_of_app; right.
+              rewrite elem_of_cons; right.
+              apply elem_of_list_lookup; eauto.
+           ++ assert (op2 = op) as ->; set_solver.
+      * eapply (Hvalid _ _ t1 t2); try done.
+        1, 2 : apply lookup_app_Some; right.
+        1, 2 : split; first done.
+        1, 2 : apply lookup_cons_Some; set_solver.
 Qed.
 
 Lemma based_on_add1 op exec T1 T2 trans :
