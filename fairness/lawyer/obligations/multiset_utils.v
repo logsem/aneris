@@ -236,25 +236,27 @@ Section MultisetOrder.
       rewrite elem_of_multiplicity in INx. 
       enough (multiplicity x Y = 0); [lia| ].
       apply not_elem_of_multiplicity. intros ?%DISJ; eauto.
-  Qed. 
+  Qed.
 
   Global Instance ms_le_PreOrder: PreOrder ms_le.
-  Proof using.
+  Proof using PO.
     split.
-    - red. intros g. apply ms_le_equiv. tauto.
-    - red. intros M N P. 
+    { red. intros g. apply ms_le_equiv. tauto. }
+    red. intros M N P. 
 
-      rewrite !ms_le_equiv'.
-      rewrite /ms_le_dm. intros (X&Y&SUB1&->&DOM1) (U&V&SUB2&->&DOM2).
-      apply gmultiset_disj_union_difference in SUB2.
-      remember (P ∖ U) as W. subst P. clear HeqW.
-      (* do 2 eexists. repeat split. *)
-      (* + admit. *)
-      (* + rewrite (gmultiset_disj_union_comm W). *)
-      (*   rewrite gmultiset_disj_union_difference_split. *)
-      (*   rewrite gmultiset_disj_union_difference_split.  *)
-        
-  Admitted.
+    rewrite !ms_le_equiv'.
+    rewrite /ms_le_dm. intros (B1&L1&SUB1&->&DOM1) (B2&L2&SUB2&->&DOM2).
+
+    exists (B2 ⊎ (B1 ∖ L2)), (L1 ⊎ (L2 ∖ B1)). repeat split.
+    { mss. }
+    { mss. }
+    red. intros y [IN1 | IN2']%gmultiset_elem_of_disj_union.
+    2: { specialize (DOM2 y ltac:(mss)) as (?&?&?). mss. }
+    red in DOM1. specialize (DOM1 _ IN1) as (x & B1x & Ryx).
+    destruct (decide (x ∈ L2)) as [L2x| ]; [| mss].
+    specialize (DOM2 _ L2x) as (z & B2z & Rxz).
+    exists z. split; [mss| ]. etrans; eauto.
+  Qed.
 
   Global Instance ms_le_AntiSymm: AntiSymm eq ms_le.
   Proof using.
