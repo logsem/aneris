@@ -4,7 +4,7 @@ Require Import Relation_Operators.
 From iris.proofmode Require Import tactics.
 From iris.algebra Require Import gset gmultiset.
 From trillium.fairness Require Import locales_helpers inftraces fairness trace_len my_omega.
-From trillium.fairness.lawyer.obligations Require Import obligations_model multiset_utils obls_utils wf_utils obls_pf.
+From trillium.fairness.lawyer.obligations Require Import obligations_model multiset_utils obls_utils wf_utils obls_pf wf_ms.
 From stdpp Require Import relations.
 
 
@@ -1157,7 +1157,7 @@ Section Termination.
     forward eapply well_founded_ind with (R := R) (P := fun _ => False).
     4: done.
     3: exact 0.
-    { eapply measure_wf. by apply ms_lt_wf. }
+    { eapply measure_wf. apply ms_lt_wf; try done. apply OP. }
     intros i NEXT.
     (* pose proof (min_owner_PF_decr (c + i) ltac:(lia)) as D. *)
     forward eapply min_owner_PF_decr with (d := c + i); eauto.
@@ -1288,7 +1288,7 @@ Section Termination.
     forward eapply well_founded_ind with (R := R) (P := fun _ => terminating_trace tr).
     4: done.
     3: exact 0. 
-    { eapply measure_wf. eapply ms_lt_wf; eauto. }
+    { eapply measure_wf. eapply ms_lt_wf; eauto. apply OP. }
     intros i NEXT.
 
     destruct (tr S!! (S i)) eqn:ITH'.
