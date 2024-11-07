@@ -1044,22 +1044,19 @@ Section trace_proof.
               by apply extraction_of_add1.
             * iSplit.
               -- iPureIntro.
-                  apply (valid_transactions_add1 T' _ (Cm (tag1, c) b) c); try done.
+                  apply (valid_transactions_add1 T' (Cm (tag1, c) b) c); try done.
                   ++ by eapply extraction_of_not_in.
-                  ++ set_solver.
-                  ++ exists (Cm (tag1, c) b).
-                    by simpl.
                   ++ apply valid_transaction_singleton.
                   ++ intros (t'' & Ht''_in & (op & Hop_in & Hop_last & Hop_conn & Hop_cm)).
-                    apply Hdec.
-                    exists t''.
-                    split; first done.
-                    exists op.
-                    split_and!; try done.
-                    rewrite /is_cm_op in Hop_cm.
-                    destruct op; try done.
-                    exfalso.
-                    eauto.
+                     apply Hdec.
+                     exists t''.
+                     split; first done.
+                     exists op.
+                     split_and!; try done.
+                     rewrite /is_cm_op in Hop_cm.
+                     destruct op; try done.
+                     exfalso.
+                     eauto.
               -- iSplit.
                   ++ iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & Hact_eq & -> & 
                       %Hopen_start & Hrest)".
@@ -1532,11 +1529,9 @@ Section trace_proof.
                destruct wo; by apply extraction_of_add1.
             -- iSplit.
                ++ iPureIntro.
-                  apply (valid_transactions_add1 T' _ (Rd (tag1, c) k wo) c); try done.
+                  apply (valid_transactions_add1 T' (Rd (tag1, c) k wo) c); try done.
                   ** by eapply extraction_of_not_in.
                   ** set_solver.
-                  ** exists (Rd (tag1, c) k wo).
-                     by simpl.
                   ** apply valid_transaction_singleton.
                   ** intros (t'' & Ht''_in & (op & Hop_in & Hop_last & Hop_conn & Hop_cm)).
                      apply Hdec.
@@ -1868,11 +1863,8 @@ Section trace_proof.
                by apply extraction_of_add1.
             -- iSplit.
                ++ iPureIntro.
-                  apply (valid_transactions_add1 T' _ (Wr (tag1, c) k v) c); try done.
+                  apply (valid_transactions_add1 T' (Wr (tag1, c) k v) c); try done.
                   ** by eapply extraction_of_not_in.
-                  ** set_solver.
-                  ** exists (Wr (tag1, c) k v).
-                     by simpl.
                   ** apply valid_transaction_singleton.
                   ** intros (t'' & Ht''_in & (op & Hop_in & Hop_last & Hop_conn & Hop_cm)).
                      apply Hdec.
