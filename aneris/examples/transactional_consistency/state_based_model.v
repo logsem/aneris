@@ -2703,10 +2703,10 @@ Proof.
     destruct op; simpl; set_solver.
 Qed.
 
-Lemma extend_execution_imp i e1 e2 exec trans sig t s s' :
+Lemma extend_execution_imp test i e1 e2 exec trans sig t s s' :
   last exec = Some (t, s) →
   applied_transaction s s' (trans ++ [Cm sig true]) →
-  valid_execution commit_test_rc exec →
+  valid_execution test exec →
   (exec ++ [(trans ++ [Cm sig true], s')]) !! i = Some e1 →
   (exec ++ [(trans ++ [Cm sig true], s')]) !! (i + 1) = Some e2 →
   applied_transaction e1.2 e2.2 e2.1.

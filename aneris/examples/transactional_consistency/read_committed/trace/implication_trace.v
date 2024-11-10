@@ -15,6 +15,8 @@ From aneris.examples.transactional_consistency
 Section trace_proof.
   Context `{!anerisG Mdl Σ, !KVSG Σ, !User_params}.
 
+  (** Definitons and lemmas for the wrapped resources *)
+
   Definition OwnTransSub (γ : gname) (trans : transaction) : iProp Σ :=
     ∃ (T : list transaction), own γ (◯ (gmap_of_trace 0 T)) ∗ ⌜trans ∈ T⌝.
 
@@ -225,10 +227,10 @@ Section trace_proof.
       1, 4 : set_solver.
       all : subst.
       all : exfalso.
-      all :   apply Hnin.
-      all :   apply Hbased.
-      all :   split; first (apply elem_of_list_lookup; set_solver).
-      all :   intros Hfalse; destruct trans; set_solver.
+      all : apply Hnin.
+      all : apply Hbased.
+      all : split; first (apply elem_of_list_lookup; set_solver).
+      all : intros Hfalse; destruct trans; set_solver.
   Qed.
 
   Lemma inv_ext_rc_wr_imp1 γ T1 T2 trans s k v :
