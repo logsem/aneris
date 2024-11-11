@@ -85,7 +85,6 @@ Section EOFinAdequacy.
     { apply eofin_sim_rel_FB. }
     { done. }
     { done. }
-
     done. 
   Qed.
 
@@ -94,10 +93,10 @@ Section EOFinAdequacy.
     (OM_WF0: om_st_wf _ (trfirst mtr))
     (FAIR: ∀ tid, fair_ex tid extr)
     (MATCH: eofin_om_traces_match extr mtr)
-    (LIM_NZ: 0 < LIM):
+    :
   terminating_trace extr.
   Proof using.
-    clear -MATCH FAIR VALID OM LIM_NZ OM_WF0.
+    clear -MATCH FAIR VALID OM OM_WF0.
     assert (exists omtr, traces_match (fun ℓ τ => ℓ.2 = Some τ) eq (@mtrans M) (@mtrans OM) mtr omtr) as [omtr MATCHo]. 
     { clear -MATCH mtr.
       exists (project_nested_trace id ((mbind Some) ∘ snd) mtr).
@@ -158,7 +157,6 @@ Section EOFinAdequacy.
       by rewrite H in OM_VALID. }
     { apply fin_wf. }
     { apply fin_wf. }
-    { constructor. by exists 0. }
     
     pose proof (traces_match_preserves_termination _ _ _ _ _ _ MATCH'' OM_TERM). 
     done.
@@ -176,8 +174,7 @@ Section EOFinAdequacy.
         (INIT: em_is_init_st ([e1], σ1) s1 (ExecutionModel := EM))
         (extr : heap_lang_extrace)
         (* (Hvex : extrace_valid extr) *)
-        (Hexfirst : trfirst extr = ([e1], σ1))
-        (LIM_NZ: 0 < LIM):
+        (Hexfirst : trfirst extr = ([e1], σ1)):
     (* rel_finitary (sim_rel LM) → *)
     wp_premise Σ s e1 σ1 s1 eofin_sim_rel (p: @em_init_param _ _ EM) -> 
     extrace_fairly_terminating extr.
@@ -290,7 +287,6 @@ Section EOFinAdequacy.
 
   Lemma eofin_terminates_impl
     (N : nat)
-    (HN: N > 1)
     (LIM_NZ: N < LIM)
     (extr : heap_lang_extrace)
     (Hexfirst : (trfirst extr).1 = [start #(0%nat) #N]):
@@ -315,7 +311,6 @@ Section EOFinAdequacy.
       apply init_om_state_init. }
     
     apply FAIR_TERM.
-    { lia. }
     red. intros ?. iStartProof. iIntros "[HEAP INIT] !>".
     iSplitL.
     - simpl. 
@@ -361,8 +356,7 @@ Section EOFinAdequacy.
 
 End EOFinAdequacy.
 
-(* TODO: try to get rid of N restriction *)
-Theorem eofin_terminates N (N1: 1 < N):
+Theorem eofin_terminates (N: nat):
   forall extr,
     (trfirst extr).1 = [start #0%nat #N] → 
     extrace_fairly_terminating extr.

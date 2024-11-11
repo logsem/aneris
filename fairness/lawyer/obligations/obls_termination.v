@@ -19,9 +19,6 @@ Section Termination.
   
   Hypothesis (LVL_WF: wf (strict lvl_le)).
   
-  Context `{Inhabited Level}. 
-  Let lvl__def := @inhabitant Level _.
-
   Definition sig_val_at sid i := 
     from_option (fun δ => from_option snd true (ps_sigs _ δ !! sid)) true (tr S!! i). 
     
@@ -38,14 +35,37 @@ Section Termination.
   Context {set_before: SignalId -> nat}.
   Hypothesis (SET_BEFORE_SPEC: forall sid, sb_prop sid (set_before sid)). 
   
-  Definition lvl_at (sid_i: SignalId * nat): Level :=
+  Definition lvl_at (sid_i: SignalId * nat): option Level :=
     let '(sid, i) := sid_i in
-    from_option (fun δ => from_option fst lvl__def (ps_sigs _ δ !! sid)) lvl__def (tr S!! i).
+    δ ← tr S!! i;
+    '(l, b) ← ps_sigs _ δ !! sid;
+    mret l. 
+    (* from_option (fun δ => from_option fst lvl__def (ps_sigs _ δ !! sid)) lvl__def (tr S!! i). *)
 
-  Definition tr_sig_lt: relation (SignalId * nat) := MR (strict lvl_le) lvl_at. 
+  Definition lvl_opt_lt (x y: option Level) :=
+    match x, y with
+    | Some x, Some y => strict lvl_le x y
+    | Some _, None => True
+    | _, _ => False
+    end. 
+    
+  Definition tr_sig_lt: relation (SignalId * nat) :=
+    MR lvl_opt_lt lvl_at. 
   
   Lemma tr_sig_lt_wf: wf tr_sig_lt.
-  Proof using LVL_WF. apply measure_wf. apply LVL_WF. Qed.
+  Proof using LVL_WF.
+    apply measure_wf.
+
+    assert (forall b, Acc lvl_opt_lt (Some b)) as ACC. 
+    { intros. pattern b. eapply well_founded_induction; [apply LVL_WF| ].
+      clear b. intros b IH.
+      constructor. intros [a| ] LT; [| done].
+      by apply IH. }
+
+    red. intros [b| ]; [by apply ACC| ].
+    constructor. intros [b| ] LT; [| done].
+    by apply ACC.
+  Qed.
   
   Lemma never_set_after_after sid i j
     (LE: i <= j):
@@ -320,7 +340,7 @@ Section Termination.
     eapply om_trans_ms_rel with (bd := false); auto.
     { intros.
       rewrite Nat.add_succ_r. rewrite Nat.add_0_r.  
-      destruct H4 as (?&?&?). eapply burns_cp_ms_le; eauto. }
+      destruct H3 as (?&?&?). eapply burns_cp_ms_le; eauto. }
     
     (* TODO: extract the lemma below? *)
     
@@ -409,9 +429,9 @@ Section Termination.
     all: try done. 
     { lia. }
     { rewrite ITH. done. }
-    { intros. simpl. specialize (NOτ k). specialize_full NOτ; eauto.
+    { intros k ? LEk KTH. simpl. specialize (NOτ k). specialize_full NOτ; eauto.
       { lia. }
-      rewrite H2 in NOτ. set_solver. }
+      rewrite KTH in NOτ. set_solver. }
     by rewrite IDTH.
   Qed.
 
@@ -544,7 +564,7 @@ Section Termination.
     pose proof (@next_sig_id_fresh (default ∅ (ps_obls _ δ1 !! τ) ∪ (dom $ ps_sigs _ δ1))) as FRESH. 
     inv_loc_step STEP; destruct δ1; try (right; done).
     - right. subst new_obls0.
-      destruct AB as (?&?&?&?&?).
+      destruct AB as (?&?&?&PH&?).
       destruct (decide (sid = s0)) as [-> | OLD].
       + destruct FRESH. 
         apply elem_of_union. right. 
@@ -552,8 +572,8 @@ Section Termination.
         eapply flatten_gset_spec. eexists. split; eauto.
         eapply elem_of_map_img; eauto.
         apply om_wf_dpo in WF1.
-        apply mk_is_Some, elem_of_dom in H2.
-        red in WF1. rewrite WF1 in H2. simpl in H2. apply elem_of_dom in H2 as [??].
+        apply mk_is_Some, elem_of_dom in PH.
+        red in WF1. rewrite WF1 in PH. simpl in PH. apply elem_of_dom in PH as [??].
         exists x0. rewrite H2. done.
       + subst new_ps. 
         destruct (decide (x0 = τ)) as [-> | NEQ].
@@ -589,7 +609,7 @@ Section Termination.
       destruct b; try done. eauto. }
 
     destruct STEP as (?&?&STEP). inversion STEP; subst. red. right.
-    move AB at bottom. destruct AB as (?&?&?&?&?).
+    move AB at bottom. destruct AB as (?&?&?&PH&?).
     destruct δ1; try (right; done); simpl in *.
     subst new_obls0 cur_obls0 obls' new_phases0. 
     destruct (decide (x1 = τ)) as [-> | NEQ'].
@@ -600,7 +620,7 @@ Section Termination.
          2: { intros <-. destruct FRESH'. by apply elem_of_dom. }
          rewrite lookup_insert_ne; [| done].
          eauto. }
-    rewrite LOC_PHASE in H2. inversion H2. subst x2. 
+    rewrite LOC_PHASE in PH. inversion PH. subst x2. 
     destruct (decide (sid ∈ cur_obls ∩ x0)).
     { exists x. rewrite !lookup_insert. simpl. eexists. split; eauto.
       split; eauto. etrans; eauto. apply phase_lt_fork. }
@@ -629,12 +649,12 @@ Section Termination.
     eapply om_trans_ms_rel with (bd := true); auto.
     { intros.
       rewrite Nat.add_succ_r Nat.add_0_r.
-      apply state_label_lookup in H1 as (NTH_&?&LBL_).
+      apply state_label_lookup in H0 as (NTH_&?&LBL_).
       rewrite LBL in LBL_. inversion LBL_. subst τ0. 
       rewrite NTH in NTH_. inversion NTH_. subst δ0. 
-      destruct H4 as (?&?&?).
+      destruct H3 as (?&?&?).
       
-      inversion H4. subst. 
+      inversion H3. subst. 
       assert (ps_phases _ mb !! τ = Some πτ) as PH'.
       { eapply loc_steps_rep_phase_exact_pres; eauto. }
       rewrite LOC_PHASE in PH'. inversion PH'. subst π__max.  
@@ -700,9 +720,9 @@ Section Termination.
     inversion EXP. subst.
     rewrite PHδ' in LOC_PHASE. inversion LOC_PHASE. subst π__max.
     
-    enough (set_before sid > n).
-    { apply PeanoNat.Nat.le_succ_l in H1. 
-      apply Nat.le_sum in H1 as [u EQ]. rewrite EQ. lia. }
+    enough (set_before sid > n) as GT. 
+    { apply PeanoNat.Nat.le_succ_l in GT. 
+      apply Nat.le_sum in GT as [u EQ]. rewrite EQ. lia. }
         
     move NEVER_SET at bottom. red in NEVER_SET.
     specialize (NEVER_SET _ ltac:(reflexivity)).
@@ -715,8 +735,8 @@ Section Termination.
            2: { eapply WF; eauto. }
            red. right. exists τ, πτ. set_solver. }           
       simpl in STEPS. destruct STEPS as [ASG' WF']. red in ASG'.
-      destruct ASG' as [[? ?] | ]; [congruence| ].
-      destruct H1 as (τ' & π' & IN' & PH' & LE').
+      destruct ASG' as [[? ?] | PH']; [congruence| ].
+      destruct PH' as (τ' & π' & IN' & PH' & LE').
       destruct (decide (τ' = τ)) as [| NEQ]; [congruence| ].
       eapply om_wf_ph_disj in NEQ; eauto.
       eapply phases_disj_not_le in LE'; [done| ].
@@ -737,10 +757,11 @@ Section Termination.
     assert (ps_sigs OP δk !! sid = Some (l, false)) as SIG0.
     { eapply expected_signal_created_before; eauto. }
     
-    pose proof (SET_BEFORE_SPEC sid n). specialize_full H1; [| done| ].
-    2: { rewrite /sig_val_at in H1. 
-         rewrite NTH in H1. simpl in H1.
-         rewrite SIG0 in H1. done. }
+    pose proof (SET_BEFORE_SPEC sid n) as SETsid.
+    specialize_full SETsid; [| done| ].
+    2: { rewrite /sig_val_at in SETsid. 
+         rewrite NTH in SETsid. simpl in SETsid.
+         rewrite SIG0 in SETsid. done. }
     
     intros c NEVER_SET_.
 
@@ -824,7 +845,7 @@ Section Termination.
     intros WF'. do 2 red in WF'. specialize_full WF'; eauto.
 
     inversion FSTEP; [| set_solver].
-    subst. destruct H1 as (?&?&FORK). inversion FORK. subst.
+    subst. destruct H0 as (?&?&FORK). inversion FORK. subst.
     destruct δ'. simpl in *.
     rewrite -PH_EQ. eexists. split; eauto. 
     revert FRESH. subst new_phases0. rewrite map_img_insert_L.
@@ -905,7 +926,7 @@ Section Termination.
     
     assert (ps_cps _ δ2 = ps_cps _ δ') as CPS2.
     { inversion FSTEP; [| done].
-      subst. destruct H1 as (?&?&FORK). inversion FORK. subst.
+      subst. destruct H0 as (?&?&FORK). inversion FORK. subst.
       by destruct δ'. }
     
     rewrite CPS2 in IN2.
@@ -962,7 +983,7 @@ Section Termination.
     
     assert (ps_eps _ δ2 = ps_eps _ δ') as EPS2.
     { inversion FSTEP; [| done].
-      subst. destruct H1 as (?&?&FORK). inversion FORK. subst.
+      subst. destruct H0 as (?&?&FORK). inversion FORK. subst.
       by destruct δ'. }
     
     rewrite EPS2 in IN2.
@@ -1038,9 +1059,9 @@ Section Termination.
       { simpl. intros. set_solver. }
       simpl. rewrite MTH. simpl. tauto. }
 
-    red in STEP. destruct STEP.
-    { rewrite /has_obls in H1. rewrite OBLSm in H1. set_solver. }
-    destruct H1 as (?&LBL&<-).
+    red in STEP. destruct STEP as [NOOBS | STEP]. 
+    { rewrite /has_obls in NOOBS. rewrite OBLSm in NOOBS. set_solver. }
+    destruct STEP as (?&LBL&<-).
     forward eapply (proj1 (label_lookup_states' _ _)); eauto.
     rewrite -Nat.add_1_r. intros [δm' MTH'].
     
@@ -1062,9 +1083,9 @@ Section Termination.
     { red. intros [??] [N' LE'] ?. simpl in LE', N'.
       move MIN at bottom. red in MIN.
       specialize (MIN (_, _) ltac:(split; [apply N'| simpl; lia])).
-      pose proof (never_set_after_eq_false _ _ UNSET c ltac:(lia)).
-      pose proof (never_set_after_eq_false _ _ UNSET (d + m) ltac:(lia)).
-      destruct H2 as (?&l&CTH&SIGc), H3 as (?&l_&DMTH&SIGdm).
+      pose proof (never_set_after_eq_false _ _ UNSET c ltac:(lia)) as X.
+      pose proof (never_set_after_eq_false _ _ UNSET (d + m) ltac:(lia)) as Y.
+      destruct X as (?&l&CTH&SIGc), Y as (?&l_&DMTH&SIGdm).
 
       forward eapply pres_by_valid_trace with (i := c) (j := d + m); eauto.
       { intros. apply (loc_step_sig_st_le_pres _ s (Some (l, false))). }
@@ -1073,11 +1094,11 @@ Section Termination.
       { lia. }
       rewrite DMTH. simpl. rewrite SIGdm. simpl. intros [<- _].
 
-      clear -H1 MIN SIGc SIGdm DMTH CTH.
+      clear -H0 MIN SIGc SIGdm DMTH CTH.
       unfold tr_sig_lt, MR, lvl_at in *.
       (* rewrite DMTH. simpl. rewrite SIGdm. simpl. *)
       rewrite CTH in MIN. simpl in MIN. rewrite SIGc in MIN. simpl in MIN.
-      apply MIN. rewrite DMTH in H1. simpl in H1. rewrite SIGdm in H1. done. }
+      apply MIN. rewrite DMTH in H0. simpl in H0. rewrite SIGdm in H0. done. }
     { by rewrite OBLSm. }
     
     intros LT.
@@ -1141,7 +1162,7 @@ Section Termination.
     (DEG_WF: wf (strict deg_le)):
     (* ¬ exists sid c, never_set_after sid c.  *)
     forall sid, eventually_set sid. 
-  Proof using LVL_WF VALID WF SET_BEFORE_SPEC H0.
+  Proof using LVL_WF VALID WF SET_BEFORE_SPEC.
     intros sid. red. intros m UNSET.
     (* red in UNSET.  *)
 
@@ -1259,9 +1280,9 @@ Section Termination.
     intros sid π d EXP. simpl.
     inversion EXP. subst.
     
-    enough (set_before sid > n).
-    { apply PeanoNat.Nat.le_succ_l in H1. 
-      apply Nat.le_sum in H1 as [u EQ]. rewrite EQ. lia. }
+    enough (set_before sid > n) as GT.
+    { apply PeanoNat.Nat.le_succ_l in GT. 
+      apply Nat.le_sum in GT as [u EQ]. rewrite EQ. lia. }
     
     red.
     clear LE. 
@@ -1283,7 +1304,7 @@ Section Termination.
     (FAIR: forall τ, obls_trace_fair _ τ tr)
     (DEG_WF: wf (strict deg_le)):
     terminating_trace tr. 
-  Proof using WF VALID SET_BEFORE_SPEC LVL_WF H0.
+  Proof using WF VALID SET_BEFORE_SPEC LVL_WF.
     set (R := MR (ms_lt deg_le) APF).    
     forward eapply well_founded_ind with (R := R) (P := fun _ => terminating_trace tr).
     4: done.
@@ -1359,8 +1380,7 @@ Section TerminationFull.
   Theorem obls_fair_trace_terminate
     (TR_WF: ∀ i δ, tr S!! i = Some δ → om_st_wf OP δ)
     (LVL_WF: wf (strict lvl_le))
-    (DEG_WF: wf (strict deg_le))
-    (LVL_INH: Inhabited Level):
+    (DEG_WF: wf (strict deg_le)):
     terminating_trace tr.
   Proof using VALID FAIR.
     Require Import Coq.Logic.ClassicalChoice.
