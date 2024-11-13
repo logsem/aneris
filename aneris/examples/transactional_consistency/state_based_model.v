@@ -122,24 +122,20 @@ Definition commit_test_rc : commitTest :=
 
 (** Snapshot Isolation *)
 
-Definition complete (exec : execution) (t : transaction) (s : state): Prop := 
-  ∀ tag c k ov i, (split exec).1 !! i = Some t → 
+Definition complete (exec : execution) (t : transaction) (s : state) (i : nat): Prop := 
+  ∀ tag c k ov j, (split exec).1 !! j = Some t → 
     (Rd (tag, c) k ov) ∈ t → 
     (¬ ∃ s v, rel_list t (Wr s k v) (Rd (tag, c) k ov)) →
-    read_state c k ov i exec s.
+    i < j ∧ s !! k = ov.
 
-Definition parent_state (exec : execution) (t : transaction) (s : state) : Prop :=
-  ∃ i t' s', exec !! i = Some (t' , s) ∧ exec !! (i + 1) = Some (t, s').
-
-Definition no_conf (exec : execution) (t : transaction) (s : state) : Prop := 
-  ∀ i j, (split exec).2 !! i = Some s → (split exec).1 !! j = Some t → 
-    ∀ i' t', i < i' < j → (split exec).1 !! i' = Some t' → 
-      ∀ k, (∃ sig v, Wr sig k v ∈ t) → ¬ (∃ sig v, Wr sig k v ∈ t').
+Definition no_conf (exec : execution) (t : transaction) (i : nat) : Prop := 
+  ∀ i' j t', (split exec).1 !! i' = Some t' → (split exec).1 !! j = Some t → 
+     i < i' < j → ∀ k, (∃ sig v, Wr sig k v ∈ t) → ¬ (∃ sig v, Wr sig k v ∈ t').
 
 Definition commit_test_si : commitTest := 
-  λ exec trans, ∃ s, s ∈ (split exec).2 ∧ 
-                complete exec trans s ∧ 
-                no_conf exec trans s.
+  λ exec trans, ∃ s i, (split exec).2 !! i = Some s ∧ 
+                complete exec trans s i ∧ 
+                no_conf exec trans i.
 
 (** Embedding into the trace infrastructure *)
 
@@ -422,7 +418,9 @@ Lemma valid_trace_si_empty : valid_trace_si [].
     destruct i; first done.
     set_solver.
   - intros t Ht_in.
-    assert (t = []) as ->; set_solver.
+    assert (t = []) as ->; first set_solver.
+    exists ∅, 0.
+    set_solver.
   - simpl.
     intros t1 t2 i j Hlookup_i Hlookup_j Heq.
     rewrite list_lookup_singleton_Some in Hlookup_i.

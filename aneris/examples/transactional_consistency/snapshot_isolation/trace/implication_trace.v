@@ -290,12 +290,13 @@ Section trace_proof.
       pose proof Hvalid as Hvalid'.
       destruct Hvalid as (_ & _ & Hvalid & _).
       destruct Hin as [Hin|Hin].
-      + destruct (Hvalid t Hin) as (s' & Hin_s' & Hcompl & Hno_conf).
-        exists s'.
+      + destruct (Hvalid t Hin) as (s' & i_s' & Hin_s' & Hcompl & Hno_conf).
+        exists s', i_s'.
         split_and!.
         * rewrite split_split.
-          simpl. 
-          set_solver.
+          simpl.
+          rewrite lookup_app_Some.
+          by left.
         * intros tag c k ov i Hlookup_i Hrd_in Hno_write.
           assert ((split exec).1 !! i = Some t) as Ht_in.
           {
@@ -313,17 +314,10 @@ Section trace_proof.
             rewrite -Hlookup_i; intros Hfalse. 
             destruct trans; set_solver.
           }
-          assert (read_state c k ov i exec s') as (j & Hleq & Hlookup_j & Hlookup_k);
-            first by apply (Hcompl tag c k ov i).
-          exists j.
-          split_and!; try done.
-          rewrite split_split.
-          simpl.
-          rewrite lookup_app_Some.
-          by left.
-        * intros i j Hlookup_i Hlookup_j i' t' Hlt Hlookup_i'.
-          eapply (Hno_conf i j _ _ i'); try done.
-          Unshelve.
+          rewrite /complete in Hcompl.
+          by apply (Hcompl tag c k ov i).
+        * intros i' j t' Hlookup_i' Hlookup_j Hlt.
+          eapply (Hno_conf i' j); try done.
           -- rewrite split_split in Hlookup_i'.
              simpl in Hlookup_i'.
              rewrite lookup_app_Some in Hlookup_i'.
@@ -336,22 +330,6 @@ Section trace_proof.
              ++ apply lookup_lt_Some in Hlookup_j.
                 lia.
              ++ rewrite list_lookup_singleton_Some Nat.sub_0_le in Hlookup_j.
-                lia.
-          -- rewrite split_split in Hlookup_i.
-             simpl in Hlookup_i.
-             rewrite lookup_app_Some in Hlookup_i.
-             destruct Hlookup_i as [Hlookup_i|Hlookup_i]; first done.
-             exfalso.
-             rewrite split_split in Hlookup_j.
-             simpl in Hlookup_j.
-             rewrite lookup_app_Some in Hlookup_j.
-             rewrite split_length_r in Hlookup_i.
-             destruct Hlookup_j as [Hlookup_j|(_ & Hlookup_j)].
-             ++ apply lookup_lt_Some in Hlookup_j.
-                rewrite split_length_l in Hlookup_j.
-                lia.
-             ++ rewrite list_lookup_singleton_Some Nat.sub_0_le in Hlookup_j.
-                rewrite split_length_l in Hlookup_j.
                 lia.
           -- rewrite split_split in Hlookup_j.
              simpl in Hlookup_j.
@@ -368,22 +346,27 @@ Section trace_proof.
              destruct trans; set_solver.
       + assert (t = trans ++ [Cm s true]) as ->; first set_solver.
         destruct Hrel_ex as (s_snap & Hrel_ex).
-        exists s_snap.
-        assert (s_snap ∈ (split exec).2) as Hsnap_in.
+        exists s_snap, (Init.Nat.pred (length exec_pre)).
+        assert ((split exec_pre).2 !! (Init.Nat.pred (length exec_pre)) = Some s_snap) as Hsnap_lookup.
         {
-          eapply (elem_of_prefix (split exec_pre).2); try done.
-          - apply last_Some_elem_of; set_solver.
-          - by apply split_prefix.
+          rewrite -split_length_r.
+          rewrite -last_lookup.
+          set_solver.
         }
+        apply prefix_exists in Hpre.
+        destruct Hpre as (exec' & Heq_pre).
         split_and!.
         * rewrite split_split. 
           simpl.
-          set_solver.
+          subst.
+          rewrite lookup_app_Some.
+          left.
+          rewrite split_split.
+          simpl.
+          rewrite lookup_app_Some.
+          by left.
         * intros tag c key ov i Hlookup_i Hrd_in Hno_writes.
           rewrite /read_state.
-          rewrite elem_of_list_lookup in Hsnap_in.
-          destruct Hsnap_in as (j & Hsnap_in).
-          exists j.
           rewrite split_split in Hlookup_i.
           simpl in Hlookup_i.
           rewrite lookup_app_Some in Hlookup_i.
@@ -395,12 +378,15 @@ Section trace_proof.
              intros Hfalse. 
              destruct trans; set_solver.
           -- split_and!.
-             ++ apply lookup_lt_Some in Hsnap_in.
-                rewrite split_length_r in Hsnap_in.
+             ++ rewrite Heq_pre in Hlength_i.
                 rewrite split_length_l in Hlength_i.
-                lia.
-             ++ rewrite split_split; simpl.
-                rewrite lookup_app_Some; by left.
+                rewrite app_length in Hlength_i.
+                assert (length exec_pre ≤ i) as Hleq; first lia.
+                destruct (length exec_pre) eqn:Heq_length; last lia.
+                rewrite -split_length_r in Heq_length.
+                apply nil_length_inv in Heq_length.
+                rewrite Heq_length in Hsnap_lookup.
+                by simpl in Hsnap_lookup.
              ++ rewrite elem_of_app in Hrd_in.
                 destruct Hrd_in as [Hrd_in|Hrd_in]; last set_solver.
                 assert (reads_from_last_state exec_pre key ov) as (s_snap' & Heq & Hlookup); last set_solver.
@@ -409,12 +395,10 @@ Section trace_proof.
                 apply Hno_writes.
                 exists s', v'.
                 by apply rel_list_imp.
-        * intros i j Hlookup_i Hlookup_j i' t' Hlt Hlookup_i' k (s' & v & Hwr_in) Hwr_in'.
+        * intros i' j t' Hlookup_i' Hlookup_j Hlt k (s' & v & Hwr_in) Hwr_in'.
           rewrite elem_of_app in Hwr_in.
           destruct Hwr_in as [Hwr_in|Hwr_in]; last set_solver.
           destruct (Hwrites s' k v Hwr_in) as (h & Hlookup_k & Hlookup_k').
-          apply prefix_exists in Hpre.
-          destruct Hpre as (exec' & Heq_pre).
           apply (rel_exec_prefix_write_not k h exec_pre exec').
           -- destruct Hvalid' as (_ & Hzero & _).
              rewrite Heq_pre in Hzero.
@@ -434,18 +418,13 @@ Section trace_proof.
              rewrite split_split in Hlookup_i'.
              simpl in Hlookup_i'.
              rewrite lookup_app_Some in Hlookup_i'.
-             assert (i = Init.Nat.pred (length exec_pre)) as Heq_i.
-             {
-               admit.
-             }
              destruct Hlookup_i' as [Hlookup_i'|Hlookup_i'].
              ++ rewrite Heq_pre in Hlookup_i'.
                 rewrite split_split in Hlookup_i'.
                 simpl in Hlookup_i'.
                 rewrite lookup_app_Some in Hlookup_i'.
                 destruct Hlookup_i' as [Hlookup_i'|Hlookup_i'].
-                ** rewrite Heq_i in Hlt.
-                   apply lookup_lt_Some in Hlookup_i'.
+                ** apply lookup_lt_Some in Hlookup_i'.
                     rewrite split_length_l in Hlookup_i'.
                     lia.
                 ** apply elem_of_list_lookup.
@@ -474,7 +453,7 @@ Section trace_proof.
       all : apply Hbased.
       all : split; first (apply elem_of_list_lookup; set_solver).
       all : intros Hfalse; destruct trans; set_solver.
-  Admitted.
+  Qed.
 
   (** Wrapped resources  *)
   Global Program Instance wrapped_resources (γmstate : gname) (clients : gset socket_address)
