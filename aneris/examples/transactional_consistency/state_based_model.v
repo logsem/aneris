@@ -123,7 +123,9 @@ Definition commit_test_rc : commitTest :=
 (** Snapshot Isolation *)
 
 Definition complete (exec : execution) (t : transaction) (s : state): Prop := 
-  ∀ tag c k ov i, (split exec).1 !! i = Some t → (Rd (tag, c) k ov) ∈ t → 
+  ∀ tag c k ov i, (split exec).1 !! i = Some t → 
+    (Rd (tag, c) k ov) ∈ t → 
+    (¬ ∃ s v, rel_list t (Wr s k v) (Rd (tag, c) k ov)) →
     read_state c k ov i exec s.
 
 Definition parent_state (exec : execution) (t : transaction) (s : state) : Prop :=
@@ -501,6 +503,32 @@ Proof.
   rewrite split_split.
   simpl.
   set_solver.
+Qed.
+
+Lemma split_prefix {A B : Type} (l1 l2 : list (A * B)) :
+  l1 `prefix_of` l2 →
+  (split l1).2 `prefix_of` (split l2).2.
+Proof.
+  generalize dependent l2.
+  induction l1 as [|h1 l1 IH].
+  - intros l2 _.
+    apply prefix_nil.
+  - intros l2 Hprefix.
+    destruct l2 as [|h2 l2].
+    + exfalso.
+      by eapply prefix_nil_not.
+    + pose proof Hprefix as Hprefix'.
+      apply prefix_cons_inv_2 in Hprefix.
+      specialize (IH l2 Hprefix).
+      apply prefix_cons_inv_1 in Hprefix'.
+      rewrite -Hprefix'.
+      assert (h1 :: l1 = [h1] ++ l1) as ->; first set_solver.
+      assert (h1 :: l2 = [h1] ++ l2) as ->; first set_solver.
+      do 2 rewrite split_split.
+      simpl.
+      destruct h1 as [a b].
+      simpl.
+      by apply prefix_cons.
 Qed.
 
 Lemma applied_transaction_exists s t : 
