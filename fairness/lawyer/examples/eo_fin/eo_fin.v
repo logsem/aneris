@@ -15,7 +15,8 @@ Definition EOLevel n := bounded_nat n.
 
 
 Section EoFin.
-  Context (LIM: nat).
+  Context (B: nat).
+  Let LIM := B + 1. 
   Let MAX_OBL_STEPS := 10.
   Let NUM_DEG := 5.
   
@@ -246,7 +247,7 @@ Section EoFin.
       iExists _. by iFrame.
     Qed.
 
-    Lemma restore_map (smap: gmap nat SignalId) (s : SignalId) (m : nat) lm B
+    Lemma restore_map (smap: gmap nat SignalId) (s : SignalId) (m : nat) lm
       (DOM: dom smap = set_seq 0 (B `min` (m + 2)))
       (IN: smap !! m = Some s)
       (LVL: lvl2nat lm = m)
@@ -277,7 +278,7 @@ Section EoFin.
       destruct H2; [| done]. rewrite H2. done.
     Qed.
 
-    Lemma BMU_smap_restore τ B (BOUND: B < LIM) s m smap
+    Lemma BMU_smap_restore τ s m smap
       (DOM : dom smap = set_seq 0 (B `min` (m + 2)))
       (IN : smap !! m = Some s)
       (lm : sigO (λ i : nat, i < LIM))
@@ -339,7 +340,7 @@ Section EoFin.
       rewrite (delete_notin _ (m + 2)).
       2: { apply not_elem_of_dom. rewrite DOM. intros ?%elem_of_set_seq. lia. }
       iApply (restore_map with "[$] [$]"); eauto.
-      rewrite DOM. f_equal. symmetry. by apply Nat.min_l.
+      rewrite DOM. f_equal. symmetry. lia.
     Qed.
 
     (* TODO: generalize, move *)
@@ -388,11 +389,13 @@ Section EoFin.
         tr_cond_neg n: cond (S n) = negb (cond n); 
     }.
 
-    Lemma thread_spec_holds τ l B (BOUND: B < LIM) (π π2: Phase) n
+    Lemma lt_B_LIM: B < LIM. lia. Qed. 
+
+    Lemma thread_spec_holds τ l (π π2: Phase) n
       (PH_LE2: phase_le π2 π)
       `(ThreadResource th_res cond)
       :
-      {{{ eofin_inv l B BOUND ∗ exc_lb EO_OP 20 (H3 := oGS) ∗
+      {{{ eofin_inv l B lt_B_LIM ∗ exc_lb EO_OP 20 (H3 := oGS) ∗
            (* even_res n ∗ *)
            th_res n ∗
            cp_mul _ π2 d2 (B - n) (H3 := oGS) ∗
@@ -432,10 +435,8 @@ Section EoFin.
       iDestruct "inv" as (m smap) "(L & AUTH & SR)".
       iDestruct (tr_agree with "[$] TH") as %EQ; eauto. subst n. 
       destruct (cond m) eqn:Cm. 
-      -
-        (* pose proof (Is_true_true_1 _ EVEN) as E. *)
-        (* rewrite E. *)
-        (* pose proof (Nat.negb_even m) as O. rewrite E in O. simpl in O. rewrite -O.  *)
+      - 
+        iClear "EXTRA". 
         
         iApply sswp_MU_wp; [done| ]. 
         iApply (wp_cmpxchg_suc with "[$]"); try done.
@@ -490,7 +491,7 @@ Section EoFin.
           replace (Z.add (Z.of_nat m) 2) with (Z.of_nat (m + 2)) by lia.
 
           (* TODO: refine the precondition and do this early in the proof *)
-          iClear "IH EXTRA". rewrite /thread_prog.
+          iClear "IH". rewrite /thread_prog.
           pure_steps.
           wp_bind (_ ≤ _)%E. pure_step.
           rewrite bool_decide_true; [| lia].
@@ -539,10 +540,7 @@ Section EoFin.
           replace (m + 2) with (S (m + 1)) by lia.
           iFrame. 
           iExists _. iFrame. 
-      -
-        (* pose proof (Is_true_true_1 _ ODD) as O. *)
-        (* rewrite O. *)
-        (* pose proof (Nat.negb_odd m) as E. rewrite O in E. simpl in E. rewrite -E.  *)
+      - 
 
         iApply sswp_MU_wp; [done| ]. 
         iApply (wp_cmpxchg_fail with "[$]"); try done.
@@ -634,12 +632,12 @@ Section EoFin.
           do 2 iExists _. iFrame "#∗". done.
     Time Qed. 
 
-    Lemma thread_spec_wrapper τ l B (BOUND: B < LIM) (π π2: Phase) n
+    Lemma thread_spec_wrapper τ l (π π2: Phase) n
       (PH_LE2: phase_le π2 π)
       `(ThreadResource th_res cond)
 
       :
-      {{{ eofin_inv l B BOUND ∗ exc_lb EO_OP 20 (H3 := oGS) ∗
+      {{{ eofin_inv l B lt_B_LIM ∗ exc_lb EO_OP 20 (H3 := oGS) ∗
            th_res n ∗
            cp_mul _ π2 d2 (S (B - n)) (H3 := oGS) ∗
            cp_mul _ π d0 20 (H3 := oGS) ∗           
@@ -737,14 +735,14 @@ Section EoFin.
     Qed. 
 
     (* TODO: parametrize smap_repr with the lower bound *)
-    Lemma alloc_inv l (* (i: nat) *) B (LT: B < LIM) τ
+    Lemma alloc_inv l (* (i: nat) *) τ
       (* (i := 0) *)
       :
       obls _ τ ∅ (H3 := oGS) -∗ l ↦ #0 -∗ 
         BMU _ ⊤ τ 2 (|={∅}=> ∃ (eoG: EoFinG Σ) (sigs: list SignalId),
                        even_res 0 (H := eoG)∗
                        odd_res 1 (H := eoG) ∗
-                       eofin_inv l B LT (H := eoG) ∗
+                       eofin_inv l B lt_B_LIM (H := eoG) ∗
                        obls _ τ (list_to_set sigs) (H3 := oGS) ∗
                        ⌜ length sigs = min B 2 ⌝ ∗
                        ⌜ NoDup sigs ⌝ ∗
@@ -840,9 +838,9 @@ Section EoFin.
           iMod (own_alloc (● ((to_agree <$> smap0): gmapUR nat (agreeR SignalId)) ⋅ ◯ _)) as (?) "[A F]".
           { apply auth_both_valid_2; [| reflexivity]. apply map_nat_agree_valid. }
           iModIntro. iExists _, _. iFrame.
-          assert (B = 0) as -> by lia. simpl.  
+          assert (B = 0) by lia. simpl.  
           replace (sigs_block smap0 0 m) with (nil: list SignalId).
-          2: { subst smap0 m. simpl. done. }
+          2: { subst smap0 m. simpl. rewrite H. done. }
 
           iSplitR "OB".
           2: { iFrame. iPureIntro; constructor. }
@@ -850,7 +848,7 @@ Section EoFin.
           iSplitR.
           { subst smap0. iPureIntro. 
             subst m. (* subst i. *)
-            set_solver. }
+            rewrite H. set_solver. }
           subst smap0. rewrite big_sepM_empty. done. }
 
       (* iMod "SR" as (γ__sr smap) "BMU". iModIntro. *)
@@ -890,8 +888,7 @@ Section EoFin.
     Context {OBLS_AMU__f: forall τ, @AMU_lift_MU__f _ _ _ τ oGS _ EM _ ⊤}.
     Context {NO_OBS_POST: ∀ τ v, obls EO_OP τ ∅ (H3 := oGS) -∗ fork_post τ v}. 
 
-    Theorem main_spec τ π (B: nat) (LT: B < LIM)
-      (* (i := 0) *)
+    Theorem main_spec τ π
       :
       {{{ exc_lb EO_OP 20 (H3 := oGS) ∗
            cp_mul _ π d2 (S (2 * (S B))) (H3 := oGS) ∗
@@ -920,7 +917,7 @@ Section EoFin.
       iApply sswp_MU_wp_fupd; [done| ]. iApply wp_alloc.
       iModIntro.
       iNext. iIntros "%l L _".
-      iPoseProof (alloc_inv _ _ LT with "[$] [$]") as "BMU". 
+      iPoseProof (alloc_inv _ _  with "[$] [$]") as "BMU". 
       MU_by_BMU. iApply (BMU_weaken with "[-BMU] [$]"); [lia| done| ]. iIntros "INV".
       (* TODO: make a tactic, remove duplication *)
       iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
@@ -947,7 +944,7 @@ Section EoFin.
       replace 40 with (20 + 20) by lia. iDestruct (cp_mul_split with "CPS_FORK") as "[CPS_FORK CPS_FORK']". 
       wp_bind (Fork _)%E. 
 
-      assert (B = 0 \/ B = 1 \/ 2 <= B) as [-> | [-> | LE2]] by lia; revgoals.
+      assert (B = 0 \/ B = 1 \/ 2 <= B) as [B0 | [B1 | LE2]] by lia; revgoals.
       - rewrite Nat.min_r in SIGS_LEN; [| done].
         destruct sigs as [| si [| si' [|]]]; try by (simpl in SIGS_LEN; lia).
 
@@ -1026,7 +1023,8 @@ Section EoFin.
         { by erewrite <- LT'. }
         rewrite (proj2 (PeanoNat.Nat.ltb_lt _ _)); [ | lia].
         iExists _. by iFrame.
-      - simpl in SIGS_LEN. 
+      - 
+        simpl in SIGS_LEN. 
         destruct sigs as [| si [|]]; try by (simpl in SIGS_LEN; lia).
 
         rewrite !big_sepL_cons. simpl. rewrite union_empty_r_L.  
@@ -1095,7 +1093,9 @@ Section EoFin.
         { apply odd_thread_resource. }
         2: { iNext. iIntros (v) "OB". by iApply NO_OBS_POST. }
         simpl. 
-        iDestruct (cp_mul_take with "CPS2'") as "[CPS2 ?]". 
+        iDestruct (cp_mul_take with "CPS2'") as "[CPS2 ?]".
+        rewrite {2 5}B1. simpl.
+        rewrite (proj2 (PeanoNat.Nat.ltb_ge _ _)); [| lia].
         iFrame "CPS2". iFrame "#∗".
         by erewrite <- LT'.
         Unshelve. exact #(). 
@@ -1120,12 +1120,14 @@ Section EoFin.
         iIntros "[? (%π1 & %π2 & PH1 & OB1 & PH3 & OB2 & [%LT1 %LT2])]".
         Unshelve. 2: exact ∅.
 
+
         rewrite difference_diag_L. rewrite intersection_idemp_L.
         iSplitL "RE CPS2 CPS_FORK PH3 OB2".
         { iApply (thread_spec_wrapper with "[-]").
           { reflexivity. }
           { apply even_thread_resource. }
           2: { iNext. iIntros (v) "OB". by iApply NO_OBS_POST. }
+          rewrite (proj2 (PeanoNat.Nat.ltb_ge _ _)); [| lia].
           rewrite Nat.sub_0_r. iFrame "CPS2". iFrame "#∗".
           apply strict_include in LT2. by erewrite <- LT2. }
 
@@ -1165,7 +1167,9 @@ Section EoFin.
         { apply odd_thread_resource. }
         2: { iNext. iIntros (v) "OB". by iApply NO_OBS_POST. }
         simpl. 
-        (* iDestruct (cp_mul_take with "CPS2'") as "[CPS2 ?]".  *)
+        (* iDestruct (cp_mul_take with "CPS2'") as "[CPS2 ?]".  *)        
+        rewrite (proj2 (PeanoNat.Nat.ltb_ge _ _)); [| lia].
+        rewrite {2 5}B0. simpl.  
         iFrame "CPS2'". iFrame "#∗".
         by erewrite <- LT'.
         Unshelve. exact #().

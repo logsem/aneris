@@ -9,9 +9,8 @@ From trillium.fairness.lawyer.examples Require Import bounded_nat.
 
 
 Section EOFinAdequacy.
-
-  Context (LIM: nat).
-  Let OP := EO_OP LIM. 
+  Context (B: nat).
+  Let OP := EO_OP B. 
   Let ASEM := ObligationsASEM OP.
   Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls OP τ ∅ (H3 := aGS)).
   Let OM := ObligationsModel OP. 
@@ -200,10 +199,9 @@ Section EOFinAdequacy.
   Global Instance subG_eofinΣ {Σ}: subG eofinΣ Σ → EoFinPreG Σ.
   Proof. solve_inG. Qed.
 
-
   (* TODO: move *)
   Lemma om_live_tids_init e σ ds eb:
-      om_live_tids OP id locale_enabled ([e], σ) (init_om_state (EO_OP LIM) ([e], σ) ds eb).
+      om_live_tids OP id locale_enabled ([e], σ) (init_om_state OP ([e], σ) ds eb).
   Proof using. 
     red. intros ?.
     rewrite /has_obls. simpl. 
@@ -257,7 +255,7 @@ Section EOFinAdequacy.
          (@heap_fairnessGS eofinΣ
             _
             _ Hinv) 0) (start #0 #N) σ1
-    (@init_om_state _ _ _ _ _ 10 (EO_OP LIM) ([start #0 #N], σ1) ds eb).
+    (@init_om_state _ _ _ _ _ 10 OP ([start #0 #N], σ1) ds eb).
   Proof using.
     rewrite /rel_always_holds0.
     
@@ -286,10 +284,8 @@ Section EOFinAdequacy.
   Qed.
 
   Lemma eofin_terminates_impl
-    (N : nat)
-    (LIM_NZ: N < LIM)
     (extr : heap_lang_extrace)
-    (Hexfirst : (trfirst extr).1 = [start #(0%nat) #N]):
+    (Hexfirst : (trfirst extr).1 = [start #(0%nat) #B]):
     (* (∀ tid, fair_ex tid extr) -> terminating_trace extr. *)
     extrace_fairly_terminating extr. 
   Proof.
@@ -297,9 +293,10 @@ Section EOFinAdequacy.
     { apply _. }
 
     destruct (trfirst extr) as [tp_ σ1] eqn:EX0. simpl in *. subst tp_.
-    
-    set (s1 := init_om_state (EO_OP LIM) (trfirst extr)
-               ((2 * N + 5) *: {[+ d2 +]} ⊎ 50 *: {[+ d0 +]})
+
+    (* TODO: get rid of extra nat parameter of di *)
+    set (s1 := init_om_state OP (trfirst extr)
+               ((2 * B + 5) *: {[+ d2 B +]} ⊎ 50 *: {[+ d0 B +]})
                  20
         ). 
     
@@ -361,7 +358,5 @@ Theorem eofin_terminates (N: nat):
     (trfirst extr).1 = [start #0%nat #N] → 
     extrace_fairly_terminating extr.
 Proof using.
-  intros.
-  eapply eofin_terminates_impl with (LIM := N + 1); eauto.
-  lia.
-Qed. 
+  intros. eapply eofin_terminates_impl; eauto.
+Qed.
