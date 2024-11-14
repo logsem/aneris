@@ -151,12 +151,12 @@ Section EoFin.
       thread_auth eofin_even (if Nat.even n then n else n + 1) ∗
       thread_auth eofin_odd (if Nat.odd n then n else n + 1). 
 
-    Definition eofin_inv_inner l M (BOUND: M < LIM) : iProp Σ :=
+    Definition eofin_inv_inner l: iProp Σ :=
       ∃ (n: nat) (smap: gmap nat SignalId), 
-          l ↦ #n ∗ threads_auth n ∗ smap_repr (min M (n + 2)) n smap.
+          l ↦ #n ∗ threads_auth n ∗ smap_repr (min B (n + 2)) n smap.
 
-    Definition eofin_inv l M BOUND: iProp Σ :=
-      inv (nroot .@ "eofin") (eofin_inv_inner l M BOUND).
+    Definition eofin_inv l: iProp Σ :=
+      inv (nroot .@ "eofin") (eofin_inv_inner l).
 
     Definition ith_sig (i: nat) (s: SignalId): iProp Σ :=
       own eofin_smap (◯ {[ i := to_agree s ]}).
@@ -395,7 +395,7 @@ Section EoFin.
       (PH_LE2: phase_le π2 π)
       `(ThreadResource th_res cond)
       :
-      {{{ eofin_inv l B lt_B_LIM ∗ exc_lb EO_OP 20 (H3 := oGS) ∗
+      {{{ eofin_inv l ∗ exc_lb EO_OP 20 (H3 := oGS) ∗
            (* even_res n ∗ *)
            th_res n ∗
            cp_mul _ π2 d2 (B - n) (H3 := oGS) ∗
@@ -512,7 +512,8 @@ Section EoFin.
           
           wp_bind (_ + _)%E.
 
-          red in H2. apply Nat.le_sum in H2 as [? LE]. rewrite {6}LE.
+          red in H2. apply Nat.le_sum in H2 as [? LE].
+          rewrite {4}LE.
           rewrite -plus_n_Sm. 
           rewrite !plus_Sn_m. rewrite !PeanoNat.Nat.sub_succ_l; try lia.
           iDestruct (cp_mul_take with "CPS2") as "[CPS2 CP2']".
@@ -637,7 +638,7 @@ Section EoFin.
       `(ThreadResource th_res cond)
 
       :
-      {{{ eofin_inv l B lt_B_LIM ∗ exc_lb EO_OP 20 (H3 := oGS) ∗
+      {{{ eofin_inv l ∗ exc_lb EO_OP 20 (H3 := oGS) ∗
            th_res n ∗
            cp_mul _ π2 d2 (S (B - n)) (H3 := oGS) ∗
            cp_mul _ π d0 20 (H3 := oGS) ∗           
@@ -742,7 +743,7 @@ Section EoFin.
         BMU _ ⊤ τ 2 (|={∅}=> ∃ (eoG: EoFinG Σ) (sigs: list SignalId),
                        even_res 0 (H := eoG)∗
                        odd_res 1 (H := eoG) ∗
-                       eofin_inv l B lt_B_LIM (H := eoG) ∗
+                       eofin_inv l (H := eoG) ∗
                        obls _ τ (list_to_set sigs) (H3 := oGS) ∗
                        ⌜ length sigs = min B 2 ⌝ ∗
                        ⌜ NoDup sigs ⌝ ∗
@@ -1094,7 +1095,7 @@ Section EoFin.
         2: { iNext. iIntros (v) "OB". by iApply NO_OBS_POST. }
         simpl. 
         iDestruct (cp_mul_take with "CPS2'") as "[CPS2 ?]".
-        rewrite {2 5}B1. simpl.
+        rewrite {1 3}B1. simpl.
         rewrite (proj2 (PeanoNat.Nat.ltb_ge _ _)); [| lia].
         iFrame "CPS2". iFrame "#∗".
         by erewrite <- LT'.
@@ -1169,7 +1170,7 @@ Section EoFin.
         simpl. 
         (* iDestruct (cp_mul_take with "CPS2'") as "[CPS2 ?]".  *)        
         rewrite (proj2 (PeanoNat.Nat.ltb_ge _ _)); [| lia].
-        rewrite {2 5}B0. simpl.  
+        rewrite {1 3}B0. simpl.  
         iFrame "CPS2'". iFrame "#∗".
         by erewrite <- LT'.
         Unshelve. exact #().
