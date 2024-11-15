@@ -75,7 +75,7 @@ Section ProgramLogic.
     Lemma sswp_MU_wp_fupd s E E' ζ e Φ
       (NVAL: language.to_val e = None)
       :
-      let sswp_post := λ e', (MU E' ζ (|={E',E}=> WP e' @ s; ζ; E {{ Φ }}))%I in
+      let sswp_post := λ e', (▷ MU E' ζ (|={E',E}=> WP e' @ s; ζ; E {{ Φ }}))%I in
       (|={E,E'}=> sswp s E' e sswp_post)%I -∗
         WP e @ s; ζ; E {{ Φ }}.
     Proof.
@@ -92,22 +92,19 @@ Section ProgramLogic.
       { iPureIntro. by rewrite Hextr in Hs. }
       iIntros (e2 σ2 efs Hstep).
       iDestruct ("Hsswp" with "[//]") as "Hsswp".
-      iApply (step_fupdN_le 1); [| done| ].
+      iApply (step_fupdN_le 2); [| done| ].
       { pose proof (trace_length_at_least extr). lia. }
       simpl.
       iApply (step_fupd_wand with "Hsswp").
       iIntros ">(Hσ & HMU & ->)".
+      iApply fupd_mask_intro; [set_solver| ]. iIntros "CLOS' !> !>". 
       rewrite /MU. iSpecialize ("HMU" $! (extr :tr[Some ζ]: _) atr with "[MSI Hσ]").
       { clear NVAL Hvalid Hs EV.        
         
         rewrite /trace_interp_interim. simpl. 
-        (* rewrite /obls_si. iDestruct "MSI" as "(M & %TS & %DPO)".  *)
-        (* iPoseProof (MSI_tids_smaller with "MSI") as "%TS". *)
         remember (trace_last extr) as xx. destruct xx as [tp h].
         inversion Hextr as [[TP HH]].
         
-        (* rewrite -TP -Heqxx. subst h. iFrame.   *)
-        (* rewrite -TP in TS. *)
         iApply bi.sep_assoc. iSplitL.
         2: { iPureIntro. repeat rewrite and_assoc. split.
              - repeat rewrite -and_assoc. repeat split; eauto.  
@@ -128,7 +125,7 @@ Section ProgramLogic.
                apply locales_of_list_equiv.
                apply locales_equiv_from_middle. done. }
         simpl. rewrite -TP -Heqxx. subst. iFrame. }
-      iMod ("HMU") as (??) "[Hσ Hwp]". iMod "Hwp". iModIntro.
+      iMod "CLOS'" as "_". iMod "HMU" as (??) "[Hσ Hwp]". iMod "Hwp". iModIntro.
       iExists _, _. rewrite right_id_L. by iFrame.
     Qed.
 
@@ -163,7 +160,7 @@ Section ProgramLogic.
     
     Lemma sswp_MUf_wp s E τ (Φ: val -> iProp Σ) e
       :
-      (∀ τ', MU__f E τ τ' ((WP e @ s; τ'; ⊤ {{ fun r => fork_post (irisG := iG) τ' r }}) ∗ Φ #())) -∗
+      (∀ τ', ▷ MU__f E τ τ' ((WP e @ s; τ'; ⊤ {{ fun r => fork_post (irisG := iG) τ' r }}) ∗ Φ #())) -∗
       WP (Fork e) @ s; τ; E {{ Φ }}.
     Proof using.
       iIntros "MU".
