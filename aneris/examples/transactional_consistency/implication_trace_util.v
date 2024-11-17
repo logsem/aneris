@@ -257,12 +257,12 @@ Section trace_proof_util.
   Definition active_trace_resources lt T s c γ (m : gmap Key (option val)) : iProp Σ :=
     ∃ domain sub_domain tail, ⌜s = Active domain⌝ ∗ 
       ⌜sub_domain = domain ∩ KVS_keys⌝ ∗ ⌜open_start c lt tail⌝ ∗ 
-      ([∗ set] k ∈ KVS_keys ∖ sub_domain, ∃ ov, ghost_map_elem γ k (DfracOwn 1%Qp) ov) ∗ 
-      (∀ k, ⌜k ∈ sub_domain⌝ → ∀ ov, ⌜m !! k = Some ov⌝ → ⌜latest_write c k ov T⌝).
+      ([∗ set] k ∈ KVS_keys ∖ sub_domain, ∃ (ov : option val), ghost_map_elem γ k (DfracOwn 1%Qp) ov) ∗ 
+      (∀ k, ⌜k ∈ sub_domain⌝ → ∀ (ov : option val), ⌜m !! k = Some ov⌝ → ⌜latest_write c k ov T⌝).
 
   Definition inactive_trace_resources lt T s c γ : iProp Σ :=
     ⌜s = CanStart⌝ ∗ ⌜commit_closed c lt⌝ ∗ ⌜¬∃ t, open_trans t c T⌝ ∗
-    ([∗ set] k ∈ KVS_keys, ∃ ov, ghost_map_elem γ k (DfracOwn 1%Qp) ov).
+    ([∗ set] k ∈ KVS_keys, ∃ (ov : option val), ghost_map_elem γ k (DfracOwn 1%Qp) ov).
 
   Definition initialized_trace_resources lt T sa γmname (extract : val → option val)
   (mstate : gmap socket_address (local_state * option val)) : iProp Σ :=
@@ -1454,7 +1454,7 @@ Section trace_proof_util.
       rewrite {4} Heq_keys.
       rewrite big_sepS_union; last set_solver.
       iFrame.
-      iAssert ([∗ map] k↦x ∈ mc, ⌜k ∈ KVS_keys⌝ → ∃ ov, ghost_map_elem γ k (DfracOwn 1%Qp) ov)%I 
+      iAssert ([∗ map] k↦x ∈ (mc : gmap Key (option val)), ⌜k ∈ KVS_keys⌝ → ∃ (ov : option val), ghost_map_elem γ k (DfracOwn 1%Qp) ov)%I 
         with "[Hkeys_conn]" as "Hkeys_conn".
       {
         iApply (big_sepM_wand with "[$Hkeys_conn]").
@@ -1580,7 +1580,7 @@ Section trace_proof_util.
       rewrite {4} Heq_keys.
       rewrite big_sepS_union; last set_solver.
       iFrame.
-      iAssert ([∗ map] k↦x ∈ mc, ⌜k ∈ KVS_keys⌝ → ∃ ov, ghost_map_elem γ k (DfracOwn 1%Qp) ov)%I 
+      iAssert ([∗ map] k↦x ∈ mc, ⌜k ∈ KVS_keys⌝ → ∃ (ov : option val), ghost_map_elem γ k (DfracOwn 1%Qp) ov)%I 
         with "[Hkeys_conn]" as "Hkeys_conn".
       {
         iApply (big_sepM_wand with "[$Hkeys_conn]").

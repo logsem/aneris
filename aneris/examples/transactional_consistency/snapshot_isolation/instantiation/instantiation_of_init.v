@@ -78,7 +78,7 @@ Section Init_setup_proof.
              commit_spec.
   Proof.
     iIntros (Hne).
-    iMod (ghost_map_alloc ((gset_to_gmap [] KVS_keys)))
+    iMod (ghost_map_alloc ((gset_to_gmap ([] : list write_event) KVS_keys)))
       as (γGauth) "((HmemG & HmemL) & Hkeys)".
     iMod (own_alloc (● (∅ : snapsTy))) as (γTrs) "HauthTrs";
       first by apply auth_auth_valid.
@@ -166,7 +166,6 @@ Section Init_setup_proof.
     iModIntro.
     iExists (SI_resources_instance clients
                γClts γGauth γGsnap γT γTrs srv_si SrvInit).
-    iFrame "#∗".
     iSplitL "Hkeys".
     { 
       rewrite !big_sepM_gset_to_gmap.
@@ -174,8 +173,9 @@ Section Init_setup_proof.
       iApply (big_sepS_mono with "Hkeys").
       iIntros (k Hk) "Hk".
       iExists [].
-      by iFrame. 
+      by iFrame.
     }
+    iFrame "#∗".
     iSplit.
     {  rewrite /KVS_ClientCanConnect //=.
        iApply big_sepS_sep.

@@ -9,10 +9,10 @@ From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From aneris.examples.transactional_consistency Require Import code_api wrapped_library.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs Require Import specs resources.
-From aneris.examples.transactional_consistency Require Import user_params aux_defs state_based_model.
+From aneris.examples.transactional_consistency Require Import resource_algebras user_params aux_defs state_based_model implication_trace_util.
 
 Section trace_proof.
-  Context `{!anerisG Mdl Σ, !User_params}.
+  Context `{!anerisG Mdl Σ, !KVSG Σ, !User_params}.
 
   (** Definitons and lemmas for the wrapped resources *)
 
@@ -32,13 +32,8 @@ Section trace_proof.
   Lemma rev_exists {A : Type} (l : list A) :
     ∃ l', l = rev l'.
   Proof.
-    induction l as [|h l IH].
-    - exists [].
-      by simpl.
-    - destruct IH as (l' & Heq). 
-      exists (l' ++ [h]).
-      rewrite rev_unit.
-      set_solver.
+    exists (rev l).
+    by rewrite rev_involutive.
   Qed.
 
   Lemma rel_exec_prefix k exec1 exec2 :
@@ -258,7 +253,7 @@ Section trace_proof.
         apply cons_middle.
   Qed.
 
-  Lemma valid_execution_rc_imp exec_pre m_pre exec m s st trans T :
+  Lemma valid_execution_si_imp exec_pre m_pre exec m s st trans T :
     rel_exec_map exec_pre m_pre →
     rel_exec_map exec m →
     exec_pre `prefix_of` exec →
@@ -455,11 +450,27 @@ Section trace_proof.
       all : intros Hfalse; destruct trans; set_solver.
   Qed.
 
+  Definition OwnExecHist (γ : gname) (exec : execution) : iProp Σ :=
+    True.
+
+  Definition OwnExec (γ : gname) (exec : execution) : iProp Σ := 
+    True.
+
+  Definition OwnHalfAgreeState (γ : gname) (s : gmap Key val) : iProp Σ := 
+    True.
+
+  Definition GlobalInvExtSI (γmap γexec γstate : gname) (T : list transaction) (exec : execution): iProp Σ := 
+    ∃ (m : gmap Key (list val)), ghost_map_auth γmap (1%Qp) m ∗ OwnExec γexec exec ∗ ⌜rel_exec_map exec m⌝ ∗ 
+      ([∗ list] _↦trans ∈ T, ∃ op, ⌜last trans = Some op⌝ ∧ (⌜is_cm_op op⌝ ∨ 
+        (∃ c st, ⌜open_trans trans c T⌝ ∗ OwnHalfAgreeState γstate st ∗ ⌜∀ sig k v, (Rd sig k (Some v)) ∈ trans → 
+          ¬ (∃ sig' v', rel_list trans (Wr sig' k v') (Rd sig k (Some v))) →  st !! k = Some v⌝))).
+
   (** Wrapped resources  *)
   Global Program Instance wrapped_resources (γmstate : gname) (clients : gset socket_address)
   `(res : !SI_resources Mdl Σ) : SI_resources Mdl Σ :=
     {|
-      GlobalInv := True%I;
+      GlobalInv := (GlobalInv ∗ trace_inv trace_inv_name valid_trace_rc ∗ 
+                    inv KVS_InvName (∃ T, GlobalInvExtSI γtrans T ∗ GlobalInvExt commit_test_rc T extract γmstate γmlin γmpost γmname γl clients))%I;
       OwnMemKey k V := True%I;
       OwnLocalKey k c vo := True%I;
       ConnectionState c sa s := (ConnectionState c sa s ∗ ghost_map_elem γmstate sa (DfracOwn 1%Qp) (s, Some c))%I;

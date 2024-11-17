@@ -49,7 +49,7 @@ Section SI_Resources_intantiation.
         (SrvInit ∗ 
          api_spec.run_server_spec SrvInit srv_si ∗
          GlobalInv_def clients γKnownClients γGauth γGsnap γT γTrs ∗
-         ghost_map_auth γGauth (1 / 2) (gset_to_gmap [] KVS_keys) ∗
+         ghost_map_auth γGauth (1 / 2) (gset_to_gmap ([] : list write_event) KVS_keys) ∗
          mono_nat_auth_own γT (1 / 2) 0);
       KVS_ClientCanConnect sa :=
         (api_spec.init_client_proxy_spec srv_si ∗

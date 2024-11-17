@@ -48,6 +48,7 @@ Class IDBG Σ :=
     IDBG_Trace3 :> ghost_mapG Σ string bool;
     IDBG_Trace4 :> ghost_mapG Σ Key (option val);
     IDBG_Trace5 :> inG Σ (authR (gmapUR nat (agreeR (leibnizO transaction))));
+    IDBG_Trace6 :> ghost_mapG Σ Key (list val);
   }.
 
 Notation KVSG Σ := (IDBG Σ).
@@ -73,6 +74,7 @@ Definition KVSΣ : gFunctors :=
      ghost_mapΣ string bool;
      ghost_mapΣ Key (option val);
      GFunctor (authR (gmapUR nat (agreeR (leibnizO transaction))));
+     ghost_mapΣ Key (list val);
      mono_natΣ;
      ras.SpecChanΣ;
      lockΣ].
