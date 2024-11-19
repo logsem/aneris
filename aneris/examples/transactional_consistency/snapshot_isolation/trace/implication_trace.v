@@ -7,7 +7,7 @@ From aneris.lib Require Import gen_heap_light.
 From aneris.aneris_lang.lib Require Import list_proof inject lock_proof.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
-From aneris.examples.transactional_consistency Require Import code_api wrapped_library.
+From aneris.examples.transactional_consistency Require Import code_api wrapped_library aux_defs.
 From aneris.examples.transactional_consistency.snapshot_isolation.specs Require Import specs resources.
 From aneris.examples.transactional_consistency Require Import resource_algebras user_params aux_defs state_based_model implication_trace_util.
 
@@ -459,26 +459,58 @@ Section trace_proof.
   Definition OwnHalfAgreeState (γ : gname) (s : gmap Key val) : iProp Σ := 
     True.
 
-  Definition GlobalInvExtSI (γmap γexec γstate : gname) (T : list transaction) (exec : execution): iProp Σ := 
+  Definition GlobalInvExtSI (γmap γexec γsi_mstate γsi_name : gname) (T : list transaction) (exec : execution)
+  (clients : gset socket_address) : iProp Σ := 
+    ∃ (mstate : gmap socket_address val), ghost_map_auth γsi_mstate (1%Qp) mstate ∗ 
+    ∃ (mnames : gmap val (gname * gname * gname * val)), ghost_map_auth γsi_name (1%Qp) mnames ∗
+      ⌜∀ sa, ((mstate !! sa = None ∧ mnames !! sa = None) ∨ (∃ c, mstate !! sa = Some c))⌝ ∗
     ∃ (m : gmap Key (list val)), ghost_map_auth γmap (1%Qp) m ∗ OwnExec γexec exec ∗ ⌜rel_exec_map exec m⌝ ∗ 
       ([∗ list] _↦trans ∈ T, ∃ op, ⌜last trans = Some op⌝ ∧ (⌜is_cm_op op⌝ ∨ 
-        (∃ c st, ⌜open_trans trans c T⌝ ∗ OwnHalfAgreeState γstate st ∗ ⌜∀ sig k v, (Rd sig k (Some v)) ∈ trans → 
+        (∃ c st sa γ γ'' γ''', ⌜open_trans trans c T⌝ ∗ ⌜extract c = sa ∧ mnames !! sa = Some (γ, γ'', γ''')⌝ ∗
+          OwnHalfAgreeState γ''' st ∗ ⌜∀ sig k v, (Rd sig k (Some v)) ∈ trans → 
           ¬ (∃ sig' v', rel_list trans (Wr sig' k v') (Rd sig k (Some v))) →  st !! k = Some v⌝))).
 
   (** Wrapped resources  *)
-  Global Program Instance wrapped_resources (γmstate : gname) (clients : gset socket_address)
+  Global Program Instance wrapped_resources (γtrans γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name : gname) (clients : gset socket_address)
   `(res : !SI_resources Mdl Σ) : SI_resources Mdl Σ :=
     {|
       GlobalInv := (GlobalInv ∗ trace_inv trace_inv_name valid_trace_rc ∗ 
-                    inv KVS_InvName (∃ T, GlobalInvExtSI γtrans T ∗ GlobalInvExt commit_test_rc T extract γmstate γmlin γmpost γmname γl clients))%I;
-      OwnMemKey k V := True%I;
-      OwnLocalKey k c vo := True%I;
-      ConnectionState c sa s := (ConnectionState c sa s ∗ ghost_map_elem γmstate sa (DfracOwn 1%Qp) (s, Some c))%I;
-      IsConnected c sa := True%I;
+                    inv KVS_InvName (∃ T exec, GlobalInvExtSI γmap γexec γsi_mstate γsi_name T exec ∗ 
+                    GlobalInvExt commit_test_si T extract γmstate γmlin γmpost γmname γl clients))%I;
+      OwnMemKey k h := (OwnMemKey k h ∗ ghost_map_elem γmap k (DfracOwn 1%Qp) h ∗
+                        (∀ v, ⌜v ∈ h⌝ → ∃ lh tag c, OwnLinHist γl lh ∗ 
+                          ⌜(#(LitString tag), (c, (#"WrLin", (#(LitString k), v))))%V ∈ lh⌝))%I;
+      OwnLocalKey k c ov := (OwnLocalKey k c ov ∗  ∃ (sa : socket_address) γ ov', ghost_map_elem γmname sa DfracDiscarded (γ, c) ∗ 
+                             ⌜extract c = Some #sa⌝ ∗ (⌜k ∈ KVS_keys⌝ → ghost_map_elem γ k (DfracOwn 1%Qp) ov') ∗ ⌜sa ∈ clients⌝ ∗ 
+                             ⌜∀ v, ov' = Some v → k ∈ KVS_keys⌝ ∗
+                             (∀ v, ⌜ov' = Some v⌝ → ∃ lh tag c, OwnLinHist γl lh ∗ ⌜(#(LitString tag), (c, (#"WrLin", (#(LitString k), v))))%V ∈ lh⌝) ∗
+                             ∃ γ' γ'' γ''', ghost_map_elem γsi_name sa DfracDiscarded (γ', γ'', γ''', c) ∗
+                             ((⌜ov' = None⌝ ∗ ghost_map_elem γ' k (DfracOwn 1%Qp) ov) ∨ 
+                              (∃ v, ov' = Some v ∧ ov = ov' ∗ ghost_map_elem γ'' k None)))%I;
+      ConnectionState c sa s := (ConnectionState c sa s ∗ ghost_map_elem γsi_mstate sa (DfracOwn 1%Qp) (Some c) ∗
+                                 ∃ γ' γ'' γ''' m, ghost_map_elem γsi_name sa DfracDiscarded (γ', γ'', γ''', c) ∗
+                                   ghost_map_auth γ' (1%Qp) m ∗
+                                  ((⌜s = CanStart⌝ ∗ ∃ st, OwnHalfAgreeState γ''' st ∗ OwnHalfAgreeState γ''' st ∗
+                                    ghost_map_elem γmstate sa (DfracOwn 1%Qp) (transactional_consistency.aux_defs.CanStart, Some c) ∗
+                                    ([∗ set] k ∈ KVS_keys, ∃ (ov : option val), ghost_map_elem γ' k (DfracOwn 1%Qp) ov ∗
+                                      ghost_map_elem γ'' k None)) ∨ 
+                                  (⌜∃ ms, s = Active ms ∧ m = ms⌝ ∗ 
+                                    ∃ exec_pre, OwnExecHist exec_pre ∗ ⌜rel_exec_map exec_pre ms⌝ ∗
+                                    ∃ st, OwnHalfAgreeState γ''' st ∗ ⌜(∀ k ov h, st !! k = ov ↔ (m !! k = Some h ∧ last h = ov))⌝ ∗
+                                    ghost_map_elem γmstate sa (DfracOwn 1%Qp) (transactional_consistency.aux_defs.Active (dom ms), Some c) ∗
+                                    ([∗ set] k ∈ KVS_keys ∖ (dom ms), ∃ (ov : option val), ghost_map_elem γ' k (DfracOwn 1%Qp) ov ∗
+                                      ghost_map_elem γ'' k None))))%I;
+      IsConnected c sa := (IsConnected c sa ∗ ⌜sa ∈ clients⌝ ∗ ⌜extract c = Some #sa⌝ ∗ 
+                           ∃ γ, ghost_map_elem γmname sa DfracDiscarded (γ, c) ∗ 
+                           ∃ γ' γ'' γ''', ghost_map_elem γsi_name sa DfracDiscarded (γ', γ'', γ''', c))%I;
       KVS_si := KVS_si;
       KVS_Init := KVS_Init%I;
-      KVS_ClientCanConnect sa := (KVS_ClientCanConnect sa ∗ ghost_map_elem γmstate sa (DfracOwn 1%Qp) (CanStart, None) ∗ ⌜sa ∈ clients⌝)%I;
-      KeyUpdStatus v k b := True%I;
+      KVS_ClientCanConnect sa := (KVS_ClientCanConnect sa ∗ 
+                                  ghost_map_elem γmstate sa (DfracOwn 1%Qp) (transactional_consistency.aux_defs.CanStart, None) ∗ ⌜sa ∈ clients⌝ ∗
+                                  ghost_map_elem γsi_mstate sa (DfracOwn 1%Qp) None)%I;
+      KeyUpdStatus c k b := (KeyUpdStatus c k b ∗ ∃ sa γ' γ'' γ''', ghost_map_elem γsi_name sa DfracDiscarded (γ', γ'', γ''', c) ∗ ⌜extract c = Some #sa⌝ ∗
+                             ((⌜b = true⌝ ∧ ∃ ov, ghost_map_elem γ' k (DfracOwn 1%Qp) ov) ∨ 
+                              (⌜b = false⌝ ∧ ghost_map_elem γ'' k None)))%I;
       Seen k V := Seen k V%I;
       extract c := res.(snapshot_isolation.specs.resources.extract) c;
     |}.
