@@ -254,19 +254,19 @@ Section trace_proof_util.
   Definition no_emit_with_address (sa : socket_address) (ltrace : list val) (extract : val → option val)  : Prop := 
     ¬∃ e c, e ∈ ltrace ∧ connOfEvent e = Some c ∧ extract c = Some #sa.
 
-  Definition active_trace_resources lt T s c γ (m : gmap Key (option val)) : iProp Σ :=
+  Definition active_trace_resources lt T s c (γ : gname) (m : gmap Key (option val)) : iProp Σ :=
     ∃ domain sub_domain tail, ⌜s = Active domain⌝ ∗ 
       ⌜sub_domain = domain ∩ KVS_keys⌝ ∗ ⌜open_start c lt tail⌝ ∗ 
       ([∗ set] k ∈ KVS_keys ∖ sub_domain, ∃ (ov : option val), ghost_map_elem γ k (DfracOwn 1%Qp) ov) ∗ 
       (∀ k, ⌜k ∈ sub_domain⌝ → ∀ (ov : option val), ⌜m !! k = Some ov⌝ → ⌜latest_write c k ov T⌝).
 
-  Definition inactive_trace_resources lt T s c γ : iProp Σ :=
+  Definition inactive_trace_resources lt T s c (γ : gname) : iProp Σ :=
     ⌜s = CanStart⌝ ∗ ⌜commit_closed c lt⌝ ∗ ⌜¬∃ t, open_trans t c T⌝ ∗
     ([∗ set] k ∈ KVS_keys, ∃ (ov : option val), ghost_map_elem γ k (DfracOwn 1%Qp) ov).
 
-  Definition initialized_trace_resources lt T sa γmname (extract : val → option val)
+  Definition initialized_trace_resources lt T sa (γmname : gname) (extract : val → option val)
   (mstate : gmap socket_address (local_state * option val)) : iProp Σ :=
-    ∃ s c γ (m : gmap Key (option val)), ⌜mstate !! sa = Some (s, Some c)⌝ ∗
+    ∃ (s : local_state) (c : val) (γ : gname) (m : gmap Key (option val)), ⌜mstate !! sa = Some (s, Some c)⌝ ∗
       ⌜extract c = Some #(LitSocketAddress sa)⌝ ∗ 
       ghost_map_elem γmname sa DfracDiscarded (γ, c) ∗ 
       ghost_map_auth γ (1%Qp) m ∗ 

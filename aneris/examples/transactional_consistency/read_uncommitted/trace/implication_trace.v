@@ -24,11 +24,11 @@ Section trace_proof.
                     inv KVS_InvName (∃ T, GlobalInvExt commit_test_ru T extract γmstate γmlin γmpost γmname γl clients))%I;
       OwnMemKey k V := (OwnMemKey k V  ∗ (∀ v, ⌜v ∈ V⌝ → ∃ lh tag c, OwnLinHist γl lh ∗ 
                         ⌜(#(LitString tag), (c, (#"WrLin", (#(LitString k), v))))%V ∈ lh⌝))%I;
-      OwnLocalKey k c ov := (OwnLocalKey k c ov ∗ ∃ (sa : socket_address) γ, ghost_map_elem γmname sa DfracDiscarded (γ, c) ∗ 
+      OwnLocalKey k c ov := (OwnLocalKey k c ov ∗ ∃ (sa : socket_address) (γ : gname), ghost_map_elem γmname sa DfracDiscarded (γ, c) ∗ 
                              ⌜extract c = Some #sa⌝ ∗ (⌜k ∈ KVS_keys⌝ → ghost_map_elem γ k (DfracOwn 1%Qp) ov) ∗ ⌜sa ∈ clients⌝)%I;
       ConnectionState c sa s := (ConnectionState c sa s ∗ ghost_map_elem γmstate sa (DfracOwn 1%Qp) (s, Some c))%I; 
       IsConnected c sa := (IsConnected c sa ∗ ⌜sa ∈ clients⌝ ∗ ⌜extract c = Some #sa⌝ ∗ 
-                           ∃ γ, ghost_map_elem γmname sa DfracDiscarded (γ, c))%I;
+                           ∃ (γ : gname), ghost_map_elem γmname sa DfracDiscarded (γ, c))%I;
       KVS_ru := KVS_ru;
       KVS_Init := KVS_Init%I;
       KVS_ClientCanConnect sa := (KVS_ClientCanConnect sa ∗ ghost_map_elem γmstate sa (DfracOwn 1%Qp) (CanStart, None) ∗ ⌜sa ∈ clients⌝)%I;
@@ -903,7 +903,7 @@ Section trace_proof.
       iDestruct (ghost_map_elem_valid with "Hfalse") as "%Hfalse".
       by rewrite dfrac_valid_own in Hfalse.
     }
-    iMod (ghost_map_update (Some v.(SV_val)) with "[$Hmap_m] [$Hkey_internal]") 
+    iMod (@ghost_map_update _ Key (option val) _ _ _ _ _ k vo (Some v.(SV_val)) with "[$Hmap_m] [$Hkey_internal]") 
       as "(Hmap_m & Hkey_internal)".
     iMod ("Hclose'" with "[Htr_is' Hmap_mstate Hmap_mname Hmap_m Htrace_res Hdisj_trace_res 
       HOwnLin' Hpost_res' Hlin_res']").
@@ -1213,7 +1213,7 @@ Section trace_proof.
           as "(Hkeys_conn_res & [%m'' (Hghost_map' & %Hnone)])".
         rewrite big_sepS_singleton.
         iDestruct "Hkeys_conn_key" as "(%ov & Hkeys_conn_key)".
-        iMod (ghost_map_update None with "[$Hghost_map'] [$Hkeys_conn_key]") 
+        iMod (@ghost_map_update _ Key (option val) _ _ _ _ _ k ov None with "[$Hghost_map'] [$Hkeys_conn_key]") 
           as "(Hghost_map' & Hkeys_conn_key)".
         iModIntro.
         iSplitR "Hghost_map'".
