@@ -1,6 +1,6 @@
 From iris.algebra Require Import gset auth gmap excl excl_auth csum.
 From iris.base_logic.lib Require Import mono_nat ghost_map.
-From iris.algebra.lib Require Import mono_list.
+From iris.algebra.lib Require Import mono_list dfrac_agree.
 From aneris.algebra Require Import monotone.
 From aneris.aneris_lang Require Import network resources proofmode.
 From aneris.lib Require Import gen_heap_light.
@@ -46,6 +46,41 @@ Section trace_proof.
   Definition OwnHalfAgreeState (γ : gname) (s : gmap Key val) : iProp Σ := 
     True.
 
+  Definition local_key_state (γsi_name : gname) (sa : socket_address) (c : val) (k : Key) (ov ov' : option val) : iProp Σ := 
+    ∃ (γ' γ'' γ''' : gname), ghost_map_elem γsi_name sa DfracDiscarded (γ', γ'', γ''', c) ∗
+      ((⌜ov' = None⌝ ∗ ghost_map_elem γ' k (DfracOwn 1%Qp) ov) ∨ 
+      (∃ v, ⌜ov' = Some v ∧ ov = ov'⌝ ∗ ghost_map_elem γ'' k (DfracOwn 1%Qp) None)).
+
+  Definition inactive_connection_exec_state (s : aux_defs.local_state) (c : val) (sa : socket_address) 
+  (γmstate γ' γ'' γ''' : gname) : iProp Σ := 
+    ⌜s = aux_defs.CanStart⌝ ∗ ∃ st, OwnHalfAgreeState γ''' st ∗ OwnHalfAgreeState γ''' st ∗
+    ghost_map_elem γmstate sa (DfracOwn 1%Qp) (transactional_consistency.aux_defs.CanStart, Some c) ∗
+    ([∗ set] k ∈ KVS_keys, ∃ (ov : option val), ghost_map_elem γ' k (DfracOwn 1%Qp) ov ∗
+      ghost_map_elem γ'' k (DfracOwn 1%Qp) None).
+
+  Definition active_connection_exec_state (s : aux_defs.local_state) (c : val) (sa : socket_address) (γexec γmstate γ' γ'' γ''' : gname) 
+  (m : gmap Key (option val)) : iProp Σ := 
+    ∃ (ms : gmap Key (list val)), ⌜s = aux_defs.Active ms⌝ ∗ ⌜∀ k ov, m !! k = Some ov ↔ (∃ h, ms !! k = Some h ∧ last h = ov)⌝ ∗ 
+      ∃ exec_pre, OwnExecHist γexec exec_pre ∗ ⌜rel_exec_map exec_pre ms⌝ ∗
+        ∃ st, OwnHalfAgreeState γ''' st ∗ ⌜∀ k ov, st !! k = ov ↔ (∃ h, ms !! k = Some h ∧ last h = ov)⌝ ∗
+          ghost_map_elem γmstate sa (DfracOwn 1%Qp) (transactional_consistency.aux_defs.Active (dom ms), Some c) ∗
+          ([∗ set] k ∈ KVS_keys ∖ (dom ms), ∃ (ov : option val), ghost_map_elem γ' k (DfracOwn 1%Qp) ov ∗
+            ghost_map_elem γ'' k (DfracOwn 1%Qp) None).
+
+  Definition connection_exec_state (s : aux_defs.local_state) (sa : socket_address) (c : val) (γexec γmstate γ' γ'' γ''' : gname) 
+  (m : gmap Key (option val)) : iProp Σ := 
+    inactive_connection_exec_state s c sa γmstate γ' γ'' γ''' ∨ active_connection_exec_state s c sa γexec γmstate γ' γ'' γ''' m.
+
+  Definition open_transactions_state (T : list transaction) (mnames : gmap socket_address (gname * gname * gname * val)) 
+  (extract : val → option val) : iProp Σ := 
+    ([∗ list] _↦(trans : transaction) ∈ T, ∃ (op : operation), ⌜last trans = Some op⌝ ∧ (⌜is_cm_op op⌝ ∨ 
+      (∃ (c : val) st (sa : socket_address) (γ γ'' γ''' : gname), 
+        ⌜open_trans trans c T⌝ ∗ ⌜extract c = Some #sa ∧ mnames !! sa = Some (γ, γ'', γ''', c)⌝ ∗
+        (* OwnHalfAgreeState γ''' st ∗  *)
+        own γ''' (to_dfrac_agree (DfracOwn 1%Qp) st) ∗
+        ⌜∀ sig k v, (Rd sig k (Some v)) ∈ trans → 
+        ¬ (∃ sig' v', rel_list trans (Wr sig' k v') (Rd sig k (Some v))) →  st !! k = Some v⌝))).
+
   Definition GlobalInvExtSI (γmap γexec γsi_mstate γsi_name : gname) (T : list transaction) (exec : execution)
   (extract : val → option val) (clients : gset socket_address) : iProp Σ := 
     ∃ (mstate : gmap socket_address (option val)), ghost_map_auth γsi_mstate (1%Qp) mstate ∗ 
@@ -53,20 +88,15 @@ Section trace_proof.
       ⌜∀ sa, ((mstate !! sa = None ∧ mnames !! sa = None) ∨ (∃ (c : val), mstate !! sa = Some (Some c)))⌝ ∗
     ∃ (m : gmap Key (list val)), 
       ghost_map_auth γmap (1%Qp) m ∗ OwnExec γexec exec ∗ ⌜rel_exec_map exec m⌝ ∗ 
-     ([∗ list] _↦(trans : transaction) ∈ T, ∃ (op : operation), ⌜last trans = Some op⌝ ∧ (⌜is_cm_op op⌝ ∨ 
-        (∃ (c : val) st (sa : socket_address) (γ γ'' γ''' : gname), 
-          ⌜open_trans trans c T⌝ ∗ ⌜extract c = Some #sa ∧ mnames !! sa = Some (γ, γ'', γ''', c)⌝ ∗
-          OwnHalfAgreeState γ''' st ∗ 
-          ⌜∀ sig k v, (Rd sig k (Some v)) ∈ trans → 
-          ¬ (∃ sig' v', rel_list trans (Wr sig' k v') (Rd sig k (Some v))) →  st !! k = Some v⌝))).
+      open_transactions_state T mnames extract.
 
   (** Wrapped resources  *)
-  Global Program Instance wrapped_resources (γtrans γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name : gname) (clients : gset socket_address)
+  Global Program Instance wrapped_resources (γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name : gname) (clients : gset socket_address)
   `(res : !SI_resources Mdl Σ) : SI_resources Mdl Σ :=
     {|
       GlobalInv := (GlobalInv ∗ trace_inv trace_inv_name valid_trace_rc ∗ 
                     inv KVS_InvName (∃ T exec, GlobalInvExtSI γmap γexec γsi_mstate γsi_name T exec extract clients ∗ 
-                    GlobalInvExt commit_test_si T extract γmstate γmlin γmpost γmname γl clients))%I;
+                    GlobalInvExt commit_test_si T extract γmstate γmlin γmpost γmname γl clients exec))%I;
       OwnMemKey k h := (OwnMemKey k h ∗ ghost_map_elem γmap k (DfracOwn 1%Qp) h ∗
                         (∀ v, ⌜v ∈ h⌝ → ∃ lh tag c, OwnLinHist γl lh ∗ 
                           ⌜(#(LitString tag), (c, (#"WrLin", (#(LitString k), v))))%V ∈ lh⌝))%I;
@@ -74,22 +104,10 @@ Section trace_proof.
                              ⌜extract c = Some #sa⌝ ∗ (⌜k ∈ KVS_keys⌝ → ghost_map_elem γ k (DfracOwn 1%Qp) ov') ∗ ⌜sa ∈ clients⌝ ∗ 
                              ⌜∀ v, ov' = Some v → k ∈ KVS_keys⌝ ∗
                              (∀ v, ⌜ov' = Some v⌝ → ∃ lh tag c, OwnLinHist γl lh ∗ ⌜(#(LitString tag), (c, (#"WrLin", (#(LitString k), v))))%V ∈ lh⌝) ∗
-                             ∃ (γ' γ'' γ''' : gname), ghost_map_elem γsi_name sa DfracDiscarded (γ', γ'', γ''', c) ∗
-                             ((⌜ov' = None⌝ ∗ ghost_map_elem γ' k (DfracOwn 1%Qp) ov) ∨ 
-                              (∃ v, ⌜ov' = Some v ∧ ov = ov'⌝ ∗ ghost_map_elem γ'' k (DfracOwn 1%Qp) None)))%I;
+                             local_key_state γsi_name sa c k ov ov')%I;
       ConnectionState c sa s := (ConnectionState c sa s ∗ ghost_map_elem γsi_mstate sa (DfracOwn 1%Qp) (Some c) ∗
-                                 ∃ (γ' γ'' γ''' : gname) m, ghost_map_elem γsi_name sa DfracDiscarded (γ', γ'', γ''', c) ∗
-                                   ghost_map_auth γ' (1%Qp) m ∗
-                                  ((⌜s = aux_defs.CanStart⌝ ∗ ∃ st, OwnHalfAgreeState γ''' st ∗ OwnHalfAgreeState γ''' st ∗
-                                    ghost_map_elem γmstate sa (DfracOwn 1%Qp) (transactional_consistency.aux_defs.CanStart, Some c) ∗
-                                    ([∗ set] k ∈ KVS_keys, ∃ (ov : option val), ghost_map_elem γ' k (DfracOwn 1%Qp) ov ∗
-                                      ghost_map_elem γ'' k (DfracOwn 1%Qp) None)) ∨ 
-                                  (∃ ms, ⌜s = aux_defs.Active ms ∧ m = ms⌝ ∗ 
-                                   ∃ exec_pre, OwnExecHist γexec exec_pre ∗ ⌜rel_exec_map exec_pre ms⌝ ∗
-                                   ∃ st, OwnHalfAgreeState γ''' st ∗ ⌜(∀ k ov h, st !! k = ov ↔ (m !! k = Some h ∧ last h = ov))⌝ ∗
-                                   ghost_map_elem γmstate sa (DfracOwn 1%Qp) (transactional_consistency.aux_defs.Active (dom ms), Some c) ∗
-                                   ([∗ set] k ∈ KVS_keys ∖ (dom ms), ∃ (ov : option val), ghost_map_elem γ' k (DfracOwn 1%Qp) ov ∗
-                                     ghost_map_elem γ'' k (DfracOwn 1%Qp) None))))%I;
+                                 ∃ (γ' γ'' γ''' : gname) (m : gmap Key (option val)), ghost_map_elem γsi_name sa DfracDiscarded (γ', γ'', γ''', c) ∗
+                                   ghost_map_auth γ' (1%Qp) m ∗ connection_exec_state s sa c γexec γmstate γ' γ'' γ''' m)%I;
       IsConnected c sa := (IsConnected c sa ∗ ⌜sa ∈ clients⌝ ∗ ⌜extract c = Some #sa⌝ ∗ 
                            ∃ (γ : gname), ghost_map_elem γmname sa DfracDiscarded (γ, c) ∗ 
                            ∃ (γ' γ'' γ''' : gname), ghost_map_elem γsi_name sa DfracDiscarded (γ', γ'', γ''', c))%I;
@@ -106,15 +124,40 @@ Section trace_proof.
       extract c := res.(snapshot_isolation.specs.resources.extract) c;
     |}.
   Next Obligation.
-  Admitted.
+    iIntros (??????????????) "(Hkey & [%sa [%γ [%ov' (Hghost_elem_per & %Hextract & Hghost_elem  & %Hin_sa & Hlin_hist & Hstate)]]])".
+    iDestruct (res.(snapshot_isolation.specs.resources.OwnLocalKey_serializable) 
+      with "Hkey") as "(Hkey & Hser)".
+    iFrame.
+    iExists sa, γ, ov'.
+    by iFrame.
+  Qed.
   Next Obligation.
-  Admitted.
+    iIntros (??????????????).
+    iIntros (??) "#(HGinv & Hinv) (#Hseen & Hkey & Hin)".
+    iMod (res.(snapshot_isolation.specs.resources.Seen_valid) 
+      with "[$HGinv][$Hseen $Hkey]") as "(Hkey & Hsub)"; first done.
+    iModIntro.
+    iFrame "∗#".
+  Qed.
   Next Obligation.
-  Admitted.
+    iIntros (???????????????) "#(HGinv & Hinv) (Hkey & Hin)".
+    iMod (res.(snapshot_isolation.specs.resources.Seen_creation) 
+      with "[$HGinv][$Hkey]") as "(Hkey & #Hseen)"; first done.
+    iModIntro.
+    iFrame "∗#".
+  Qed.
   Next Obligation.
-  Admitted.
+    simpl.
+    iIntros (????????? clients res sa c) "(Hconn & _)".
+    iApply (res.(snapshot_isolation.specs.resources.Extraction_of_address) 
+      with "[$Hconn]").
+  Qed.
   Next Obligation.
-  Admitted.
+    simpl.
+    iIntros (?????????).
+    iIntros (clients res sa sa' c c' Heq1 Heq2 Hneq).
+    by eapply res.(snapshot_isolation.specs.resources.Extraction_preservation).
+  Qed.
 
   (** Helper lemmas *)
 
@@ -532,6 +575,61 @@ Section trace_proof.
   Qed.
 
   (** Per operation implications *)
+
+  Lemma init_client_implication γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name clients (res : SI_resources Mdl Σ) 
+  (lib : KVS_transaction_api) : 
+    ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
+    trace_inv trace_inv_name valid_trace_si -∗
+    inv KVS_InvName (∃ T exec, GlobalInvExtSI γmap γexec γsi_mstate γsi_name T exec extract clients ∗ 
+                     GlobalInvExt commit_test_si T extract γmstate γmlin γmpost γmname γl clients exec) -∗
+    @init_client_proxy_spec _ _ _ _ lib res -∗
+    @init_client_proxy_spec _ _ _ _ (KVS_wrapped_api lib) (wrapped_resources γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name clients res).
+  Proof.
+  Admitted.
+
+  Lemma start_implicationγtrans γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name clients (res : SI_resources Mdl Σ) 
+  (lib : KVS_transaction_api) : 
+    ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
+    trace_inv trace_inv_name valid_trace_si -∗
+    inv KVS_InvName (∃ T exec, GlobalInvExtSI γmap γexec γsi_mstate γsi_name T exec extract clients ∗ 
+                     GlobalInvExt commit_test_si T extract γmstate γmlin γmpost γmname γl clients exec) -∗
+    @start_spec _ _ _ _ lib res -∗
+    @start_spec _ _ _ _ (KVS_wrapped_api lib) (wrapped_resources γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name clients res).
+  Proof.
+  Admitted.
+
+  Lemma write_implication γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name clients (res : SI_resources Mdl Σ) 
+  (lib : KVS_transaction_api) : 
+    ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
+    trace_inv trace_inv_name valid_trace_si -∗
+    inv KVS_InvName (∃ T exec, GlobalInvExtSI γmap γexec γsi_mstate γsi_name T exec extract clients ∗ 
+                     GlobalInvExt commit_test_si T extract γmstate γmlin γmpost γmname γl clients exec) -∗
+    @write_spec _ _ _ _ lib res -∗
+    @write_spec _ _ _ _ (KVS_wrapped_api lib) (wrapped_resources γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name clients res).
+  Proof.
+  Admitted.
+
+  Lemma read_implication γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name clients (res : SI_resources Mdl Σ) 
+  (lib : KVS_transaction_api) : 
+    ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
+    trace_inv trace_inv_name valid_trace_si -∗
+    inv KVS_InvName (∃ T exec, GlobalInvExtSI γmap γexec γsi_mstate γsi_name T exec extract clients ∗ 
+                     GlobalInvExt commit_test_si T extract γmstate γmlin γmpost γmname γl clients exec) -∗
+    @read_spec _ _ _ _ lib res -∗
+    @read_spec _ _ _ _ (KVS_wrapped_api lib) (wrapped_resources γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name clients res).
+  Proof.
+  Admitted.
+
+  Lemma commit_implication γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name clients (res : SI_resources Mdl Σ) 
+  (lib : KVS_transaction_api) : 
+    ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
+    trace_inv trace_inv_name valid_trace_si -∗
+    inv KVS_InvName (∃ T exec, GlobalInvExtSI γmap γexec γsi_mstate γsi_name T exec extract clients ∗ 
+                     GlobalInvExt commit_test_si T extract γmstate γmlin γmpost γmname γl clients exec) -∗
+    @commit_spec _ _ _ _ lib res -∗
+    @commit_spec _ _ _ _ (KVS_wrapped_api lib) (wrapped_resources γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name clients res).
+  Proof.
+  Admitted.
 
   (* Primary lemma to be used with adequacy *)
   Lemma library_implication (clients : gset socket_address) (lib : KVS_transaction_api) :
