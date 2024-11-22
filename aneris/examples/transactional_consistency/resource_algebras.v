@@ -1,5 +1,5 @@
 From iris.algebra Require Import auth gmap dfrac frac_auth excl csum.
-From iris.algebra.lib Require Import mono_list.
+From iris.algebra.lib Require Import mono_list dfrac_agree.
 From iris.base_logic.lib Require Import mono_nat ghost_map.
 From iris.bi.lib Require Import fractional.
 From aneris.lib Require Import gen_heap_light.
@@ -51,6 +51,7 @@ Class IDBG Σ :=
     IDBG_Trace6 :> ghost_mapG Σ Key (list val);
     IDBG_Trace7 :> ghost_mapG Σ socket_address (gname * gname * gname * val);
     IDBG_Trace8 :> ghost_mapG Σ socket_address (option val);
+    IDBG_Trace9 :> inG Σ (dfrac_agreeR (gmapO Key eventO));
   }.
 
 Notation KVSG Σ := (IDBG Σ).
@@ -79,6 +80,7 @@ Definition KVSΣ : gFunctors :=
      ghost_mapΣ Key (list val);
      ghost_mapΣ socket_address (gname * gname * gname * val);
      ghost_mapΣ socket_address (option val);
+     GFunctor (dfrac_agreeR (gmapO Key eventO));
      mono_natΣ;
      ras.SpecChanΣ;
      lockΣ].

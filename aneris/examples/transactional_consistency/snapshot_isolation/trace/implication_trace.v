@@ -43,9 +43,6 @@ Section trace_proof.
   Definition OwnExec (γ : gname) (exec : execution) : iProp Σ := 
     True.
 
-  Definition OwnHalfAgreeState (γ : gname) (s : gmap Key val) : iProp Σ := 
-    True.
-
   Definition local_key_state (γsi_name : gname) (sa : socket_address) (c : val) (k : Key) (ov ov' : option val) : iProp Σ := 
     ∃ (γ' γ'' γ''' : gname), ghost_map_elem γsi_name sa DfracDiscarded (γ', γ'', γ''', c) ∗
       ((⌜ov' = None⌝ ∗ ghost_map_elem γ' k (DfracOwn 1%Qp) ov) ∨ 
@@ -53,7 +50,7 @@ Section trace_proof.
 
   Definition inactive_connection_exec_state (s : aux_defs.local_state) (c : val) (sa : socket_address) 
   (γmstate γ' γ'' γ''' : gname) : iProp Σ := 
-    ⌜s = aux_defs.CanStart⌝ ∗ ∃ st, OwnHalfAgreeState γ''' st ∗ OwnHalfAgreeState γ''' st ∗
+    ⌜s = aux_defs.CanStart⌝ ∗ ∃ st,  own γ''' (to_dfrac_agree (DfracOwn 1) st) ∗
     ghost_map_elem γmstate sa (DfracOwn 1%Qp) (transactional_consistency.aux_defs.CanStart, Some c) ∗
     ([∗ set] k ∈ KVS_keys, ∃ (ov : option val), ghost_map_elem γ' k (DfracOwn 1%Qp) ov ∗
       ghost_map_elem γ'' k (DfracOwn 1%Qp) None).
@@ -62,7 +59,7 @@ Section trace_proof.
   (m : gmap Key (option val)) : iProp Σ := 
     ∃ (ms : gmap Key (list val)), ⌜s = aux_defs.Active ms⌝ ∗ ⌜∀ k ov, m !! k = Some ov ↔ (∃ h, ms !! k = Some h ∧ last h = ov)⌝ ∗ 
       ∃ exec_pre, OwnExecHist γexec exec_pre ∗ ⌜rel_exec_map exec_pre ms⌝ ∗
-        ∃ st, OwnHalfAgreeState γ''' st ∗ ⌜∀ k ov, st !! k = ov ↔ (∃ h, ms !! k = Some h ∧ last h = ov)⌝ ∗
+        ∃ st, own γ''' (to_dfrac_agree (DfracOwn (1 / 2)) st) ∗ ⌜∀ k ov, st !! k = ov ↔ (∃ h, ms !! k = Some h ∧ last h = ov)⌝ ∗
           ghost_map_elem γmstate sa (DfracOwn 1%Qp) (transactional_consistency.aux_defs.Active (dom ms), Some c) ∗
           ([∗ set] k ∈ KVS_keys ∖ (dom ms), ∃ (ov : option val), ghost_map_elem γ' k (DfracOwn 1%Qp) ov ∗
             ghost_map_elem γ'' k (DfracOwn 1%Qp) None).
@@ -74,10 +71,9 @@ Section trace_proof.
   Definition open_transactions_state (T : list transaction) (mnames : gmap socket_address (gname * gname * gname * val)) 
   (extract : val → option val) : iProp Σ := 
     ([∗ list] _↦(trans : transaction) ∈ T, ∃ (op : operation), ⌜last trans = Some op⌝ ∧ (⌜is_cm_op op⌝ ∨ 
-      (∃ (c : val) st (sa : socket_address) (γ γ'' γ''' : gname), 
+      (∃ (c : val) (st : gmap Key val) (sa : socket_address) (γ γ'' γ''' : gname), 
         ⌜open_trans trans c T⌝ ∗ ⌜extract c = Some #sa ∧ mnames !! sa = Some (γ, γ'', γ''', c)⌝ ∗
-        (* OwnHalfAgreeState γ''' st ∗  *)
-        own γ''' (to_dfrac_agree (DfracOwn 1%Qp) st) ∗
+        own γ''' (to_dfrac_agree (DfracOwn (1 / 2)) st) ∗
         ⌜∀ sig k v, (Rd sig k (Some v)) ∈ trans → 
         ¬ (∃ sig' v', rel_list trans (Wr sig' k v') (Rd sig k (Some v))) →  st !! k = Some v⌝))).
 
