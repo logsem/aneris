@@ -4,6 +4,7 @@ From iris.algebra.lib Require Import mono_list.
 From aneris.algebra Require Import monotone.
 From aneris.aneris_lang Require Import network resources proofmode.
 From aneris.lib Require Import gen_heap_light.
+From aneris.examples.reliable_communication.lib.repdb.resources Require Import log_resources.
 From aneris.aneris_lang.lib Require Import list_proof inject lock_proof.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
@@ -16,19 +17,18 @@ Section trace_proof_util.
 
   (** Ghost theory for wrapped resources *)
 
-  (* For the OwnLinTrace/OwnLinHist resources and rules we are reusing trace infrastructure *)
+  Definition OwnLinTrace (γ : gname) (l : list val) : iProp Σ := 
+    own_log_auth γ 1%Qp l.
 
   Definition OwnLinHist (γ : gname) (l : list val) : iProp Σ :=
-    own γ (◯ (gmap_of_trace 0 l)).
-
-  Definition OwnLinTrace (γ : gname) (l : list val) : iProp Σ := 
-    own γ (● gmap_of_trace 0 l) ∗ OwnLinHist γ l.
+    own_log_obs γ l.
 
   Lemma own_lin_hist (γ : gname) (l : list val) :
     OwnLinTrace γ l ==∗ OwnLinTrace γ l ∗ OwnLinHist γ l.
   Proof.
-    rewrite /OwnLinTrace.
-    iIntros "(H1 & #H2)".
+    rewrite /OwnLinTrace /OwnLinHist.
+    iIntros "H1".
+    iDestruct (get_obs with "H1") as "#H2".
     iModIntro.
     iFrame "#∗".
   Qed.
@@ -38,32 +38,19 @@ Section trace_proof_util.
     OwnLinTrace γ l ∗ OwnLinHist γ h ∗ ⌜h `prefix_of` l⌝.
   Proof.
     rewrite /OwnLinTrace /OwnLinHist.
-    iIntros "((H1 & H2) & H3)".
-    iDestruct (own_op with "[$H1 $H3]") as "H".
-    iDestruct (own_valid with "H") as %[Hsub Hvalid]%auth_both_valid_discrete.
-    iDestruct "H" as "(H1 & H3)".
+    iIntros "(H1 & H2)".
+    iDestruct (own_obs_prefix with "[$H1][$H2]") as "%Hpre".
     iFrame.
-    iPureIntro.
-    eapply gmap_of_trace_hist_valid_prefix; eauto.
+    by iPureIntro.
   Qed.
 
   Lemma own_lin_add (γ : gname) (l: list val) (v : val) :
     OwnLinTrace γ l ==∗ OwnLinTrace γ (l ++ [v]).
   Proof.
-    rewrite /OwnLinTrace /OwnLinHist.
-    iIntros "(H1 & H2)".
-    rewrite gmap_of_trace_snoc Nat.add_0_l.
-    iMod (own_update_2 with "H1 H2") as "[H1 H2]".
-    apply auth_update.
-    eapply (alloc_local_update _ _ (length l : nat) (to_agree v)); try done.
-    { 
-      eapply not_elem_of_dom.
-      rewrite gmap_of_trace_dom.
-      intro Hfalse. 
-      lia. 
-    }
-    iModIntro. 
-    iFrame.
+    rewrite /OwnLinTrace.
+    iIntros "H1".
+    by iMod (own_log_auth_update _ _ (l ++ [v]) with "[$H1]") as "HlFull"; 
+      first by apply prefix_app_r.
   Qed.
 
   Definition trace_lin_resources (lt t : list val) (γ : gname) : iProp Σ :=

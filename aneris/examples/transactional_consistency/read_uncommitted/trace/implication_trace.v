@@ -1777,16 +1777,13 @@ Section trace_proof.
     iMod (ghost_map_alloc_empty (K:=string) (V:=bool)) as "[%γmlin Hghost_map_mlin]".
     iMod (ghost_map_alloc_empty (K:=string) (V:=bool)) as "[%γmpost Hghost_map_mpost]".
     iMod (ghost_map_alloc_empty (K:=socket_address) (V:=(gname * val))) as "[%γmname Hghost_map_mname]".
-    iMod (own_alloc (● gmap_of_trace 0 ([] : list val) ⋅ 
-      ◯ gmap_of_trace 0 ([] : list val))) as (γl) "Hltrace".
-    {
-      apply auth_both_valid. 
-      split; first done. 
-      by apply gmap_of_trace_valid.
+    iMod (own_alloc (●ML ([] : list val) ⋅ ◯ML ([] : list val))) as (γl) "[Hltrace _]".
+    { 
+      apply mono_list_both_dfrac_valid.
+      by split; [done|exists []; done]. 
     }
-    iDestruct "Hltrace" as "[Hltrace Hlhist]".
     iMod (inv_alloc KVS_InvName ⊤ (∃ T exec, GlobalInvExt commit_test_ru T extract γmstate γmlin γmpost γmname γl clients exec) with 
-      "[Htr Hghost_map_mstate Hghost_map_mlin Hghost_map_mpost Hghost_map_mname Hltrace Hlhist]") as "#HinvExt".
+      "[Htr Hghost_map_mstate Hghost_map_mlin Hghost_map_mpost Hghost_map_mname Hltrace]") as "#HinvExt".
     {
       iNext.
       iExists [], [([], ∅)], [], [].

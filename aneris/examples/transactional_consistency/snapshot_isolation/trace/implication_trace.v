@@ -4,6 +4,7 @@ From iris.algebra.lib Require Import mono_list dfrac_agree.
 From aneris.algebra Require Import monotone.
 From aneris.aneris_lang Require Import network resources proofmode.
 From aneris.lib Require Import gen_heap_light.
+From aneris.examples.reliable_communication.lib.repdb.resources Require Import log_resources.
 From aneris.aneris_lang.lib Require Import list_proof inject lock_proof.
 From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
@@ -37,11 +38,9 @@ Section trace_proof.
   Definition reads_from_last_state (exec : execution) (k : Key) (ov : option val) := 
     ∃ s, last (split exec).2 = Some s ∧ s !! k = ov.
 
-  Definition OwnExecHist (γ : gname) (exec : execution) : iProp Σ :=
-    True.
+  Definition OwnExec (γ : gname) (exec : execution) : iProp Σ := own_log_auth γ 1%Qp exec.
 
-  Definition OwnExec (γ : gname) (exec : execution) : iProp Σ := 
-    True.
+  Definition OwnExecHist (γ : gname) (exec : execution) : iProp Σ := own_log_obs γ exec.
 
   Definition local_key_state (γsi_name : gname) (sa : socket_address) (c : val) (k : Key) (ov ov' : option val) : iProp Σ := 
     ∃ (γ' γ'' γ''' : gname), ghost_map_elem γsi_name sa DfracDiscarded (γ', γ'', γ''', c) ∗
@@ -50,7 +49,7 @@ Section trace_proof.
 
   Definition inactive_connection_exec_state (s : aux_defs.local_state) (c : val) (sa : socket_address) 
   (γmstate γ' γ'' γ''' : gname) : iProp Σ := 
-    ⌜s = aux_defs.CanStart⌝ ∗ ∃ st,  own γ''' (to_dfrac_agree (DfracOwn 1) st) ∗
+    ⌜s = aux_defs.CanStart⌝ ∗ ∃ (st : gmap Key val), own γ''' (to_dfrac_agree (DfracOwn 1) st) ∗
     ghost_map_elem γmstate sa (DfracOwn 1%Qp) (transactional_consistency.aux_defs.CanStart, Some c) ∗
     ([∗ set] k ∈ KVS_keys, ∃ (ov : option val), ghost_map_elem γ' k (DfracOwn 1%Qp) ov ∗
       ghost_map_elem γ'' k (DfracOwn 1%Qp) None).
