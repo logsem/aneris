@@ -52,7 +52,7 @@ Class IDBG Σ :=
     IDBG_Trace7 :> ghost_mapG Σ socket_address (gname * gname * gname * val);
     IDBG_Trace8 :> ghost_mapG Σ socket_address (option val);
     IDBG_Trace9 :> inG Σ (dfrac_agreeR (gmapO Key eventO));
-    IDBG_Trace10 :> inG Σ (mono_listUR (leibnizO (transaction * (gmap Key val))));
+    IDBG_Trace10 :> inG Σ (mono_listUR (leibnizO (transaction * state)));
     IDBG_Trace11 :> inG Σ (mono_listUR (leibnizO val));
   }.
 
@@ -83,7 +83,7 @@ Definition KVSΣ : gFunctors :=
      ghost_mapΣ socket_address (gname * gname * gname * val);
      ghost_mapΣ socket_address (option val);
      GFunctor (dfrac_agreeR (gmapO Key eventO));
-     GFunctor (mono_listUR (leibnizO (transaction * (gmap Key val))));
+     GFunctor (mono_listUR (leibnizO (transaction * state)));
      GFunctor (mono_listUR (leibnizO val));
      mono_natΣ;
      ras.SpecChanΣ;
