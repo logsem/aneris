@@ -243,9 +243,10 @@ Section EOFinAdequacy.
     clear -OB_ OBτ H. rewrite OB_ in H. congruence.
   Qed. 
 
+  (* TODO: generalize? move? *)
   Lemma om_sim_RAH 
     {Hinv: @heapGS eofinΣ M EM}
-    σ1 N ds eb:
+    σ1 e ds eb:
   ⊢
   rel_always_holds0 
     (@eofin_sim_rel) NotStuck
@@ -254,8 +255,8 @@ Section EOFinAdequacy.
        @em_thread_post heap_lang _ _ eofinΣ
          (@heap_fairnessGS eofinΣ
             _
-            _ Hinv) 0) (start #0 #N) σ1
-    (@init_om_state _ _ _ _ _ 10 OP ([start #0 #N], σ1) ds eb).
+            _ Hinv) 0) e σ1
+    (@init_om_state _ _ _ _ _ 10 OP ([e], σ1) ds eb).
   Proof using.
     rewrite /rel_always_holds0.
     
@@ -265,6 +266,8 @@ Section EOFinAdequacy.
     
     iApply fupd_mask_intro_discard; [done| ].
     
+    clear CONT_SIM. 
+
     destruct extr.
     { iPureIntro.  
       simpl in VALID_STEP.
@@ -273,6 +276,7 @@ Section EOFinAdequacy.
       rewrite /eofin_sim_rel. rewrite /valid_state_evolution_fairness /om_live_tids.
       split; [done| ]. simpl. red.
       apply om_live_tids_init. }
+ 
     simpl in VALID_STEP. inversion VALID. subst. simpl in *.
     red in EX_FIN. simpl in EX_FIN. subst. simpl.
     rewrite /eofin_sim_rel. iSplit.
