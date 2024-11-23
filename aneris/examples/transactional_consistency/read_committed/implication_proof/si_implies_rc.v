@@ -42,6 +42,7 @@ Section Implication.
       KVS_Init := SI.(snapshot_isolation.specs.resources.KVS_Init);
       KVS_ClientCanConnect sa := SI.(snapshot_isolation.specs.resources.KVS_ClientCanConnect) sa;
       Seen k V := (∃ h, ⌜∀ v, v ∈ V → v ∈ h⌝ ∗ SI.(snapshot_isolation.specs.resources.Seen) k h)%I;
+      extract c := SI.(snapshot_isolation.specs.resources.extract) c;
     |}.
   Next Obligation.
     iIntros (SI k cst v) "[[%V [%h (%Hfalse & _)]] | (%Hneq & Hupd & Hkey)]"; first done. 
@@ -79,6 +80,17 @@ Section Implication.
       iPureIntro.
       intro v.
       by destruct (Himp v) as [_ Hgoal].
+  Qed.
+  Next Obligation.
+    simpl.
+    iIntros (SI sa c) "Hconn".
+    iApply (SI.(snapshot_isolation.specs.resources.Extraction_of_address) 
+      with "[$Hconn]").
+  Qed.
+  Next Obligation.
+    simpl.
+    iIntros (SI sa sa' c c' Heq1 Heq2 Hneq).
+    by eapply SI.(snapshot_isolation.specs.resources.Extraction_preservation).
   Qed.
 
   Lemma rewrite_maps_1 `{SI : !SI_resources Mdl Σ} (m : gmap Key Vals) :

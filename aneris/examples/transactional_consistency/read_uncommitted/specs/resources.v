@@ -42,6 +42,9 @@ Section Resources.
     Seen_timeless k V :> Timeless (Seen k V);
     Seen_persistent k V :> Persistent (Seen k V);
 
+    (** Extraction of socket addresses from connections *)
+    extract : val → option val;
+
     (** Properties *)
     OwnLocalKey_serializable k cst v :
       k ↦{cst} Some v -∗
@@ -58,6 +61,16 @@ Section Resources.
       GlobalInv ⊢
       k ↦ₖ V ={E}=∗
       k ↦ₖ V ∗ Seen k V;
+
+    Extraction_of_address sa c : 
+      ⊢ IsConnected c sa -∗ 
+        ⌜extract c = Some #sa⌝;
+    
+    Extraction_preservation sa sa' c c' : 
+      extract c = Some #sa →
+      extract c' = Some #sa' →
+      sa ≠ sa' →
+      c ≠ c';
   }.
 
 End Resources.

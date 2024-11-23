@@ -71,7 +71,7 @@ let update_kvs (kvs : 'a kvsTy) (cache : 'a cacheTy) (tc : int)
       upd kvs_t' cache_l
   in upd kvs cache
 
-let check_at_key k (ts : int) (tc : int) (vlst : ((string * ('a * int)) alist)) =
+let check_at_key (ts : int) (tc : int) (vlst : ((string * ('a * int)) alist)) =
   assert (ts < tc);
   match vlst with
   | None -> true
@@ -95,7 +95,7 @@ let commit_handler
         (fun k _v ->
            let vlsto = (map_lookup k kvs_t) in
            let vs = if vlsto = None then list_nil else unSOME vlsto in
-           check_at_key k ts tc vs) cache in
+           check_at_key ts tc vs) cache in
     if b then begin
       vnum := tc;
       kvs := update_kvs kvs_t cache tc;

@@ -61,7 +61,7 @@ Section Start_Proof.
     iIntros "#Hinv #Hlk #Hspec %Φ !# Hsh".
     rewrite /TC_start /= /start.
     wp_pures.
-    iDestruct "Hlk" as (lk cst l γCst γlk γS γA γCache γMsnap) "(-> & Hcc1 & Hlk)".
+    iDestruct "Hlk" as (lk cst l γCst γlk γS γA γCache γMsnap γU) "(-> & Hcc1 & Hlk)".
     wp_pures.
     wp_apply (acquire_spec with "Hlk").
     iIntros (?) "(-> & Hlkd & HisC)".
@@ -76,7 +76,7 @@ Section Start_Proof.
       iMod "Hsh" as (m) "[(Hcst & _) Hclose]".
       iDestruct "Habs" as (? ? ? ? ?) "(? & ? & ? & ? & ? & Habs)".
       iDestruct "Hcst" as (sp) "(Hcst & %Heq)".
-      iDestruct "Hcst" as (? ? ? ? ? ? ? ->) "(#Habs1 & Hsp)".
+      iDestruct "Hcst" as (? ? ? ? ? ? ? ? ->) "(Hut & #Habs1 & Hsp)".
       destruct sp; simplify_eq /=.
       iDestruct (client_connected_agree with "[$Hcc1][$Habs1]") as "%Heq'".
       simplify_eq /=.
@@ -128,7 +128,7 @@ Section Start_Proof.
         iIntros (ts M Mf) "Hpost".
         iDestruct "Hpost" as "(%Hsub & -> & %Hvsn & Hser & Hts & Hfrag & Hpts & #Hseen)".
         iDestruct "Hst'" as (sp) "(Hst' & %Heq')".
-        iDestruct "Hst'" as (???????->) "(#Hcc2 & Hst')".
+        iDestruct "Hst'" as (????????->) "(Hut & #Hcc2 & Hst')".
         destruct sp; simplify_eq /=.
         iDestruct (client_connected_agree with "[$Hcc1][$Hcc2]") as "%Heq2".
         simplify_eq /=.
@@ -163,10 +163,10 @@ Section Start_Proof.
         iApply fupd_frame_l; iSplit.
         iFrame "#∗".
         iApply "Hclose".
-        iSplitL "Hst HghM1".
+        iSplitL "Hst HghM1 Hut".
         { iExists (PSActive M).
           iSplit; last done.
-          iExists _, _, _, _, _, _, _.
+          iExists _, _, _, _, _, _, _, _.
           iSplit; first done.
           iFrame "#∗". }
         iFrame "#∗".

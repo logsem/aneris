@@ -108,27 +108,25 @@ Section Specification.
 End Specification.
 
 Section RC_Module.
-  Context `{!anerisG Mdl Σ, !User_params, !KVS_transaction_api}.
+  Context `{!User_params}.
 
-  Definition RC_client_toolbox `{!RC_resources Mdl Σ} : iProp Σ :=
+  Definition RC_client_toolbox `{!anerisG Mdl Σ, !KVS_transaction_api, 
+  !RC_resources Mdl Σ} : iProp Σ :=
     init_kvs_spec ∗ init_client_proxy_spec ∗ read_spec ∗
     write_spec ∗ start_spec ∗ commit_spec.
  
-   Class RC_init := {
-    RC_init_module E (clients : gset socket_address) :
-      ↑KVS_InvName ⊆ E →
-       ⊢ |={E}=>
-      ∃ (res : RC_resources Mdl Σ),
+  Definition RC_spec clients `{!anerisG Mdl Σ} (lib : KVS_transaction_api) : iProp Σ :=
+    ∃ (res : RC_resources Mdl Σ),
         ([∗ set] k ∈ KVS_keys, k ↦ₖ ∅) ∗
         KVS_Init ∗
         GlobalInv ∗
         ([∗ set] sa ∈ clients, KVS_ClientCanConnect sa) ∗
-        init_kvs_spec ∗
-        init_client_proxy_spec ∗
-        read_spec ∗
-        write_spec ∗
-        start_spec ∗
-        commit_spec
+        RC_client_toolbox.
+
+   Class RC_init `{!anerisG Mdl Σ, lib : !KVS_transaction_api} := {
+    RC_init_module E (clients : gset socket_address) :
+      ↑KVS_InvName ⊆ E →
+       ⊢ |={E}=> RC_spec clients lib
      }.
    
 End RC_Module.

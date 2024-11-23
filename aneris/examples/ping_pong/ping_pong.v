@@ -1,7 +1,7 @@
 From aneris.aneris_lang Require Import tactics proofmode adequacy.
 From aneris.aneris_lang.program_logic Require Import aneris_weakestpre aneris_adequacy.
 From aneris.aneris_lang.lib Require Import network_util_code network_util_proof.
-From aneris.aneris_lang Require Import no_model.
+From aneris.aneris_lang Require Import adequacy_no_model.
 Set Default Proof Using "Type".
 
 Definition pong : val :=
@@ -188,6 +188,7 @@ Definition ping_pong_is :=
     state_heaps :=  {["system" := ∅ ]};
     state_sockets := {["system" := ∅ ]};
     state_ms := ∅;
+    state_trace := [];
   |}.
 
 (** This soundness theorem tells us---without relying on Aneris or Iris---that
@@ -196,7 +197,7 @@ Theorem ping_pong_safe :
   aneris_adequate ping_pong_runner "system" ping_pong_is (λ _, True).
 Proof.
   set (Σ := #[anerisΣ unit_model]).
-  apply (no_model.adequacy_hoare_no_model_simpl Σ ips {[ pong_addr; ping_addr ]}); try set_solver.
+  apply (adequacy_no_model.adequacy_hoare_no_model_simpl Σ ips {[ pong_addr; ping_addr ]}); try set_solver.
   iIntros (dinvG).
   iIntros (?) "!# (Hf & Hhist & Hips) HΦ".
   iDestruct (unallocated_split with "Hf") as "[Hf1 Hf2]"; [set_solver|].

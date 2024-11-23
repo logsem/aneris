@@ -49,7 +49,7 @@ Section SI_Resources_intantiation.
         (SrvInit ∗ 
          api_spec.run_server_spec SrvInit srv_si ∗
          GlobalInv_def clients γKnownClients γGauth γGsnap γT γTrs ∗
-         ghost_map_auth γGauth (1 / 2) (gset_to_gmap [] KVS_keys) ∗
+         ghost_map_auth γGauth (1 / 2) (gset_to_gmap ([] : list write_event) KVS_keys) ∗
          mono_nat_auth_own γT (1 / 2) 0);
       KVS_ClientCanConnect sa :=
         (api_spec.init_client_proxy_spec srv_si ∗
@@ -59,7 +59,28 @@ Section SI_Resources_intantiation.
         )%I;
       OwnLocalKey_serializable k c v :=
       own_cache_user_serializable γKnownClients k c v;
-      (* Seen_valid E k h h' :=  *) |}.
+      extract c := match c with | (v1, v2)%V => Some v1 | _ => None end;
+    |}.
+  Next Obligation.
+    simpl.
+    intros ?????.
+    set_solver.
+  Qed.
+  Next Obligation.
+    simpl.
+    intros ??????.
+    set_solver.
+  Qed.
+  Next Obligation.
+    simpl.
+    intros ?????.
+    set_solver.
+  Qed.
+  Next Obligation.
+    simpl.
+    intros ?????.
+    set_solver.
+  Qed.
   Next Obligation.
     iIntros (E k h h' Hcl) "#Hinv (#Hs & Hk)".
     iDestruct "Hs" as (hw) "(Hs & %Heq1)".
@@ -89,6 +110,17 @@ Section SI_Resources_intantiation.
     - iExists hw.
       iFrame "#".
       by iPureIntro.
+  Qed.
+  Next Obligation.
+    simpl.
+    iIntros (sa c) "(Hinv & Hreq & (%lk & %cst & %l & %γCst & 
+      %γlk & %γA & %γS & %γCache & %γMsnap & %γU & -> & Hconn))".
+    by iPureIntro.
+  Qed.
+  Next Obligation.
+    simpl.
+    iIntros (sa sa' c c').
+    destruct c; destruct c'; set_solver.
   Qed.
 
 End SI_Resources_intantiation.

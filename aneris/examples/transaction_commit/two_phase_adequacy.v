@@ -7,7 +7,8 @@ From aneris.examples.transaction_commit Require Import
 Definition init_state := {|
   state_heaps :=  {["system" := ∅ ]};
   state_sockets := {["system" := ∅ ]};
-  state_ms := ∅; |}.
+  state_ms := ∅; 
+  state_trace := []; |}.
 
 Definition runner_expr := mkExpr "system" runner.
 
@@ -40,7 +41,7 @@ Proof.
   set (Σ := #[anerisΣ (TC_model rms); tcΣ]).
   eapply (@adequacy_safe Σ (TC_model rms) _ _ ips addrs ∅ ∅ ∅);
     [| |set_solver|set_solver|set_solver|set_solver|set_solver|
-      done].
+      done|done].
   { apply tc_model_finitary. }
   iIntros (anG).
   iMod pending_alloc as (γ) "Hpend".
@@ -130,7 +131,7 @@ Proof.
   iIntros "!#".
   iExists (* (λ _ atr, ⌜trace_steps (λ δ _ δ', δ = δ' ∨ TCNext rms δ δ') atr⌝%I) *)
     (λ v, ∃ w, ⌜v = mkVal "system" w⌝ ∗ (λ _, True) w)%I.
-  iIntros "Hf Hhist ? #Hnode _ _ _ _ _ Hfrag".
+  iIntros "Hf Hhist ? #Hnode _ _ _ _ _ Hfrag _ _".
   rewrite (big_sepS_delete _ addrs tm_addr); [|set_solver].
   iDestruct "Hhist" as "[? Hhist]".
   assert (addrs ∖ {[tm_addr]} = rms) as -> by set_solver.

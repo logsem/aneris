@@ -73,6 +73,7 @@ Proof.
   { done. }
   { done. }
   { done. }
+  { done. }
 Qed.
 
 Lemma gcounter_adequacy gcdata (ps : programs_using_gcounters gcdata) :
@@ -100,6 +101,7 @@ Proof.
   { done. }
   { done. }
   { done. }
+  { done. }
   iIntros (?) "".
   iMod (runner_spec with "[]") as (?) "Hwp".
   { apply ps. }
@@ -111,7 +113,7 @@ Proof.
   { iPoseProof (progs_wp ps) as "?"; done. }
   iModIntro.
   iExists (λ v, ∃ w : val, ⌜v = _⌝ ∗ ⌜w = #()⌝)%I.
-  iIntros "Hfx Hmps Hfips Hins Halevs Hsevs Hrevs _ _ Hfst".
+  iIntros "Hfx Hmps Hfips Hins Halevs Hsevs Hrevs _ _ Hfst _ _".
   iMod ("Hwp" with "Hfst Hfx [Hmps] [Hsevs] [Hrevs] [Hfips] [Halevs]") as "[#Hinv Hwp]".
   { assert (Aprogs ps = (⋃ (portssocks ps).*2)) as -> by apply ps. done. }
   { by rewrite big_sepS_list_to_set; last apply gcd_addr_list_NoDup. }

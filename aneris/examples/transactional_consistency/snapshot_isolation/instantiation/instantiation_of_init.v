@@ -56,7 +56,7 @@ From aneris.examples.transactional_consistency.snapshot_isolation.proof.server R
  Notation gnamesTy := (gmapUR socket_address
                                    (agreeR (leibnizO gname))).
 
- Notation csumTy := (csum.csumR (exclR unitR) (agreeR (prodO (prodO (prodO (prodO gnameO gnameO) gnameO) gnameO) gnameO))).
+ Notation csumTy := (csum.csumR (exclR unitR) (agreeR (prodO (prodO (prodO (prodO (prodO gnameO gnameO) gnameO) gnameO) gnameO) gnameO))).
  
 Section Init_setup_proof.
   Context `{!anerisG Mdl Σ, DB : !User_params, !KVSG Σ}.
@@ -78,7 +78,7 @@ Section Init_setup_proof.
              commit_spec.
   Proof.
     iIntros (Hne).
-    iMod (ghost_map_alloc ((gset_to_gmap [] KVS_keys)))
+    iMod (ghost_map_alloc ((gset_to_gmap ([] : list write_event) KVS_keys)))
       as (γGauth) "((HmemG & HmemL) & Hkeys)".
     iMod (own_alloc (● (∅ : snapsTy))) as (γTrs) "HauthTrs";
       first by apply auth_auth_valid.
@@ -145,7 +145,7 @@ Section Init_setup_proof.
           eapply (alloc_local_update); last done.
           apply not_elem_of_dom. set_solver. }
         iModIntro; iExists _; iFrame.
-        iSplit; first (rewrite dom_insert_L; set_solver).
+        iSplit; first by rewrite dom_insert_L Hdom. 
         rewrite big_sepS_insert; last done.
         iFrame. rewrite /client_can_connect. eauto. }
     iMod "HauthClts" as (M) "(HauthClts & %Hdom & Hclts)".
@@ -166,7 +166,6 @@ Section Init_setup_proof.
     iModIntro.
     iExists (SI_resources_instance clients
                γClts γGauth γGsnap γT γTrs srv_si SrvInit).
-    iFrame "#∗".
     iSplitL "Hkeys".
     { 
       rewrite !big_sepM_gset_to_gmap.
@@ -174,8 +173,9 @@ Section Init_setup_proof.
       iApply (big_sepS_mono with "Hkeys").
       iIntros (k Hk) "Hk".
       iExists [].
-      by iFrame. 
+      by iFrame.
     }
+    iFrame "#∗".
     iSplit.
     {  rewrite /KVS_ClientCanConnect //=.
        iApply big_sepS_sep.

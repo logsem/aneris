@@ -49,6 +49,8 @@ Ltac reshape_expr e tac :=
     | SendTo ?e0 (Val ?v1) (Val ?v2)    => add_item (SendToLCtx v1 v2) K e0
     | SendTo ?e0 ?e1 (Val ?v2)          => add_item (SendToMCtx e0 v2) K e1
     | ReceiveFrom ?e                    => add_item ReceiveFromCtx K e
+    | Emit ?e                           => add_item EmitCtx K e
+    | Fresh ?e                          => add_item FreshCtx K e
     end
   with add_item Ki K e := go (Ki :: K) e
   in

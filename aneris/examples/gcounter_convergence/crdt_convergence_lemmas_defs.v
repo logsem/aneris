@@ -24,13 +24,13 @@ Section crdt_convergence_lemmas.
     {∀ (sh : socket_handle) (msg : string) (to : socket_address),
         e ≠ SendTo #(LitSocket sh) #msg #to}.
   Proof.
-    destruct e as [| | | | | | | | | | | | | | | | | | | | | | | | |esh emsg eto| | |];
+    destruct e as [| | | | | | | | | | | | | | | | | | | | | | | | |esh emsg eto| | | | |];
       (try by right; intros ? ? ? Hns; simplify_eq); [].
-    destruct esh as [[[]| | | |]| | | | | | | | | | | | | | | | | | | | | | | | | | | |];
+    destruct esh as [[[]| | | |]| | | | | | | | | | | | | | | | | | | | | | | | | | | | | |];
       (try by right; intros ? ? ? Hns; simplify_eq); [].
-    destruct emsg as [[[]| | | |]| | | | | | | | | | | | | | | | | | | | | | | | | | | |];
+    destruct emsg as [[[]| | | |]| | | | | | | | | | | | | | | | | | | | | | | | | | | | | |];
       (try by right; intros ? ? ? Hns; simplify_eq); [].
-    destruct eto as [[[]| | | |]| | | | | | | | | | | | | | | | | | | | | | | | | | | |];
+    destruct eto as [[[]| | | |]| | | | | | | | | | | | | | | | | | | | | | | | | | | | | |];
       (try by right; intros ? ? ? Hns; simplify_eq); [].
     left; eexists (_, (_, _)); done.
   Qed.

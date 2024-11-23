@@ -293,7 +293,8 @@ Section Aneris_AS.
          (trace_messages_history ex) ∗
        auth_st (trace_last atr) ∗
        ⌜valid_state_evolution ex atr⌝ ∗
-       steps_auth (trace_length ex))%I;
+       steps_auth (trace_length ex) ∗
+       trace_auth (state_trace ((trace_last ex).2)))%I;
     fork_post _ _ := True%I }.
 
 End Aneris_AS.

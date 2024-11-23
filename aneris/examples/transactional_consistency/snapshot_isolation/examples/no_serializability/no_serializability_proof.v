@@ -796,10 +796,11 @@ Definition sa_dom : gset socket_address :=
   {[ server_addr ; client_1_addr; client_2_addr; client_3_addr; client_4_addr ]}.
 
 Definition init_state :=
-  {|
+   {|
     state_heaps := {["system" := ∅ ]};
     state_sockets := {["system" := ∅ ]};
     state_ms := ∅;
+    state_trace := [];
   |}.
 
 Theorem runner_safe :

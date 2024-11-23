@@ -85,6 +85,9 @@ Inductive expr :=
 | ReceiveFrom (e1 : expr)
 | SetReceiveTimeout (e1 : expr) (e2 e3 : expr)
 | Start (ip : base_lit) (e : expr)
+(* Traces *)
+| Emit (e : expr)
+| Fresh (e : expr)
 
 with val :=
 | LitV (l : base_lit)

@@ -277,4 +277,5 @@ Arguments programs_using_gcounters _ : clear implicits.
 Definition init_state := {|
   state_heaps :=  {["system" := ∅ ]};
   state_sockets := {["system" := ∅ ]};
-  state_ms := ∅; |}.
+  state_ms := ∅; 
+  state_trace := []; |}.

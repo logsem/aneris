@@ -100,27 +100,25 @@ Section Specification.
 End Specification.
 
 Section RU_Module.
-  Context `{!anerisG Mdl Σ, !User_params, !KVS_transaction_api}.
+  Context `{!User_params}.
 
-  Definition RU_client_toolbox `{!RU_resources Mdl Σ} : iProp Σ :=
+  Definition RU_client_toolbox `{!anerisG Mdl Σ, !KVS_transaction_api, 
+  !RU_resources Mdl Σ} : iProp Σ :=
     init_kvs_spec ∗ init_client_proxy_spec ∗ read_spec ∗
     write_spec ∗ start_spec ∗ commit_spec.
  
-   Class RU_init := {
-    RU_init_module E (clients : gset socket_address) :
-      ↑KVS_InvName ⊆ E →
-       ⊢ |={E}=>
-      ∃ (res : RU_resources Mdl Σ),
+   Definition RU_spec clients `{!anerisG Mdl Σ} (lib : KVS_transaction_api) : iProp Σ :=
+    ∃ (res : RU_resources Mdl Σ),
         ([∗ set] k ∈ KVS_keys, k ↦ₖ ∅) ∗
         KVS_Init ∗
         GlobalInv ∗
         ([∗ set] sa ∈ clients, KVS_ClientCanConnect sa) ∗
-        init_kvs_spec ∗
-        init_client_proxy_spec ∗
-        read_spec ∗
-        write_spec ∗
-        start_spec ∗
-        commit_spec
+        RU_client_toolbox.
+
+   Class RU_init `{!anerisG Mdl Σ, lib : !KVS_transaction_api} := {
+    RU_init_module E (clients : gset socket_address) :
+      ↑KVS_InvName ⊆ E →
+       ⊢ |={E}=> RU_spec clients lib
      }.
    
 End RU_Module.

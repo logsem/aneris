@@ -59,7 +59,7 @@ Section Proof_of_commit_handler.
       | None => vl = InjLV #()
     end) → 
     {{{ ⌜True⌝ }}}
-      check_at_key #k #ts #(tc + 1) vl @[ip_of_address MTC.(MTS_saddr)]
+      check_at_key #ts #(tc + 1) vl @[ip_of_address MTC.(MTS_saddr)]
     {{{ (br : bool), RET #br;
       (⌜br = true⌝ ∗ ⌜M !! k = Msnap !! k⌝)
       ∨ (⌜br = false⌝ ∗ 
@@ -401,7 +401,7 @@ Section Proof_of_commit_handler.
                       then InjL #()
                       else network_util_code.unSOME "vlsto" 
                     in
-                    check_at_key "k" #ts #(tc + 1) "vs")%V cache
+                    check_at_key #ts #(tc + 1) "vs")%V cache
                     @[ip_of_address MTC.(MTS_saddr)]
     {{{ (b : bool), RET #b; 
       (⌜b = true⌝ ∗ ⌜can_commit ((λ hw, to_hist hw) <$> filter (λ k, k.1 ∈ dom Msnap) M) 
@@ -950,7 +950,7 @@ Section Proof_of_commit_handler.
                                                   else
                                                   network_util_code.unSOME
                                                     "vlsto" in
-                                                  check_at_key "k" "ts" "tc" "vs")
+                                                  check_at_key "ts" "tc" "vs")
                                                "cache" in
                                              if: "b"
                                              then #vnum <- "tc" ;;

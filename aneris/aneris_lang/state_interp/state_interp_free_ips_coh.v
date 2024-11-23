@@ -186,7 +186,8 @@ Lemma free_ips_coh_update_msg sh a skt Sn r m σ1 :
     free_ips_coh
       {| state_heaps := state_heaps σ;
          state_sockets := <[ip:=Sn']> (state_sockets σ);
-         state_ms := state_ms σ |}.
+         state_ms := state_ms σ;
+         state_trace := state_trace σ  |}.
   Proof.
     rewrite /free_ips_coh /=.
     iDestruct 1 as (Fip Piu (Hdsj & HFip)) "[HfCtx HpCtx]".
@@ -238,16 +239,18 @@ Lemma free_ips_coh_update_msg sh a skt Sn r m σ1 :
       -- simplify_map_eq. eapply HFip; eauto.
   Qed.
 
-  Lemma free_ips_coh_ms hps skts ms1 ms2 :
+  Lemma free_ips_coh_ms hps skts ms1 ms2 trace1 trace2:
     free_ips_coh {|
       state_heaps := hps;
       state_sockets := skts;
       state_ms := ms1;
+      state_trace := trace1 
       |} -∗
     free_ips_coh {|
       state_heaps := hps;
       state_sockets := skts;
       state_ms := ms2;
+      state_trace := trace2
     |}.
   Proof. done. Qed.
 

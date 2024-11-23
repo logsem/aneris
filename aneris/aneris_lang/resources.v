@@ -1,6 +1,6 @@
 From stdpp Require Import fin_maps gmap.
 From iris.algebra Require Import auth gmap frac agree coPset
-     gset frac_auth ofe excl.
+     gset frac_auth ofe excl list.
 From iris.bi.lib Require Import fractional.
 From iris.base_logic.lib Require Import saved_prop invariants mono_nat.
 From iris.proofmode Require Import tactics.
@@ -75,6 +75,9 @@ Definition aneris_events := event_obs aneris_lang.
 
 Canonical Structure aneris_eventsO := leibnizO aneris_events.
 
+Canonical Structure eventO := leibnizO val.
+Canonical Structure traceO := leibnizO (list val).
+
 (** The system CMRA *)
 Class anerisG (Mdl : Model) Σ :=
   AnerisG {
@@ -124,6 +127,11 @@ Class anerisG (Mdl : Model) Σ :=
       aneris_receiveonEVS_name : gname;
       aneris_observed_send_name : gname;
       aneris_observed_recv_name : gname;
+     (** traces *)
+     aneris_trace_histG :> inG Σ (authR (gmapUR nat (agreeR eventO)));
+     aneris_trace_hist_name : gname;
+     aneris_traceG :> inG Σ (frac_authR (agreeR traceO));
+     aneris_trace_name : gname;
     }.
 
 Class anerisPreG Σ (Mdl : Model) :=
@@ -148,6 +156,8 @@ Class anerisPreG Σ (Mdl : Model) :=
         inG Σ (authUR (gmapUR string (exclR aneris_eventsO)));
       anerisPre_sendreceiveEVSG :>
         inG Σ (authUR (gmapUR socket_address_group (exclR aneris_eventsO)));
+      anerisPre_trace_histG :> inG Σ (authR (gmapUR nat (agreeR eventO)));
+      anerisPre_traceG :> inG Σ (frac_authR (agreeR traceO));
     }.
 
 Definition anerisΣ (Mdl : Model) : gFunctors :=
@@ -166,7 +176,9 @@ Definition anerisΣ (Mdl : Model) : gFunctors :=
    GFunctor (authUR (optionUR (exclR (ModelO Mdl))));
    mono_natΣ;
    GFunctor (authUR (gmapUR string (exclR aneris_eventsO)));
-   GFunctor (authUR (gmapUR socket_address_group (exclR aneris_eventsO)))
+   GFunctor (authUR (gmapUR socket_address_group (exclR aneris_eventsO)));
+   GFunctor (authR (gmapUR nat (agreeR eventO)));
+   GFunctor (frac_authR (agreeR traceO))
    ].
 
 #[global] Instance subG_anerisPreG {Σ Mdl} :
@@ -424,6 +436,42 @@ Section definitions.
   (** Steps *)
   Definition steps_auth n := mono_nat_auth_own aneris_steps_name 1 n.
   Definition steps_lb n := mono_nat_lb_own aneris_steps_name n.
+
+  (** Traces *)
+  Fixpoint gmap_of_trace {A} (n: nat) (l: list A): gmap nat (agree (leibnizO A)) :=
+  match l with
+  | nil => ∅
+  | x :: l' => <[ n := to_agree x ]> (gmap_of_trace (S n) l')
+  end.
+
+  Lemma gmap_of_trace_snoc {A} n (l: list A) (a: A):
+    gmap_of_trace n (l ++ [a]) =
+    <[ (n + length l)%nat := to_agree a ]> (gmap_of_trace n l).
+  Proof.
+    revert n. induction l as [| x l].
+    { cbn. intros. by rewrite Nat.add_0_r. }
+    { intros. cbn. rewrite IHl /= -Nat.add_succ_r insert_commute //. lia. }
+  Qed.
+
+  Lemma gmap_of_trace_dom {A} (n: nat) (l: list A) k :
+    k ∈ dom (gmap_of_trace n l) ↔ (n ≤ k < n + length l)%nat.
+  Proof.
+    revert n. induction l.
+    { intros. cbn. rewrite dom_empty_L elem_of_empty. lia. }
+    { intros. cbn. rewrite dom_insert_L elem_of_union elem_of_singleton IHl. lia. }
+  Qed.
+
+  Definition trace_auth (t: list val) :=
+    (own aneris_trace_name (●F (to_agree (t: traceO))))%I.
+  Definition trace_hist (t: list val) :=
+    own aneris_trace_hist_name (◯ (gmap_of_trace 0 t)).
+  Definition trace_half_frag (t: list val) :=
+    own aneris_trace_name (◯F{1/2} (to_agree (t: traceO))).
+  Definition trace_is (t: list val) :=
+    (trace_half_frag t ∗ own aneris_trace_hist_name (● gmap_of_trace 0 t) ∗ trace_hist t)%I.
+
+  Definition trace_inv (N: namespace) (I: list val → Prop) :=
+    inv N (∃ t, trace_half_frag t ∗ ⌜I t⌝).
 
 End definitions.
 
@@ -731,7 +779,6 @@ Proof.
   iIntros "#Hgs #HAs #HAr".
   iMod (gen_heap_light_init
           (∅ : gmap socket_address_group (message_soup * message_soup))) as (γ) "Hctx".
-
   set σ' := (gset_to_gmap ((∅, ∅) : message_soup * message_soup) gs).
   iMod (gen_heap_light_alloc_gen _ σ' with "Hctx") as "[Hctx HB]".
   { apply map_disjoint_empty_r. }
@@ -876,6 +923,32 @@ Proof.
   rewrite -!elem_of_elements HMF //.
 Qed.
 
+Lemma gmap_of_trace_valid {A} (l: list A) (n: nat):
+  ✓ gmap_of_trace n l.
+Proof.
+  revert n. induction l.
+  { cbn. done. }
+  { intro. cbn. eapply (@insert_valid _ _ _ (agreeR (leibnizO A))); eauto; done. }
+Qed.
+
+Lemma trace_auth_init `{anerisPreG Σ Mdl} (t: list val) :
+  ⊢ |==> ∃ γ γH, own (A := (frac_authR (agreeR traceO))) γ (●F (to_agree (t: traceO))) ∗ 
+                 (own (A := (frac_authR (agreeR traceO))) γ (◯F{1/2} (to_agree (t: traceO))) ∗ 
+                  own (A := (authR (gmapUR nat (agreeR eventO)))) γH (● gmap_of_trace 0 t) ∗ 
+                  own (A := (authR (gmapUR nat (agreeR eventO)))) γH (◯ (gmap_of_trace 0 t))) ∗ 
+                 own (A := (frac_authR (agreeR traceO))) γ (◯F{1/2} (to_agree (t: traceO))).
+Proof.
+  iMod (own_alloc (●F (to_agree (t: traceO)) ⋅ ◯F (to_agree (t: traceO)))) as (γ) "Hγ".
+  by apply frac_auth_valid.
+  rewrite own_op. iDestruct "Hγ" as "[? Hγf]".
+  iMod (own_alloc (● gmap_of_trace 0 t ⋅ ◯ gmap_of_trace 0 t)) as (γh) "Hγh".
+  apply auth_both_valid. split; [ done | by apply gmap_of_trace_valid].
+  rewrite own_op. iDestruct "Hγh" as "[? ?]".
+  iModIntro. iExists γ, γh.
+  iFrame.
+  rewrite -own_op -frac_auth_frag_op Qp.half_half agree_idemp //.
+Qed.
+
 Section resource_lemmas.
   Context `{aG : !anerisG Mdl Σ}.
 
@@ -1011,7 +1084,8 @@ Section resource_lemmas.
     iMod ("IHips" $! _
                   (mkState (delete ip $ state_heaps σ)
                            (delete ip $ state_sockets σ)
-                           (state_ms σ)) with "[] [] [] Hγs") as "Hγs".
+                           (state_ms σ)
+                           (state_trace σ)) with "[] [] [] Hγs") as "Hγs".
     { iPureIntro. set_solver. }
     { iPureIntro. set_solver. }
     { iPureIntro. set_solver. }
@@ -1719,6 +1793,116 @@ Section resource_lemmas.
   Proof.
     iIntros "Hauth".
     iMod (mono_nat_own_update with "Hauth") as "[$ _]"; [lia|done].
+  Qed.
+
+  (** Traces *)
+
+  #[global] Instance trace_hist_persistent (t: list val): Persistent (trace_hist t) := _.
+
+  Lemma alloc_trace_hist t :
+    trace_is t -∗ trace_is t ∗ trace_hist t.
+  Proof.
+    rewrite /trace_is /trace_hist. iIntros "(? & ? & #H)". iFrame "H ∗".
+  Qed.
+
+  Lemma trace_auth_half_frag_agree t t':
+    trace_auth t -∗ trace_half_frag t' -∗ ⌜t = t'⌝.
+  Proof.
+    rewrite /trace_auth /trace_is.
+    iIntros "H1 H2".
+    iDestruct (own_valid_2 with "H1 H2") as "H".
+    iDestruct "H" as %Hi%frac_auth_included.
+    rewrite -> Some_included_total in Hi.
+    apply to_agree_included, leibniz_equiv in Hi. eauto.
+  Qed.
+
+  Lemma trace_agree t t':
+    trace_auth t -∗ trace_is t' -∗ ⌜t = t'⌝.
+  Proof.
+    iIntros "H1 (H2 & _ & _)". iApply (trace_auth_half_frag_agree with "H1 H2").
+  Qed.
+  (* Search (_ + _). *)
+  Lemma trace_half_frag_agree t t':
+    trace_half_frag t -∗ trace_is t' -∗ ⌜t = t'⌝.
+  Proof.
+    rewrite /trace_is /trace_half_frag.
+    iIntros "H1 (H2 & _ & _)".
+    iDestruct (own_valid_2 with "H1 H2") as "H".
+    rewrite -frac_auth_frag_op Qp.half_half.
+    iDestruct "H" as %Hv. rewrite frac_auth_frag_valid in Hv.
+    destruct Hv as [_ Hv].
+    by apply to_agree_op_inv in Hv.
+  Qed.
+
+  Lemma trace_add_event t (e: val) :
+    trace_auth t -∗ trace_is t -∗ trace_half_frag t ==∗
+    trace_auth (t ++ [e]) ∗ trace_is (t ++ [e]) ∗ trace_half_frag (t ++ [e]).
+  Proof.
+    rewrite /trace_auth /trace_is /trace_hist.
+    iIntros "H1 (H2 & H2ha & H2h) H3".
+    iDestruct (own_op with "[$H2 $H3]") as "H2".
+    rewrite -frac_auth_frag_op Qp.half_half agree_idemp.
+    iMod (own_update_2 _ _ _ (●F (to_agree (t++[e] : traceO)) ⋅ ◯F (to_agree (t++[e] : traceO))) with "H1 H2") as "[? ?]".
+    by apply frac_auth_update_1.
+    rewrite gmap_of_trace_snoc Nat.add_0_l.
+    iMod (own_update_2 with "H2ha H2h") as "[? ?]".
+    apply auth_update.
+    eapply (alloc_local_update _ _ (length t : nat) (to_agree (e:eventO))); [|done].
+    { eapply not_elem_of_dom. intros ?%gmap_of_trace_dom. lia. }
+    iModIntro. iFrame.
+    rewrite /trace_half_frag -own_op -frac_auth_frag_op Qp.half_half agree_idemp //.
+    Unshelve. all: typeclasses eauto.
+  Qed.
+
+  Lemma gmap_of_trace_hist_valid_prefix {A} n (t: list A) h :
+    ✓ gmap_of_trace n t →
+    gmap_of_trace n h ≼ gmap_of_trace n t →
+    h `prefix_of` t.
+  Proof.
+    revert n t. induction h as [| a h].
+    { cbn. intros. apply prefix_nil. }
+    { intros n t Hv Hsub.
+      pose proof (proj1 (lookup_included _ _) Hsub) as Hsub'.
+      destruct t as [| e t].
+      { exfalso. specialize (Hsub' n).
+        rewrite /= lookup_insert lookup_empty in Hsub'.
+        apply option_included in Hsub' as [HH|(? & ? & ? & HH & ?)]; inversion HH. }
+      specialize (Hsub' n). rewrite /= !lookup_insert in Hsub'.
+      eapply (proj1 (Some_included_total _ _)) in Hsub'.
+      eapply (proj1 (to_agree_included (a:leibnizO A) e)) in Hsub'.
+      apply leibniz_equiv in Hsub'. subst e.
+      cbn in Hsub.
+      apply (delete_valid _ n) in Hv. rewrite /= delete_insert in Hv.
+      2: { eapply not_elem_of_dom. intros ?%gmap_of_trace_dom. lia. }
+      assert (gmap_of_trace (S n) h ≼ gmap_of_trace (S n) t).
+      { apply lookup_included. intros i.
+        eapply (proj1 (lookup_included _ _)) with i in Hsub.
+        destruct (decide (i = n)); subst.
+        { rewrite (_ : gmap_of_trace (S n) h !! n = None).
+          rewrite (_ : gmap_of_trace (S n) t !! n = None) //.
+          all: eapply not_elem_of_dom.
+          all: intros ?%gmap_of_trace_dom; lia. }
+        rewrite !lookup_insert_ne // in Hsub. }
+      eapply prefix_cons, IHh; eauto. }
+    Unshelve. all: typeclasses eauto.
+  Qed.
+
+  Lemma trace_hist_trace_is_prefix t h :
+    trace_is t -∗ trace_hist h -∗ ⌜ h `prefix_of` t ⌝.
+  Proof.
+    rewrite /trace_is /trace_hist. iIntros "(H1 & H2 & H3) H4".
+    iDestruct (own_op with "[$H2 $H4]") as "H".
+    iDestruct (own_valid with "H") as %[Hsub Hv]%auth_both_valid_discrete.
+    iPureIntro. eapply gmap_of_trace_hist_valid_prefix; eauto.
+  Qed.
+
+  Lemma trace_is_inv t N I :
+    trace_is t -∗ trace_inv N I ={⊤}=∗ trace_is t ∗ ⌜ I t ⌝.
+  Proof.
+    iIntros "Ht Hi". unfold trace_inv.
+    iInv N as ">H" "Hclose". iDestruct "H" as (t') "(Ht' & %)".
+    iDestruct (trace_half_frag_agree with "[$] [$]") as %->.
+    iMod ("Hclose" with "[Ht']"). eauto. iIntros "!>". eauto.
   Qed.
 
 End resource_lemmas.

@@ -443,9 +443,10 @@ End proof_of_main.
 
 Definition init_state :=
   {|
-    state_heaps := {[ "system" := ∅ ]};
-    state_sockets := {[ "system" := ∅ ]};
+    state_heaps := {["system" := ∅ ]};
+    state_sockets := {["system" := ∅ ]};
     state_ms := ∅;
+    state_trace := [];
   |}.
 
 Definition dummy_model := model unit (fun x y => True) ().

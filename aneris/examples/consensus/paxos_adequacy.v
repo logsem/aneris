@@ -8,7 +8,8 @@ From aneris.aneris_lang Require Import tactics proofmode.
 Definition init_state := {|
   state_heaps :=  {["system" := ∅ ]};
   state_sockets := {["system" := ∅ ]};
-  state_ms := ∅; |}.
+  state_ms := ∅; 
+  state_trace := []; |}.
 
 Definition socket_interp `{!paxosG Σ params} sa : socket_interp Σ :=
   match sa with
@@ -303,13 +304,14 @@ Proof.
   { set_solver. }
   { set_solver. }
   { set_solver. }
+  { set_solver. }
   iIntros (anG).
   iMod paxos_res_alloc as
       (γM γP γmv γmb) "(HM & HM' & Hpend0 & Hpend1 & Hmv_ctx & Hmb_ctx & Has)".
   set (paxosGI := Build_paxosG Σ runner_topo _ γM _ γP _ γmb _ γmv).
   iIntros "!#".
   iExists (λ v, ∃ w, ⌜v = mkVal "system" w⌝ ∗ (λ _, True) w)%I.
-  iIntros "Hf Hhist ? #Hnode _ _ _ _ _ Hfrag".
+  iIntros "Hf Hhist ? #Hnode _ _ _ _ _ Hfrag _ _".
   iDestruct (big_sepS_union with "Hhist") as "[Hhist Hclient]"; [set_solver|].
   iPoseProof (big_sepS_singleton with "Hclient") as "Hclient".
   iDestruct (big_sepS_union with "Hhist") as "[Hhist Hlearners]"; [set_solver|].

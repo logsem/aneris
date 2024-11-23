@@ -11,7 +11,7 @@ Recent documentation of Aneris is available [`here`](documentation.pdf).
 
 ## Compiling
 
-The project maintains compatibility with Coq 8.17 and relies on `coqc` being
+The project maintains compatibility with Coq 8.18 and relies on `coqc` being
 available in your shell. Clone the external git submodule dependencies using
 
     git submodule update --init --recursive
@@ -80,7 +80,7 @@ You can now run
 at the root of the repository to generate Coq files from the OCaml sources in
 [`ml_sources`](/ml_sources). To compile the source files, run
 
-    dune build
+    dune build --root .
 
 at the root of the repository.
 
@@ -105,7 +105,23 @@ Nieto](https://abeln.github.io/), [Amin Timany](https://cs.au.dk/~timany/), and
 [Lars Birkedal](https://cs.au.dk/~birke/). This development is available in the
 [aneris/examples/ccddb](aneris/examples/ccddb) folder.
 
-A [preprint](https://iris-project.org/pdfs/2021-submitted-trillium.pdf) is
-available describing Trillium, a program logic framework for both proving
+[Trillium](https://iris-project.org/pdfs/2024-popl-trillium.pdf) 
+is a program logic framework for both proving
 partial correctness properties and trace properties; Aneris is now an
 instantiation of the Trillium framework.
+
+Aneris also supports trace-based reasoning to establish free theorems using the 
+the method described in [Theorems for Free from Separation Logic Specifications](https://iris-project.org/pdfs/2021-icfp-intensional-final.pdf). 
+In fact, parts of the Coq development accompaying the paper 
+are injected into the Aneris program logic. 
+For completeness, this concerns elements in the files: 
+
+- aneris/aneris_lang/ast.v
+- aneris/aneris_lang/lang.v 
+- aneris/aneris_lang/resources.v
+- aneris/aneris_lang/adequacy.v 
+- aneris/aneris_lang/lifting.v
+- aneris/aneris_lang/resources.v
+- aneris/aneris_lang/state_interp/state_interp_def.v
+- aneris/aneris_lang/adequacy_trace.v
+- aneris/aneris_lang/program_logic/aneris_lifting.v

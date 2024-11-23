@@ -106,28 +106,25 @@ Section Specification.
 End Specification.
 
 Section SI_Module.
-  Context `{!anerisG Mdl Σ, !User_params,
-            !KVSG Σ, !KVS_transaction_api}.
+  Context `{!User_params, !KVSG Σ}.
 
-  Definition SI_client_toolbox `{!SI_resources Mdl Σ} : iProp Σ :=
+  Definition SI_client_toolbox `{!anerisG Mdl Σ, !KVS_transaction_api, 
+  !SI_resources Mdl Σ} : iProp Σ :=
     init_kvs_spec ∗ init_client_proxy_spec ∗ read_spec ∗
     write_spec ∗ start_spec ∗ commit_spec.
- 
-   Class SI_init := {
-    SI_init_module E (clients : gset socket_address) :
-      ↑KVS_InvName ⊆ E →
-       ⊢ |={E}=>
-      ∃ (res : SI_resources Mdl Σ),
+
+  Definition SI_spec clients `{!anerisG Mdl Σ} (lib : KVS_transaction_api) : iProp Σ :=
+    ∃ (res : SI_resources Mdl Σ),
         ([∗ set] k ∈ KVS_keys, k ↦ₖ []) ∗
         KVS_Init ∗
         GlobalInv ∗
         ([∗ set] sa ∈ clients, KVS_ClientCanConnect sa) ∗
-        init_kvs_spec ∗
-        init_client_proxy_spec ∗
-        read_spec ∗
-        write_spec ∗
-        start_spec ∗
-        commit_spec
+        SI_client_toolbox.
+ 
+   Class SI_init `{!anerisG Mdl Σ, lib : !KVS_transaction_api} := {
+    SI_init_module E (clients : gset socket_address) :
+      ↑KVS_InvName ⊆ E →
+       ⊢ |={E}=> SI_spec clients lib
      }.
    
 End SI_Module.

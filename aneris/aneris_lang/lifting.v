@@ -141,6 +141,11 @@ Proof. solve_atomic. Qed.
     Atomic s (mkExpr n (SetReceiveTimeout (Val v0) (Val v1) (Val v2))).
 Proof. solve_atomic. Qed.
 
+#[global] Instance emit_atomic n s v : Atomic s (mkExpr n (Emit (Val v))).
+Proof. solve_atomic. Qed.
+#[global] Instance fresh_atomic n s v : Atomic s (mkExpr n (ast.Fresh (Val v))).
+Proof. solve_atomic. Qed.
+
 #[global] Instance receive_from_stutteringatomic n sh s :
   StutteringAtomic s (mkExpr n (ReceiveFrom (Val $ LitV $ sh))).
 Proof.
@@ -274,7 +279,7 @@ Section primitive_laws.
   Proof.
     refine ({| stuttering_label := () |}).
 
-    iIntros (ex atr c δ ? ? Hval Hc Hδ) "(? & ? & ? & ? & Hauth)".
+    iIntros (ex atr c δ ? ? Hval Hc Hδ) "(? & ? & ? & ? & Hauth & ?)".
     rewrite /state_interp /=.
     rewrite (last_eq_trace_ends_in ex c) //=.
     rewrite (last_eq_trace_ends_in atr δ) //=.
@@ -291,7 +296,7 @@ Section primitive_laws.
   Proof.
     refine ({| pure_label := () |}).
 
-    iIntros (ex atr tp tp' σ δ ? ? ? Hex Hδ) "(?&?&?&?&Hauth)".
+    iIntros (ex atr tp tp' σ δ ? ? ? Hex Hδ) "(?&?&?&?&Hauth&?)".
     rewrite /state_interp /=.
     rewrite (last_eq_trace_ends_in ex (tp, σ)) //=.
     rewrite (last_eq_trace_ends_in atr δ) //=.
@@ -308,7 +313,7 @@ Section primitive_laws.
     WP (mkExpr n (Fork e)) @ k; (n, tid); E {{ Φ }}.
   Proof.
     iIntros "[HΦ He]". iApply wp_lift_atomic_head_step; [done|].
-    iIntros (ex atr K tp1 tp2 σ1 Hexvalid Hex Hlocale) "(?&?&?&%&Hauth) !>".
+    iIntros (ex atr K tp1 tp2 σ1 Hexvalid Hex Hlocale) "(?&?&?&%&Hauth&?) !>".
     iSplit.
     - iPureIntro. solve_exec_safe.
     - iIntros (e2 σ2 efs Hstep).
@@ -342,7 +347,7 @@ Section primitive_laws.
   Proof.
     iIntros (Φ) "[>Hn Haevs] HΦ".
     iApply wp_lift_atomic_head_step_no_fork; auto.
-    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth) !> /=".
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth & ?) !> /=".
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (is_node_heap_valid with "Hσ Hn") as (h) "%".
     iSplitR; [by iPureIntro; do 3 eexists; eapply LocalStepS; eauto | ].
@@ -406,7 +411,7 @@ Section primitive_laws.
     {{{ RET (mkVal n v); l ↦[n]{q} v }}}.
   Proof.
     iIntros (Φ) ">Hl HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
-    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth) !> /=".
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth & ?) !> /=".
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_heap_valid with "Hσ Hl") as (h) "[% %]".
     iSplit.
@@ -431,7 +436,7 @@ Section primitive_laws.
     {{{ RET (mkVal n #()); l ↦[n] v2 }}}.
   Proof. 
     iIntros (Φ) ">Hl HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
-    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth) !> /=".
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth & ?) !> /=".
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_heap_valid with "Hσ Hl") as (h) "[% %]".
     iSplit. { iPureIntro; do 3 eexists. eapply LocalStepS; eauto. econstructor. eauto. }
@@ -458,7 +463,7 @@ Section primitive_laws.
   Proof.
     iIntros (Heq Φ) ">Hl HΦ".
     iApply wp_lift_atomic_head_step_no_fork; auto.
-    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth) !> /=".
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth & ?) !> /=".
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_heap_valid with "Hσ Hl") as (h) "[% %]".
     iSplit.
@@ -484,7 +489,7 @@ Section primitive_laws.
     {{{ RET (mkVal n #true); l ↦[n] v2 }}}.
   Proof.
     iIntros (Φ) ">Hl HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
-    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth) !> /=".
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth & ?) !> /=".
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_heap_valid with "Hσ Hl") as (h) "[% %]".
     iSplit.
@@ -510,7 +515,7 @@ Section primitive_laws.
     {{{ (r : Z), RET (mkVal n #r); ⌜(r >= 0) ∧ (r < u)⌝%Z }}}.
   Proof.
     iIntros (Φ) "(> #Hin & %Hm) HΦ". iApply wp_lift_atomic_head_step_no_fork; auto.
-    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & %Hve & Hsteps) !> /=".
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & %Hve & Hsteps & ?) !> /=".
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (is_node_heap_valid with "Hσ Hin") as (h) "%Hlookup". simpl in Hlookup.
     iSplit.
@@ -542,7 +547,7 @@ Section primitive_laws.
   Proof.
     iIntros "(>Hnode & >Hfip & HΦ & Hwp)".
     iApply (wp_lift_head_step with "[-]"); first auto.
-    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex) "(Hevs & Hσ & Hm & % & Hauth) /=".
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex) "(Hevs & Hσ & Hm & % & Hauth & ?) /=".
     iDestruct (is_node_heap_valid with "Hσ Hnode") as %[h Hsome].
     iDestruct (aneris_state_interp_free_ip_valid with "Hσ Hfip") as %[Hnone _].
     rewrite (last_eq_trace_ends_in _ _ Hex).
@@ -578,7 +583,7 @@ Section primitive_laws.
   Proof.
     iIntros (Φ) ">Hn HΦ".
     iApply wp_lift_atomic_head_step_no_fork; first auto.
-    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth) !> /=".
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth & ?) !> /=".
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (is_node_valid_sockets with "Hσ Hn") as (?) "%".
     iSplitR.
@@ -618,7 +623,7 @@ Section primitive_laws.
     iIntros (? Φ) "(>Hp & >Hsh) HΦ".
     iApply wp_lift_atomic_head_step_no_fork; first auto.
     iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale)
-            "(Hevs & Hσ & Hm & % & Hauth) !> /=".
+            "(Hevs & Hσ & Hm & % & Hauth & ?) !> /=".
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
       as (Sn r) "[%HSn (%Hr & %Hreset)]". 
@@ -658,7 +663,7 @@ Section primitive_laws.
     iIntros (? Φ) "(>Hp & >Hsh) HΦ".
     iApply wp_lift_atomic_head_step_no_fork; first auto.
     iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale)
-            "(Hevs & Hσ & Hm & % & Hauth) !> /=".
+            "(Hevs & Hσ & Hm & % & Hauth & ?) !> /=".
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
       as (Sn r) "[%HSn (%Hr & %Hreset)]".
@@ -720,7 +725,7 @@ Section primitive_laws.
                else (∃ m', ⌜msg ≡g{sagT,sagR} m'⌝ ∗ sagR ⤇* φ ∗ φ m'))%I with "[Hmsg]" as "Hmsg".
     { destruct is_dup; iNext; done. }
     iApply wp_lift_atomic_head_step_no_fork; auto.
-    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth) /=".
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth & ?) /=".
     iMod (steps_auth_update_S with "Hauth") as "Hauth".
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
@@ -1125,7 +1130,7 @@ Section primitive_laws.
     iDestruct (elem_of_group_unfold with "HinR") as "[%HsagR _]".
     iLöb as "IH".
     iApply wp_lift_head_step; auto.
-    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex) "(Hevs & Hσ & Hm & % & Hauth) /=".
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex) "(Hevs & Hσ & Hm & % & Hauth & ?) /=".
     iMod (steps_auth_update_S with "Hauth") as "Hauth".
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
@@ -1330,7 +1335,7 @@ Section primitive_laws.
     iIntros (Hskt Φ) "(>Hsh & >Hrt & #HΨ & Htrck) HΦ /=".
     iLöb as "IH".
     iApply wp_lift_head_step; auto.
-    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex) "(Hevs & Hσ & Hm & % & Hauth) /=".
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex) "(Hevs & Hσ & Hm & % & Hauth & ?) /=".
     iMod (steps_auth_update_S with "Hauth") as "Hauth".
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
@@ -2179,7 +2184,7 @@ Section primitive_laws.
   Proof.
     iIntros (??? Φ) ">Hsh HΦ".
     iApply wp_lift_atomic_head_step_no_fork; first auto.
-    iIntros (ex atr K tp1 tp2 σ1 Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth) /=".
+    iIntros (ex atr K tp1 tp2 σ1 Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth & ?) /=".
     iMod (steps_auth_update_S with "Hauth") as "Hauth".
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
@@ -2217,7 +2222,7 @@ Section primitive_laws.
   Proof.
     iIntros (?? Φ) ">Hsh HΦ".
     iApply wp_lift_atomic_head_step_no_fork; first auto.
-    iIntros (ex atr K tp1 tp2 σ1 Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth) /=".
+    iIntros (ex atr K tp1 tp2 σ1 Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth & ?) /=".
     iMod (steps_auth_update_S with "Hauth") as "Hauth".
     rewrite (last_eq_trace_ends_in _ _ Hex).
     iDestruct (aneris_state_interp_socket_valid with "Hσ Hsh")
@@ -2240,6 +2245,79 @@ Section primitive_laws.
     iFrame.
     iSplit; [ iPureIntro; apply user_model_evolution_id |].
     iApply ("HΦ" with "[$]").
+  Qed.
+
+  Lemma wp_emit n k E ζ tr v N (I: list val → Prop) :
+    ↑N ⊆ E →
+    I (tr ++ [v]) →
+    {{{ trace_is tr ∗ trace_inv N I }}}
+      (mkExpr n (Emit v)) @ k; ζ; E
+    {{{ RET (mkVal n #()); trace_is (tr ++ [v]) }}}.
+  Proof.
+    iIntros (Hl HI Φ) "[Ht Hi] HΦ".
+    iApply wp_lift_atomic_head_step_no_fork; auto.
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth & Htrace) !> /=".
+    rewrite (last_eq_trace_ends_in _ _ Hex).
+    iSplit.
+    { iPureIntro. do 3 eexists. apply EmitStepS; eauto. }
+    iIntros (v2 σ2 efs Hstep). 
+    pose proof Hex as Htrig.
+    eapply aneris_events_state_interp_no_triggered in Htrig;
+      [|done|done|done|done|done].
+    inv_head_step.
+    iNext.
+    iInv "Hi" as ">Hi" "Hclose".
+    iDestruct "Hi" as (tr') "[Htr' _]".
+    iDestruct (trace_half_frag_agree with "Htr' Ht") as %->.
+    iDestruct (trace_agree with "Htrace Ht") as %<-.
+    iMod (trace_add_event with "Htrace Ht Htr'") as "(Htrace & Ht & Htr')".
+    iMod ("Hclose" with "[Htr']"). 
+    { iNext. eauto. }
+    iMod (steps_auth_update_S with "Hauth") as "Hauth".
+    iModIntro.
+    simplify_eq /=.
+    iExists _, ().
+    rewrite -message_history_evolution_id Htrig; iFrame.
+    iSplit; first done.
+    iSplitR "HΦ Ht"; [|by iApply "HΦ"].
+    iPureIntro; apply user_model_evolution_id.
+  Qed.
+
+  Lemma wp_fresh n k E ζ tr v N (I: list val → Prop) :
+    ↑N ⊆ E →
+    (∀ (tag : string), tag ∉ tags tr → I (tr ++ [(#tag, v)%V])) →
+    {{{ trace_is tr ∗ trace_inv N I }}}
+      (mkExpr n (ast.Fresh v)) @ k; ζ; E
+    {{{ (tag : string), RET (mkVal n #tag); trace_is (tr ++ [(#tag, v)%V]) ∗ ⌜tag ∉ tags tr⌝ }}}.
+  Proof.
+    iIntros (Hl HI Φ) "[Ht Hi] HΦ".
+    iApply wp_lift_atomic_head_step_no_fork; auto.
+    iIntros (ex atr K tp1 tp2 σ Hexvalid Hex Hlocale) "(Hevs & Hσ & Hm & % & Hauth & Htrace) !> /=".
+    rewrite (last_eq_trace_ends_in _ _ Hex).
+    pose proof (infinite_is_fresh (tags (state_trace σ))).
+    iSplit.
+    { iPureIntro. do 3 eexists. apply FreshStepS; eauto. }
+    iIntros (v2 σ2 efs Hstep). 
+    pose proof Hex as Htrig.
+    eapply aneris_events_state_interp_no_triggered in Htrig;
+      [|done|done|done|done|done].
+    inv_head_step.
+    iNext.
+    iInv "Hi" as ">Hi" "Hclose".
+    iDestruct "Hi" as (tr') "[Htr' _]".
+    iDestruct (trace_half_frag_agree with "Htr' Ht") as %->.
+    iDestruct (trace_agree with "Htrace Ht") as %<-.
+    iMod (trace_add_event with "Htrace Ht Htr'") as "(Htrace & Ht & Htr')".
+    iMod ("Hclose" with "[Htr']"). 
+    { iNext. eauto. }
+    iMod (steps_auth_update_S with "Hauth") as "Hauth".
+    iModIntro.
+    simplify_eq /=.
+    iExists _, ().
+    rewrite -message_history_evolution_id Htrig; iFrame.
+    iSplit; first done.
+    iSplitR "HΦ Ht"; [iPureIntro; apply user_model_evolution_id|].
+    by iApply "HΦ"; iFrame.
   Qed.
 
 End primitive_laws.

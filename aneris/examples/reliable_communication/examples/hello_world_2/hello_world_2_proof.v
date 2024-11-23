@@ -278,6 +278,7 @@ Definition init_state :=
     state_heaps := {[ "system" := ∅ ]};
     state_sockets := {[ "system" := ∅ ]};
     state_ms := ∅;
+    state_trace := [];
   |}.
 
 From aneris.examples.reliable_communication.resources

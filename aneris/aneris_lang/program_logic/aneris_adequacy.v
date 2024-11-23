@@ -63,9 +63,11 @@ Theorem adequacy_multiple_strong Σ Mdl `{anerisPreG Σ Mdl} `{EqDecision (aneri
   map_Forall (λ ip s, socket_addresses_coh s ip) (state_sockets σ) →
   (* Message soup is initially empty *)
   state_ms σ = ∅ →
+  (* Trace is initially empty *)
+  state_trace σ = [] →
   aneris_adequate_multiple es σ φs.
 Proof.
-  intros Hlen HMdlfin Hwp Hsendle Hrecvle Hσ Hskts Hports Hbs Hcoh1 Hcoh2 Hms.
+  intros Hlen HMdlfin Hwp Hsendle Hrecvle Hσ Hskts Hports Hbs Hcoh1 Hcoh2 Hms Htrace.
   rewrite /aneris_adequate_multiple.
   rewrite /aneris_adequate_multiple. simpl.
   eapply (adequacy_multiple_strong A _ obs_send_sas obs_rec_sas);
@@ -119,9 +121,10 @@ Theorem adequacy_multiple Σ Mdl `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_tr
   state_heaps σ = gset_to_gmap ∅ $ get_ips es →
   state_sockets σ = gset_to_gmap ∅ $ get_ips es →
   state_ms σ = ∅ →
+  state_trace σ = [] →
   aneris_adequate_multiple es σ φs.
 Proof.
-  intros Hlen HMdlfin Hwp Hsendle Hrecvle Hσ Hskts Hms.
+  intros Hlen HMdlfin Hwp Hsendle Hrecvle Hσ Hskts Hms Htrace.
   eapply (adequacy_multiple A _ obs_send_sas obs_rec_sas);
     [done|done|done|done| |done..].
   intros dg.
@@ -176,12 +179,13 @@ Theorem adequacy_groups Σ Mdl `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trac
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
+  state_trace σ = [] →
   aneris_adequate e ip σ φ.
 Proof.
   intros Hdisj Hne Hsendle Hrecvle.
-  intros HMdlfin Hwp Hip Hste Hsce Hmse.
+  intros HMdlfin Hwp Hip Hste Hsce Hmse Htrace.
   eapply (adequacy_groups _ A _ obs_send_sas obs_rec_sas);
-    [done|done|done|done|done| |done|done|done|done].
+    [done|done|done|done|done| |done|done|done|done|done].
   intros dg.
   iMod (Hwp dg) as "Hwp".
   iModIntro. iIntros "?????????? /=".
@@ -210,6 +214,7 @@ Theorem adequacy1 Σ Mdl `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_mode
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
+  state_trace σ = [] →
   aneris_adequate e ip σ φ.
 Proof.
   intros HMdlfin Hwp Hsendle Hrecvle Hip Hste Hsce Hmse.
@@ -242,6 +247,7 @@ Theorem adequacy Σ Mdl `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace_model
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
+  state_trace σ = [] →
   aneris_adequate e ip σ φ.
 Proof.
   intros HMdlfin Hwp Hsendle Hrecvle Hip Hste Hsce Hmse.
@@ -277,6 +283,7 @@ Theorem adequacy_hoare_groups Σ Mdl `{anerisPreG Σ Mdl} `{EqDecision (aneris_t
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
+  state_trace σ = [] →
   aneris_adequate e ip σ φ.
 Proof.
   intros Hdisj Hne Hsendle Hrecvle.
@@ -308,6 +315,7 @@ Theorem adequacy1_hoare Σ Mdl `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trac
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
+  state_trace σ = [] →
   aneris_adequate e ip σ φ.
 Proof.
   intros ??? Hwp ????.
@@ -338,6 +346,7 @@ Theorem adequacy_hoare Σ Mdl `{anerisPreG Σ Mdl} `{EqDecision (aneris_to_trace
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
   state_ms σ = ∅ →
+  state_trace σ = [] →
   aneris_adequate e ip σ φ.
 Proof.
   intros ??? Hwp ????.

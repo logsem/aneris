@@ -184,7 +184,7 @@ Proof.
     inversion Hcfgstep; simpl in *; set_solver. }
   rewrite Htrl; simpl in *.
   inversion Hpstep as [????? Hhstep]; simplify_eq/=.
-  inversion Hhstep as [??????? Hbstep|ip' ??????? Hbstep|ip' |]; simplify_eq/=.
+  inversion Hhstep as [??????? Hbstep|ip' ??????? Hbstep|ip' | | |]; simplify_eq/=.
   - inversion Hbstep; simplify_eq/=; set_solver.
   - rewrite dom_insert.
     split; first set_solver.
@@ -199,6 +199,8 @@ Proof.
     destruct (decide (ip = ip')) as [->|].
     + rewrite lookup_insert; intros ????; simplify_eq/=.
     + rewrite lookup_insert_ne; last done; set_solver.
+  - set_solver.
+  - set_solver.
   - set_solver.
 Qed.
 
@@ -224,7 +226,8 @@ Definition incr_sim ip (ex : execution_trace aneris_lang) (atr : finite_trace na
 Definition init_state ip := {|
   state_heaps :=  {[ip := ∅ ]};
   state_sockets := {[ip := ∅ ]};
-  state_ms := ∅; |}.
+  state_ms := ∅; 
+  state_trace := [];|}.
 
 Lemma incr_exampleM_finitary : aneris_model_rel_finitary incr_exampleM.
 Proof.
@@ -248,9 +251,10 @@ Proof.
   { set_solver. }
   { set_solver. }
   { set_solver. }
+  { set_solver. }
   iIntros (?) "!#".
   iExists (λ _, True)%I.
-  iIntros "_ _ _ #? Hevs _ _ _ _ Hfg".
+  iIntros "_ _ _ #? Hevs _ _ _ _ Hfg _ _".
   rewrite big_sepS_singleton.
   assert (inG #[ anerisΣ incr_exampleM; GFunctor incr_res] incr_res).
   { assert (subG (GFunctor incr_res) #[ anerisΣ incr_exampleM; GFunctor incr_res]).

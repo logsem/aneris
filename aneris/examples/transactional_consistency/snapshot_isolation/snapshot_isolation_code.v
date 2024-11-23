@@ -67,7 +67,7 @@ Definition update_kvs : val :=
     "upd" "kvs" "cache".
 
 Definition check_at_key : val :=
-  λ: "k" "ts" "tc" "vlst",
+  λ: "ts" "tc" "vlst",
   assert: ("ts" < "tc");;
   match: "vlst" with
     NONE => #true
@@ -96,7 +96,7 @@ Definition commit_handler : val :=
                              let: "vs" := (if: "vlsto" = NONE
                               then  []
                               else  unSOME "vlsto") in
-                             check_at_key "k" "ts" "tc" "vs")
+                             check_at_key "ts" "tc" "vs")
                  "cache" in
      (if: "b"
       then

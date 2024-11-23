@@ -102,6 +102,8 @@ Proof.
             (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
         | Start e0 e1, Start e0' e1' =>
           cast_if_and (decide (e0 = e0')) (decide (e1 = e1'))
+        | Emit e, Emit e' => cast_if (decide (e = e'))
+        | Fresh e, Fresh e' => cast_if (decide (e = e'))
         | _, _ => right _
         end
       with gov (v1 v2 : val) {struct v1} : Decision (v1 = v2) :=
@@ -143,10 +145,10 @@ Proof.
    | inr (inl (inl (inr a))) => LitSocketAddress a
    | inr (inl (inr (inl ()))) => LitUnit
    | inr (inl (inr (inr ()))) => LitUnit
-   | inr (inr (inl (inl ()))) => LitUnit
    | inr (inr (inl (inr ()))) => LitUnit
    | inr (inr (inr (inl ()))) => LitUnit
    | inr (inr (inr (inr ()))) => LitUnit
+   | inr (inr (inl (inl ()))) => LitUnit
    end)  _); by intros [].
 Qed.
 
@@ -237,6 +239,8 @@ Proof.
      | CAS e1 e2 e3 => GenNode 25 [go e1; go e2; go e3]
      | GetAddressInfo e => GenNode 26 [go e]
      | Rand e => GenNode 27 [go e]
+     | Emit e => GenNode 28 [go e]
+     | Fresh e => GenNode 29 [go e]
      end
    with gov v :=
      match v with
@@ -283,6 +287,8 @@ Proof.
      | GenNode 25 [e1; e2; e3] => CAS (go e1) (go e2) (go e3)
      | GenNode 26 [e] => GetAddressInfo (go e)
      | GenNode 27 [e] => Rand (go e)
+     | GenNode 28 [e] => Emit (go e)
+     | GenNode 29 [e] => Fresh (go e)
      | _ => Val $ LitV LitUnit (* dummy *)
      end
    with gov v :=
@@ -354,7 +360,9 @@ Inductive ectx_item :=
 | SetReceiveTimeoutLCtx (v1 v2 : val)
 | SetReceiveTimeoutMCtx (e0 : expr) (v2 : val)
 | SetReceiveTimeoutRCtx (e0 e1 : expr)
-| ReceiveFromCtx.
+| ReceiveFromCtx
+| EmitCtx
+| FreshCtx.
 
 Definition fill_item (Ki : ectx_item) (e : expr) : expr :=
   match Ki with
@@ -398,6 +406,8 @@ Definition fill_item (Ki : ectx_item) (e : expr) : expr :=
   | SetReceiveTimeoutMCtx e0 v2 => SetReceiveTimeout e0 e (Val v2)
   | SetReceiveTimeoutRCtx e0 e1 => SetReceiveTimeout e0 e1 e
   | ReceiveFromCtx => ReceiveFrom e
+  | EmitCtx => Emit e
+  | FreshCtx => Fresh e
   end.
 
 (** Substitution *)
@@ -434,6 +444,8 @@ Fixpoint subst (x : string) (v : val) (e : expr)  : expr :=
     SetReceiveTimeout (subst x v e0) (subst x v e1) (subst x v e2)
   | ReceiveFrom e => ReceiveFrom (subst x v e)
   | Start i e => Start i (subst x v e)
+  | Emit e => Emit (subst x v e)
+  | Fresh e => Fresh (subst x v e)
   end.
 
 Definition subst' (mx : binder) (v : val) : expr → expr :=
@@ -700,18 +712,21 @@ Definition port_not_in_use (p : port) (sockets : gmap socket_handle (socket * li
 
 (** The global state of the system
    - maps each node of the system to it local state (H, S)
-   - keeps track of all messages that has been sent throught the network *)
+   - keeps track of all messages that has been sent throught the network
+   - kepps track of the trace of emitted tags *)
 Record state := mkState {
   state_heaps : gmap ip_address heap;
   state_sockets : gmap ip_address sockets;
   state_ms : message_multi_soup;
+  state_trace : list val;
 }.
 
 #[global] Instance etaState : Settable _ :=
   settable! mkState
   <state_heaps;
    state_sockets;
-   state_ms>.
+   state_ms;
+   state_trace>.
 
 Definition option_socket_address_to_val (sa : option socket_address) :=
   match sa with
@@ -864,6 +879,16 @@ Definition is_head_step_pure (e : expr) : bool :=
   | _ => true
   end.
 
+Fixpoint tags (t: list val): list string :=
+  match t with
+  | [] => []
+  | v :: t =>
+    match v with
+    | PairV (LitV (LitString tag)) _ => [tag]
+    | _ => []
+    end ++ tags t
+  end.
+
 Inductive head_step : aneris_expr → state →
                       aneris_expr → state → list aneris_expr → Prop :=
 | LocalStepPureS n h e e' ef σ
@@ -888,7 +913,9 @@ Inductive head_step : aneris_expr → state →
               {|
                 state_heaps := <[ip:=∅]>(state_heaps σ);
                 state_sockets := <[ip:=∅]>(state_sockets σ);
-                state_ms := state_ms σ |}
+                state_ms := state_ms σ;
+                state_trace := state_trace σ;
+              |}
               [mkExpr ip e]
 | SocketStepS n e e' Sn Sn' M' σ
     (SocketStep : socket_step n
@@ -899,8 +926,19 @@ Inductive head_step : aneris_expr → state →
               (mkExpr n e')
               {| state_heaps := state_heaps σ;
                  state_sockets := <[n:=Sn']>(state_sockets σ);
-                 state_ms := M'; |}
-              [].
+                 state_ms := M'; 
+                 state_trace := state_trace σ;
+              |}
+              []
+| EmitStepS n v σ: 
+    head_step (mkExpr n (Emit (Val v))) σ 
+              (mkExpr n (Val $ LitV $ LitUnit)) 
+              (σ <| state_trace := (state_trace σ) ++ [v] |>) []
+| FreshStepS tag n v σ: 
+    tag ∉ tags (state_trace σ) →
+    head_step (mkExpr n (Fresh (Val v))) σ 
+              (mkExpr n (Val $ LitV (LitString tag))) 
+              (σ <| state_trace := (state_trace σ) ++ [(PairV (LitV (LitString tag)) v)] |>) [].
 
 Lemma aneris_to_of_val v : aneris_to_val (aneris_of_val v) = Some v.
 Proof. by destruct v. Qed.
@@ -933,10 +971,11 @@ Proof. destruct e,v. by inversion 1. Qed.
 Lemma aneris_val_head_stuck σ1 e1 σ2 e2 ef :
   head_step e1 σ1 e2 σ2 ef → aneris_to_val e1 = None.
 Proof.
-  inversion 1; subst; last inversion SocketStep; subst;
-    try (cbv -[base_lang.to_val];
-           by erewrite base_lang.val_head_stuck; last eassumption);
-    eauto.
+  inversion 1; subst.
+  4 : inversion SocketStep; subst.
+  all : try (cbv -[base_lang.to_val];
+        by erewrite base_lang.val_head_stuck; last eassumption);
+        eauto.
 Qed.
 
 Lemma fill_item_aneris_val Ki e :
@@ -957,12 +996,16 @@ Qed.
 Lemma head_ctx_step_aneris_val Ki e σ e2 σ2 ef :
   head_step (aneris_fill_item Ki e) σ e2 σ2 ef → is_Some (aneris_to_val e).
 Proof.
-  inversion 1; subst; last inversion SocketStep; subst; simplify_option_eq;
-    try
-      (apply/fmap_is_Some; exact: base_lang.head_ctx_step_val);
-    apply/fmap_is_Some.
-    all: destruct Ki; try (by eauto);
-      inversion H0; subst; by eauto.
+  inversion 1; subst.
+  4 : inversion SocketStep; subst.
+  all : simplify_option_eq;
+        try
+          (apply/fmap_is_Some; exact: base_lang.head_ctx_step_val);
+        apply/fmap_is_Some; 
+        subst.
+  all : destruct Ki; try (by eauto).
+  all : try inversion H0; subst; try by eauto.
+  all : inversion H2; subst; by eauto.
 Qed.
 
 #[global] Instance of_aneris_val_inj : Inj (=) (=) aneris_of_val.
@@ -983,19 +1026,25 @@ Inductive config_step :
     config_step σ
                 {| state_heaps := state_heaps σ;
                    state_sockets := <[n:=Sn']>(state_sockets σ);
-                   state_ms := state_ms σ ∖ {[+ m +]}; |}
+                   state_ms := state_ms σ ∖ {[+ m +]}; 
+                  state_trace := state_trace σ;
+                |}
 | MessageDuplicateStep σ m :
     m ∈ state_ms σ →
     config_step σ
                 {| state_heaps := state_heaps σ;
                    state_sockets := state_sockets σ;
-                   state_ms := state_ms σ ⊎ {[+ m +]}; |}
+                   state_ms := state_ms σ ⊎ {[+ m +]}; 
+                   state_trace := state_trace σ;
+                |}
 | MessageDropStep σ m :
     m ∈ state_ms σ →
     config_step σ
                 {| state_heaps := state_heaps σ;
                    state_sockets := state_sockets σ;
-                   state_ms := state_ms σ ∖ {[+ m +]}; |}.
+                   state_ms := state_ms σ ∖ {[+ m +]}; 
+                   state_trace := state_trace σ;
+                |}.
 
 Definition aneris_locale := (ip_address * nat)%type.
 Definition locale_of (c: list aneris_expr) (e : aneris_expr) := (e.(expr_n), length $ (filter (λ e', e'.(expr_n) = e.(expr_n))) c).
@@ -1049,7 +1098,6 @@ Proof. intros ? ?; unfold Decision; solve_decision. Qed.
 #[global] Instance aneris_state_eq_dec : EqDecision state.
 Proof. intros ? ?; unfold Decision; solve_decision. Qed.
 
-
 Lemma aneris_locale_injective tp0 e0 tp1 tp e :
   (tp, e) ∈ prefixes_from (tp0 ++ [e0]) tp1 →
   locale_of tp0 e0 ≠ locale_of tp e.
@@ -1079,6 +1127,7 @@ Proof.
           state_heaps := ∅;
           state_sockets := ∅;
           state_ms := ∅;
+          state_trace := [];
         |}
     |}.
 Qed.

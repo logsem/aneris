@@ -1,4 +1,4 @@
-From iris.algebra Require Import auth gmap excl excl_auth.
+From iris.algebra Require Import auth gmap excl excl_auth frac_auth.
 From aneris.algebra Require Import monotone.
 From aneris.aneris_lang Require Import network resources proofmode.
 From aneris.aneris_lang.lib Require Import

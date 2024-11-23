@@ -263,7 +263,8 @@ Section state_interpretation.
     [∗ map] ip0↦γs ∈ γm, local_state_coh
                            {| state_heaps := state_heaps σ;
                               state_sockets := <[ip:=Sn']> (state_sockets σ);
-                              state_ms := state_ms σ |} ip0 γs.
+                              state_ms := state_ms σ; 
+                              state_trace := state_trace σ |} ip0 γs.
   Proof.
     iIntros (HM Hσ Hsh -> Hskt) "Hγm".
     iApply big_sepM_mono; last done.
