@@ -200,7 +200,7 @@ Section trace_proof.
       exists h.
       split; last lia.
       simpl in Hrel.
-      by rewrite -app_nil_end_deprecated in Hrel.
+      by rewrite app_nil_r in Hrel.
     - intros exec1 Hlookup h Hrel.
       simpl in Hrel.
       inversion Hrel as [Heq1 Heq2 | exec s t h' v Hneq Hwr Hrel' Heq1 Heq2| 
