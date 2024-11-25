@@ -94,4 +94,13 @@ Section RelationsUtils.
     eapply rel_compose_nsteps_next. eexists. split; eauto. 
   Qed.
   
+  Lemma clos_refl_nsteps (R: relation A) x y
+    (CR: Relation_Operators.clos_refl _ R x y):
+    exists n, nsteps R n x y.
+  Proof using.
+    inversion CR; subst.
+    - exists 1. by apply nsteps_1.
+    - exists 0. by apply nsteps_0.
+  Qed.                          
+    
 End RelationsUtils.

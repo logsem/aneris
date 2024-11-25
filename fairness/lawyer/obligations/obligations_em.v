@@ -122,9 +122,6 @@ Section ObligationsEM.
       em_initialization := obls_resources_init;
     |}.
 
-  (* TODO: remove duplicate *)
-  Definition phase0: Phase := nil.
-
   Definition init_phases (n: nat): list Phase :=
     (fun i => ext_phase phase0 i) <$> seq 0 n. 
 

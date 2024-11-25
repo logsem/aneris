@@ -232,7 +232,8 @@ Section PhaseFuel.
     forall δ δ' mb mf k
       (ITH: tr !! i = Some (δ, Some (τ, δ')))
       (BOUND : k ≤ LIM_STEPS)
-      (STEPS: nsteps (λ p1 p2, loc_step p1 τ p2) k δ mb)
+      (* (STEPS: nsteps (λ p1 p2, loc_step p1 τ p2) k δ mb) *)
+      (STEPS: nsteps (λ p1 p2, loc_step_ex p1 p2) k δ mb)
       (BSTEP: (∃ π δ, burns_cp mb τ mf π δ))
       (FSTEP: clos_refl (ProgressState) (λ p1 p2, ∃ τ' R, forks_locale p1 τ p2 τ' R) mf δ'),
       ms_le deg_le (PF' ((LIM_STEPS + 2) * i + k) mb) (PF' ((LIM_STEPS + 2) * i) δ).
@@ -257,7 +258,8 @@ Section PhaseFuel.
       forall δ δ' τ mb mf k,
         tr !! i = Some (δ, Some (τ, δ')) ->
         k ≤ LIM_STEPS ->
-        nsteps (λ p1 p2, loc_step p1 τ p2) k δ mb ->
+        (* nsteps (λ p1 p2, loc_step p1 τ p2) k δ mb -> *)
+        nsteps (λ p1 p2, loc_step_ex p1 p2) k δ mb ->
         (∃ π δ, burns_cp mb τ mf π δ) ->
         clos_refl (ProgressState) (λ p1 p2, ∃ τ' R, forks_locale p1 τ p2 τ' R) mf δ' ->
         rel (PF' ((LIM_STEPS + 2) * i + LIM_STEPS + 1) mf) (PF' ((LIM_STEPS + 2) * i + LIM_STEPS) mb))

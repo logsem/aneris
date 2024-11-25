@@ -182,6 +182,15 @@ Section LogicHelpers.
     forall a, P a <-> (forall a', a' = a -> P a').
   Proof. set_solver. Qed. 
 
+  Lemma exist_impl_forall {A: Type} {P: A -> Prop} {Q: Prop}:
+    ((exists x, P x) -> Q) <-> (forall x, P x -> Q).
+  Proof using.
+    clear -A. 
+    split.
+    - intros PQ x Px. eauto.
+    - intros PQ [x Px]. eauto.
+  Qed. 
+
 End LogicHelpers.
 
 
@@ -336,6 +345,21 @@ Lemma filter_singleton_if:
 Proof. intros. destruct decide; set_solver. Qed. 
 
 
+Lemma gset_filter_subseteq_mono_strong `{Countable A} (P Q: A -> Prop)
+  `{∀ x, Decision (P x)} `{∀ x, Decision (Q x)}
+  (g: gset A)
+  (IMPL: ∀ x, x ∈ g -> P x -> Q x):
+  filter P g ⊆ filter Q g.
+Proof using. clear -IMPL. set_solver. Qed. 
+
+(* TODO: move *)
+Lemma gset_filter_True `{Countable K} (g: gset K)
+  (P: K -> Prop)
+  `{∀ x, Decision (P x)}
+  (TRUE: forall k, k ∈ g -> P k):
+  filter P g = g.
+Proof using. clear -TRUE. set_solver. Qed. 
+  
 Section bigop_utils.
   Context `{Monoid M o}.
   Context `{Countable K}.
