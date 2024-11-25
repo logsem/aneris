@@ -1104,6 +1104,16 @@ Proof.
   destruct ov as [v|]; set_solver.
 Qed.
 
+Lemma conn_event_op op c :
+  connOfOp op = c →
+  connOfEvent (toLinEvent op) = Some c.
+Proof.
+  intro Hop.
+  destruct op as [(tag, c') k ov | (tag, c') k v | (tag, c') b]; 
+    try set_solver.
+  destruct ov as [v|]; set_solver.
+Qed.
+
 Lemma lin_to_post le tag e_post :
   is_lin_event le →
   tagOfEvent le = Some tag →
