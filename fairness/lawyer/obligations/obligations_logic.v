@@ -3,12 +3,35 @@ From iris.algebra Require Import auth gmap gset excl.
 From iris.base_logic Require Export gen_heap.
 From trillium.program_logic Require Export weakestpre adequacy ectx_lifting.
 From trillium.fairness Require Import locales_helpers utils. 
-From trillium.fairness.lawyer.obligations Require Import obligations_model obls_utils obligations_resources obligations_am obligations_em.
+From trillium.fairness.lawyer.obligations Require Import obligations_model obls_utils obligations_resources obligations_am obligations_em obligations_wf.
 From trillium.fairness.lawyer Require Import sub_action_em program_logic action_model.
 From trillium.fairness.heap_lang Require Export heap_lang_defs tactics notation sswp_logic locales_helpers_hl.
 
 
 Close Scope Z. 
+
+(* some lemmas about heap lang rely on concrete instances of EqDecision and Countable *)
+(* TODO: find better solution *)
+Class ObligationsParamsPre (Degree Level: Type) (LIM_STEPS: nat) := { 
+    opar_deg_eqdec' :> EqDecision Degree;
+    opar_deg_cnt' :> Countable Degree;
+    deg_le' :> relation Degree;
+    deg_PO' :> PartialOrder deg_le';
+
+    opar_lvl_eqdec':> EqDecision Level;
+    opar_lvl_cnt':> Countable Level;
+    lvl_le':> relation Level;
+    lvl_PO':> PartialOrder lvl_le';
+  }.
+
+Global Instance LocaleOP
+  `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}
+  `{CNT: Countable Locale}:
+  ObligationsParams Degree Level Locale LIM_STEPS.
+Proof using.
+  esplit; try by apply OPRE. apply CNT.
+Defined.                 
+
 
 Section ProgramLogic.
   Context `{OfeDiscrete DegO} `{OfeDiscrete LevelO}.
@@ -17,14 +40,17 @@ Section ProgramLogic.
   Let Degree := ofe_car DegO.
   Let Level := ofe_car LevelO.
   
-  Context `(OP: ObligationsParams Degree Level (locale heap_lang) LIM_STEPS).
-  Let OM := ObligationsModel OP.
+  (* Context `{OP: ObligationsParams Degree Level (locale heap_lang) LIM_STEPS}. *)
+  Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}.
+  Let OP := LocaleOP (Locale := locale heap_lang).
+  Existing Instance OP. 
+  Let OM := ObligationsModel.
   
   Context {Σ: gFunctors}.
   Context {invs_inΣ: invGS_gen HasNoLc Σ}.
 
-  Let OAM := ObligationsAM OP. 
-  Let ASEM := ObligationsASEM OP.
+  Let OAM := ObligationsAM. 
+  Let ASEM := ObligationsASEM.
   Context {oGS: @asem_GS _ _ ASEM Σ}. 
   
   Section BMU.
@@ -32,11 +58,11 @@ Section ProgramLogic.
     Definition OAM_st_interp_interim_step (c c': cfg heap_lang)
       (δ: amSt OAM) (τ: locale heap_lang) (k: nat) oτ': iProp Σ :=
           ∃ δ__k,
-            obls_msi OP δ__k (H3 := oGS) ∗
-            ⌜ nsteps (fun p1 p2 => loc_step OP p1 τ p2) k δ δ__k  ⌝ ∗
-            ⌜ threads_own_obls OP c δ ⌝ ∗
-            ⌜ dom_phases_obls OP δ ⌝ ∗
-            ⌜ obls_eq OP (dom $ ps_obls OP δ) δ__k ⌝ ∗
+            obls_msi δ__k (oGS := oGS) ∗
+            ⌜ nsteps (fun p1 p2 => loc_step p1 τ p2) k δ δ__k  ⌝ ∗
+            ⌜ threads_own_obls c δ ⌝ ∗
+            ⌜ dom_phases_obls δ ⌝ ∗
+            ⌜ obls_eq (dom $ ps_obls δ) δ__k ⌝ ∗
            ⌜ locale_step c (Some τ) c' ⌝ ∗
            ⌜ step_fork c c' = oτ' ⌝
     .
@@ -51,10 +77,10 @@ Section ProgramLogic.
 
     Lemma finish_obls_steps c c' δ τ n π' deg
       (BOUND: n <= LIM_STEPS)
-      (LE: exists π, ps_phases OP δ !! τ = Some π /\ phase_le π' π)
+      (LE: exists π, ps_phases δ !! τ = Some π /\ phase_le π' π)
       :
-      ⊢ OAM_st_interp_interim_step c c' δ τ n None -∗ (cp OP π' deg (H3 := oGS))==∗
-        ∃ δ', obls_si OP c' δ' (ObligationsGS0 := oGS) ∗ ⌜ om_trans OP δ τ δ' ⌝
+      ⊢ OAM_st_interp_interim_step c c' δ τ n None -∗ (cp π' deg (oGS := oGS))==∗
+        ∃ δ', obls_si c' δ' (ObligationsGS0 := oGS) ∗ ⌜ om_trans δ τ δ' ⌝
     .
     Proof.
       iIntros "TI'' cp".
@@ -75,7 +101,7 @@ Section ProgramLogic.
       iDestruct "X" as "(%δ' & MSI & %BURNS)". 
       iModIntro. iExists _. simpl. iFrame.
       
-      assert (threads_own_obls OP c' δ') as TH_OWN'.
+      assert (threads_own_obls c' δ') as TH_OWN'.
       { eapply locale_nofork_step_obls_pres; eauto.
         2: { apply gset_pick_None in NOFORK.
              apply set_eq_subseteq. split.
@@ -97,15 +123,15 @@ Section ProgramLogic.
       (BOUND: n <= LIM_STEPS)
       (* can use th_phase_ge here, since it'll only be used after BMU *)
       (* TODO: unify these proofs? *)
-      (* (LE: exists π, ps_phases OP (trace_last omtr) !! τ = Some π /\ phase_le π' π) *)
+      (* (LE: exists π, ps_phases (trace_last omtr) !! τ = Some π /\ phase_le π' π) *)
       (LE: phase_le π' π)
       :
-      ⊢ OAM_st_interp_interim_step c c' δ τ n (Some τ') -∗ (cp OP π' deg (H3 := oGS)) -∗ obls OP τ R0 (H3 := oGS) -∗ th_phase_ge OP τ π (H3 := oGS) ==∗
+      ⊢ OAM_st_interp_interim_step c c' δ τ n (Some τ') -∗ (cp π' deg (oGS := oGS)) -∗ obls τ R0 (oGS := oGS) -∗ th_phase_ge τ π (oGS := oGS) ==∗
         ∃ δ' π1 π2,
-          obls_si OP c' δ' (ObligationsGS0 := oGS) ∗
-          obls OP τ (R0 ∖ R') (H3 := oGS) ∗ th_phase_ge OP τ π1 (H3 := oGS) ∗ 
-          obls OP τ' (R0 ∩ R') (H3 := oGS) ∗ th_phase_ge OP τ' π2 (H3 := oGS) ∗
-          ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝ ∗ ⌜ om_trans OP δ τ δ' ⌝.
+          obls_si c' δ' (ObligationsGS0 := oGS) ∗
+          obls τ (R0 ∖ R') (oGS := oGS) ∗ th_phase_ge τ π1 (oGS := oGS) ∗ 
+          obls τ' (R0 ∩ R') (oGS := oGS) ∗ th_phase_ge τ' π2 (oGS := oGS) ∗
+          ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝ ∗ ⌜ om_trans δ τ δ' ⌝.
     Proof using.
       clear H1 H0 H. 
 
@@ -126,12 +152,12 @@ Section ProgramLogic.
         red. etrans; eauto. }
       iDestruct "X" as "(%δ' & MSI & %BURNS)".
 
-      assert (obls_eq OP (dom (ps_obls OP δ)) δ') as OBLS'.
+      assert (obls_eq (dom (ps_obls δ)) δ') as OBLS'.
       { eapply pres_by_loc_step_implies_progress.
         { apply loc_step_obls_pres. }
         { reflexivity. }
         eexists. do 2 (esplit; eauto). }
-      assert (dom_phases_obls OP δ') as DPO'.
+      assert (dom_phases_obls δ') as DPO'.
       { eapply pres_by_loc_step_implies_progress; eauto.
         { apply loc_step_dpo_pres. }
         eexists. do 2 (esplit; eauto). }
@@ -144,7 +170,7 @@ Section ProgramLogic.
       iModIntro. do 3 iExists _. simpl. iFrame.
 
       (* TODO: make a lemma? *)
-      assert (dom (ps_obls OP δ'') = dom (ps_obls OP δ') ∪ {[ τ' ]}) as OBLS''.
+      assert (dom (ps_obls δ'') = dom (ps_obls δ') ∪ {[ τ' ]}) as OBLS''.
       { inversion FORKS. subst. subst ps'.
         destruct δ'. simpl. subst new_obls0. simpl in *.
         rewrite !dom_insert_L.
@@ -152,7 +178,7 @@ Section ProgramLogic.
         { clear -H. set_solver. }
         rewrite -DPO'. simpl. eapply elem_of_dom; eauto. }
       (* TODO: make a lemma? *)
-      assert (dom (ps_phases OP δ'') = dom (ps_phases OP δ') ∪ {[ τ' ]}) as PHASES''.
+      assert (dom (ps_phases δ'') = dom (ps_phases δ') ∪ {[ τ' ]}) as PHASES''.
       { inversion FORKS. subst. subst ps'.
         destruct δ'. simpl. subst new_phases0. simpl in *.
         rewrite !dom_insert_L.
@@ -220,8 +246,8 @@ Section ProgramLogic.
     Lemma BMU_AMU E ζ b (P : iProp Σ) π
       (BOUND: b <= LIM_STEPS)
       :
-      ⊢ (th_phase_ge OP ζ π (H3 := oGS) -∗ BMU E ζ b ((P) ∗ ∃ ph deg, cp OP ph deg (H3 := oGS) ∗ ⌜ phase_le ph π ⌝)) -∗
-        th_phase_ge OP ζ π (H3 := oGS) -∗
+      ⊢ (th_phase_ge ζ π (oGS := oGS) -∗ BMU E ζ b ((P) ∗ ∃ ph deg, cp ph deg (oGS := oGS) ∗ ⌜ phase_le ph π ⌝)) -∗
+        th_phase_ge ζ π (oGS := oGS) -∗
         AMU E ζ obls_act P (aeGS := oGS).
     Proof using.
       rewrite /AMU /AMU_impl /BMU. iIntros "BMU PH" (c c' δ) "TI'".
@@ -255,14 +281,14 @@ Section ProgramLogic.
     Lemma BMU_AMU__f E ζ ζ' b (P : iProp Σ) π R0 R'
       (BOUND: b <= LIM_STEPS)
       :
-      ⊢ (th_phase_ge OP ζ π (H3 := oGS) -∗ BMU E ζ b
-           (P ∗ (∃ ph deg, cp OP ph deg (H3 := oGS) ∗ ⌜ phase_le ph π ⌝) ∗
-           th_phase_ge OP ζ π (H3 := oGS) ∗
-           obls OP ζ R0 (H3 := oGS))) -∗
-        th_phase_ge OP ζ π (H3 := oGS) -∗
+      ⊢ (th_phase_ge ζ π (oGS := oGS) -∗ BMU E ζ b
+           (P ∗ (∃ ph deg, cp ph deg (oGS := oGS) ∗ ⌜ phase_le ph π ⌝) ∗
+           th_phase_ge ζ π (oGS := oGS) ∗
+           obls ζ R0 (oGS := oGS))) -∗
+        th_phase_ge ζ π (oGS := oGS) -∗
         AMU__f E ζ ζ' obls_act (P ∗ ∃ π1 π2, 
-                     th_phase_ge OP ζ π1 (H3 := oGS) ∗ obls OP ζ (R0 ∖ R') (H3 := oGS) ∗
-                     th_phase_ge OP ζ' π2 (H3 := oGS) ∗ obls OP ζ' (R0 ∩ R') (H3 := oGS) ∗
+                     th_phase_ge ζ π1 (oGS := oGS) ∗ obls ζ (R0 ∖ R') (oGS := oGS) ∗
+                     th_phase_ge ζ' π2 (oGS := oGS) ∗ obls ζ' (R0 ∩ R') (oGS := oGS) ∗
                      ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝
         ) (aeGS := oGS).
     Proof using.
@@ -293,7 +319,7 @@ Section ProgramLogic.
     Qed.
 
     Lemma OU_BMU E ζ P b:
-       ⊢ OU OP ζ (BMU E ζ b P) (H3 := oGS) -∗ BMU E ζ (S b) P.
+       ⊢ OU ζ (BMU E ζ b P) (oGS := oGS) -∗ BMU E ζ (S b) P.
     Proof using.
       iIntros "OU". rewrite {2}/BMU /OAM_st_interp_interim_step.
       iIntros (c c' δ n f) "TI'".
@@ -315,7 +341,7 @@ Section ProgramLogic.
 
     (* an example usage of OU *)
     Lemma BMU_step_create_signal E ζ P b l R:
-       ⊢ (∀ sid, sgn OP sid l (Some false) (H3 := oGS) -∗ obls OP ζ (R ∪ {[ sid ]}) (H3 := oGS) -∗ BMU E ζ b P) -∗ obls OP ζ R (H3 := oGS) -∗ BMU E ζ (S b) P.
+       ⊢ (∀ sid, sgn sid l (Some false) (oGS := oGS) -∗ obls ζ (R ∪ {[ sid ]}) (oGS := oGS) -∗ BMU E ζ b P) -∗ obls ζ R (oGS := oGS) -∗ BMU E ζ (S b) P.
     Proof using.
       iIntros "CONT OB".
       iApply OU_BMU. iApply (OU_wand with "[CONT]").
@@ -344,10 +370,15 @@ Section TestProg.
   Let Degree := ofe_car DegO.
   Let Level := ofe_car LevelO.
   
-  Context `(OP: ObligationsParams Degree Level (locale heap_lang) LIM_STEPS).
-  Let OM := ObligationsModel OP.
-  Let OAM := ObligationsAM OP. 
-  Let ASEM := ObligationsASEM OP.
+  (* Context `{OP: ObligationsParams Degree Level (locale heap_lang) LIM_STEPS}. *)
+  (* Let OM := ObligationsModel. *)
+  Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}.
+  Let OP := LocaleOP (Locale := locale heap_lang).
+  Existing Instance OP. 
+  Let OM := ObligationsModel.
+
+  Let OAM := ObligationsAM. 
+  Let ASEM := ObligationsASEM.
   Context `{oGS: @asem_GS _ _ ASEM Σ}.
 
   Hypothesis (LIM_STEPS_LB: 5 <= LIM_STEPS).
@@ -358,15 +389,15 @@ Section TestProg.
   Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS _ EM _ (↑ nroot)}.
   Context {OBLS_AMU__f: forall τ, @AMU_lift_MU__f _ _ _ τ oGS _ EM _ (↑ nroot)}.
  
-  Context {NO_OBLS_POST: ⊢ ∀ τ, obls OP τ ∅ (H3 := oGS) -∗ 
+  Context {NO_OBLS_POST: ⊢ ∀ τ, obls τ ∅ (oGS := oGS) -∗ 
                                   em_thread_post τ (em_GS0 := heap_fairnessGS (heapGS := hGS))}.
 
   Lemma test_spec (τ: locale heap_lang) (π: Phase) (d d': Degree) (l: Level)
-    (DEG: deg_lt _ d' d)
+    (DEG: deg_lt d' d)
     :
-    {{{ cp_mul OP π d 10 (H3 := oGS) ∗ th_phase_ge OP τ π (H3 := oGS) ∗ obls OP τ ∅ (H3 := oGS) ∗ exc_lb OP 5 (H3 := oGS) }}}
+    {{{ cp_mul π d 10 (oGS := oGS) ∗ th_phase_ge τ π (oGS := oGS) ∗ obls τ ∅ (oGS := oGS) ∗ exc_lb 5 (oGS := oGS) }}}
       test_prog @ τ
-      {{{ x, RET #x; obls OP τ ∅ (H3 := oGS) }}}.
+      {{{ x, RET #x; obls τ ∅ (oGS := oGS) }}}.
   Proof.
     iIntros (Φ). iIntros "(CPS & PH & OBLS & #EB) POST".
     rewrite /test_prog. 
@@ -398,7 +429,7 @@ Section TestProg.
     iApply OBLS_AMU; [by rewrite nclose_nroot| ].
     iApply (BMU_AMU with "[-PH] [$]"); [eauto| ]. iIntros "PH".
     iApply OU_BMU.
-    iDestruct (OU_create_sig _ _ _ l with "[$]") as "OU".
+    iDestruct (OU_create_sig _ _ l with "[$]") as "OU".
     iApply (OU_wand with "[-OU]"); [| done].
     iIntros "(%sid & SIG & OBLS & %NEW)".
     iApply BMU_intro.

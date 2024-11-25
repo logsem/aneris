@@ -3,25 +3,26 @@ From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import locales_helpers comp_utils trace_lookup fairness fin_branch.
 From trillium.fairness.heap_lang Require Import simulation_adequacy.
 From trillium.fairness.lawyer Require Import sub_action_em action_model.
-From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_em obls_fairness_preservation obligations_am obligations_fin_branch obls_termination multiset_utils.
+From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_em obls_fairness_preservation obligations_am obligations_fin_branch obls_termination multiset_utils obligations_wf.
 From trillium.fairness.lawyer.examples.eo_fin Require Import eo_fin.
 From trillium.fairness.lawyer.examples Require Import bounded_nat.
 
 
 Section EOFinAdequacy.
   Context (B: nat).
-  Let OP := EO_OP B. 
-  Let ASEM := ObligationsASEM OP.
-  Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls OP τ ∅ (H3 := aGS)).
-  Let OM := ObligationsModel OP. 
-  Let M := AM2M (ObligationsAM OP). 
+  Let OP := EO_OP B.
+  Existing Instance OP. 
+  Let ASEM := ObligationsASEM.
+  Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls τ ∅ (oGS := aGS)).
+  Let OM := ObligationsModel. 
+  Let M := AM2M ObligationsAM. 
   
   Definition eofin_valid_evolution_step (c1 : cfg heap_lang) (oζ : olocale heap_lang) 
     (c2 : cfg heap_lang) (δ1 : mstate M) (ℓ : mlabel M) (δ2 : mstate M): Prop :=
-    obls_ves_wrapper OP c1 oζ c2 δ1 ℓ δ2. 
+    obls_ves_wrapper c1 oζ c2 δ1 ℓ δ2. 
 
   Definition eofin_st_rel (c: cfg heap_lang) (δ: mstate M) :=
-    om_live_tids OP id locale_enabled c δ. 
+    om_live_tids id locale_enabled c δ. 
     
   Definition eofin_sim_rel (extr: execution_trace heap_lang) (omtr: auxiliary_trace M) :=
     valid_state_evolution_fairness eofin_valid_evolution_step extr omtr ∧
@@ -40,7 +41,7 @@ Section EOFinAdequacy.
     simpl. rewrite /eofin_sim_rel. simpl.
     rewrite /eofin_valid_evolution_step /eofin_st_rel. simpl.
     apply list_approx_smaller_card. 
-    apply OM_fin_branch_impl; try by apply _.
+    apply @OM_fin_branch_impl; by apply _.
   Qed. 
     
   Theorem om_simulation_adequacy_model_trace Σ
@@ -89,7 +90,7 @@ Section EOFinAdequacy.
 
   Lemma eofin_matching_traces_termination extr mtr
     (VALID: extrace_valid extr)
-    (OM_WF0: om_st_wf _ (trfirst mtr))
+    (OM_WF0: om_st_wf (trfirst mtr))
     (FAIR: ∀ tid, fair_ex tid extr)
     (MATCH: eofin_om_traces_match extr mtr)
     :
@@ -120,7 +121,7 @@ Section EOFinAdequacy.
     pose proof (traces_match_compose _ _ _ MATCH MATCHo) as MATCH'.
 
     (* TODO: extract these lemmas *)
-    assert (out_om_traces_match OP locale_step Some
+    assert (out_om_traces_match locale_step Some
               (fun oτ c => from_option (fun τ => locale_enabled τ c) False oτ)
               extr omtr) as MATCH''.
     { eapply trace_utils.traces_match_impl; [..| apply MATCH'].
@@ -141,10 +142,10 @@ Section EOFinAdequacy.
       destruct FAIR as [| FAIR]. 
       { left. done. }
       right. destruct FAIR as (?&?&?). eauto. }
-    pose proof (out_om_fairness_preserved _ _ _ _ _ extr omtr MATCH'' FAIR'') as OM_FAIR. 
+    pose proof (out_om_fairness_preserved _ _ _ _ extr omtr MATCH'' FAIR'') as OM_FAIR. 
 
     pose proof (traces_match_valid2 _ _ _ _ _ _ MATCH'') as OM_VALID.  
-    pose proof (obls_fair_trace_terminate _ _ OM_VALID OM_FAIR) as OM_TERM.
+    pose proof (obls_fair_trace_terminate _ OM_VALID OM_FAIR) as OM_TERM.
     specialize_full OM_TERM.
     { intros. eapply pres_by_valid_trace with (i := 0) (j := i) in OM_VALID. 
       2: apply wf_preserved_by_loc_step.
@@ -201,7 +202,7 @@ Section EOFinAdequacy.
 
   (* TODO: move *)
   Lemma om_live_tids_init e σ ds eb:
-      om_live_tids OP id locale_enabled ([e], σ) (init_om_state OP ([e], σ) ds eb).
+      om_live_tids id locale_enabled ([e], σ) (init_om_state ([e], σ) ds eb).
   Proof using. 
     red. intros ?.
     rewrite /has_obls. simpl. 
@@ -217,19 +218,19 @@ Section EOFinAdequacy.
           (oGS := @heap_fairnessGS eofinΣ _ _ Hinv)
     (tp : list expr)
   (σ : state)
-  (δ' : ProgressState OP)
+  (δ' : ProgressState)
   ee
-  (TH_OWN : threads_own_obls OP (tp, σ) δ'):
-  gen_heap_interp (heap σ) -∗ obls_msi OP δ' (H3 := oGS) -∗
-  cur_posts tp ee (λ _ : val, obls OP 0 ∅ (H3 := oGS)) -∗
-  ⌜om_live_tids OP id locale_enabled (tp, σ) δ'⌝.
+  (TH_OWN : threads_own_obls (tp, σ) δ'):
+  gen_heap_interp (heap σ) -∗ obls_msi δ' (oGS := oGS) -∗
+  cur_posts tp ee (λ _ : val, obls 0 ∅ (oGS := oGS)) -∗
+  ⌜om_live_tids id locale_enabled (tp, σ) δ'⌝.
   Proof using.
     clear -Hinv TH_OWN.
     iIntros "HEAP MSI POSTS".
     rewrite /om_live_tids. iIntros (τ OBτ).
     rewrite /locale_enabled.
     red in OBτ.
-    destruct (ps_obls _ δ' !! τ) as [V| ] eqn:OB_; [| done].
+    destruct (ps_obls δ' !! τ) as [V| ] eqn:OB_; [| done].
     simpl in OBτ.
     red in TH_OWN. rewrite set_eq in TH_OWN. specialize (TH_OWN τ).
     apply proj2 in TH_OWN. specialize (TH_OWN ltac:(eapply elem_of_dom; eauto)).
@@ -256,7 +257,7 @@ Section EOFinAdequacy.
          (@heap_fairnessGS eofinΣ
             _
             _ Hinv) 0) e σ1
-    (@init_om_state _ _ _ _ _ 10 OP ([e], σ1) ds eb).
+    (@init_om_state _ _ _ 10 OP ([e], σ1) ds eb).
   Proof using.
     rewrite /rel_always_holds0.
     
@@ -299,7 +300,7 @@ Section EOFinAdequacy.
     destruct (trfirst extr) as [tp_ σ1] eqn:EX0. simpl in *. subst tp_.
 
     (* TODO: get rid of extra nat parameter of di *)
-    set (s1 := init_om_state OP (trfirst extr)
+    set (s1 := init_om_state (trfirst extr)
                ((2 * B + 5) *: {[+ d2 B +]} ⊎ 50 *: {[+ d0 B +]})
                  20
         ). 
@@ -324,7 +325,11 @@ Section EOFinAdequacy.
         apply AMU_lift_top. }
       rewrite /obls_init_resource. subst s1. simpl.
       rewrite EX0.
-      rewrite init_phases_helper. 
+      
+      (* rewrite init_phases_helper.  *)
+      (* rewrite (init_phases_helper (start #0%nat #B) σ1). *)
+      pose proof (init_phases_helper (start #0%nat #B) σ1) as IP. rewrite IP. 
+
       rewrite locales_of_cfg_simpl. simpl.
       rewrite union_empty_r_L. simpl. 
       iDestruct "INIT" as "(CPS & SIGS & OB & EPS & PH & EB)".

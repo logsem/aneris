@@ -7,27 +7,26 @@ From stdpp Require Import relations.
 
 
 Section PhaseFuel.
-  Context `(OP: ObligationsParams Degree Level Locale LIM_STEPS).
-  Context `{Countable Locale}. 
-  Let OM := ObligationsModel OP.
+  Context `{OP: ObligationsParams Degree Level Locale LIM_STEPS}.
+  Let OM := ObligationsModel.
 
   Definition loc_step_no_exp_all δ1 τ δ2 :=
-    (exists π δ, burns_cp OP δ1 τ δ2 π δ) \/
-    (exists π δ δ' n, exchanges_cp OP δ1 τ δ2 π δ δ' n) \/
-    (exists l, creates_signal OP δ1 τ δ2 l) \/
-    (exists s, sets_signal OP δ1 τ δ2 s) \/
-    (exists s π δ δ', creates_ep OP δ1 τ δ2 s π δ δ').
+    (exists π δ, burns_cp δ1 τ δ2 π δ) \/
+    (exists π δ δ' n, exchanges_cp δ1 τ δ2 π δ δ' n) \/
+    (exists l, creates_signal δ1 τ δ2 l) \/
+    (exists s, sets_signal δ1 τ δ2 s) \/
+    (exists s π δ δ', creates_ep δ1 τ δ2 s π δ δ').
 
   Lemma loc_step_split δ1 τ δ2:
-    loc_step OP δ1 τ δ2 <->
-      (loc_step_no_exp_all δ1 τ δ2 \/ (exists sid π d, expects_ep OP δ1 τ δ2 sid π d)).
+    loc_step δ1 τ δ2 <->
+      (loc_step_no_exp_all δ1 τ δ2 \/ (exists sid π d, expects_ep δ1 τ δ2 sid π d)).
   Proof using.
     rewrite /loc_step_no_exp_all. split.
     - intros [T|[T|[T|[T|[T|T]]]]]; tauto.
     - intros [[T|[T|[T|[T|T]]]] | ?]; red; tauto.
   Qed.
     
-  Context (tr: obls_trace OP).
+  Context (tr: obls_trace).
   
   Context (sig_bound: SignalId -> nat).
   
@@ -58,10 +57,10 @@ Section PhaseFuel.
   Context (P: Phase -> Prop).
   Context `{forall π, Decision (P π)}. 
   
-  Definition PF' (k: nat) (δ: ProgressState OP) :=
-    (mset_map snd ∘ (mset_filter (fun '(π_, _) => P π_)) ∘ (ps_cps OP)) δ
+  Definition PF' (k: nat) (δ: ProgressState) :=
+    (mset_map snd ∘ (mset_filter (fun '(π_, _) => P π_)) ∘ (ps_cps)) δ
       ⊎
-      approx_expects k (filter (fun '(_, π_, _) => P π_) (ps_eps OP δ)).
+      approx_expects k (filter (fun '(_, π_, _) => P π_) (ps_eps δ)).
   
   Definition TPF' (i: nat): gmultiset Degree :=
     from_option (PF' ((LIM_STEPS + 2) * i)) ∅ (tr S!! i).
@@ -73,7 +72,7 @@ Section PhaseFuel.
     :
     ms_le deg_le (approx_expects n X) (approx_expects m Y).
   Proof using. 
-    clear -LE SUB. 
+    clear -LE SUB.
     rewrite /approx_expects.
     apply union_difference_L in SUB. rewrite SUB.
     rewrite big_opS_union; [| set_solver].
@@ -112,10 +111,10 @@ Section PhaseFuel.
   
   Lemma exchange_cp_ms_le δ1 τ δ2 k π d d' n
     `{forall π, Decision (P π)}
-    (EXC: exchanges_cp OP δ1 τ δ2 π d d' n):
+    (EXC: exchanges_cp δ1 τ δ2 π d d' n):
     ms_le deg_le (PF' (S k) δ2) (PF' k δ1).
   Proof using.
-    clear -EXC. rewrite /PF'. 
+    clear -EXC OM. rewrite /PF'. 
     inversion EXC; subst. 
     destruct δ1. simpl in *. 
     apply ms_le_disj_union; [apply _| ..].
@@ -142,10 +141,10 @@ Section PhaseFuel.
   Qed.
   
   Lemma create_ep_ms_le δ1 τ δ2 k s π d d'
-    (CREATE: creates_ep OP δ1 τ δ2 s π d d'):
+    (CREATE: creates_ep δ1 τ δ2 s π d d'):
     ms_le deg_le (PF' (S k) δ2) (PF' k δ1).
   Proof using.
-    clear -CREATE. 
+    clear -CREATE OM.
     rewrite /PF'. inversion CREATE; subst.
     destruct δ1. simpl in *.
     subst new_cps0 new_eps0.
@@ -212,14 +211,13 @@ Section PhaseFuel.
     - destruct T as (?&?&?&?&T). eapply create_ep_ms_le; eauto. 
   Qed.
   
-  Definition expect_ms_le δ1 τ δ2 k
-    :=
+  Definition expect_ms_le δ1 τ δ2 k :=
     forall sid π' d,
-      expects_ep _ δ1 τ δ2 sid π' d ->
+      expects_ep δ1 τ δ2 sid π' d ->
       ms_le deg_le (PF' (S k) δ2) (PF' k δ1). 
   
   Lemma loc_step_ms_le δ1 τ δ2 k
-    (STEP: loc_step _ δ1 τ δ2)
+    (STEP: loc_step δ1 τ δ2)
     (EXP_CASE: expect_ms_le δ1 τ δ2 k)
     :
     ms_le deg_le (PF' (S k) δ2) (PF' k δ1).
@@ -234,14 +232,14 @@ Section PhaseFuel.
     forall δ δ' mb mf k
       (ITH: tr !! i = Some (δ, Some (τ, δ')))
       (BOUND : k ≤ LIM_STEPS)
-      (STEPS: nsteps (λ p1 p2, loc_step OP p1 τ p2) k δ mb)
-      (BSTEP: (∃ π δ, burns_cp OP mb τ mf π δ))
-      (FSTEP: clos_refl (ProgressState OP) (λ p1 p2, ∃ τ' R, forks_locale OP p1 τ p2 τ' R) mf δ'),
+      (STEPS: nsteps (λ p1 p2, loc_step p1 τ p2) k δ mb)
+      (BSTEP: (∃ π δ, burns_cp mb τ mf π δ))
+      (FSTEP: clos_refl (ProgressState) (λ p1 p2, ∃ τ' R, forks_locale p1 τ p2 τ' R) mf δ'),
       ms_le deg_le (PF' ((LIM_STEPS + 2) * i + k) mb) (PF' ((LIM_STEPS + 2) * i) δ).
 
   
   Lemma forks_locale_ms_le δ1 τ δ2 τ' R k
-    (FORK: forks_locale OP δ1 τ δ2 τ' R):
+    (FORK: forks_locale δ1 τ δ2 τ' R):
     ms_le deg_le (PF' (S k) δ2) (PF' k δ1).
   Proof using.
     rewrite /PF'.
@@ -254,14 +252,14 @@ Section PhaseFuel.
   
   Lemma om_trans_ms_rel (bd: bool) i
     (rel := (if bd then ms_lt deg_le else ms_le deg_le): relation (gmultiset Degree))
-    (VALID: obls_trace_valid OP tr)
+    (VALID: obls_trace_valid tr)
     (BURN_REL:
       forall δ δ' τ mb mf k,
         tr !! i = Some (δ, Some (τ, δ')) ->
         k ≤ LIM_STEPS ->
-        nsteps (λ p1 p2, loc_step OP p1 τ p2) k δ mb ->
-        (∃ π δ, burns_cp OP mb τ mf π δ) ->
-        clos_refl (ProgressState OP) (λ p1 p2, ∃ τ' R, forks_locale OP p1 τ p2 τ' R) mf δ' ->
+        nsteps (λ p1 p2, loc_step p1 τ p2) k δ mb ->
+        (∃ π δ, burns_cp mb τ mf π δ) ->
+        clos_refl (ProgressState) (λ p1 p2, ∃ τ' R, forks_locale p1 τ p2 τ' R) mf δ' ->
         rel (PF' ((LIM_STEPS + 2) * i + LIM_STEPS + 1) mf) (PF' ((LIM_STEPS + 2) * i + LIM_STEPS) mb))
     (NSTEPS_LE: forall τ,
         tr L!! i = Some τ ->
@@ -308,7 +306,7 @@ Section PhaseFuel.
   Qed.
   
   Lemma burns_cp_ms_le δ1 τ δ2 π' d k
-    (STEP: burns_cp OP δ1 τ δ2 π' d):
+    (STEP: burns_cp δ1 τ δ2 π' d):
     ms_le deg_le (PF' (S k) δ2) (PF' k δ1).
   Proof using.
     rewrite /PF'. 
@@ -321,9 +319,9 @@ Section PhaseFuel.
   Qed.        
   
   Lemma burns_cp_own_ms_lt δ1 τ δ2 πτ πb d k
-    (PH: ps_phases _ δ1 !! τ = Some πτ)
+    (PH: ps_phases δ1 !! τ = Some πτ)
     (Pτ: P πb)
-    (STEP: burns_cp OP δ1 τ δ2 πb d):
+    (STEP: burns_cp δ1 τ δ2 πb d):
     ms_lt deg_le (PF' (S k) δ2) (PF' k δ1).
   Proof using.
     rewrite /PF'. 

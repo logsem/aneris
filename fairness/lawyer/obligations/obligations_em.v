@@ -2,7 +2,7 @@ From iris.proofmode Require Import tactics.
 From stdpp Require Import namespaces.
 From iris.algebra Require Import auth gmap gset excl gmultiset big_op mono_nat.
 From trillium.fairness Require Import fairness locales_helpers execution_model.
-From trillium.fairness.lawyer.obligations Require Import obligations_model obls_utils obligations_resources multiset_utils.
+From trillium.fairness.lawyer.obligations Require Import obligations_model obls_utils obligations_resources multiset_utils obligations_wf.
 
 
 Section ObligationsEM.
@@ -17,34 +17,34 @@ Section ObligationsEM.
 
   (* Context {Locale: Type}. *)
   Context {Λ: language}.
-  Context `{Countable (locale Λ)}.
+  (* Context `{Countable (locale Λ)}. *)
   Let Locale := locale Λ.
 
   Context {LIM_STEPS: nat}.
-  Context (OP: ObligationsParams Degree Level Locale LIM_STEPS).
-  Let OM := ObligationsModel OP.
+  Context {OP: ObligationsParams Degree Level Locale LIM_STEPS}.
+  Let OM := ObligationsModel.
 
   Definition threads_own_obls (c: cfg Λ) (δ: mstate OM) :=
-    locales_of_cfg c = dom $ ps_obls OP δ. 
+    locales_of_cfg c = dom $ ps_obls δ. 
     
   Lemma locale_nofork_step_obls_pres c1 c2 τ θ δ1 δ2
     (STEP: locale_step c1 (Some τ) c2)
     (TH_OWN: threads_own_obls c1 δ1)
-    (TRANS: progress_step OP δ1 θ δ2)
+    (TRANS: progress_step δ1 θ δ2)
     (NOFORK: locales_of_cfg c2 = locales_of_cfg c1)
     :
     threads_own_obls c2 δ2.
   Proof.
     destruct c1 as [tp1 σ1], c2 as [tp2 σ2].
     red. rewrite NOFORK.
-    unshelve forward eapply (pres_by_loc_step_implies_progress _ _ _ _ _ _ _ TRANS). 
+    unshelve forward eapply (pres_by_loc_step_implies_progress _ _ _ _ _ _ TRANS). 
     2: { eapply @loc_step_obls_pres. }
     { reflexivity. }
     intros EQ. by rewrite EQ. 
   Qed.
       
   Definition obls_cfg_corr (σ: cfg Λ) (δ: mstate OM) :=
-      threads_own_obls σ δ /\ dom_phases_obls OP δ. 
+      threads_own_obls σ δ /\ dom_phases_obls δ. 
 
   Definition obls_valid_evolution_step
     (σ1: cfg Λ) (oζ: olocale Λ) (σ2: cfg Λ)
@@ -56,53 +56,53 @@ Section ObligationsEM.
       obls_cfg_corr σ2 δ2
   .
 
-  Definition obls_si `{!ObligationsGS OP Σ}
+  Definition obls_si `{!ObligationsGS Σ}
     (σ: cfg Λ) (δ: mstate OM): iProp Σ :=
-      obls_msi _ δ ∗ ⌜ obls_cfg_corr σ δ ⌝. 
+      obls_msi δ ∗ ⌜ obls_cfg_corr σ δ ⌝. 
 
-  Definition obls_init_resource `{!ObligationsGS OP Σ}
+  Definition obls_init_resource `{!ObligationsGS Σ}
     (δ: mstate OM) (_: unit): iProp Σ :=
-    own (obls_cps _) (◯ (cps_repr _ $ ps_cps _ δ)) ∗
-    own (obls_sigs _) (◯ (sig_map_repr $ ps_sigs _ δ)) ∗
-    own (obls_obls _) (◯ (obls_map_repr $ ps_obls _ δ)) ∗
-    own (obls_eps _) (◯ (eps_repr _ $ ps_eps _ δ)) ∗
-    own (obls_phs _) (◯ (phases_repr $ ps_phases _ δ)) ∗
-    own (obls_exc_lb _) (◯MN (ps_exc_bound _ δ))
+    own obls_cps (◯ (cps_repr $ ps_cps δ)) ∗
+    own obls_sigs (◯ (sig_map_repr $ ps_sigs δ)) ∗
+    own obls_obls (◯ (obls_map_repr $ ps_obls δ)) ∗
+    own obls_eps (◯ (eps_repr $ ps_eps δ)) ∗
+    own obls_phs (◯ (phases_repr $ ps_phases δ)) ∗
+    own obls_exc_lb (◯MN (ps_exc_bound δ))
   .
 
   Definition obls_is_init_st (σ: cfg Λ) (δ: mstate OM) :=
     exists τ0,
       let R := {[ τ0 ]} in
-      locales_of_cfg σ = R /\ dom $ ps_obls OP δ = R /\ 
+      locales_of_cfg σ = R /\ dom $ ps_obls δ = R /\ 
       (* TODO: add this to invariant? *)
-      om_st_wf _ δ.
+      om_st_wf δ.
 
-  Lemma obls_resources_init Σ {PRE: ObligationsPreGS OP Σ}:
+  Lemma obls_resources_init Σ {PRE: ObligationsPreGS Σ}:
     ∀ s1 σ p (INIT: obls_is_init_st σ s1),
-        ⊢ |==> ∃ eGS: ObligationsGS OP Σ, obls_init_resource s1 p ∗ obls_si σ s1. 
+        ⊢ |==> ∃ eGS: ObligationsGS Σ, obls_init_resource s1 p ∗ obls_si σ s1. 
   Proof using.
     clear H1 H0 H. 
     simpl. intros δ σ ? INIT. iStartProof.
-    iMod (own_alloc (● (cps_repr _ $ ps_cps _  δ) ⋅ ◯ _)) as (?) "[CPa CPf]".
+    iMod (own_alloc (● (cps_repr $ ps_cps  δ) ⋅ ◯ _)) as (?) "[CPa CPf]".
     { by apply auth_both_valid_2. }
-    iMod (own_alloc (● (sig_map_repr (ps_sigs _ δ)) ⋅ ◯ _)) as (?) "[SIGSa SIGSf]".
+    iMod (own_alloc (● (sig_map_repr (ps_sigs δ)) ⋅ ◯ _)) as (?) "[SIGSa SIGSf]".
     { apply auth_both_valid_2; [| reflexivity].
       rewrite /sig_map_repr.
       intros s. destruct lookup eqn:L; [| done].
       apply lookup_fmap_Some in L. 
       destruct L as ([l b]&<-&?).
       done. }
-    iMod (own_alloc (● (obls_map_repr $ ps_obls _ δ) ⋅ ◯ _)) as (?) "[OBLSa OBLSf]". 
+    iMod (own_alloc (● (obls_map_repr $ ps_obls δ) ⋅ ◯ _)) as (?) "[OBLSa OBLSf]". 
     { apply auth_both_valid_discrete. split; [reflexivity| ].
       intros τ. rewrite lookup_fmap. 
       by destruct lookup. }
-    iMod (own_alloc (● (eps_repr _ $ ps_eps _ δ) ⋅ ◯ _)) as (?) "[EPSa EPSf]". 
+    iMod (own_alloc (● (eps_repr $ ps_eps δ) ⋅ ◯ _)) as (?) "[EPSa EPSf]". 
     { by apply auth_both_valid_2. }
-    iMod (own_alloc (● (phases_repr $ ps_phases _ δ) ⋅ ◯ _)) as (?) "[PHa PHf]". 
+    iMod (own_alloc (● (phases_repr $ ps_phases δ) ⋅ ◯ _)) as (?) "[PHa PHf]". 
     { apply auth_both_valid_2; [| reflexivity].
       rewrite /phases_repr. intros τ. destruct lookup eqn:L; [| done].
       rewrite lookup_fmap_Some in L. destruct L as (? & <- & L). done. }
-    iMod (own_alloc (●MN (ps_exc_bound _ δ) ⋅ mono_nat_lb _)) as (?) "[LBa LBf]".
+    iMod (own_alloc (●MN (ps_exc_bound δ) ⋅ mono_nat_lb _)) as (?) "[LBa LBf]".
     { apply mono_nat_both_valid. reflexivity. }
     iModIntro. iExists {| obls_pre := PRE; |}.
     iFrame.
@@ -115,10 +115,10 @@ Section ObligationsEM.
   
   Definition ObligationsEM: ExecutionModel Λ OM :=
     {| 
-      em_Σ := obls_Σ OP;
+      em_Σ := obls_Σ;
       em_valid_evolution_step := obls_valid_evolution_step;
-      em_thread_post Σ `{!ObligationsGS OP Σ} :=
-        fun τ => (obls _ τ ∅)%I;
+      em_thread_post Σ `{!ObligationsGS Σ} :=
+        fun τ => (obls τ ∅)%I;
       em_initialization := obls_resources_init;
     |}.
 
@@ -153,7 +153,7 @@ Section ObligationsEM.
   Qed.
 
   Lemma init_om_dpo (c: cfg Λ) ds eb:
-    dom_phases_obls _ (init_om_state c ds eb).
+    dom_phases_obls (init_om_state c ds eb).
   Proof.
     red. simpl. rewrite dom_list_to_map_L. simpl.
     rewrite fst_zip.
@@ -206,7 +206,7 @@ Section ObligationsEM.
     
   From trillium.fairness.lawyer Require Import sub_action_em obligations_am action_model. 
   Context `{Inhabited Locale}. 
-  Let OAM := ObligationsAM OP. 
+  Let OAM := ObligationsAM. 
 
   Definition obls_ves_wrapper:
     cfg Λ → olocale Λ → cfg Λ → 
@@ -217,9 +217,9 @@ Section ObligationsEM.
       from_option (fun ρ => obls_valid_evolution_step c1 oτ c2 δ1 ρ δ2) False oρ /\
       a = obls_act. 
 
-  Definition ObligationsASEM: ActionSubEM Λ (ObligationsAM OP) :=
+  Definition ObligationsASEM: ActionSubEM Λ (ObligationsAM) :=
     {| 
-      asem_Σ := obls_Σ OP;
+      asem_Σ := obls_Σ;
       asem_valid_evolution_step := obls_ves_wrapper;
       asem_initialization := obls_resources_init;
     |}.

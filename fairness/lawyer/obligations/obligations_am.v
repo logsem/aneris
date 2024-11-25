@@ -6,23 +6,22 @@ From trillium.fairness.lawyer Require Import action_model.
 
 
 Section ObligationsAM.
-  Context `(OP: ObligationsParams Degree Level Locale LIM_STEPS).
-  Context `{Countable Locale}.
+  Context `{OP: ObligationsParams Degree Level Locale LIM_STEPS}.
   Context {INH_LOC: Inhabited Locale}.
-  Let OM := ObligationsModel OP.
+  Let OM := ObligationsModel.
 
   Definition obls_ns: namespace := nroot .@ "obligations".
   Definition obls_act: Action := coPpick (↑ obls_ns).
 
-  Inductive obls_AM_trans: ProgressState OP → Action * option Locale → ProgressState OP → Prop :=
+  Inductive obls_AM_trans: ProgressState → Action * option Locale → ProgressState → Prop :=
   | oam_step δ1 ρ δ2
-      (STEP: om_trans OP δ1 ρ δ2):
+      (STEP: om_trans δ1 ρ δ2):
   obls_AM_trans δ1 (obls_act, Some ρ) δ2. 
   
-  Global Instance OM_st_eqdec: EqDecision (ProgressState OP).
+  Global Instance OM_st_eqdec: EqDecision ProgressState.
   Proof. solve_decision. Qed. 
 
-  Global Instance OM_st_inh: Inhabited (ProgressState OP).
+  Global Instance OM_st_inh: Inhabited ProgressState.
   Proof.
     constructor. exact {|
       ps_cps := ∅;

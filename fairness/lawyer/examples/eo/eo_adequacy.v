@@ -3,7 +3,7 @@ From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import locales_helpers comp_utils fairness.
 From trillium.fairness.heap_lang Require Import simulation_adequacy notation.
 From trillium.fairness.lawyer Require Import counter_model sub_action_em action_model.
-From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_am obligations_em obligations_resources obls_fairness_preservation obls_refill_em obls_refill_model.
+From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_am obligations_em obligations_resources obls_fairness_preservation obls_refill_em obls_refill_model obligations_logic.
 From trillium.fairness.lawyer.counter Require Import counter_em.
 (* TODO: avoid importing  the other definition*)
 From trillium.fairness Require Import trace_lookup.
@@ -34,31 +34,36 @@ Section EOAdequacy.
   Let Degree := ofe_car DegO.
   Let Level := ofe_car LevelO.
   
-  Context (OP: ObligationsParams Degree Level (locale heap_lang) LIM_STEPS).
-  Let ASEMo := ObligationsASEM OP.
+  (* Context (OP: ObligationsParams Degree Level (locale heap_lang) LIM_STEPS). *)
+  Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}.
+  Let OP := LocaleOP (Locale := locale heap_lang).
+  Existing Instance OP. 
+  Let OM := ObligationsModel.
+
+  Let ASEMo := ObligationsASEM.
   Let ASEMc := @CounterASEM heap_lang.
 
   (* TODO: move *)
-  Instance is_act_of_obls_dec: forall a, Decision (is_action_of (ObligationsRefillAM OP) a).
+  Instance is_act_of_obls_dec: forall a, Decision (is_action_of ObligationsRefillAM a).
   Proof. Admitted. 
   Instance is_act_of_cnt_dec: forall a, Decision (is_action_of CounterAM a).
   Proof. Admitted. 
 
   Let ASEM := ProdASEM (ASEM1 := ASEMo) (ASEM2 := ASEMc).
-  Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls OP τ ∅ (H3 := aGS.1)).
-  Let PM := ProdAM (ObligationsRefillAM OP) CounterAM.
+  Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls τ ∅ (oGS := aGS.1)).
+  Let PM := ProdAM (ObligationsRefillAM) CounterAM.
   Let M := AM2M PM.
   
   Definition eoΣ: gFunctors.
   Admitted.
 
   Definition eo_st_rel (l: loc) (c: cfg heap_lang) (δ: mstate M) :=
-    om_live_tids OP id locale_enabled c δ.1 /\
+    om_live_tids id locale_enabled c δ.1 /\
     heap c.2 !! l = Some #(δ.2).
 
   Let eo_lbl_match (oτ: olocale heap_lang) (aρ: mlabel M): Prop :=
         from_option (fun ρ => match ρ with
-                           | inl τ' => oτ = Some $ locale_of_orm_lbl OP τ'
+                           | inl τ' => oτ = Some $ locale_of_orm_lbl τ'
                            | inr _ => False
                            end) False aρ.2.
     

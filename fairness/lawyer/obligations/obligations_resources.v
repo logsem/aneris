@@ -15,14 +15,10 @@ Section ObligationsRepr.
   Let Degree := ofe_car DegO.
   Let Level := ofe_car LevelO.
 
-  (* Context {Λ: language}. *)
-  (* Context `{Countable (locale Λ)}. *)
-  (* Let Locale := locale Λ.  *)
-  Context `{Countable Locale}. 
-  
+  Context {Locale: Type}.
   Context {LIM_STEPS: nat}.
-  Context (OP: ObligationsParams Degree Level Locale LIM_STEPS).
-  Let OM := ObligationsModel OP.
+  Context {OP: ObligationsParams Degree Level Locale LIM_STEPS}.
+  Let OM := ObligationsModel.
 
   Let phO := listO natO. 
   Let cpO := prodO phO DegO. 
@@ -50,7 +46,6 @@ Section ObligationsRepr.
 
   Definition sig_map_repr smap: gmapUR SignalId sstR :=
     (fun '(l, b) => (to_agree l, Excl' b)) <$> smap. 
-    (* [^op map] sg ↦ sst ∈ smap, {[ sg := (to_agree sst.1, Excl' sst.2) ]}. *)
 
   Definition obls_map_repr (omap: gmap Locale (gset SignalId)):
     gmapUR Locale (exclR (gsetUR natO)) :=
@@ -65,18 +60,13 @@ Section ObligationsRepr.
 
   Definition cps_repr (cps: gmultiset (@CallPermission Degree)): (gmultisetUR cpO) := cps.
 
-  (* Definition obls_repr (obls: gmap Locale (gset SignalId)):  *)
-  
-  (* Definition obls_msi `{ObligationsGS Σ} (ps: ProgressState OP): iProp Σ := *)
-  (*   own obls_eps ((● (eps_repr $ ps_eps OP ps)): authUR (gsetUR epO)) *)
-  (* .  *)
-  Definition obls_msi `{ObligationsGS Σ} (ps: ProgressState OP): iProp Σ :=
-    own obls_cps (● (cps_repr $ ps_cps OP ps)) ∗
-    own obls_sigs (● (sig_map_repr $ ps_sigs OP ps)) ∗
-    own obls_obls (● (obls_map_repr $ ps_obls OP ps)) ∗
-    own obls_eps (● (eps_repr $ ps_eps OP ps)) ∗
-    own obls_phs (● (phases_repr $ ps_phases OP ps)) ∗
-    own obls_exc_lb (●MN (ps_exc_bound OP ps))
+  Definition obls_msi {Σ: gFunctors} {oGS: ObligationsGS Σ} (ps: ProgressState): iProp Σ :=
+    own obls_cps (● (cps_repr $ ps_cps ps)) ∗
+    own obls_sigs (● (sig_map_repr $ ps_sigs ps)) ∗
+    own obls_obls (● (obls_map_repr $ ps_obls ps)) ∗
+    own obls_eps (● (eps_repr $ ps_eps ps)) ∗
+    own obls_phs (● (phases_repr $ ps_phases ps)) ∗
+    own obls_exc_lb (●MN (ps_exc_bound ps))
   . 
   
   Definition obls_Σ: gFunctors := #[
@@ -92,35 +82,35 @@ Section ObligationsRepr.
     ∀ Σ, subG obls_Σ Σ → ObligationsPreGS Σ.
   Proof using. solve_inG. Qed.           
 
-  Definition cp `{ObligationsGS Σ} (ph: Phase) (deg: Degree): iProp Σ :=
-    own obls_cps (◯ (cps_repr ({[+ ((ph, deg)) +]}))). 
+  Section Resources.
+    Context `{oGS: ObligationsGS Σ}. 
 
-  Definition cp_mul `{ObligationsGS Σ} ph deg n: iProp Σ :=
-    own obls_cps (◯ (n *: {[+ (ph, deg) +]})). 
+    Definition cp (ph: Phase) (deg: Degree): iProp Σ :=
+      own obls_cps (◯ (cps_repr ({[+ ((ph, deg)) +]}))). 
 
-  Definition cps `{ObligationsGS Σ} (m: gmultiset (@CallPermission Degree)) : iProp Σ :=
+    Definition cp_mul ph deg n: iProp Σ :=
+      own obls_cps (◯ (n *: {[+ (ph, deg) +]})). 
+
+    Definition cps (m: gmultiset (@CallPermission Degree)) : iProp Σ :=
       own obls_cps (◯ (cps_repr m)). 
 
-  Definition sgn `{ObligationsGS Σ} (sid: SignalId) (l: Level) (ob: option bool): iProp Σ :=
-    own obls_sigs (◯ ({[ sid := (to_agree l, mbind (Some ∘ Excl) ob ) ]})).
-
-  Definition obls `{ObligationsGS Σ} τ (R: gset SignalId) :=
-    own obls_obls (◯ ({[ τ := Excl R]}: gmapUR Locale (exclR (gsetR natO)))).
-
-  Definition sgns_level_gt `{ObligationsGS Σ} (R: gset SignalId) lm: iProp Σ :=
-    [∗ set] s ∈ R, (∃ l, sgn s l None ∗ ⌜ lvl_lt _ lm l ⌝). 
-  
-  Definition ep `{ObligationsGS Σ} (sid: SignalId) π d: iProp Σ :=
+    Definition sgn (sid: SignalId) (l: Level) (ob: option bool): iProp Σ :=
+      own obls_sigs (◯ ({[ sid := (to_agree l, mbind (Some ∘ Excl) ob ) ]})).
+    
+    Definition obls τ (R: gset SignalId) :=
+      own obls_obls (◯ ({[ τ := Excl R]}: gmapUR Locale (exclR (gsetR natO)))).
+    
+    Definition sgns_level_gt (R: gset SignalId) lm: iProp Σ :=
+      [∗ set] s ∈ R, (∃ l, sgn s l None ∗ ⌜ lvl_lt lm l ⌝). 
+    
+    Definition ep (sid: SignalId) π d: iProp Σ :=
     own obls_eps (◯ {[ (sid, π, d) ]}). 
-
-  Definition exc_lb `{ObligationsGS Σ} (n: nat) :=
-    own obls_exc_lb (mono_nat_lb n).
-
-  Definition th_phase_ge `{ObligationsGS Σ} ζ π: iProp Σ :=
-    ∃ π__max, own obls_phs (◯ (phases_repr {[ ζ := π__max]})) ∗ ⌜ phase_le π π__max⌝.
-
-  Section ResourcesFacts.
-    Context `{ObligationsGS Σ}. 
+    
+    Definition exc_lb (n: nat) :=
+      own obls_exc_lb (mono_nat_lb n).
+    
+    Definition th_phase_ge ζ π: iProp Σ :=
+      ∃ π__max, own obls_phs (◯ (phases_repr {[ ζ := π__max]})) ∗ ⌜ phase_le π π__max⌝.
 
     Lemma obls_proper ζ R1 R2 (EQUIV: R1 ≡ R2):
       ⊢ obls ζ R1 ∗-∗ obls ζ R2.
@@ -128,7 +118,7 @@ Section ObligationsRepr.
     
     Lemma cp_msi_dom δ ph deg:
       ⊢ obls_msi δ -∗ cp ph deg -∗
-        ⌜ (ph, deg) ∈ ps_cps OP δ ⌝.
+        ⌜ (ph, deg) ∈ ps_cps δ ⌝.
     Proof using.
       clear H H0 H1.
       rewrite /obls_msi. iIntros "(CPS&_) CP". 
@@ -141,7 +131,7 @@ Section ObligationsRepr.
 
     Lemma obls_msi_exact δ ζ R:
       ⊢ obls_msi δ -∗ obls ζ R -∗
-        ⌜ ps_obls OP δ !! ζ = Some R ⌝.
+        ⌜ ps_obls δ !! ζ = Some R ⌝.
     Proof using.
       clear H0 H H1. 
       rewrite /obls_msi. iIntros "(_&_&OBLS&_) OB". 
@@ -160,7 +150,7 @@ Section ObligationsRepr.
     (* TODO: unify sigs_msi_.. proofs *)
     Lemma sigs_msi_in δ sid l ov:
       ⊢ obls_msi δ -∗ sgn sid l ov -∗
-        ⌜ exists v, ps_sigs OP δ !! sid = Some (l, v) ⌝.
+        ⌜ exists v, ps_sigs δ !! sid = Some (l, v) ⌝.
     Proof using H1 H0. 
       clear H. 
       rewrite /obls_msi. iIntros "(_&SIGS&_) SIG". 
@@ -172,7 +162,7 @@ Section ObligationsRepr.
       simpl in LE'. rewrite -SIG' in LE'.
       rewrite /sig_map_repr in LE'.
       rewrite lookup_fmap in LE'.
-      destruct (ps_sigs OP δ !! sid) as [[??]|] eqn:LL.
+      destruct (ps_sigs δ !! sid) as [[??]|] eqn:LL.
       all: rewrite LL in LE'; simpl in LE'.
       2: { apply option_included_total in LE' as [?|?]; set_solver. }
       rewrite Some_included_total in LE'.
@@ -183,7 +173,7 @@ Section ObligationsRepr.
 
     Lemma sigs_msi_exact δ sid l v:
       ⊢ obls_msi δ -∗ sgn sid l (Some v) -∗
-        ⌜ ps_sigs OP δ !! sid = Some (l, v) ⌝.
+        ⌜ ps_sigs δ !! sid = Some (l, v) ⌝.
     Proof using H1 H0.
       clear H. 
       rewrite /obls_msi. iIntros "(_&SIGS&_) SIG". 
@@ -195,7 +185,7 @@ Section ObligationsRepr.
       simpl in LE'. rewrite -SIG' in LE'.
       rewrite /sig_map_repr in LE'.
       rewrite lookup_fmap in LE'.
-      destruct (ps_sigs OP δ !! sid) as [[??]|] eqn:LL.
+      destruct (ps_sigs δ !! sid) as [[??]|] eqn:LL.
       all: rewrite LL in LE'; simpl in LE'.
       2: { apply option_included_total in LE' as [?|?]; set_solver. }
       rewrite Some_included_total in LE'.
@@ -224,7 +214,7 @@ Section ObligationsRepr.
 
     Lemma th_phase_msi_ge_strong δ ζ π:
       ⊢ obls_msi δ -∗ th_phase_ge ζ π -∗        
-        obls_msi δ ∗ ∃ π__max, own obls_phs (◯ phases_repr {[ζ := π__max]}) ∗ ⌜ ps_phases OP δ !! ζ = Some π__max /\ phase_le π π__max ⌝. 
+        obls_msi δ ∗ ∃ π__max, own obls_phs (◯ phases_repr {[ζ := π__max]}) ∗ ⌜ ps_phases δ !! ζ = Some π__max /\ phase_le π π__max ⌝. 
     Proof using.
       rewrite /obls_msi. iIntros "(?&?&?&?&PHASES&?) PH".
       iRevert "PHASES PH". iFrame. iIntros "PHASES PH".  
@@ -248,7 +238,7 @@ Section ObligationsRepr.
 
     Lemma th_phase_msi_ge δ ζ π:
       ⊢ obls_msi δ -∗ th_phase_ge ζ π -∗        
-        ⌜ exists π__max, ps_phases OP δ !! ζ = Some π__max /\ phase_le π π__max ⌝. 
+        ⌜ exists π__max, ps_phases δ !! ζ = Some π__max /\ phase_le π π__max ⌝. 
     Proof using.
       iIntros "? ?". 
       iDestruct (th_phase_msi_ge_strong with "[$] [$]") as "[? L]".
@@ -265,7 +255,7 @@ Section ObligationsRepr.
     Qed.
 
     Lemma exc_lb_msi_bound δ n:
-      ⊢ obls_msi δ -∗ exc_lb n -∗ ⌜ n <= ps_exc_bound OP δ ⌝.
+      ⊢ obls_msi δ -∗ exc_lb n -∗ ⌜ n <= ps_exc_bound δ ⌝.
     Proof using.
       rewrite /obls_msi. iIntros "(_&_&_&_&_&B) LB".
       iCombine "B LB" as "LB".
@@ -275,7 +265,7 @@ Section ObligationsRepr.
 
     Lemma obls_sgn_lt_locale_obls δ ζ R lm:
       ⊢ obls_msi δ -∗ obls ζ R -∗ sgns_level_gt R lm -∗
-        ⌜ lt_locale_obls OP lm ζ δ ⌝.
+        ⌜ lt_locale_obls lm ζ δ ⌝.
     Proof using H1 H0.
       iIntros "MSI OBLS SIGS_LT".
       iDestruct (obls_msi_exact with "[$] [$]") as %Rζ. 
@@ -286,7 +276,7 @@ Section ObligationsRepr.
       (* TODO: lemma? *)
       apply extract_Somes_gset_spec in IN. simpl in IN.
       apply elem_of_map in IN. destruct IN as [sid [EQ IN]].
-      destruct (ps_sigs OP δ !! sid) as [[l' b]| ] eqn:SID; [| done].
+      destruct (ps_sigs δ !! sid) as [[l' b]| ] eqn:SID; [| done].
       simpl in EQ. inversion EQ. subst l'. 
 
       iDestruct (big_sepS_forall with "SIGS_LT") as "LT".
@@ -298,7 +288,7 @@ Section ObligationsRepr.
 
     Lemma ep_msi_in δ sid π d:
       ⊢ obls_msi δ -∗ ep sid π d -∗
-        ⌜ ((sid, π, d): (@ExpectPermission _)) ∈ (ps_eps OP δ) ⌝. 
+        ⌜ ((sid, π, d): (@ExpectPermission _)) ∈ (ps_eps δ) ⌝. 
     Proof using. 
       rewrite /obls_msi. iIntros "(_&_&_&EPS&_) EP". 
       iCombine "EPS EP" as "EPS". 
@@ -307,15 +297,10 @@ Section ObligationsRepr.
       by apply gset_included, singleton_subseteq_l in SUB.
     Qed. 
 
-  End ResourcesFacts.
-
-  Section ResourcesUpdates.
-    Context `{ObligationsGS Σ}.
-
-    Let OU' (R: ProgressState OP -> Locale -> ProgressState OP -> Prop) ζ P: iProp Σ :=
+    Let OU' (R: ProgressState -> Locale -> ProgressState -> Prop) ζ P: iProp Σ :=
       ∀ δ, obls_msi δ ==∗ ∃ δ', obls_msi δ' ∗ ⌜ R δ ζ δ'⌝ ∗ P. 
 
-    Definition OU := OU' (loc_step OP).
+    Definition OU := OU' (loc_step).
 
     Lemma OU_wand ζ P Q:
       (P -∗ Q) -∗ OU ζ P -∗ OU ζ Q.
@@ -329,9 +314,9 @@ Section ObligationsRepr.
     Global Instance OU_entails ζ:
       Proper (bi_entails ==> bi_entails) (OU ζ).
     Proof using.
-      intros ???. iIntros "OU".
-      iApply (OU_wand with "[] [$]").
-      iApply H4. 
+      intros ?? IMPL. iIntros "OU".
+      iApply (OU_wand with "[] [$]").  
+      iApply IMPL. 
     Qed.
 
     Global Instance OU_equiv ζ:
@@ -347,11 +332,11 @@ Section ObligationsRepr.
     Proof using.
       clear H1 H0 H. 
       rewrite /OU /OU'. iIntros "OB %δ MSI".
-      set (sid := next_sig_id (R ∪ (dom $ ps_sigs _ δ))).
+      set (sid := next_sig_id (R ∪ (dom $ ps_sigs δ))).
       iDestruct (obls_msi_exact with "[$] [$]") as %Rζ. 
       rewrite {1}/obls_msi. iDestruct "MSI" as "(?&SIGS&OBLS&?&?&?)".
       destruct δ. simpl. iFrame. simpl in *.
-      iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _ _). 
+      iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _). 
       iRevert "SIGS OBLS". iFrame. iIntros "SIGS OBLS". simpl.
       rewrite !bi.sep_assoc. 
 
@@ -359,7 +344,7 @@ Section ObligationsRepr.
       iSplitL.
       2: { iPureIntro.
            red. do 2 right. left. exists l. 
-           erewrite (f_equal (creates_signal _ _ _)).
+           erewrite (f_equal (creates_signal _ _)).
            { econstructor; eauto. simpl. eapply elem_of_dom; eauto. }
            simpl. reflexivity. }      
 
@@ -403,14 +388,14 @@ Section ObligationsRepr.
       rewrite {1}/obls_msi. iDestruct "MSI" as "(?&SIGS&OBLS&?&?&?)".
       destruct δ. simpl in *.
       iCombine "OBLS OB" as "OBLS". iCombine "SIGS SIG" as "SIGS".
-      iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _ _). 
+      iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _). 
       iRevert "OBLS SIGS". iFrame. simpl. iIntros "OBLS SIGS".
 
       rewrite bi.sep_comm -!bi.sep_assoc.  
       iSplitR.
       { iPureIntro.
         red. do 3 right. left. exists sid. 
-        erewrite (f_equal (sets_signal _ _ _)).
+        erewrite (f_equal (sets_signal _ _)).
         { econstructor; eauto. simpl. eapply elem_of_dom; eauto. }
         simpl. reflexivity. }
       
@@ -441,7 +426,7 @@ Section ObligationsRepr.
 
     Lemma exchange_cp_upd ζ π d d' b k
       (LE: k <= b)
-      (DEG: deg_lt _ d' d):
+      (DEG: deg_lt d' d):
       ⊢ cp π d -∗ th_phase_ge ζ π -∗ exc_lb b -∗ OU ζ (cp_mul π d' k ∗ th_phase_ge ζ π). 
     Proof using.
       rewrite /OU /OU'. iIntros "CP PH #LB %δ MSI".
@@ -451,14 +436,14 @@ Section ObligationsRepr.
       rewrite {1}/obls_msi. iDestruct "MSI" as "(CPS&?&?&?&?&?)".
       destruct δ. simpl in *.
       iCombine "CPS CP" as "CPS".
-      iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _ _). 
+      iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _). 
       iRevert "CPS". iFrame. simpl. iIntros "CPS".
 
       rewrite bi.sep_comm -!bi.sep_assoc.  
       iSplitR.
       { iPureIntro.
         red. right. left. exists π, d, d', k. 
-        erewrite (f_equal (exchanges_cp _ _ _)).
+        erewrite (f_equal (exchanges_cp _ _)).
         { econstructor; eauto. simpl. lia. }
         simpl. reflexivity. }
 
@@ -475,7 +460,7 @@ Section ObligationsRepr.
     Qed.
 
     (* TODO: ? use duplicable "signal exists" resource *)
-    Lemma create_ep_upd ζ π π__cp d d' sid l ov (DEG: deg_lt _ d' d)
+    Lemma create_ep_upd ζ π π__cp d d' sid l ov (DEG: deg_lt d' d)
       (PH_LE: phase_le π__cp π)
       :
       ⊢ cp π__cp d -∗ sgn sid l ov -∗ th_phase_ge ζ π -∗ 
@@ -488,14 +473,14 @@ Section ObligationsRepr.
       rewrite {1}/obls_msi. iDestruct "MSI" as "(CPS&SIGS&?&EPS&?&?)".
       destruct δ. simpl in *.
       iCombine "CPS CP" as "CPS".
-      iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _ _). 
+      iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _). 
       iRevert "CPS EPS". iFrame. simpl. iIntros "CPS EPS".
  
       rewrite bi.sep_comm -!bi.sep_assoc.
       iSplitR.
       { iPureIntro.
         red. do 4 right. left. exists sid, π__cp. do 2 eexists. 
-        erewrite (f_equal (creates_ep _ _ _)).
+        erewrite (f_equal (creates_ep _ _)).
         { econstructor; eauto.
           - simpl. by apply elem_of_dom.
           - etrans; eauto. }
@@ -523,45 +508,9 @@ Section ObligationsRepr.
       rewrite gmultiset_difference_diag. set_solver.
     Qed.
       
-    (* Lemma expect_sig_upd ζ sid π d l R *)
-    (*   : *)
-    (*   ⊢ ep sid π d -∗ sgn sid l (Some false) -∗ obls ζ R -∗ *)
-    (*     sgns_level_gt R l -∗ th_phase_ge ζ π -∗ *)
-    (*     OU ζ (cp π d ∗ sgn sid l (Some false) ∗ obls ζ R ∗ th_phase_ge ζ π). *)
-    (* Proof using H1 H0. *)
-    (*   rewrite /OU /OU'. iIntros "#EP SIG OBLS #SIGS_LT PH %δ MSI". *)
-    (*   iDestruct (sigs_msi_exact with "[$] [$]") as %Sζ. *)
-    (*   iDestruct (th_phase_msi_ge with "[$] [$]") as %(? & ? & ?). *)
-    (*   iDestruct (ep_msi_in with "[$] [$]") as %EP.  *)
-    (*   iDestruct (obls_sgn_lt_locale_obls with "[$] [$] [$]") as %LT.  *)
-
-    (*   rewrite {1}/obls_msi. iDestruct "MSI" as "(CPS&?&?&?&?&?)". *)
-    (*   destruct δ. simpl in *. *)
-    (*   iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _ _).  *)
-    (*   iRevert "CPS". iFrame. simpl. iIntros "CPS". *)
-
-    (*   rewrite /cp /cps_repr /eps_repr.  *)
-    (*   rewrite bi.sep_comm -bi.sep_assoc. *)
-    (*   iSplitR. *)
-    (*   { iPureIntro. *)
-    (*     red. do 5 right. do 3 eexists.  *)
-    (*     erewrite (f_equal (expects_ep _ _ _)). *)
-    (*     { econstructor; eauto. } *)
-    (*     simpl. reflexivity. } *)
-
-    (*   rewrite bi.sep_comm. *)
-    (*   rewrite -own_op.  *)
-    (*   iApply own_update; [| by iFrame]. *)
-    (*   apply auth_update_alloc. *)
-    (*   eapply local_update_proper. *)
-    (*   1: reflexivity. *)
-    (*   2: eapply gmultiset_local_update_alloc. *)
-    (*   f_equiv. rewrite gmultiset_disj_union_left_id. set_solver. *)
-    (* Qed. *)
-
     Lemma th_phase_msi_align δ ζ π:
       ⊢ obls_msi δ -∗ th_phase_ge ζ π -∗
-        obls_msi δ ∗ th_phase_ge ζ (default π (ps_phases OP δ !! ζ)). 
+        obls_msi δ ∗ th_phase_ge ζ (default π (ps_phases δ !! ζ)). 
     Proof using.
       iIntros "? ?". 
       iDestruct (th_phase_msi_ge_strong with "[$] [$]") as "[? L]".
@@ -579,14 +528,15 @@ Section ObligationsRepr.
     Proof using H1 H0.
       rewrite /OU /OU'. iIntros "#EP SIG OBLS #SIGS_LT PH %δ MSI".
       iDestruct (sigs_msi_exact with "[$] [$]") as %Sζ.
-      iDestruct (th_phase_msi_ge with "[$] [$]") as %(? & ? & ?).
-      iDestruct (th_phase_msi_align with "[$] [$]") as "[MSI PH]". rewrite H4. simpl.
+      iDestruct (th_phase_msi_ge with "[$] [$]") as %(? & PH__ζ & LE__πx).
+      iDestruct (th_phase_msi_align with "[$] [$]") as "[MSI PH]".
+      rewrite PH__ζ. simpl.
       iDestruct (ep_msi_in with "[$] [$]") as %EP. 
       iDestruct (obls_sgn_lt_locale_obls with "[$] [$] [$]") as %LT. 
 
       rewrite {1}/obls_msi. iDestruct "MSI" as "(CPS&?&?&?&?&?)".
       destruct δ. simpl in *.
-      iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _ _). 
+      iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _). 
       iRevert "CPS". iFrame. simpl. iIntros "CPS".
 
       rewrite /cp /cps_repr /eps_repr. 
@@ -594,10 +544,10 @@ Section ObligationsRepr.
       iSplitR.
       { iPureIntro.
         red. do 5 right. do 3 eexists. 
-        erewrite (f_equal (expects_ep _ _ _)).
+        erewrite (f_equal (expects_ep _ _)).
         { econstructor.
-          { apply H4. }
-          { etrans; [apply PH_EXP | apply H5]. }
+          { apply PH__ζ. }
+          { etrans; [apply PH_EXP | apply LE__πx]. }
           all: eauto. }
         done. }
 
@@ -616,14 +566,14 @@ Section ObligationsRepr.
 
     (* TODO: ? refactor these proofs about burn_cp *)
     Lemma burn_cp_upd_impl δ ζ π deg
-      (PH_MAX: exists π__max, ps_phases OP δ !! ζ = Some π__max /\ phase_le π π__max)
+      (PH_MAX: exists π__max, ps_phases δ !! ζ = Some π__max /\ phase_le π π__max)
       :
-      ⊢ obls_msi δ -∗ cp π deg ==∗ ∃ δ', obls_msi δ' ∗ ⌜ burns_cp OP δ ζ δ' π deg⌝.
+      ⊢ obls_msi δ -∗ cp π deg ==∗ ∃ δ', obls_msi δ' ∗ ⌜ burns_cp δ ζ δ' π deg⌝.
     Proof using.
       iIntros "MSI CP".
       iDestruct (cp_msi_dom with "[$] [$]") as "%IN". 
       rewrite {1}/obls_msi. iDestruct "MSI" as "(CPS&?&?&?&?&?)".
-      destruct δ. simpl in *. iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _ _). 
+      destruct δ. simpl in *. iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _). 
       simpl. iRevert "CPS". iFrame. iIntros "CPS". simpl.
       rewrite /cp.
       iCombine "CPS CP" as "CPS". iMod (own_update with "CPS").
@@ -633,14 +583,14 @@ Section ObligationsRepr.
         f_equiv. by rewrite gmultiset_difference_diag. }
       iModIntro. iFrame. iPureIntro.
       destruct PH_MAX as (?&?&?). 
-      erewrite (f_equal (burns_cp _ _ _)).
+      erewrite (f_equal (burns_cp _ _)).
       { econstructor; eauto. }
       done. 
     Qed.
 
     Lemma burn_cp_upd_burn ζ π deg:
       ⊢ cp π deg -∗ th_phase_ge ζ π -∗ 
-        OU' (fun δ1 ζ' δ2 => burns_cp OP δ1 ζ' δ2 π deg) ζ (th_phase_ge ζ π). 
+        OU' (fun δ1 ζ' δ2 => burns_cp δ1 ζ' δ2 π deg) ζ (th_phase_ge ζ π). 
     Proof using.
       rewrite /OU'. iIntros "CP PH % MSI".
       iDestruct (th_phase_msi_ge with "[$] [$]") as %(? & ? & ?). 
@@ -685,13 +635,13 @@ Section ObligationsRepr.
  
     (* TODO: ? refactor these proofs about fork step *)
     Lemma fork_locale_upd_impl δ ζ ζ' π R0 R'
-      (FRESH: ζ' ∉ dom $ ps_phases OP δ)
-      (DOM_EQ: dom_phases_obls OP δ)
+      (FRESH: ζ' ∉ dom $ ps_phases δ)
+      (DOM_EQ: dom_phases_obls δ)
       :
       ⊢ obls_msi δ -∗ th_phase_ge ζ π -∗ obls ζ R0 ==∗ 
         ∃ δ' π1 π2, obls_msi δ' ∗ th_phase_ge ζ π1 ∗ th_phase_ge ζ' π2 ∗
               obls ζ (R0 ∖ R') ∗ obls ζ' (R0 ∩ R') ∗
-              ⌜ forks_locale OP δ ζ δ' ζ' R' ⌝ ∗
+              ⌜ forks_locale δ ζ δ' ζ' R' ⌝ ∗
               ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝. 
     Proof using.
       clear H1 H0 H.
@@ -699,7 +649,7 @@ Section ObligationsRepr.
       iDestruct (th_phase_msi_ge_strong with "[$] [$]") as "(MSI & %π0 & (PH & %PH & %PLE))".
       iDestruct (obls_msi_exact with "[$] [$]") as %OBLS. 
       rewrite {1}/obls_msi. iDestruct "MSI" as "(?&?&OBLS&?&PHASES&?)".
-      destruct δ. simpl in *. iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _ _). 
+      destruct δ. simpl in *. iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _). 
       simpl. iRevert "OBLS PHASES". iFrame. iIntros "OBLS PHASES". simpl.
       iCombine "OBLS OB" as "OBLS". iCombine "PHASES PH" as "PHASES".
 
@@ -710,7 +660,7 @@ Section ObligationsRepr.
 
       iSplitL.
       2: { iPureIntro.
-           erewrite (f_equal (forks_locale _ _ _)).
+           erewrite (f_equal (forks_locale _ _)).
            { econstructor; eauto. }
            simpl. reflexivity. }
 
@@ -767,6 +717,6 @@ Section ObligationsRepr.
         intros. eapply exclusive_local_update. done.
     Qed.
 
-  End ResourcesUpdates.
+  End Resources.
 
 End ObligationsRepr.

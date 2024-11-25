@@ -20,14 +20,17 @@ Section EoFin.
   Let MAX_OBL_STEPS := 10.
   Let NUM_DEG := 5.
   
-  Instance EO_OP: ObligationsParams (EODegree NUM_DEG) (EOLevel LIM) (locale heap_lang) MAX_OBL_STEPS.
+  (* Instance EO_OP: ObligationsParams (EODegree NUM_DEG) (EOLevel LIM) (locale heap_lang) MAX_OBL_STEPS. *)
+  Instance EO_OP': ObligationsParamsPre (EODegree NUM_DEG) (EOLevel LIM) MAX_OBL_STEPS.
   Proof using.
     esplit; try by apply _.
     - apply nat_bounded_PO. 
     - apply nat_bounded_PO. 
   Defined.
+  Definition EO_OP := LocaleOP (Locale := locale heap_lang). 
+  Existing Instance EO_OP. 
 
-  Let OM := ObligationsModel EO_OP.
+  Let OM := ObligationsModel.
 
   Let EOLevelOfe := BNOfe LIM. 
   Let EODegreeOfe := BNOfe NUM_DEG. 
@@ -35,7 +38,7 @@ Section EoFin.
   Context `{EM: ExecutionModel heap_lang M}. 
   Context `{hGS: @heapGS Σ _ EM}.
 
-  Let ASEM := ObligationsASEM EO_OP.
+  Let ASEM := ObligationsASEM.
   Context {oGS: @asem_GS _ _ ASEM Σ}. 
   
   Let thread_prog: val :=
@@ -135,7 +138,7 @@ Section EoFin.
   End ThreadResources.
 
   Definition ex_ith_sig (n i: nat) (s: SignalId): iProp Σ :=
-    ∃ l, sgn EO_OP s l (Some $ Nat.ltb i n) (H3 := oGS) ∗ ⌜ lvl2nat l = i ⌝. 
+    ∃ l, sgn s l (Some $ Nat.ltb i n) (oGS := oGS) ∗ ⌜ lvl2nat l = i ⌝. 
   
   Definition smap_repr' {PRE: EoFinPreG Σ} γ K n (smap: gmap nat SignalId): iProp Σ :=
     own γ (● (to_agree <$> smap: gmapUR nat (agreeR SignalId))) ∗
@@ -184,7 +187,7 @@ Section EoFin.
     Qed.
 
     Definition ith_sig_sgn i s K n (smap: gmap nat SignalId):
-      ⊢ ith_sig i s -∗ smap_repr K n smap -∗ ∃ l, sgn _ s l None (H3 := oGS) ∗ ⌜ lvl2nat l = i ⌝. 
+      ⊢ ith_sig i s -∗ smap_repr K n smap -∗ ∃ l, sgn s l None (oGS := oGS) ∗ ⌜ lvl2nat l = i ⌝. 
     Proof.
       iIntros "S SR".
       iDestruct (ith_sig_in with "[$] [$]") as "%ITH". 
@@ -214,12 +217,12 @@ Section EoFin.
       (PH_LE: phase_le π__cp π)
       (LT: i < K):
       ⊢ smap_repr K n smap -∗ 
-         cp EO_OP π__cp d2 (H3 := oGS) -∗
-         th_phase_ge EO_OP τ π (H3 := oGS) -∗
-         |==> OU EO_OP τ
+         cp π__cp d2 (oGS := oGS) -∗
+         th_phase_ge τ π (oGS := oGS) -∗
+         |==> OU τ
            (∃ s, ith_sig i s ∗
-             ep EO_OP s π__cp d1 (H3 := oGS) ∗ smap_repr K n smap ∗
-            th_phase_ge EO_OP τ π (H3 := oGS)) (H3 := oGS).
+             ep s π__cp d1 (oGS := oGS) ∗ smap_repr K n smap ∗
+            th_phase_ge τ π (oGS := oGS)) (oGS := oGS).
     Proof using.
       iIntros "SR CP PH".
       rewrite /smap_repr /smap_repr'. iDestruct "SR" as "(AUTH & %DOM & SIGS)".
@@ -230,7 +233,7 @@ Section EoFin.
       2, 3: apply map_disjoint_singleton_l_2; by apply lookup_delete.
       iDestruct "SIGS" as "[SIG SIGS]". setoid_rewrite big_sepM_singleton.
       rewrite {1}/ex_ith_sig. iDestruct "SIG" as "(%l & SIG & %LVLi)".
-      iDestruct (create_ep_upd with "[$] [$] [PH]") as "OU".
+      iDestruct (create_ep_upd with "CP [$] [PH]") as "OU".
       { apply (ith_bn_lt _ 1). lia. }
       { done. }
       { done. }
@@ -253,10 +256,10 @@ Section EoFin.
       (LVL: lvl2nat lm = m)
       :
       ⊢ (([∗ map] k↦y ∈ delete m smap,
-           ∃ l0, sgn EO_OP y l0 (Some (k <? m)) (H3 := oGS) ∗ ⌜lvl2nat l0 = k⌝) -∗
-          sgn EO_OP s lm (Some true) (H3 := oGS)-∗
+           ∃ l0, sgn y l0 (Some (k <? m)) (oGS := oGS) ∗ ⌜lvl2nat l0 = k⌝) -∗
+          sgn s lm (Some true) (oGS := oGS)-∗
           [∗ map] i↦s0 ∈ smap,
-           ∃ l0, sgn EO_OP s0 l0 (Some (i <? m + 1)) (H3 := oGS) ∗ ⌜ lvl2nat l0 = i⌝)%I.
+           ∃ l0, sgn s0 l0 (Some (i <? m + 1)) (oGS := oGS) ∗ ⌜ lvl2nat l0 = i⌝)%I.
     Proof using.
       iIntros "SIGS SG".
       rewrite (big_sepM_delete _ smap); eauto.
@@ -284,18 +287,18 @@ Section EoFin.
       (lm : sigO (λ i : nat, i < LIM))
       (LVL : lvl2nat lm = m):
         ⊢
-  obls EO_OP τ ∅ (H3 := oGS) -∗
+  obls τ ∅ (oGS := oGS) -∗
   ([∗ map] k↦y ∈ delete m smap, ∃ l0 : sigO (λ i : nat, i < LIM),
-                                          sgn EO_OP y l0 (Some (k <? m)) (H3 := oGS) ∗
+                                          sgn y l0 (Some (k <? m)) (oGS := oGS) ∗
                                           ⌜lvl2nat l0 = k⌝) -∗
-  (sgn EO_OP s lm (Some true) (H3 := oGS)) -∗
+  (sgn s lm (Some true) (oGS := oGS)) -∗
   own eofin_smap (● ((to_agree <$> smap): gmap _ _)) -∗
-  BMU EO_OP (⊤ ∖ ↑nroot.@"eofin") τ 1
-    (⌜B ≤ m + 2⌝ ∗ obls EO_OP τ ∅ (H3 := oGS) ∗ smap_repr (B `min` (m + 2)) (m + 1) smap
+  BMU (⊤ ∖ ↑nroot.@"eofin") τ 1
+    (⌜B ≤ m + 2⌝ ∗ obls τ ∅ (oGS := oGS) ∗ smap_repr (B `min` (m + 2)) (m + 1) smap
      ∨ (|==> ⌜m + 2 < B⌝ ∗
           (∃ (s' : SignalId) (lm': EOLevel B),
              smap_repr (B `min` (m + 3)) (m + 1) (<[m + 2:=s']> smap) ∗
-             ith_sig (m + 2) s' ∗ obls EO_OP τ {[s']} (H3 := oGS) ∗
+             ith_sig (m + 2) s' ∗ obls τ {[s']} (oGS := oGS) ∗
              ⌜lvl2nat lm' = (m + 2)%nat⌝))) (oGS := oGS).
     Proof using.
       iIntros "OBLS SIGS SIG SM".
@@ -345,7 +348,7 @@ Section EoFin.
 
     (* TODO: generalize, move *)
     Lemma lvl_lt_equiv (l1 l2: EOLevel LIM):
-      lvl_lt EO_OP l1 l2 <-> bn2nat _ l1 < bn2nat _ l2.
+      lvl_lt l1 l2 <-> bn2nat _ l1 < bn2nat _ l2.
     Proof using.
       destruct l1, l2; simpl in *.
       rewrite /lvl_lt. rewrite strict_spec_alt. simpl.
@@ -358,10 +361,10 @@ Section EoFin.
     Lemma ith_sig_expect i sw m τ π π__e N smap s
       (PH_EXP: phase_le π__e π)
       (GE: m <= i):
-      ⊢ ep _ sw π__e d1 (H3 := oGS) -∗ th_phase_ge _ τ π (H3 := oGS) -∗
+      ⊢ ep sw π__e d1 (oGS := oGS) -∗ th_phase_ge τ π (oGS := oGS) -∗
          smap_repr N m smap -∗ ith_sig i sw -∗
-         ith_sig (i + 1) s -∗ obls _ τ {[ s ]} (H3 := oGS) -∗
-         OU _ τ (∃ π', cp _ π' d1 (H3 := oGS) ∗ smap_repr N m smap ∗ th_phase_ge _ τ π' (H3 := oGS) ∗ obls _ τ {[ s ]} (H3 := oGS) ∗ ⌜ phase_le π π' /\ phase_le π__e π' ⌝) (H3 := oGS).
+         ith_sig (i + 1) s -∗ obls τ {[ s ]} (oGS := oGS) -∗
+         OU τ (∃ π', cp π' d1 (oGS := oGS) ∗ smap_repr N m smap ∗ th_phase_ge τ π' (oGS := oGS) ∗ obls τ {[ s ]} (oGS := oGS) ∗ ⌜ phase_le π π' /\ phase_le π__e π' ⌝) (oGS := oGS).
     Proof using.
       iIntros "#EP PH SR #SW #S OBLS". 
       iDestruct (ith_sig_in with "[$] [$]") as "%ITH".
@@ -369,7 +372,7 @@ Section EoFin.
       iDestruct (smap_repr_split with "SW [$]") as "[SGw SR]".
       rewrite {1}/ex_ith_sig. rewrite (proj2 (Nat.ltb_ge _ _)); [| done].
       iDestruct "SGw" as "(%lw & SGw & %LW)".
-      iDestruct (expect_sig_upd with "[$] [$] [$] [] [$]") as "OU"; [done| ..].
+      iDestruct (expect_sig_upd with "EP [$] [$] [] [$]") as "OU"; [done| ..].
       { rewrite /sgns_level_gt. rewrite big_sepS_singleton.
         iDestruct "OWN" as "(%lo & SGo & %LO)".
         iExists _. iFrame "SGo". iPureIntro.
@@ -395,18 +398,18 @@ Section EoFin.
       (PH_LE2: phase_le π2 π)
       `(ThreadResource th_res cond)
       :
-      {{{ eofin_inv l ∗ exc_lb EO_OP 20 (H3 := oGS) ∗
+      {{{ eofin_inv l ∗ exc_lb 20 (oGS := oGS) ∗
            (* even_res n ∗ *)
            th_res n ∗
-           cp_mul _ π2 d2 (B - n) (H3 := oGS) ∗
-           cp_mul _ π d0 20 (H3 := oGS) ∗
-           (cp _ π2 d2 (H3 := oGS) ∨ ∃ sw π__e, ith_sig (n - 1) sw ∗ ep _ sw π__e d1 (H3 := oGS) ∗ ⌜ phase_le π__e π ⌝) ∗
-           th_phase_ge EO_OP τ π (H3 := oGS) ∗
+           cp_mul π2 d2 (B - n) (oGS := oGS) ∗
+           cp_mul π d0 20 (oGS := oGS) ∗
+           (cp π2 d2 (oGS := oGS) ∨ ∃ sw π__e, ith_sig (n - 1) sw ∗ ep sw π__e d1 (oGS := oGS) ∗ ⌜ phase_le π__e π ⌝) ∗
+           th_phase_ge τ π (oGS := oGS) ∗
            (if n <? B
-            then ∃ s, ith_sig n s ∗ obls EO_OP τ {[s]} (H3 := oGS)
-            else obls EO_OP τ ∅ (H3 := oGS)) }}}
+            then ∃ s, ith_sig n s ∗ obls τ {[s]} (oGS := oGS)
+            else obls τ ∅ (oGS := oGS)) }}}
         thread_prog #l #n #B @ τ
-      {{{ v, RET v; obls EO_OP τ ∅ (H3 := oGS) }}}.       
+      {{{ v, RET v; obls τ ∅ (oGS := oGS) }}}.       
     Proof using OBLS_AMU. 
       iIntros (Φ). iLöb as "IH" forall (π π2 n PH_LE2). 
       iIntros "(#INV & #EB & TH & CPS2 & CPS & EXTRA & PH & SN_OB) POST".
@@ -457,8 +460,8 @@ Section EoFin.
         iApply (OU_wand with "[-OU]"); [| done]. iIntros "(SIG & OBLS)".
         rewrite (subseteq_empty_difference_L {[ s ]}); [| done].        
         
-        iPoseProof (BMU_smap_restore with "[$] [$] [$] [$]") as "BMU"; eauto.
-        iApply (BMU_lower _ _ _ 1); [lia| ].
+        iPoseProof (BMU_smap_restore with "OBLS [$] [$] [$]") as "BMU"; eauto.
+        iApply (BMU_lower _ _ 1); [lia| ].
         iApply (BMU_wand with "[-BMU] [$]"). iIntros "COND".
         
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
@@ -638,16 +641,16 @@ Section EoFin.
       `(ThreadResource th_res cond)
 
       :
-      {{{ eofin_inv l ∗ exc_lb EO_OP 20 (H3 := oGS) ∗
+      {{{ eofin_inv l ∗ exc_lb 20 (oGS := oGS) ∗
            th_res n ∗
-           cp_mul _ π2 d2 (S (B - n)) (H3 := oGS) ∗
-           cp_mul _ π d0 20 (H3 := oGS) ∗           
-           th_phase_ge EO_OP τ π (H3 := oGS) ∗
+           cp_mul π2 d2 (S (B - n)) (oGS := oGS) ∗
+           cp_mul π d0 20 (oGS := oGS) ∗           
+           th_phase_ge τ π (oGS := oGS) ∗
            (if n <? B
-            then ∃ s, ith_sig n s ∗ obls EO_OP τ {[s]} (H3 := oGS)
-            else obls EO_OP τ ∅ (H3 := oGS)) }}}
+            then ∃ s, ith_sig n s ∗ obls τ {[s]} (oGS := oGS)
+            else obls τ ∅ (oGS := oGS)) }}}
         thread_prog #l #n #B @ τ
-      {{{ v, RET v; obls EO_OP τ ∅ (H3 := oGS) }}}.       
+      {{{ v, RET v; obls τ ∅ (oGS := oGS) }}}.       
     Proof using OBLS_AMU.
       iIntros (Φ). iIntros "(#INV & #EB & TH & CPS2 & CPS & PH & SN_OB) POST".
       iDestruct (cp_mul_take with "CPS2") as "[??]".
@@ -739,12 +742,12 @@ Section EoFin.
     Lemma alloc_inv l (* (i: nat) *) τ
       (* (i := 0) *)
       :
-      obls _ τ ∅ (H3 := oGS) -∗ l ↦ #0 -∗ 
-        BMU _ ⊤ τ 2 (|={∅}=> ∃ (eoG: EoFinG Σ) (sigs: list SignalId),
+      obls τ ∅ (oGS := oGS) -∗ l ↦ #0 -∗ 
+        BMU ⊤ τ 2 (|={∅}=> ∃ (eoG: EoFinG Σ) (sigs: list SignalId),
                        even_res 0 (H := eoG)∗
                        odd_res 1 (H := eoG) ∗
                        eofin_inv l (H := eoG) ∗
-                       obls _ τ (list_to_set sigs) (H3 := oGS) ∗
+                       obls τ (list_to_set sigs) (oGS := oGS) ∗
                        ⌜ length sigs = min B 2 ⌝ ∗
                        ⌜ NoDup sigs ⌝ ∗
                        ([∗ list] k ↦ s ∈ sigs, ith_sig k s)
@@ -755,11 +758,11 @@ Section EoFin.
       iMod (thread_res_alloc 1) as "(%γ' & AUTH' & FRAG')".
       
       set (m := min B 2).
-      iAssert (BMU EO_OP ⊤ τ 2 
+      iAssert (BMU ⊤ τ 2 
                  (|==> ∃ γ smap, smap_repr' γ m 0 smap ∗
                                  (* let sigs := map_img smap in *)
                                  let sigs := sigs_block smap 0 m in
-                                 obls _ τ (list_to_set sigs) (H3 := oGS) ∗
+                                 obls τ (list_to_set sigs) (oGS := oGS) ∗
                                  (* ⌜ size sigs = m ⌝ ∗ *)
                                   ⌜ NoDup sigs ⌝ ∗ 
                                  own γ (◯ ((to_agree <$> smap): gmapUR nat _))
@@ -787,9 +790,6 @@ Section EoFin.
           replace (sigs_block smap0 0 m) with ([ si; si' ]).
           2: { subst smap0 m. rewrite EQ. rewrite /sigs_block. simpl. done. } 
 
-          (* rewrite !bi.sep_assoc. iSplitL.  *)
-          (* 2: { subst smap0. simpl.. *)
-          (*      iApply big_sepS_impl.  *)
           rewrite !bi.sep_assoc. iSplitL.
           2: { iPureIntro. econstructor; try set_solver. apply NoDup_singleton. }
           
@@ -852,7 +852,6 @@ Section EoFin.
             rewrite H. set_solver. }
           subst smap0. rewrite big_sepM_empty. done. }
 
-      (* iMod "SR" as (γ__sr smap) "BMU". iModIntro. *)
       iApply (BMU_wand with "[-SR] [$]"). 
       iIntros "X". iMod "X" as "(%γ__sr & %smap & SR & OB & %SIZE & #F)".
       
@@ -887,17 +886,17 @@ Section EoFin.
     Close Scope Z. 
 
     Context {OBLS_AMU__f: forall τ, @AMU_lift_MU__f _ _ _ τ oGS _ EM _ ⊤}.
-    Context {NO_OBS_POST: ∀ τ v, obls EO_OP τ ∅ (H3 := oGS) -∗ fork_post τ v}. 
+    Context {NO_OBS_POST: ∀ τ v, obls τ ∅ (oGS := oGS) -∗ fork_post τ v}. 
 
     Theorem main_spec τ π
       :
-      {{{ exc_lb EO_OP 20 (H3 := oGS) ∗
-           cp_mul _ π d2 (S (2 * (S B))) (H3 := oGS) ∗
-           cp_mul _ π d0 40 (H3 := oGS) ∗
-           th_phase_ge EO_OP τ π (H3 := oGS) ∗
-           obls EO_OP τ ∅ (H3 := oGS) }}}
+      {{{ exc_lb 20 (oGS := oGS) ∗
+           cp_mul π d2 (S (2 * (S B))) (oGS := oGS) ∗
+           cp_mul π d0 40 (oGS := oGS) ∗
+           th_phase_ge τ π (oGS := oGS) ∗
+           obls τ ∅ (oGS := oGS) }}}
       start #(0%nat) #B @ τ
-      {{{ v, RET v; obls EO_OP τ ∅ (H3 := oGS) }}}.
+      {{{ v, RET v; obls τ ∅ (oGS := oGS) }}}.
     Proof using PRE OBLS_AMU__f OBLS_AMU NO_OBS_POST.
       iIntros (Φ). iIntros "(#EB & CPS2 & CPS_FORK & PH & OB) POST". rewrite /start.
       iDestruct (cp_mul_take with "CPS2") as "[CPS2 CP]". 
@@ -929,11 +928,6 @@ Section EoFin.
       iMod "INV" as "(% & %sigs & RE & RO & #INV & OB & %SIGS_LEN & %SIGS_UNIQ & #SIGS)".
       clear PRE. 
       iModIntro.
-
-      (* assert (0 = i) as II by done. rewrite {2 5 6 7 8 10 11 13}II. *)
-      (* rewrite {2}II in SIG_LEN. *)
-      (* revert SIG_LEN. *)
-      (* clear II. generalize i. clear i. intros i SIG_LEN.  *)
 
       wp_bind (Rec _ _ _)%V. pure_steps.
 

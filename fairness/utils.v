@@ -31,6 +31,30 @@ Section gmap.
     eapply map_disjoint_spec in H; done.
   Qed.
 
+  Lemma map_split {A: Type} (m: gmap K A) k:
+    m = from_option (singletonM k) ∅ (m !! k) ∪ delete k m.
+  Proof using.
+    apply map_eq. intros k'.
+    destruct (decide (k' = k)) as [->|?].
+    - destruct (m !! k) eqn:KTH.
+      + simpl. rewrite lookup_union_l'.
+        all: by rewrite lookup_singleton.
+      + simpl. rewrite lookup_union_r; [| done].
+        by rewrite lookup_delete.
+    - rewrite lookup_union_r.
+      2: { destruct (m !! k); [| set_solver]. 
+           by rewrite lookup_singleton_ne. } 
+      by rewrite lookup_delete_ne.
+  Qed.
+  
+  Lemma lookup_map_singleton {A: Type} (k: K) (a: A) k':
+    ({[ k := a ]}: gmap K A) !! k' = if (decide (k' = k)) then Some a else None.
+  Proof using.
+    destruct decide; subst.
+    - apply lookup_singleton.
+    - by apply lookup_singleton_ne.
+  Qed. 
+    
 End gmap.
 
 (* TODO: upstream*)
@@ -636,7 +660,23 @@ Section FlattenGset.
     rewrite /flatten_gset. rewrite elements_singleton. set_solver. 
   Qed. 
 
+  Lemma flatten_gset_empty: flatten_gset ∅ = (∅: gset K).
+  Proof using. set_solver. Qed. 
+ 
 End FlattenGset.
+
+Lemma map_img_sets_split_helper `{Countable K, Countable A} (k: K) (m: gmap K (gset A)):
+  flatten_gset $ map_img m = default ∅ (m !! k) ∪ (flatten_gset $ map_img (delete k m)).
+Proof using.
+  rewrite {1}(map_split m k). rewrite map_img_union_disjoint_L.
+  2: { destruct (m !! k) eqn:KTH; simpl. 
+       all: apply map_disjoint_dom; set_solver. }
+  rewrite flatten_gset_union. f_equal.
+  destruct (m !! k) eqn:KTH; simpl.
+  - by rewrite map_img_singleton_L flatten_gset_singleton.
+  - by rewrite map_img_empty_L flatten_gset_empty.
+Qed. 
+
 
 Section GsetPick.
   Context `{Countable K}.

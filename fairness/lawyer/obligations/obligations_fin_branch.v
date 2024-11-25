@@ -16,20 +16,20 @@ Section FiniteBranching.
 
   (* Context {Locale: Type}. *)
   Context {Λ: language}.
-  Context `{Countable (locale Λ)}.
+  (* Context `{Countable (locale Λ)}. *)
   Let Locale := locale Λ.
 
   Context {LIM_STEPS: nat}.
-  Context (OP: ObligationsParams Degree Level Locale LIM_STEPS).
-  Let OM := ObligationsModel OP.
+  Context {OP: ObligationsParams Degree Level Locale LIM_STEPS}.
+  Let OM := ObligationsModel.
 
   Context `{Inhabited Locale}.
 
   Lemma burns_cp_next_states δ:
-    list_approx (fun δ' => exists τ π d, burns_cp OP δ τ δ' π d). 
+    list_approx (fun δ' => exists τ π d, burns_cp δ τ δ' π d). 
   Proof using.
-    set (new_cps := map (fun cp => ps_cps _ δ ∖ {[+ cp +]}) (elements $ ps_cps _ δ)).
-    exists (map (flip (update_cps OP) δ) new_cps). 
+    set (new_cps := map (fun cp => ps_cps δ ∖ {[+ cp +]}) (elements $ ps_cps δ)).
+    exists (map (flip (update_cps) δ) new_cps). 
     intros ? (?&?&? & STEP).
     inversion STEP; subst; simpl in *. simpl.
     apply elem_of_list_In. apply in_map_iff. eexists. simpl. split; [reflexivity|].
@@ -38,13 +38,13 @@ Section FiniteBranching.
   Qed.
 
   Lemma exchanges_cp_next_states δ d':
-    list_approx (fun δ' => exists τ π d n, exchanges_cp OP δ τ δ' π d d' n). 
+    list_approx (fun δ' => exists τ π d n, exchanges_cp δ τ δ' π d d' n). 
   Proof using.
     set (new_cps :=
-           '(π, d) ← elements $ ps_cps _ δ;
-           n ← seq 0 (ps_exc_bound _ δ + 1);
-           mret (ps_cps _ δ ∖ {[+ (π, d) +]} ⊎ n *: {[+ (π, d') +]})).
-    exists (map (flip (update_cps OP) δ) new_cps). 
+           '(π, d) ← elements $ ps_cps δ;
+           n ← seq 0 (ps_exc_bound δ + 1);
+           mret (ps_cps δ ∖ {[+ (π, d) +]} ⊎ n *: {[+ (π, d') +]})).
+    exists (map (flip (update_cps) δ) new_cps). 
     intros ? (?&?&?&?& STEP).
     inversion STEP; subst; simpl in *. simpl.
     apply elem_of_list_In. apply in_map_iff. eexists. simpl. split; [reflexivity|].
@@ -56,16 +56,16 @@ Section FiniteBranching.
   Qed.
 
   Lemma creates_signal_next_states δ ℓ:
-    list_approx (fun δ' => exists τ, creates_signal OP δ τ δ' ℓ).
+    list_approx (fun δ' => exists τ, creates_signal δ τ δ' ℓ).
   Proof using.
     set (new_st τ :=
-           let s := next_sig_id (default ∅ (ps_obls _ δ !! τ) ∪ (dom $ ps_sigs _ δ)) in
-           let new_sigs := <[ s := (ℓ, false) ]> (ps_sigs _ δ) in
+           let s := next_sig_id (default ∅ (ps_obls δ !! τ) ∪ (dom $ ps_sigs δ)) in
+           let new_sigs := <[ s := (ℓ, false) ]> (ps_sigs δ) in
            let add_obl := 
-             let cur_loc_obls := default ∅ (ps_obls _ δ !! τ) in
-             <[ τ := cur_loc_obls ∪ {[ s ]} ]> (ps_obls _ δ) in
-           update_obls OP add_obl $ update_sigs OP new_sigs δ). 
-    exists (map new_st (elements $ dom $ ps_obls _ δ)).
+             let cur_loc_obls := default ∅ (ps_obls δ !! τ) in
+             <[ τ := cur_loc_obls ∪ {[ s ]} ]> (ps_obls δ) in
+           update_obls add_obl $ update_sigs new_sigs δ). 
+    exists (map new_st (elements $ dom $ ps_obls δ)).
     intros ? (?& STEP).
     inversion STEP; subst; simpl in *. simpl.
     apply elem_of_list_In. apply in_map_iff. eexists. split; [reflexivity|].
@@ -74,17 +74,17 @@ Section FiniteBranching.
   Qed.
 
   Lemma sets_signal_next_states δ:
-    list_approx (fun δ' => exists τ s, sets_signal OP δ τ δ' s). 
+    list_approx (fun δ' => exists τ s, sets_signal δ τ δ' s). 
   Proof using.
     set (set_sig τs' :=
            let '(τ, s') := τs' in 
-           let new_sigs := (map_imap (fun s '(ℓ, b) => Some (ℓ, (if (decide (s' = s)) then true else b))) (ps_sigs _ δ)) in
+           let new_sigs := (map_imap (fun s '(ℓ, b) => Some (ℓ, (if (decide (s' = s)) then true else b))) (ps_sigs δ)) in
            let new_obls :=
-             (let cur_loc_obls := default ∅ (ps_obls _ δ !! τ) in
-              <[ τ := cur_loc_obls ∖ {[ s' ]} ]> (ps_obls _ δ)) in
-           update_obls OP new_obls $ update_sigs OP new_sigs δ
+             (let cur_loc_obls := default ∅ (ps_obls δ !! τ) in
+              <[ τ := cur_loc_obls ∖ {[ s' ]} ]> (ps_obls δ)) in
+           update_obls new_obls $ update_sigs new_sigs δ
            ). 
-    exists (map set_sig (elements $ gset_prod (dom $ ps_obls _ δ) (dom $ ps_sigs _ δ))).
+    exists (map set_sig (elements $ gset_prod (dom $ ps_obls δ) (dom $ ps_sigs δ))).
     intros ? (?&?& STEP). inversion STEP; subst; simpl in *. simpl.
     apply elem_of_list_In. apply in_map_iff.
     eexists (_, _). subst set_sig new_ps. split.
@@ -93,7 +93,7 @@ Section FiniteBranching.
       destruct (decide (sid = x0)) as [->|?].
       { rewrite lookup_insert. rewrite SIG. simpl. rewrite decide_True; done. }
       rewrite lookup_insert_ne; [| done]. 
-      destruct (ps_sigs OP δ !! sid) eqn:SID; rewrite SID; [| done].
+      destruct (ps_sigs δ !! sid) eqn:SID; rewrite SID; [| done].
       simpl. destruct s. rewrite decide_False; done. }
     apply elem_of_list_In, elem_of_elements.
     apply gset_prod_spec. simpl. split; eauto.
@@ -101,14 +101,14 @@ Section FiniteBranching.
   Qed.
 
   Lemma creates_ep_next_states δ d':
-    list_approx (fun δ' => exists τ s π d, creates_ep OP δ τ δ' s π d d'). 
+    list_approx (fun δ' => exists τ s π d, creates_ep δ τ δ' s π d d'). 
   Proof using.
     set (add_ep s_cp :=
            let '(s, (π, d)) := s_cp in
-           let new_cps := ps_cps _ δ ∖ {[+ (π, d) +]} in
-           let new_eps := ps_eps _ δ ∪ {[ (s, π, d') ]} in
-           update_eps _ new_eps $ update_cps _ new_cps δ).
-    exists (map add_ep (elements $ gset_prod (dom $ ps_sigs _ δ) (gmultiset_dom $ ps_cps _ δ))).
+           let new_cps := ps_cps δ ∖ {[+ (π, d) +]} in
+           let new_eps := ps_eps δ ∪ {[ (s, π, d') ]} in
+           update_eps new_eps $ update_cps new_cps δ).
+    exists (map add_ep (elements $ gset_prod (dom $ ps_sigs δ) (gmultiset_dom $ ps_cps δ))).
     intros ? (?&?&?&?& STEP). inversion STEP; subst; simpl in *. simpl.
     apply elem_of_list_In. apply in_map_iff.
     eexists (_, (_, _)). split; [reflexivity| ].
@@ -118,16 +118,16 @@ Section FiniteBranching.
   Qed.
 
   Lemma expects_ep_next_states δ:
-    list_approx (fun δ' => exists τ s π d, expects_ep OP δ τ δ' s π d).
+    list_approx (fun δ' => exists τ s π d, expects_ep δ τ δ' s π d).
   Proof using.
     set (add_cp (ep: @ExpectPermission Degree) :=
-           τ ← elements $ dom $ ps_phases _ δ;
-           let πτ := default phase0 (ps_phases _ δ !! τ) in
-           let cps' := let '(_, _, d) := ep in ps_cps _ δ ⊎ {[+ (πτ, d) +]} in
-           let δ' := update_cps OP cps' δ in
+           τ ← elements $ dom $ ps_phases δ;
+           let πτ := default phase0 (ps_phases δ !! τ) in
+           let cps' := let '(_, _, d) := ep in ps_cps δ ⊎ {[+ (πτ, d) +]} in
+           let δ' := update_cps cps' δ in
            mret δ'
         ).
-    exists (flat_map add_cp (elements $ ps_eps _ δ)).
+    exists (flat_map add_cp (elements $ ps_eps δ)).
     intros ? (?&?&?&?& STEP). inversion STEP; subst; simpl in *. simpl.
     apply elem_of_list_In. apply in_flat_map. eexists ((_, _), _).
     rewrite -!elem_of_list_In elem_of_elements. split; eauto.
@@ -138,16 +138,16 @@ Section FiniteBranching.
   Qed.
 
   Lemma forks_locale_next_states δ τ':
-    list_approx (fun δ' => exists τ obls', forks_locale _ δ τ δ' τ' obls'). 
+    list_approx (fun δ' => exists τ obls', forks_locale δ τ δ' τ' obls'). 
   Proof using.
     clear H1 H0 H. 
-    exists (τπ0 ← map_to_list (ps_phases _ δ);
+    exists (τπ0 ← map_to_list (ps_phases δ);
            let '(τ, π0) := τπ0 in
-           let obls0 := default ∅ (ps_obls _ δ !! τ) in
+           let obls0 := default ∅ (ps_obls δ !! τ) in
            obls' ← elements $ powerset obls0;           
-           let new_obls := <[ τ' := obls']> $ <[ τ := obls0 ∖ obls' ]> $ ps_obls _ δ in
-           let new_phases := <[ τ' := fork_right π0 ]> $ <[ τ := fork_left π0 ]> $ ps_phases _ δ in
-           mret (update_phases _ new_phases $ update_obls _ new_obls δ)).
+           let new_obls := <[ τ' := obls']> $ <[ τ := obls0 ∖ obls' ]> $ ps_obls δ in
+           let new_phases := <[ τ' := fork_right π0 ]> $ <[ τ := fork_left π0 ]> $ ps_phases δ in
+           mret (update_phases new_phases $ update_obls new_obls δ)).
     intros ? (?&?& STEP). inversion STEP; subst; simpl in *. simpl. 
     apply elem_of_list_bind. eexists (_, _).
     rewrite elem_of_list_bind. setoid_rewrite elem_of_list_ret.
@@ -169,7 +169,7 @@ Section FiniteBranching.
     Context (FINdeg: Finite Degree) (FINlvl: Finite Level).
 
     Lemma loc_step_approx δ:
-      list_approx (fun δ' => exists τ, loc_step OP δ τ δ'). 
+      list_approx (fun δ' => exists τ, loc_step δ τ δ'). 
     Proof using FINlvl FINdeg.
       exists (
           proj1_sig (burns_cp_next_states δ) ++
@@ -212,20 +212,20 @@ Section FiniteBranching.
     Instance nsteps_impl {A: Type}:
       Proper ((eq ==> eq ==> impl) ==> eq ==> (eq ==> eq ==> impl)) (@relations.nsteps A).
     Proof using.
-      red. intros ?????????????. subst. red in H4.
+      red. intros ?????????????. subst. red in H3.
       generalize dependent y2. induction y0.
       { intros ?. by rewrite !nsteps_0. }
       intros ?. rewrite -!rel_compose_nsteps_next.
       intros (?&STEPS&STEP). apply IHy0 in STEPS.
-      eexists. split; eauto. eapply H4; eauto.
+      eexists. split; eauto. eapply H3; eauto.
     Qed. 
 
     Lemma progress_step_approx δ:
-      list_approx (fun δ' => exists τ, progress_step OP δ τ δ'). 
+      list_approx (fun δ' => exists τ, progress_step δ τ δ'). 
     Proof using FINlvl FINdeg.
       clear H1 H0 H. 
       red.
-      exists (flat_map (fun i => list_approx_repeat (fun δ1 δ2 => exists τ, loc_step _ δ1 τ δ2)
+      exists (flat_map (fun i => list_approx_repeat (fun δ1 δ2 => exists τ, loc_step δ1 τ δ2)
                            loc_step_approx i δ) (seq 0 (LIM_STEPS + 2))).
       intros δ' [τ STEP]. apply elem_of_list_In, in_flat_map.
       setoid_rewrite <- elem_of_list_In.
@@ -242,7 +242,7 @@ Section FiniteBranching.
     Qed.
 
     Lemma om_trans_approx δ (L: gset Locale):
-      list_approx (fun δ' => dom (ps_obls _ δ') ⊆ L /\ exists τ, om_trans OP δ τ δ'). 
+      list_approx (fun δ' => dom (ps_obls δ') ⊆ L /\ exists τ, om_trans δ τ δ'). 
     Proof using FINlvl FINdeg.
       clear H1 H0 H.
       set (approx1 := proj1_sig $ progress_step_approx δ).
@@ -275,8 +275,8 @@ Section FiniteBranching.
       (oζ: olocale Λ)
       :
       list_approx (fun '(δ', ℓ) =>
-           obls_ves_wrapper OP c oζ (tp', σ') δ ℓ δ' ∧
-           om_live_tids OP id locale_enabled (tp', σ') δ'). 
+           obls_ves_wrapper c oζ (tp', σ') δ ℓ δ' ∧
+           om_live_tids id locale_enabled (tp', σ') δ'). 
     Proof using FINlvl FINdeg.
       destruct (om_trans_approx δ (locales_of_cfg (tp', σ'))) as [nexts NEXTS].
       exists (flat_map (fun τ => map (fun δ' => (δ', (obls_act, Some τ))) nexts) (elements $ locales_of_cfg c)).

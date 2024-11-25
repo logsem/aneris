@@ -89,6 +89,10 @@ Section GmultisetUtils.
     all: subst; lia.
   Qed. 
 
+  Lemma gmultiset_elem_of_weaken (x y: gmultiset A) k:
+    k ∈ x ∖ y -> k ∈ x.
+  Proof using. multiset_solver. Qed. 
+
   Section MultisetFilter.
     Context (P : A → Prop). 
     Context `{∀ x, Decision (P x)}. 

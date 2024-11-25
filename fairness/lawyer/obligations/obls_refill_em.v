@@ -3,7 +3,11 @@ From stdpp Require Import namespaces.
 From iris.algebra Require Import auth gmap gset excl gmultiset big_op mono_nat.
 From trillium.fairness Require Import fairness locales_helpers execution_model.
 From trillium.fairness.lawyer Require Import sub_action_em action_model.
-From trillium.fairness.lawyer.obligations Require Import obligations_model obls_refill_model obligations_em obligations_am (* obls_utils*) obligations_resources.
+From trillium.fairness.lawyer.obligations Require Import obligations_model obls_refill_model
+  obligations_em
+  obligations_am
+obligations_resources
+.
 
 
 Section ObligationsRefillEM.
@@ -17,15 +21,14 @@ Section ObligationsRefillEM.
 
   (* Context {Locale: Type}. *)
   Context {Λ: language}.
-  Context `{Countable (locale Λ)}.
   Let Locale := locale Λ.
 
   Context {LIM_STEPS: nat}.
-  Context (OP: ObligationsParams Degree Level Locale LIM_STEPS).
+  Context {OP: ObligationsParams Degree Level Locale LIM_STEPS}.
 
-  Let ORM := ObligationsRefillModel OP.
+  Let ORM := ObligationsRefillModel.
   Context `{Inhabited Locale}. 
-  Let ORAM := ObligationsRefillAM OP.
+  Let ORAM := ObligationsRefillAM.
 
   (* TODO: move? *)
   Definition locale_of_orm_lbl (l: mlabel ORM) :=
@@ -50,9 +53,9 @@ Section ObligationsRefillEM.
         ) False oρ. 
 
   Program Definition ObligationsASEM: ActionSubEM Λ ORAM := {| 
-      asem_Σ := obls_Σ OP;
+      asem_Σ := obls_Σ;
       asem_valid_evolution_step := obls_refill_ves_wrapper;
-      asem_initialization Σ := fun {_: ObligationsPreGS OP Σ} => obls_resources_init OP Σ;
+      asem_initialization Σ := fun {_: ObligationsPreGS Σ} => obls_resources_init Σ;
     |}.
   Next Obligation.
     apply obls_Σ_pre.
