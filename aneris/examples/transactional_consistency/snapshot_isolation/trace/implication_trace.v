@@ -42,7 +42,7 @@ Section trace_proof.
 
   Definition OwnExecHist (γ : gname) (exec : execution) : iProp Σ := own_log_obs γ exec.
 
-  Definition local_key_state (γsi_name : gname) (sa : socket_address) (c : val) (k : Key) (ov ov' : option val) : iProp Σ := 
+  Definition local_key_state (γsi_name γl : gname) (sa : socket_address) (c : val) (k : Key) (ov ov' : option val) : iProp Σ := 
     ∃ (γ' γ'' γ''' : gname), ghost_map_elem γsi_name sa DfracDiscarded (Some (γ', γ'', γ''', c)) ∗
       ((⌜ov' = None⌝ ∗ ghost_map_elem γ' k (DfracOwn 1%Qp) ov) ∨ 
       (∃ v, ⌜ov' = Some v ∧ ov = ov'⌝ ∗ ghost_map_elem γ'' k (DfracOwn 1%Qp) None)).
@@ -55,12 +55,13 @@ Section trace_proof.
       ghost_map_elem γ'' k (DfracOwn 1%Qp) None).
 
   Definition active_connection_exec_state (s : aux_defs.local_state) (c : val) (sa : socket_address) (γexec γmstate γ' γ'' γ''' : gname) 
-  (m : gmap Key (option val)) : iProp Σ := 
-    ∃ (ms : gmap Key (list val)), ⌜s = aux_defs.Active ms⌝ ∗ ⌜∀ k ov, m !! k = Some ov ↔ (∃ h, ms !! k = Some h ∧ last h = ov)⌝ ∗ 
-      ∃ exec_pre m_pre, OwnExecHist γexec exec_pre ∗ ⌜rel_exec_map exec_pre ms ∧ ms ⊆ m_pre⌝ ∗
-        ∃ st, own γ''' (to_dfrac_agree (DfracOwn (1 / 2)) st) ∗ ⌜∀ k ov, st !! k = ov ↔ (∃ h, ms !! k = Some h ∧ last h = ov)⌝ ∗
-          ghost_map_elem γmstate sa (DfracOwn 1%Qp) (transactional_consistency.aux_defs.Active (dom ms), Some c) ∗
-          ([∗ set] k ∈ KVS_keys ∖ (dom ms ∩ KVS_keys), ∃ (ov : option val), ghost_map_elem γ' k (DfracOwn 1%Qp) ov ∗
+  (m_conn : gmap Key (option val)) : iProp Σ := 
+    ∃ (ms ms_sub: gmap Key (list val)), ⌜s = aux_defs.Active ms_sub⌝ ∗ 
+      ⌜∀ k (ov : option val), k ∈ KVS_keys → k ∈ dom (ms_sub) → (m_conn !! k = Some ov → (∃ h, ms_sub !! k = Some h ∧ last h = ov))⌝ ∗ 
+      ∃ exec_pre, OwnExecHist γexec exec_pre ∗ ⌜rel_exec_map exec_pre ms ∧ ms_sub ⊆ ms⌝ ∗
+        ∃ st, own γ''' (to_dfrac_agree (DfracOwn (1 / 2)) st) ∗ ⌜∀ k (ov : option val), k ∈ KVS_keys → (st !! k = ov ↔ (∃ h, ms !! k = Some h ∧ last h = ov))⌝ ∗
+          ghost_map_elem γmstate sa (DfracOwn 1%Qp) (transactional_consistency.aux_defs.Active (dom ms_sub), Some c) ∗
+          ([∗ set] k ∈ KVS_keys ∖ (dom ms_sub ∩ KVS_keys), ∃ (ov : option val), ghost_map_elem γ' k (DfracOwn 1%Qp) ov ∗
             ghost_map_elem γ'' k (DfracOwn 1%Qp) None).
 
   Definition connection_exec_state (s : aux_defs.local_state) (sa : socket_address) (c : val) (γexec γmstate γ' γ'' γ''' : gname) 
@@ -78,7 +79,8 @@ Section trace_proof.
   Definition GlobalInvExtSI (γmap γexec γsi_name : gname) (T : list transaction) (exec : execution)
   (extract : val → option val) (clients : gset socket_address) : iProp Σ := 
     ∃ (mnames : gmap socket_address (option (gname * gname * gname * val))), ghost_map_auth γsi_name (1%Qp) mnames ∗ 
-    ∃ (m : gmap Key (list val)), ghost_map_auth γmap (1%Qp) m ∗ OwnExec γexec exec ∗ ⌜rel_exec_map exec m⌝ ∗ 
+    ∃ (m : gmap Key (list val)), ghost_map_auth γmap (1%Qp) m ∗ ⌜∀ k, k ∈ KVS_keys → is_Some (m !! k)⌝ ∗
+    OwnExec γexec exec ∗ ⌜rel_exec_map exec m⌝ ∗ 
     open_transactions_state T mnames extract clients.
 
   (** Wrapped resources  *)
@@ -93,12 +95,10 @@ Section trace_proof.
                           ⌜(#(LitString tag), (c, (#"WrLin", (#(LitString k), v))))%V ∈ lh⌝))%I;
       OwnLocalKey k c ov := (OwnLocalKey k c ov ∗  ∃ (sa : socket_address) γ ov', ghost_map_elem γmname sa DfracDiscarded (γ, c) ∗ 
                              ⌜extract c = Some #sa⌝ ∗ (⌜k ∈ KVS_keys⌝ → ghost_map_elem γ k (DfracOwn 1%Qp) ov') ∗ ⌜sa ∈ clients⌝ ∗ 
-                             ⌜∀ v, ov' = Some v → k ∈ KVS_keys⌝ ∗
-                             (∀ v, ⌜ov' = Some v⌝ → ∃ lh tag c, OwnLinHist γl lh ∗ ⌜(#(LitString tag), (c, (#"WrLin", (#(LitString k), v))))%V ∈ lh⌝) ∗
-                             local_key_state γsi_name sa c k ov ov')%I;
+                             (⌜k ∈ KVS_keys⌝ → local_key_state γsi_name γl sa c k ov ov'))%I;
       ConnectionState c sa s := (ConnectionState c sa s ∗ 
-                                 ∃ (γ' γ'' γ''' : gname) (m : gmap Key (option val)), ghost_map_elem γsi_name sa DfracDiscarded (Some (γ', γ'', γ''', c)) ∗
-                                   ghost_map_auth γ' (1%Qp) m ∗ connection_exec_state s sa c γexec γmstate γ' γ'' γ''' m)%I;
+                                 ∃ (γ' γ'' γ''' : gname) (m_conn : gmap Key (option val)), ghost_map_elem γsi_name sa DfracDiscarded (Some (γ', γ'', γ''', c)) ∗
+                                   ghost_map_auth γ' (1%Qp) m_conn ∗ connection_exec_state s sa c γexec γmstate γ' γ'' γ''' m_conn)%I;
       IsConnected c sa := (IsConnected c sa ∗ ⌜sa ∈ clients⌝ ∗ ⌜extract c = Some #sa⌝ ∗ 
                            ∃ (γ : gname), ghost_map_elem γmname sa DfracDiscarded (γ, c) ∗ 
                            ∃ (γ' γ'' γ''' : gname), ghost_map_elem γsi_name sa DfracDiscarded (Some (γ', γ'', γ''', c)))%I;
@@ -109,13 +109,13 @@ Section trace_proof.
                                   ghost_map_elem γsi_name sa (DfracOwn 1%Qp) (None : option (gname * gname * gname * val)))%I;
       KeyUpdStatus c k b := (KeyUpdStatus c k b ∗ ∃ (sa : socket_address) (γ' γ'' γ''' : gname), ⌜extract c = Some #sa⌝ ∗
                               ghost_map_elem γsi_name sa DfracDiscarded (Some (γ', γ'', γ''', c)) ∗ 
-                              ((⌜b = true⌝ ∧ ∃ ov, ghost_map_elem γ' k (DfracOwn 1%Qp) ov) ∨ 
-                               (⌜b = false⌝ ∧ ghost_map_elem γ'' k (DfracOwn 1%Qp) None)))%I;
+                              (⌜k ∈ KVS_keys⌝ → ((⌜b = true⌝ ∧ ∃ (ov : option val), ghost_map_elem γ' k (DfracOwn 1%Qp) ov) ∨ 
+                                (⌜b = false⌝ ∧ ghost_map_elem γ'' k (DfracOwn 1%Qp) None))))%I;
       Seen k V := Seen k V%I;
       extract c := res.(snapshot_isolation.specs.resources.extract) c;
     |}.
   Next Obligation.
-    iIntros (?????????????) "(Hkey & [%sa [%γ [%ov' (Hghost_elem_per & %Hextract & Hghost_elem  & %Hin_sa & Hlin_hist & Hstate)]]])".
+    iIntros (?????????????) "(Hkey & [%sa [%γ [%ov' (Hghost_elem_per & %Hextract & Hghost_elem & Hstate)]]])".
     iDestruct (res.(snapshot_isolation.specs.resources.OwnLocalKey_serializable) 
       with "Hkey") as "(Hkey & Hser)".
     iFrame.
@@ -665,7 +665,7 @@ Section trace_proof.
     iClear "Hstart".
     iMod "Hshift" as "[%m (((Hconn_state & %γ' & %γ'' & %γ''' & %m_conn & #Hsa_pointer_si & Hghost_map_m_conn &
       Hconn_exec_state) & Hkeys) & Hshift)]".
-    iDestruct "Hconn_exec_state" as "[(_ & %st & Hfrag_half & Hsa_pointer & Hkeys_conn_si)|(%ms_si & %Hfalse & _)]"; 
+    iDestruct "Hconn_exec_state" as "[(_ & %st & Hfrag_half & Hsa_pointer & Hkeys_conn_si)|(%ms & %ms_sub & %Hfalse & _)]"; 
       last (exfalso; set_solver).
     iModIntro.
     iExists m.
@@ -770,8 +770,8 @@ Section trace_proof.
       iPureIntro.
       by simpl.
     }
-    iDestruct "Hinv_si_res'" as "(%mnames_si & Hghost_map_mnames_si & %m_si & Hghot_map_m_si & 
-      Hown_exec & %Hrel_exec & Hopen_trans_state)".
+    iDestruct "Hinv_si_res'" as "(%mnames_si & Hghost_map_mnames_si & %ms & Hghot_map_m_si & 
+      %Hkeys_some_ms & Hown_exec & %Hrel_exec & Hopen_trans_state)".
     iDestruct (get_obs with "Hown_exec") as "#Hown_exec_hist".
     rewrite /open_transactions_state.
     rewrite {4} Heq_sa_clients.
@@ -781,11 +781,16 @@ Section trace_proof.
     iDestruct (@ghost_map_lookup with "[$Hghost_map_mnames_si][$Hsa_pointer_si]") as "%Hlookup'".
     iDestruct "Hopen_trans_state_sa" as "[%Hfalse|(%c_sa & %st_sa & %γ_sa & %γ''_sa & %γ'''_sa & %Hextract_c_sa 
       & Hfrag_half' & Hopen_state)]"; first (exfalso; set_solver).
-    assert (∃ (st_new : gmap Key val), ∀ k ov, st_new !! k = ov ↔ (∃ h, m_si !! k = Some h ∧ last h = ov)) 
-      as (st_new & Hst_new_rel).
+    iAssert (⌜m ⊆ ms⌝)%I as "%Hsubset".
     {
-      admit.
+      iApply (@ghost_map_lookup_big with "[$Hghot_map_m_si][Hkeys2]").
+      iApply (big_sepM_wand with "[$Hkeys2]").
+      iApply big_sepM_intro.
+      iModIntro.
+      iIntros (k h Hlookup_k) "(Hkey_res & _)".
+      iFrame.
     }
+    destruct Hrel_exec as (st_new & Hrel_exec).
     iAssert (|==> (own γ''' (to_dfrac_agree (DfracOwn (1 / 2)) st_new) ∗ 
       own γ''' (to_dfrac_agree (DfracOwn (1 / 2)) st_new)))%I 
       with "[Hfrag_half Hfrag_half']" as ">(Hfrag_half & Hfrag_half')".
@@ -797,14 +802,65 @@ Section trace_proof.
       rewrite dfrac_op_own. 
       by rewrite Qp.half_half.
     }
-    iAssert ((|==> (([∗ set] k ∈ KVS_keys, ∃ (ov : option val), ghost_map_elem γ' k (DfracOwn 1%Qp) ov ∗ 
+    iAssert ((|==> (([∗ set] k ∈ KVS_keys, ∃ (ov : option val), ghost_map_elem γ' k (DfracOwn 1%Qp) ov ∗ ⌜k ∈ dom m → (∃ h, m !! k = Some h ∧ last h = ov)⌝ ∗
       ghost_map_elem γ'' k (DfracOwn 1%Qp) None) ∗ 
-      (∃ m_conn', ghost_map_auth γ' 1 m_conn' ∧ ⌜∀ k ov, k ∈ KVS_keys → (m_conn' !! k = Some ov ↔ st_new !! k = ov)⌝)))%I)
+      (∃ m_conn', ghost_map_auth γ' 1 m_conn' ∧ ⌜∀ k ov, k ∈ KVS_keys → k ∈ dom m → (m_conn' !! k = Some ov → (∃ h, m !! k = Some h ∧ last h = ov))⌝)))%I)
       with "[Hghost_map_m_conn Hkeys_conn_si]" as ">(Hkeys_conn_si & (%m_conn' & Hghost_map_m_conn & %Hm_conn'_st_new_rel))".
     {
-      admit.
+      clear Hnone Hkeys_some_ms Hrel_exec.
+      iRevert "Hghost_map_m_conn".
+      iRevert (m_conn).
+      iInduction KVS_keys as [|k KVS_Keys Hnin] "IH" using set_ind_L.
+      - iIntros (m_conn) "Hghost_map_m_conn".
+        iModIntro.
+        set_solver.
+      - iIntros (m_conn) "Hghost_map_m_conn".
+        rewrite big_sepS_union; last set_solver.
+        iDestruct "Hkeys_conn_si" as "(Hkeys_conn_si_k & Hkeys_conn_si)".
+        rewrite big_sepS_singleton.
+        iDestruct "Hkeys_conn_si_k" as "(%ov & Hkey1 & Hkey2)".
+        destruct (m !! k) as [h|] eqn:Hlookup_k_m; last first.
+        + iMod ("IH" with "[$Hkeys_conn_si][$Hghost_map_m_conn]") as "(Hkeys_conn_si & Hghost_map_m_conn)".
+          iDestruct "Hghost_map_m_conn" as "(%m_conn' & Hghost_map_m_conn & %Hm_conn'_pure)".
+          iDestruct (@ghost_map_lookup with "[$Hghost_map_m_conn][$Hkey1]") as "%Hlookup_k".
+          iModIntro.
+          rewrite big_sepS_union; last set_solver.
+          iFrame.
+          rewrite big_sepS_singleton.
+          apply not_elem_of_dom_2 in Hlookup_k_m.
+          iSplitR "Hghost_map_m_conn".
+          * iExists ov.
+            iFrame.
+            iPureIntro.
+            set_solver.
+          * iExists m_conn'.
+            iFrame.
+            iPureIntro.
+            intros k' ov' Hk_in Hlookup_k'.
+            apply elem_of_union in Hk_in.
+            destruct Hk_in as [Hk_in|Hk_in]; set_solver.
+        + iMod (@ghost_map_update _ Key (option val) _ _ _ _ _ k ov (last h) with "[$Hghost_map_m_conn] [$Hkey1]") 
+            as "(Hghost_map_m_conn & Hkey1)".
+          iMod ("IH" with "[$Hkeys_conn_si][$Hghost_map_m_conn]") as "(Hkeys_conn_si & Hghost_map_m_conn)".
+          iDestruct "Hghost_map_m_conn" as "(%m_conn' & Hghost_map_m_conn & %Hm_conn'_pure)".
+          iDestruct (@ghost_map_lookup with "[$Hghost_map_m_conn][$Hkey1]") as "%Hlookup_k".
+          iModIntro.
+          rewrite big_sepS_union; last set_solver.
+          iFrame.
+          rewrite big_sepS_singleton.
+          iSplitR "Hghost_map_m_conn".
+          * iExists (last h).
+            iFrame.
+            iPureIntro.
+            eauto.
+          * iExists m_conn'.
+            iFrame.
+            iPureIntro.
+            intros k' ov' Hk_in Hlookup_k'.
+            apply elem_of_union in Hk_in.
+            destruct Hk_in as [Hk_in|Hk_in]; set_solver.
     }
-    iAssert ((([∗ set] k ∈ (dom m) ∩ KVS_keys, ∃ (ov : option val), ghost_map_elem γ' k (DfracOwn 1%Qp) ov ∗ 
+    iAssert ((([∗ set] k ∈ (dom m) ∩ KVS_keys, ∃ (ov : option val), ghost_map_elem γ' k (DfracOwn 1%Qp) ov ∗ ⌜k ∈ dom m → (∃ h, m !! k = Some h ∧ last h = ov)⌝ ∗
       ghost_map_elem γ'' k (DfracOwn 1%Qp) None) ∗ 
       ([∗ set] k ∈ KVS_keys ∖ ((dom m) ∩ KVS_keys), ∃ (ov : option val), ghost_map_elem γ' k (DfracOwn 1%Qp) ov ∗ 
       ghost_map_elem γ'' k (DfracOwn 1%Qp) None))%I) 
@@ -815,7 +871,13 @@ Section trace_proof.
         set_solver.
       - rewrite {1} Heq.
         rewrite (big_sepS_union _ (dom m ∩ KVS_keys) (KVS_keys ∖ (dom m ∩ KVS_keys))); last set_solver.
+        iDestruct "Hkeys_conn_si" as "(Hkeys_conn_si1 & Hkeys_conn_si2)".
         iFrame.
+        iApply (big_sepS_wand with "[$Hkeys_conn_si2]").
+        iApply big_sepS_intro.
+        iModIntro.
+        iIntros (k Hk_in) "(%ov & Hke1 & _ & Hkey2)".
+        iExists ov; iFrame.
     }
     iMod ("Hclose'" with "[Hfrag_half Hghost_map_mnames_si Hghot_map_m_si Hown_exec Hopen_state 
       Hopen_trans_state Htr_is' HOwnLin' Hghost_map_mname' Hghost_map_m' 
@@ -826,8 +888,9 @@ Section trace_proof.
       iSplitL "Hghost_map_mnames_si Hghot_map_m_si Hown_exec Hopen_state Hopen_trans_state Hfrag_half".
       {
         iExists mnames_si; iFrame.
-        iExists m_si; iFrame.
+        iExists ms; iFrame.
         iSplit; first by iPureIntro.
+        iSplit; first by (iPureIntro; exists st_new).
         rewrite /open_transactions_state.
         rewrite {4} Heq_sa_clients.
         rewrite big_sepS_union; last set_solver.
@@ -925,7 +988,7 @@ Section trace_proof.
         iApply (client_trace_state_resources_neq2 sa sa' c with "[][][][$]"); try done.
         iPureIntro; set_solver.
     }
-    iMod ("Hshift" with "[Hkeys_conn_si1 Hkeys_conn_si2 Hghost_map_m_conn Hfrag_half' 
+    iMod ("Hshift" with "[Hkeys_status Hkeys_conn_si1 Hkeys_conn_si2 Hghost_map_m_conn Hfrag_half' 
       Hkeys1 Hkeys2 Hkeys_conn Hsa_pointer Hkeys_conn_res1 Hconn_state]").
     {
       iFrame.
@@ -934,24 +997,95 @@ Section trace_proof.
         iExists γ', γ'', γ''', m_conn'.
         iFrame "∗#".
         iRight.
-        iExists m; iSplit; first by iPureIntro.
+        iExists ms, m.
+        iSplit; first by iPureIntro.
         iFrame.
+        iSplit; first by iPureIntro.
+        iExists exec'.
+        iFrame "#".
         iSplit.
         - iPureIntro.
-          admit.
-        - iExists exec', m_si.
-          iFrame "#".
-          iSplit.
-          + iPureIntro.
-            admit.
-          + iExists st_new.
-            iFrame.
-            iPureIntro.
-            admit.
+          split; last done.
+          by exists st_new.
+        - iExists st_new.
+          iFrame.
+          iPureIntro.
+          set_solver.
       }
       iSplitL "Hkeys1 Hkeys2"; first (do 3 rewrite {1} big_sepM_sep; iFrame).
       iFrame "#".
-      admit.
+      clear Hm_conn'_st_new_rel Hsubset.
+      iClear "Hseen".
+      iInduction m as [|k h m Hlookup_k_m] "IH" using map_ind; first set_solver.
+      rewrite dom_insert_L intersection_union_r_L.
+      assert ({[k]} ∩ KVS_keys ## dom m ∩ KVS_keys) as Hdisjoint.
+      {
+        assert (k ∉ dom m) as Hnin; last set_solver.
+        by apply not_elem_of_dom_2.
+      }
+      rewrite big_sepS_union; last done.
+      iDestruct "Hkeys_conn_si1" as "(Hkeys_conn_si1_k & Hkeys_conn_si1)".
+      rewrite big_sepS_union; last done.
+      iDestruct "Hkeys_conn_res1" as "(Hkeys_conn_res1_k & Hkeys_conn_res1)".
+      rewrite big_sepM_insert; last done.
+      iDestruct "Hkeys_status" as "(Hkeys_status_k & Hkeys_status)".
+      rewrite big_sepM_insert; last done.
+      iDestruct "Hkeys_conn" as "(Hkeys_conn_k & Hkeys_conn)".
+      rewrite big_sepM_insert; last done.
+      iSplitR "Hkeys_status Hkeys_conn_si1 Hkeys_conn Hkeys_conn_res1"; 
+        last iApply ("IH" with "[$Hkeys_status][Hkeys_conn_si1][$Hkeys_conn][$Hkeys_conn_res1]");
+        last first.
+      {
+        iApply (big_sepS_wand with "[$Hkeys_conn_si1]").
+        iApply big_sepS_intro.
+        iModIntro.
+        iIntros (k' Hk_in) "(%ov & Hkey1 & %Hkey_pure & Hkey2)".
+        iExists ov.
+        iFrame.
+        iPureIntro.
+        intros Hk'_in.
+        apply not_elem_of_dom_2 in Hlookup_k_m.
+        rewrite lookup_insert_ne in Hkey_pure; set_solver.
+      }
+      iFrame.
+      assert (c = c') as <-; first set_solver.
+      destruct (decide (k ∈ KVS_keys)) as [Hk_in|Hk_nin].
+      - rewrite (subseteq_intersection_1_L {[k]} KVS_keys); last set_solver.
+        do 2 rewrite big_sepS_singleton.
+        iDestruct "Hkeys_conn_si1_k" as "(%ov & Hkeys_conn_si1_k_1 & %Hkey_conn_si1_pure & Hkeys_conn_si1_k_2)".
+        iSplitR "Hkeys_conn_si1_k_2".
+        + iExists sa, γ, None.
+          iFrame "#".
+          iSplit; first done.
+          iSplitL "Hkeys_conn_res1_k"; first (iIntros (_); iFrame).
+          iSplit; first done.
+          iIntros (_).
+          iExists γ', γ'', γ'''.
+          iFrame "#".
+          iLeft.
+          destruct Hkey_conn_si1_pure as (h' & Hlookup_m_k & Hlast_eq); first set_solver.
+          rewrite lookup_insert in Hlookup_m_k.
+          assert (last h = last h') as ->; first set_solver.
+          rewrite Hlast_eq.
+          by iFrame.
+        + iExists sa, γ', γ'', γ'''.
+          iFrame "#".
+          iSplit; first done.
+          iIntros (_).
+          iRight.
+          iSplit; first done.
+          iFrame.
+      - iSplitL.
+        + iExists sa, γ, None.
+          iFrame "#".
+          iSplit; first done.
+          iSplitR; first (iIntros (Hfalse); set_solver).
+          iSplit; first done.
+          iIntros (Hfalse); set_solver.
+        + iExists sa, γ', γ'', γ'''.
+          iFrame "#".
+          iSplit; first done.
+          iIntros (Hfalse); set_solver.
     }
     iModIntro.
     rewrite /start_post_emit_event.
@@ -1001,7 +1135,7 @@ Section trace_proof.
       set_solver.
     }
     set_solver.
-  Admitted.
+  Qed.
 
   Lemma init_client_implication γmstate γmlin γmpost γmname γl γmap γexec γsi_name clients (res : SI_resources Mdl Σ) 
   (lib : KVS_transaction_api) : 
@@ -1170,7 +1304,7 @@ Section trace_proof.
     iMod (ghost_map_insert_persist sa (γ, c) Hlookup_none with "[$Hghost_map_mname]") 
       as "(Hghost_map_mname & #Hkey_pers_mname)".
     iDestruct "Hinv_si_res'" as "(%mname_si & Hghost_map_mname_si & %m_si & Hghost_map_m_si & 
-      Hown_exec & %Hrel_exe_map & Hopen_si)".
+      %Hkeys_some_m_si & Hown_exec & %Hrel_exe_map & Hopen_si)".
     iDestruct (@ghost_map_lookup with "[$Hghost_map_mname_si][$Hsa_pointer_si]") as "%Hlookup_none'".
     iMod (ghost_map_alloc ((gset_to_gmap None KVS_keys : gmap Key (option val))))
       as "[%γ' (Hghost_map_m_si' & Hghost_elems_m_si')]".
@@ -1203,7 +1337,7 @@ Section trace_proof.
       {
         iExists (<[sa:=Some (γ', γ'', γ''', c)]> mname_si); iFrame.
         iExists m_si; iFrame.
-        iSplit; first by iPureIntro.
+        do 2 (iSplit; first by iPureIntro).
         rewrite /open_transactions_state.
         rewrite {3} Heq_sa_clients.
         rewrite {4} Heq_sa_clients.
@@ -1408,8 +1542,11 @@ Section trace_proof.
         iFrame.
         iSplit.
         - iPureIntro.
-          apply rel_exec_map_init.
-        - rewrite /open_transactions_state.
+          intros k Hk_in.
+          assert (gset_to_gmap [] KVS_keys !! k = Some []) as ->; last done.
+          by apply lookup_gset_to_gmap_Some.
+        - iSplit; first (iPureIntro; apply rel_exec_map_init).
+          rewrite /open_transactions_state.
           iApply big_sepS_intro.
           iModIntro.
           iIntros (sa Hsa_in).
