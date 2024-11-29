@@ -11,6 +11,26 @@ Section Wf.
     dom $ filter (fun '(s, (l, b)) => b = false) (ps_sigs δ) ⊆
     flatten_gset $ map_img $ ps_obls δ.
 
+  Lemma obls_assigned_equiv δ:
+    obls_assigned δ <-> 
+      forall s l, ps_sigs δ !! s = Some (l, false) ->
+      map_Exists (fun τ obs => s ∈ obs) (ps_obls δ).
+  Proof using.
+    rewrite /obls_assigned. rewrite elem_of_subseteq.
+    apply forall_proper. intros s.
+    rewrite elem_of_dom.
+    rewrite map_filter_lookup. simpl. 
+    destruct (ps_sigs δ !! s) as [[??]| ] eqn:SIGS; rewrite SIGS; simpl. 
+    2: { split; intros; try done. by destruct H0. }
+    destruct b; simpl. 
+    { simpl. split; intros; try done. by destruct H0. }
+    rewrite -exist_impl_forall. rewrite ex_det_iff.
+    2: { intros ? [=]. subst. reflexivity. }
+    apply ZifyClasses.impl_morph; [set_solver| ].
+    rewrite flatten_gset_spec. rewrite map_Exists_lookup.
+    setoid_rewrite elem_of_map_img. set_solver.
+  Qed.
+
   Definition dom_phases_disj δ :=
     forall τ1 τ2 π1 π2, 
       τ1 ≠ τ2 ->
@@ -60,10 +80,16 @@ Section Wf.
     (R: ProgressState -> ProgressState -> Prop) (P: ProgressState -> Prop) :=
     ∀ δ1 δ2, P δ1 -> R δ1 δ2 -> P δ2.
   
-  Definition preserved_by_loc_step τ := preserved_by (loc_step_of τ).
+  (* Definition preserved_by_loc_step τ := preserved_by (loc_step_of τ). *)
+  Definition preserved_by_loc_step_ex := preserved_by loc_step_ex. 
+
   Definition preserved_by_fork τ := preserved_by (fork_step_of τ).
-  Definition preserved_by_rep_loc_step τ :=
-    fun P => forall n, preserved_by (relations.nsteps (loc_step_of τ) n) P. 
+
+  (* Definition preserved_by_rep_loc_step τ := *)
+  (*   fun P => forall n, preserved_by (relations.nsteps (loc_step_of τ) n) P.  *)
+  Definition preserved_by_rep_loc_step_ex :=
+    fun P => forall n, preserved_by (relations.nsteps loc_step_ex n) P. 
+
   Definition preserved_by_progress_step τ :=
     preserved_by (progress_step_of τ). 
   Definition preserved_by_om_trans τ :=
@@ -81,16 +107,16 @@ Section Wf.
     apply IHn in STEP1; eauto.
   Qed.
 
-  Lemma pres_by_loc_step_implies_rep τ P
-    (PRES: preserved_by_loc_step τ P)
+  Lemma pres_by_loc_step_implies_rep P
+    (PRES: preserved_by_loc_step_ex P)
     :
-    preserved_by_rep_loc_step τ P. 
+    preserved_by_rep_loc_step_ex P. 
   Proof.
     red. intros. eapply pres_by_rel_implies_rep; eauto.
   Qed.
 
   Lemma pres_by_loc_step_implies_progress τ P
-    (PPRES: preserved_by_loc_step τ P)
+    (PPRES: preserved_by_loc_step_ex P)
     :
     preserved_by_progress_step τ P. 
   Proof using.
@@ -99,12 +125,12 @@ Section Wf.
     eapply rel_compose_mono in STEP.
     2: reflexivity.
     1: apply rel_compose_nsteps_next in STEP.
-    2: { do 2 red. intros. by left. }    
+    2: { do 2 red. intros. eexists. by left. }    
     eapply pres_by_loc_step_implies_rep; eauto.
   Qed.
 
   Lemma pres_by_loc_fork_steps_implies_om_trans τ P
-    (PPRES: preserved_by_loc_step τ P)
+    (PPRES: preserved_by_loc_step_ex P)
     (FPRES: preserved_by_fork τ P)
     :
     preserved_by_om_trans τ P. 
@@ -118,7 +144,7 @@ Section Wf.
   Qed.
 
   Lemma pres_by_loc_fork_steps_implies_any_pres τ P
-    (PPRES: preserved_by_loc_step τ P)
+    (PPRES: preserved_by_loc_step_ex P)
     (FPRES: preserved_by_fork τ P)
     :
     preserved_by (obls_any_step_of τ) P. 
@@ -129,7 +155,8 @@ Section Wf.
   Lemma pres_by_valid_trace_strong (tr: obls_trace) i j P (T: Locale -> Prop)
     (LE: i <= j)
     (VALID: obls_trace_valid tr)
-    (PPRES: forall τ, T τ -> preserved_by_loc_step τ P)
+    (* (PPRES: forall τ, T τ -> preserved_by_loc_step τ P) *)
+    (PPRES: preserved_by_loc_step_ex P)
     (FPRES: forall τ, T τ -> preserved_by_fork τ P)
     (Pi: from_option P True (tr S!! i))
     (Tij: forall k τ, i <= k < j -> tr L!! k = Some τ -> T τ)
@@ -154,7 +181,8 @@ Section Wf.
 
   Lemma pres_by_valid_trace (tr: obls_trace) i P
     (VALID: obls_trace_valid tr)
-    (PPRES: forall τ, preserved_by_loc_step τ P)
+    (* (PPRES: forall τ, preserved_by_loc_step τ P) *)
+    (PPRES: preserved_by_loc_step_ex P)
     (FPRES: forall τ, preserved_by_fork τ P)
     (Pi: from_option P True (tr S!! i)):
     forall j, i <= j -> from_option P True (tr S!! j).
@@ -172,17 +200,17 @@ Section Wf.
      destruct T as (?&?&?&T) ];
     inversion T; subst. 
 
-  Lemma loc_step_dpo_pres τ: preserved_by_loc_step τ dom_phases_obls.
+  Lemma loc_step_dpo_pres: preserved_by_loc_step_ex dom_phases_obls.
   Proof using.
-    do 2 red. intros δ1 δ2 PHASES_CORR STEP.
+    do 2 red. intros δ1 δ2 PHASES_CORR [τ STEP].
     inv_loc_step STEP; destruct δ1; try done; simpl in *. 
     - subst new_obls0. red. subst new_ps. simpl. set_solver. 
     - subst new_obls0. simpl. red. set_solver. 
   Qed.
 
-  Lemma loc_step_asg_pres τ: preserved_by_loc_step τ obls_assigned.
+  Lemma loc_step_asg_pres: preserved_by_loc_step_ex obls_assigned.
   Proof using.
-    do 2 red. intros δ1 δ2 ASG STEP.
+    do 2 red. intros δ1 δ2 ASG [τ STEP].
     inv_loc_step STEP; destruct δ1; try done; simpl in *. 
     - subst new_ps. red. simpl.
       subst new_sigs0 new_obls0. 
@@ -217,27 +245,29 @@ Section Wf.
       apply elem_of_map_img. eexists. eapply lookup_delete_Some; eauto.
   Qed.
 
-  Lemma loc_step_dpd_pres τ: preserved_by_loc_step τ dom_phases_disj.
+  Lemma loc_step_dpd_pres: preserved_by_loc_step_ex dom_phases_disj.
   Proof using.
-    do 2 red. intros δ1 δ2 DPD STEP.
+    do 2 red. intros δ1 δ2 DPD [τ STEP].
     inv_loc_step STEP; destruct δ1; try done; simpl in *.
   Qed.
 
   Definition phases_eq R δ1 := ps_phases δ1 = R.
 
-  Lemma loc_step_phases_pres τ R: preserved_by (loc_step_of τ) (phases_eq R).
+  Lemma loc_step_phases_pres R: preserved_by loc_step_ex (phases_eq R).
   Proof using. 
-    do 2 red. intros δ1 δ2 PH STEP.
+    do 2 red. intros δ1 δ2 PH [τ STEP].
     inv_loc_step STEP; destruct δ1; try done; simpl in *.
   Qed.
 
-  Lemma loc_step_epb_pres' τ: preserved_by_loc_step τ 
-                                (fun δ => eps_phase_bound δ /\ dom_phases_disj δ). 
+  Lemma loc_step_epb_pres': preserved_by_loc_step_ex 
+                                (fun δ => eps_phase_bound δ /\ dom_phases_disj δ).
   Proof using.
-    do 2 red. intros δ1 δ2 [EPB DPD] STEP.
+    do 2 red. intros δ1 δ2 [EPB DPD] [τ STEP].
     split.
-    2: { eapply loc_step_dpd_pres; eauto. } 
-    pose proof (@loc_step_phases_pres _ _ _ _ ltac:(reflexivity) STEP) as PH.
+    2: { eapply loc_step_dpd_pres; eauto. red. eauto. } 
+
+    pose proof (@loc_step_phases_pres _ _ _ eq_refl ltac:(red; eauto)) as PH. 
+    
     add_case (ps_eps δ2 ⊆ ps_eps δ1) EPS_LE.
     { intros LE. red. intros (τ' & π & ep & PH2 & IN & LT).
       eapply elem_of_subseteq in IN; eauto.
@@ -259,13 +289,13 @@ Section Wf.
     apply strict_spec_alt in LE'. tauto. 
   Qed.
 
-  Lemma loc_step_cpb_pres' τ: preserved_by_loc_step τ
+  Lemma loc_step_cpb_pres': preserved_by_loc_step_ex
                                 (fun δ => cps_phase_bound δ /\ dom_phases_disj δ). 
   Proof using.
-    do 2 red. intros δ1 δ2 [CPB DPD] STEP.
+    do 2 red. intros δ1 δ2 [CPB DPD] [τ STEP].
     split.
-    2: by eapply loc_step_dpd_pres; eauto. 
-    pose proof (@loc_step_phases_pres _ _ _ _ ltac:(reflexivity) STEP) as PH.
+    2: { eapply loc_step_dpd_pres; eauto. red. eauto. }
+    pose proof (@loc_step_phases_pres _ _ _ eq_refl ltac:(red; eauto)) as PH.
     add_case (ps_cps δ2 ⊆ ps_cps δ1) CPS_LE.
     { intros LE. red. intros (τ' & π & cp & PH2 & IN & LT).
       eapply gmultiset_elem_of_subseteq in IN; eauto.
@@ -295,9 +325,9 @@ Section Wf.
       apply strict_spec_alt in LT. tauto. 
   Qed.
 
-  Lemma loc_step_obls_sigs_pres τ: preserved_by_loc_step τ obligations_are_signals.
+  Lemma loc_step_obls_sigs_pres: preserved_by_loc_step_ex obligations_are_signals.
   Proof using.
-    do 2 red. intros δ1 δ2 OS STEP.
+    do 2 red. intros δ1 δ2 OS [τ STEP].
     inv_loc_step STEP; destruct δ1; try done; simpl in *.
     - subst new_ps. red. simpl. subst new_obls0 new_sigs0.
       rewrite map_img_insert_L dom_insert_L.
@@ -316,12 +346,12 @@ Section Wf.
       subst cur_loc_obls0. set_solver.
   Qed. 
 
-  Lemma loc_step_obls_disj_pres' τ: preserved_by_loc_step τ
-                                      (fun δ => obls_disjoint δ /\ obligations_are_signals δ). 
+  Lemma loc_step_obls_disj_pres': preserved_by_loc_step_ex
+                                      (fun δ => obls_disjoint δ /\ obligations_are_signals δ).
   Proof using.
-    do 2 red. intros δ1 δ2 [DPI OS] STEP.
+    do 2 red. intros δ1 δ2 [DPI OS] [τ STEP].
     split.
-    2: by eapply loc_step_obls_sigs_pres; eauto. 
+    2: { eapply loc_step_obls_sigs_pres; eauto. red. eauto. }
     inv_loc_step STEP; destruct δ1; try done; simpl in *.
     - subst new_ps. red. simpl. intros τ1 τ2 NEQ.
       subst new_obls0. simpl.
@@ -364,7 +394,7 @@ Section Wf.
       + apply _. 
   Qed.
         
-  Lemma wf_preserved_by_loc_step τ: preserved_by (loc_step_of τ) om_st_wf.
+  Lemma wf_preserved_by_loc_step: preserved_by loc_step_ex om_st_wf.
   Proof using.
     red. intros ?? WF1 STEP. 
     split.
@@ -595,11 +625,11 @@ subst new_obls0.
     - apply wf_preserved_by_fork_step.
   Qed.
     
-  Definition obls_eq R δ1 := dom $ ps_obls δ1 = R.
+  Definition dom_obls_eq R δ1 := dom $ ps_obls δ1 = R.
       
-  Lemma loc_step_obls_pres R τ: preserved_by (loc_step_of τ) (obls_eq R). 
+  Lemma loc_step_dom_obls_pres R: preserved_by loc_step_ex (dom_obls_eq R).
   Proof using.
-    do 2 red. intros δ1 δ2 OE STEP. 
+    do 2 red. intros δ1 δ2 OE [τ STEP]. 
     add_case (dom $ ps_obls δ2 = dom $ ps_obls δ1) SAME.
     { intros EQ. by rewrite EQ. }
     inv_loc_step STEP; destruct δ1; try done; simpl in *.

@@ -166,17 +166,17 @@ Section Model.
     (exists s π δ δ', creates_ep ps1 θ ps2 s π δ δ') \/
     (exists s π δ, expects_ep ps1 θ ps2 s π δ).
 
-  Definition loc_step_of θ := fun ps1 ps2 => loc_step ps1 θ ps2. 
+  Definition loc_step_ex := fun ps1 ps2 => exists θ, loc_step ps1 θ ps2.
   Definition fork_step_of θ := fun ps1 ps2 => exists τ' R, forks_locale ps1 θ ps2 τ' R.
 
   Definition obls_any_step_of θ := 
-    fun ps1 ps2 => loc_step_of θ ps1 ps2 \/ fork_step_of θ ps1 ps2. 
+    fun ps1 ps2 => loc_step_ex ps1 ps2 \/ fork_step_of θ ps1 ps2. 
 
   Notation " x ;;; y " := (rel_compose x y) (at level 20).
 
   Definition progress_step ps1 (θ: Locale) ps2 :=
     exists n, n <= LIM_STEPS /\
-           (relations.nsteps (loc_step_of θ) n
+           (relations.nsteps loc_step_ex n
              ;;;
             (fun p1 p2 => exists π δ, burns_cp p1 θ p2 π δ)
            )
@@ -192,7 +192,9 @@ Section Model.
   Definition om_trans_of τ := fun δ1 δ2 => om_trans δ1 τ δ2.
 
   Definition ObligationsModel: Model :=
-    {| mtrans := om_trans |}. 
+    {| mtrans := om_trans |}.
+
+  Definition π0: Phase := nil.
 
   (* Definition phases_incompat π1 π2 := ¬ phase_le π1 π2 /\ ¬ phase_le π2 π1. *)
   (* Definition phases_disj (π1 π2: Phase) := ↑ π1 ## (↑ π2: coPset). *)
