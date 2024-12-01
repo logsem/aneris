@@ -20,15 +20,20 @@ Section Termination.
   Definition sig_val_at sid i := 
     from_option (fun δ => from_option snd true (ps_sigs δ !! sid)) true (tr S!! i). 
     
+  Definition sig_is_set_at sid i := 
+    from_option (fun δ => from_option (eq true ∘ snd) False (ps_sigs δ !! sid)) False (tr S!! i). 
+
   Definition never_set_after sid c := 
-    forall i, c <= i -> sig_val_at sid i = false.
+    forall i, c <= i -> is_Some (tr S!! i) -> sig_val_at sid i = false.
 
-  (* TODO: get rid of excessive negations *)
-  Definition eventually_set sid :=
-    forall c, ¬ never_set_after sid c.
+  (* (* TODO: get rid of excessive negations *) *)
+  (* Definition eventually_set sid := *)
+  (*   forall c, ¬ never_set_after sid c. *)
 
-  Definition sb_prop sid n := 
-    forall i, eventually_set sid -> n <= i -> sig_val_at sid i = true. 
+  Definition sb_prop sid n :=
+    (¬ exists i, sig_is_set_at sid i) /\ n = 0 \/
+    (exists i, sig_is_set_at sid i /\ i <= n). 
+    (* forall i, eventually_set sid -> n <= i -> sig_val_at sid i = true.  *)
 
   Context {set_before: SignalId -> nat}.
   Hypothesis (SET_BEFORE_SPEC: forall sid, sb_prop sid (set_before sid)).
@@ -143,25 +148,23 @@ Section Termination.
   Qed.
 
   Lemma never_set_after_eq_false sid c:
-    never_set_after sid c -> forall i, c <= i -> 
-      exists δ l, tr S!! i = Some δ /\ ps_sigs δ !! sid = Some (l, false).
+    never_set_after sid c -> forall i δ, c <= i -> tr S!! i = Some δ ->
+      exists l, ps_sigs δ !! sid = Some (l, false).
   Proof using.
-    intros NEVER i LE.
-    red in NEVER. specialize (NEVER _ LE).
-    rewrite /sig_val_at in NEVER. destruct (tr S!! i) eqn:ITH; [| done].
-    simpl in *.
-    destruct (ps_sigs m !! sid) as [[??]|] eqn:SIG; try done.
+    intros NEVER i ? LE ITH.
+    red in NEVER. specialize (NEVER _ LE ltac:(eauto)).
+    rewrite /sig_val_at in NEVER. rewrite ITH in NEVER. simpl in *.
+    destruct (ps_sigs δ !! sid) as [[??]|] eqn:SIG; try done.
     simpl in NEVER. subst. eauto. 
   Qed. 
 
   Lemma never_set_owned s c
     (NEVER_SET: never_set_after s c):
-    forall i, c <= i ->
-         map_Exists (fun τ obs => s ∈ obs) (from_option (ps_obls) ∅ (tr S!! i)). 
+    forall i δ, c <= i -> tr S!! i = Some δ -> 
+         map_Exists (fun τ obs => s ∈ obs) (ps_obls δ).
   Proof using WF.
-    intros i LE.
-    eapply never_set_after_eq_false in NEVER_SET as (?&?&ITH&?); eauto.
-    rewrite ITH. simpl.
+    intros i ? LE ITH. 
+    eapply never_set_after_eq_false in NEVER_SET as (?&?); eauto. 
     eapply obls_assigned_equiv; eauto. 
     eapply WF; eauto.
   Qed.
@@ -550,6 +553,40 @@ Section Termination.
     etrans; eauto. apply phase_lt_fork.
   Qed. 
 
+  Lemma signal_created_never_set sid i
+    (CR: sid ∈ dom $ from_option ps_sigs ∅ (tr S!! i))
+    (NOT_SET: ¬ exists j, sig_is_set_at sid j):
+    never_set_after sid i.
+  Proof using VALID.
+    red. intros k LEik [? KTH].
+    destruct (tr S!! i) eqn:ITH; [| done]. simpl in CR.
+    rewrite /sig_val_at. rewrite KTH. simpl. 
+    forward eapply sig_st_le_lookup_helper with (s := sid); eauto.
+    apply elem_of_dom in CR as [[? b] Sm]. rewrite Sm.
+    destruct (ps_sigs x !! sid) as [[? b']| ] eqn:Sk; try done. simpl.
+    destruct b'; [| done].
+    edestruct NOT_SET. exists k. red. rewrite KTH /= Sk. done.
+  Qed.
+
+  Lemma sig_is_set_at_after sid i
+    (SET: sig_is_set_at sid i):
+    forall j, i <= j -> is_Some (tr S!! j) -> sig_is_set_at sid j.
+  Proof using VALID.
+    intros ? LE [δj JTH].
+    red. rewrite JTH. simpl.
+    red in SET. destruct (tr S!! i) as [δi| ] eqn:ITH; [| done]. simpl in SET.
+    eapply sig_st_le_lookup_helper with (s := sid) in LE; eauto.
+    destruct (ps_sigs δi !! sid) as [[??]| ] eqn:Si; [| done].
+    destruct (ps_sigs δj !! sid) as [[??]| ] eqn:Sj; [| done].
+    simpl in *. destruct b, b0; tauto.
+  Qed.
+
+  (* TODO: move *)
+  Ltac by_classical_contradiction cname :=
+    match goal with
+    | |- ?goal => destruct (Classical_Prop.classic (goal)) as [| cname]; first done; exfalso
+    end.
+
   Lemma owm_om_trans_ms_le πτ τ τs n s δ0
     (NTH: tr S!! n = Some δ0)
     (PH: ps_phases δ0 !! τ = Some πτ)
@@ -586,12 +623,10 @@ Section Termination.
     rewrite LBL in IDTHl. inversion IDTHl. subst τ'. clear IDTHl.
 
     (* destruct (ps_sigs δk !! s) as [[ls ?]|] eqn:SIG__min.  *)
-    pose proof (never_set_after_eq_false _ _ NEVER_SET _ ltac:(reflexivity)) as X.
-    destruct X as (?&ls&NTH_&SIGsn).
-    rewrite NTH in NTH_. inversion NTH_. subst x.
-    pose proof (never_set_after_eq_false _ _ NEVER_SET _ ltac:(apply Nat.le_succ_diag_r)) as X.
-    destruct X as (?&?&NTH'_&SIGsn').
-    rewrite -Nat.add_1_r IDTH' in NTH'_. inversion NTH'_. subst x.
+    pose proof (never_set_after_eq_false _ _ NEVER_SET _ _ ltac:(reflexivity) NTH) as X.
+    destruct X as (ls&SIGsn).
+    pose proof (never_set_after_eq_false _ _ NEVER_SET (n + 1) _ ltac:(lia) IDTH') as X.
+    destruct X as (?&SIGsn').
 
     forward eapply sig_st_le_lookup_helper with (i := n) (j := n + 1) (s := s); eauto; [lia| ].
     rewrite SIGsn SIGsn'. simpl. intros [<- _].   
@@ -605,8 +640,12 @@ Section Termination.
       - eapply nsteps_mono; [| apply FSTEP].
         do 2 red. rewrite /obls_any_step_of. eauto. }
     intros SIGmb. 
- 
-    clear dependent mf. clear dependent δk'. 
+
+    (* { intros. apply (loc_step_sig_st_le_pres sid (Some (l, false))). } *)
+    (* { intros. apply fork_step_sig_st_le_pres. } *)
+    (* assert (forall sid, sig_st_le ps_sigs *)
+    
+    clear dependent mf. rename δk' into δ''. 
     
     generalize dependent mb. induction k.
     { intros ? ->%obls_utils.nsteps_0.
@@ -637,7 +676,10 @@ Section Termination.
     
     apply min_owner_expect_ms_le.
     3: { rewrite PHδ'. simpl. eapply elem_of_map_img. eauto. }
-    2: { eapply pres_by_loc_step_implies_rep; eauto. apply wf_preserved_by_loc_step. }
+    2: { eapply pres_by_loc_step_implies_rep.
+         3: { apply STEPS. }
+         { apply wf_preserved_by_loc_step. }
+         eauto. }
     
     intros sid π d EXP. simpl.
     inversion EXP. subst.
@@ -672,87 +714,56 @@ Section Termination.
       simpl in OBL'. simpl. apply elem_of_map. eexists. split; eauto.
       rewrite SIG'. done. }
     
-    red. destruct (Nat.lt_ge_cases n (set_before sid)) as [?|GE]; [done| ].   
-    
-    (* either it was there when the big step started,
-       or it's a new signal, but then the thread holds an obligation
-       and cannot wait on it *)
-    assert (ps_sigs δk !! sid = Some (l, false) \/ ps_sigs δk !! sid = None) as SIG0.
-    { 
-      (* eapply expected_signal_created_before; eauto. *)
-      admit. 
+    red. destruct (Nat.lt_ge_cases n (set_before sid)) as [?|GE]; [done| ].
+
+    assert (exists i, sig_is_set_at sid i) as EVsid.
+    { by_classical_contradiction X.
+      forward eapply (signal_created_never_set _ (n + 1)); eauto.
+      { admit. }
+      intros NEVER_SET'.
+      
+      (* assert (never_set_after sid (max n c)) as NEVER_SET'. *)
+      (* { eapply never_set_after_after; [| apply NEVER_SET_]. lia. }  *)
+      (* (* clear NEVER_SET_. *) *)
+      move MIN at bottom. red in MIN.
+      
+      (* specialize (MIN (_, _) NEVER_SET'). *)
+      specialize (MIN (sid, n + 1) ltac:(split; [done| simpl; lia])). 
+      
+      eapply never_set_after_eq_false in NEVER_SET'; [| reflexivity| eauto].
+      destruct NEVER_SET' as (?&NCsig).
+      rewrite /tr_sig_lt /MR in MIN. simpl in MIN.
+      rewrite NTH in MIN. simpl in MIN. rewrite IDTH' in MIN. simpl in MIN.
+      
+      (* forward eapply pres_by_valid_trace with (i := c) (j := max n c); eauto. *)
+      (* { intros. apply (loc_step_sig_st_le_pres sid (Some (l, false))). } *)
+      (* { intros. apply fork_step_sig_st_le_pres. } *)
+      (* { red in NEVER_SET_. specialize (NEVER_SET_ _ ltac:(reflexivity)). *)
+      (*   rewrite /sig_val_at in NEVER_SET_. *)
+      (*   destruct (tr S!! c) eqn:CTH; [| done]. simpl in *. *)
+      (*   destruct (ps_sigs m !! sid) as [[??]| ]eqn:CTHsid; [| done]. simpl in *. *)
+      (*   subst. enough (l = l0); [done| ]. admit. } *)
+      (* { lia. } *)
+      (* rewrite NC //= NCsig. intros [<- _]. done. *)
+      
+      
+      rewrite NCsig SIGsn in MIN. simpl in MIN.
+      assert (x = l) as -> by admit.
+      done. 
     }
-
-
-    pose proof (SET_BEFORE_SPEC sid (n + 1)) as SETsid'.
-    specialize_full SETsid'; [| lia| ].
-    2: { rewrite /sig_val_at in SETsid'. 
-         rewrite NTH in SETsid'. simpl in SETsid'.
-         rewrite SIG0 in SETsid. done. }
-    
-    intros c NEVER_SET_.
-
-    assert (never_set_after sid (max n c)) as NEVER_SET'.
-    { eapply never_set_after_after; [| apply NEVER_SET_]. lia. } 
-    clear NEVER_SET_.
-    move MIN at bottom. red in MIN.
-
-    (* specialize (MIN (_, _) NEVER_SET'). *)
-    specialize (MIN (sid, (n `max` c)) ltac:(split; [done| simpl; lia])). 
-
-    eapply never_set_after_eq_false in NEVER_SET'; [| reflexivity].
-    destruct NEVER_SET' as (?&?&NC&NCsig). 
-    rewrite /tr_sig_lt /MR in MIN. simpl in MIN.
-    rewrite NC NTH in MIN. simpl in MIN. rewrite NCsig SIGsn in MIN. simpl in MIN.
-
-    forward eapply pres_by_valid_trace with (i := n) (j := max n c); eauto.
-    { intros. apply (loc_step_sig_st_le_pres sid (Some (l, false))). }
-    { intros. apply fork_step_sig_st_le_pres. }
-    { rewrite NTH. simpl. rewrite SIG0. done. }
+       
+    generalize (SET_BEFORE_SPEC sid). rewrite /sb_prop. intros [? | SETsid]; [tauto| ].
+    destruct SETsid as (f & SETf & LEf_sb).
+    forward eapply sig_is_set_at_after with (j := n).
+    { eauto. }
     { lia. }
-    rewrite NC //= NCsig. intros [<- _].     
-    
-    specialize (MIN OBLS_LT).
-    edestruct @strict_not_both; eauto. done.
-
-    
-
-
-
-
-    
-    
-    pose proof (SET_BEFORE_SPEC sid n) as SETsid.
-
-    specialize_full SETsid; [| done| ].
-    2: { rewrite /sig_val_at in SETsid. 
-         rewrite NTH in SETsid. simpl in SETsid.
-         rewrite SIG0 in SETsid. done. }
-    
-    intros c NEVER_SET_.
-
-    assert (never_set_after sid (max n c)) as NEVER_SET'.
-    { eapply never_set_after_after; [| apply NEVER_SET_]. lia. } 
-    clear NEVER_SET_.
-    move MIN at bottom. red in MIN.
-
-    (* specialize (MIN (_, _) NEVER_SET'). *)
-    specialize (MIN (sid, (n `max` c)) ltac:(split; [done| simpl; lia])). 
-
-    eapply never_set_after_eq_false in NEVER_SET'; [| reflexivity].
-    destruct NEVER_SET' as (?&?&NC&NCsig). 
-    rewrite /tr_sig_lt /MR in MIN. simpl in MIN.
-    rewrite NC NTH in MIN. simpl in MIN. rewrite NCsig SIGsn in MIN. simpl in MIN.
-
-    forward eapply pres_by_valid_trace with (i := n) (j := max n c); eauto.
-    { intros. apply (loc_step_sig_st_le_pres sid (Some (l, false))). }
-    { intros. apply fork_step_sig_st_le_pres. }
-    { rewrite NTH. simpl. rewrite SIG0. done. }
-    { lia. }
-    rewrite NC //= NCsig. intros [<- _].     
-    
-    specialize (MIN OBLS_LT).
-    edestruct @strict_not_both; eauto. done.
+    { eauto. }
+    rewrite /sig_is_set_at NTH /=. destruct (ps_sigs δk !! sid) as [[??]|] eqn:SIDn; [| done].
+    simpl. intros <-.
+    unshelve eapply (pres_by_rel_implies_rep _ _ _ _ _ _) in STEPS.
+    { apply loc_step_sig_st_le_pres. }
+    2: { simpl. eapply reflexive_eq. symmetry. apply SIDn. }
+    simpl in STEPS. rewrite SIG in STEPS. tauto. 
   Qed. 
 
   Lemma other_om_trans_ms_le πτ τ n
