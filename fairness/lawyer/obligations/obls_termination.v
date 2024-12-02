@@ -606,90 +606,37 @@ Section Termination.
     ps_sigs (update_cps cps' δ) = ps_sigs δ.
   Proof using. by destruct δ. Qed.
 
-  Lemma owm_om_trans_ms_le πτ τ τs n s δ0
-    (NTH: tr S!! n = Some δ0)
-    (PH: ps_phases δ0 !! τ = Some πτ)
-    (NEVER_SET : never_set_after s n)
-    (MIN: minimal_in_prop tr_sig_lt (s, n) (λ sn, never_set_after sn.1 sn.2 /\ n <= sn.2))
-    (OWNER: s ∈ default ∅ (ps_obls δ0 !! τ))
-    (LBL: tr L!! n = Some τs):
-    ms_le deg_le (TPF πτ (S n)) (TPF πτ n).
+  Lemma owm_loc_step_ms_le
+  (πτ : Phase)
+  (τ : Locale)
+  (τs : mlabel ObligationsModel)
+  (n : nat)
+  (s : SignalId)
+  (δk : ProgressState)
+  (PH : ps_phases δk !! τ = Some πτ)
+  (NTH : tr S!! n = Some δk)
+  (NEVER_SET : never_set_after s n)
+  (MIN : minimal_in_prop tr_sig_lt (s, n)
+          (λ sn, never_set_after sn.1 sn.2 ∧ n ≤ sn.2))
+  (OWNER : s ∈ default ∅ (ps_obls δk !! τ))
+  (δ'' : ProgressState)
+  (k : nat)
+  (IDTH' : tr S!! (n + 1) = Some δ'')
+  (BOUND : S k ≤ LIM_STEPS)
+  (ls : Level)
+  (SIGsn : ps_sigs δk !! s = Some (ls, false))
+  (SIGsn' : ps_sigs δ'' !! s = Some (ls, false))
+  (δ' mb : ProgressState)
+  (STEPS : nsteps (λ p1 p2 : ProgressState, loc_step_ex p1 p2) k δk δ')
+  (STEP : loc_step_ex δ' mb)
+  (SIG_LE'' : ∀ sid, sig_st_le (ps_sigs mb !! sid) (ps_sigs δ'' !! sid))
+  (SF : ps_sigs mb !! s = Some (ls, false))
+  (SIG' : ps_sigs δ' !! s = Some (ls, false))
+  :
+  ms_le deg_le (PF' set_before (phase_ge πτ) ((LIM_STEPS + 2) * n + S k) mb)
+    (PF' set_before (phase_ge πτ) ((LIM_STEPS + 2) * n + k) δ').
   Proof using VALID WF SET_BEFORE_SPEC.
-    clear LVL_WF. 
-    forward eapply (proj1 (label_lookup_states' _ _)); eauto. intros [δ' NTH']. 
-    
-    eapply om_trans_ms_rel with (bd := false); auto.
-    { intros * ??? B ?.
-      rewrite Nat.add_succ_r Nat.add_0_r.
-      apply state_label_lookup in H as (NTH_&?&LBL_).
-      rewrite LBL in LBL_. inversion LBL_. subst τ0. 
-      rewrite NTH in NTH_. inversion NTH_. subst δ0. 
-      destruct B as (?&?&B). inversion B. subst. 
-      assert (ps_phases mb !! τ = Some πτ) as PH'.
-      { eapply loc_steps_rep_phase_exact_pres; eauto. }
-      eapply burns_cp_ms_le; eauto.
-    }
-    
-    (* TODO: extract the lemma below? *)
-    
-    clear δ' NTH'. 
-    intros τ' IDTHl. 
-    red. intros δk δk' mb mf k ITH BOUND NSTEPS BSTEP FSTEP.
-    apply state_label_lookup in ITH as (IDTH & IDTH' & _). 
-    rewrite NTH in IDTH. inversion IDTH. subst δ0. clear IDTH. 
-    rewrite LBL in IDTHl. inversion IDTHl. subst τ'. clear IDTHl.
-
-    pose proof (never_set_after_eq_false _ _ NEVER_SET _ _ ltac:(reflexivity) NTH) as X.
-    destruct X as (ls&SIGsn).
-    pose proof (never_set_after_eq_false _ _ NEVER_SET (n + 1) _ ltac:(lia) IDTH') as X.
-    destruct X as (?&SIGsn').
-
-    forward eapply sig_st_le_lookup_helper with (i := n) (j := n + 1) (s := s); eauto; [lia| ].
-    rewrite SIGsn SIGsn'. simpl. intros [<- _].   
-
-    assert (forall sid, sig_st_le (ps_sigs mb !! sid) (ps_sigs δk' !! sid)) as SIG_LE''.
-    { intros.
-      etrans.
-      { eapply loc_step_sig_st_le_pres; [reflexivity| ].
-        red. eexists. red. left. eauto. }
-      inversion FSTEP as [? F| ]; subst.
-      2: { reflexivity. }
-      destruct F as (?&?&F).
-      eapply fork_step_sig_st_le_pres; [reflexivity| ].
-      eexists. eauto. }      
-
-    apply clos_refl_nsteps in FSTEP as [r FSTEP]. 
-    forward eapply signal_false_between; [apply SIGsn | apply SIGsn'| ..].
-    { eapply nsteps_mono; [| apply NSTEPS].
-      do 2 red. rewrite /obls_any_step_of. eauto. }
-    { apply rel_compose_nsteps_next'. eexists. split. 
-      - red. left. red. exists τs. red. left. eauto.
-      - eapply nsteps_mono; [| apply FSTEP].
-        do 2 red. rewrite /obls_any_step_of. eauto. }
-    intros SIGmb. 
-    
-    clear dependent mf. rename δk' into δ''.
-    
-    generalize dependent mb. induction k.
-    { intros ? ->%obls_utils.nsteps_0.
-      rewrite Nat.add_0_r. reflexivity. }
-    intros mb (δ' & STEPS & STEP)%nsteps_inv_r SIG_LE'' SF.
-
-    assert (ps_sigs δ' !! s = Some (ls, false)) as SIG'.
-    { eapply signal_false_between; [apply SIGsn | apply SF| ..].
-      - eapply nsteps_mono; [| apply STEPS].
-        do 2 red. rewrite /obls_any_step_of. eauto.
-      - apply nsteps_1. left. eauto.
-      (* TODO: get rid of it *)
-      Unshelve. exact τ. 
-    }
-    specialize (IHk ltac:(lia) _ STEPS).
-    specialize_full IHk.
-    2: done.
-    { intros. etrans; [| by apply SIG_LE''].
-      eapply loc_step_sig_st_le_pres; eauto. reflexivity. }
-    etrans; eauto.
-
+    clear LVL_WF.
     destruct STEP as [τc STEP]. 
     
     eapply ms_le_Proper; [| | eapply loc_step_ms_le]; eauto.
@@ -787,6 +734,92 @@ Section Termination.
     { apply loc_step_sig_st_le_pres. }
     2: { simpl. eapply reflexive_eq. symmetry. apply SIDn. }
     simpl in STEPS. rewrite SIG in STEPS. tauto. 
+  Qed.
+
+  Lemma owm_om_trans_ms_le πτ τ τs n s δ0
+    (NTH: tr S!! n = Some δ0)
+    (PH: ps_phases δ0 !! τ = Some πτ)
+    (NEVER_SET : never_set_after s n)
+    (MIN: minimal_in_prop tr_sig_lt (s, n) (λ sn, never_set_after sn.1 sn.2 /\ n <= sn.2))
+    (OWNER: s ∈ default ∅ (ps_obls δ0 !! τ))
+    (LBL: tr L!! n = Some τs):
+    ms_le deg_le (TPF πτ (S n)) (TPF πτ n).
+  Proof using VALID WF SET_BEFORE_SPEC.
+    clear LVL_WF. 
+    forward eapply (proj1 (label_lookup_states' _ _)); eauto. intros [δ' NTH']. 
+    
+    eapply om_trans_ms_rel with (bd := false); auto.
+    { intros * ??? B ?.
+      rewrite Nat.add_succ_r Nat.add_0_r.
+      apply state_label_lookup in H as (NTH_&?&LBL_).
+      rewrite LBL in LBL_. inversion LBL_. subst τ0. 
+      rewrite NTH in NTH_. inversion NTH_. subst δ0. 
+      destruct B as (?&?&B). inversion B. subst. 
+      assert (ps_phases mb !! τ = Some πτ) as PH'.
+      { eapply loc_steps_rep_phase_exact_pres; eauto. }
+      eapply burns_cp_ms_le; eauto. }
+    
+    (* TODO: extract the lemma below? *)
+    
+    clear δ' NTH'. 
+    intros τ' IDTHl. 
+    red. intros δk δk' mb mf k ITH BOUND NSTEPS BSTEP FSTEP.
+    apply state_label_lookup in ITH as (IDTH & IDTH' & _). 
+    rewrite NTH in IDTH. inversion IDTH. subst δ0. clear IDTH. 
+    rewrite LBL in IDTHl. inversion IDTHl. subst τ'. clear IDTHl.
+
+    pose proof (never_set_after_eq_false _ _ NEVER_SET _ _ ltac:(reflexivity) NTH) as X.
+    destruct X as (ls&SIGsn).
+    pose proof (never_set_after_eq_false _ _ NEVER_SET (n + 1) _ ltac:(lia) IDTH') as X.
+    destruct X as (?&SIGsn').
+
+    forward eapply sig_st_le_lookup_helper with (i := n) (j := n + 1) (s := s); eauto; [lia| ].
+    rewrite SIGsn SIGsn'. simpl. intros [<- _].   
+
+    assert (forall sid, sig_st_le (ps_sigs mb !! sid) (ps_sigs δk' !! sid)) as SIG_LE''.
+    { intros.
+      etrans.
+      { eapply loc_step_sig_st_le_pres; [reflexivity| ].
+        red. eexists. red. left. eauto. }
+      inversion FSTEP as [? F| ]; subst.
+      2: { reflexivity. }
+      destruct F as (?&?&F).
+      eapply fork_step_sig_st_le_pres; [reflexivity| ].
+      eexists. eauto. }      
+
+    apply clos_refl_nsteps in FSTEP as [r FSTEP]. 
+    forward eapply signal_false_between; [apply SIGsn | apply SIGsn'| ..].
+    { eapply nsteps_mono; [| apply NSTEPS].
+      do 2 red. rewrite /obls_any_step_of. eauto. }
+    { apply rel_compose_nsteps_next'. eexists. split. 
+      - red. left. red. exists τs. red. left. eauto.
+      - eapply nsteps_mono; [| apply FSTEP].
+        do 2 red. rewrite /obls_any_step_of. eauto. }
+    intros SIGmb. 
+    
+    clear dependent mf. rename δk' into δ''.
+    
+    generalize dependent mb. induction k.
+    { intros ? ->%obls_utils.nsteps_0.
+      rewrite Nat.add_0_r. reflexivity. }
+    intros mb (δ' & STEPS & STEP)%nsteps_inv_r SIG_LE'' SF.
+
+    assert (ps_sigs δ' !! s = Some (ls, false)) as SIG'.
+    { eapply signal_false_between; [apply SIGsn | apply SF| ..].
+      - eapply nsteps_mono; [| apply STEPS].
+        do 2 red. rewrite /obls_any_step_of. eauto.
+      - apply nsteps_1. left. eauto.
+      (* TODO: get rid of it *)
+      Unshelve. exact τ. 
+    }
+    specialize (IHk ltac:(lia) _ STEPS).
+    specialize_full IHk.
+    2: done.
+    { intros. etrans; [| by apply SIG_LE''].
+      eapply loc_step_sig_st_le_pres; eauto. reflexivity. }
+
+    etrans; eauto.
+    eapply owm_loc_step_ms_le; eauto. 
   Qed.
 
   Lemma other_om_trans_ms_le πτ τ n
