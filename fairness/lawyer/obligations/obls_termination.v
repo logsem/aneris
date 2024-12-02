@@ -208,10 +208,14 @@ Section Termination.
       inversion STEP; destruct δ1; done.
     Qed.
 
-    Lemma sig_st_le_refl ost:
-      sig_st_le ost ost.
+    Global Instance sig_st_le_refl_PO: PartialOrder sig_st_le.
     Proof using.
-      destruct ost as [[??]|]; done.
+      split; [split| ].
+      - intros ost. destruct ost as [[??]|]; done.
+      - intros [[??]|] [[??]|] [[??]|]; try done. simpl.
+        intros [-> ?] [-> ?]. destruct b, b0, b1; tauto.
+      - intros [[??]|] [[??]|]; try done. simpl.
+        intros [-> ?] [? ?]. destruct b, b0; tauto.
     Qed.
 
     Lemma sig_st_le_lookup_helper i j δi δj s
@@ -223,7 +227,7 @@ Section Termination.
       forward eapply pres_by_valid_trace; eauto.
       { intros. apply loc_step_sig_st_le_pres with (sid := s). }
       { intros. apply fork_step_sig_st_le_pres. }
-      { rewrite ITH. simpl. apply sig_st_le_refl. }
+      { rewrite ITH. simpl. reflexivity. }
       by rewrite JTH.
     Qed.       
 
@@ -306,7 +310,7 @@ Section Termination.
       - apply fork_step_sig_st_le_pres. }    
     intros SIG1. red in SIG1. specialize_full SIG1.
     2: { apply STEPS1. }
-    { rewrite F1. apply sig_st_le_refl. } 
+    { rewrite F1. reflexivity. } 
 
     forward eapply pres_by_rel_implies_rep.
     { apply pres_by_loc_fork_steps_implies_any_pres.
@@ -314,13 +318,13 @@ Section Termination.
       - apply fork_step_sig_st_le_pres. }    
     intros SIG2. red in SIG2. specialize_full SIG2.
     2: { apply STEPS2. }
-    { apply sig_st_le_refl. }
+    { reflexivity. }
     rewrite F2 in SIG2.
 
     destruct (ps_sigs δ' !! s) as [[??]| ]; try done.
     simpl in SIG1, SIG2. destruct SIG1, SIG2; subst.
     destruct b; tauto.
-  Qed.     
+  Qed.
 
   (* TODO: rephrase in terms of preserved_by? *)
   Lemma expected_signal_created_before δ1 δ2 τ n sid l
@@ -347,7 +351,7 @@ Section Termination.
     intros δ2 (δ' & STEPS & STEP)%rel_compose_nsteps_next SIG2 NO2.
     forward eapply (loc_step_sig_st_le_pres sid).
     intros LE'. red in LE'. specialize_full LE'; [| eauto |]. 
-    { apply sig_st_le_refl. }
+    { reflexivity. }
     { red. eauto. }
     rewrite SIG2 in LE'.
 
@@ -472,7 +476,7 @@ Section Termination.
     destruct AB as [SET | AB].
     { destruct SET as [l SID]. red.
       left. eapply (loc_step_sig_st_le_pres sid) in STEP'.
-      2: { apply sig_st_le_refl. }
+      2: { reflexivity. }
       rewrite SID in STEP'.
       destruct (ps_sigs δ2 !! sid) as [[??]|] eqn:ST; try done.
       simpl in STEP'. destruct STEP' as [-> ?]. 
@@ -521,7 +525,7 @@ Section Termination.
     destruct AB as [SET | AB].
     { destruct SET as [l SID]. red.
       left. eapply (fork_step_sig_st_le_pres _ sid) in STEP.
-      2: { apply sig_st_le_refl. }
+      2: { reflexivity. }
       rewrite SID in STEP.
       destruct (ps_sigs δ2 !! sid) as [[??]|] eqn:ST; try done.
       simpl in STEP. destruct STEP as [-> ?]. 
@@ -587,6 +591,21 @@ Section Termination.
     | |- ?goal => destruct (Classical_Prop.classic (goal)) as [| cname]; first done; exfalso
     end.
 
+  Lemma sig_st_le_dom_sub δ1 δ2
+    (SIG_LE: forall sid, sig_st_le (ps_sigs δ1 !! sid) (ps_sigs δ2 !! sid)):
+    dom $ ps_sigs δ1 ⊆ dom $ ps_sigs δ2.
+  Proof using.
+    apply elem_of_subseteq. intros s [[??] SIG]%elem_of_dom.
+    specialize (SIG_LE s). rewrite SIG in SIG_LE.
+    destruct (ps_sigs δ2 !! s) eqn:SIG2; [| done].
+    eapply elem_of_dom; eauto.
+  Qed.
+
+  (* TODO: move *)
+  Lemma update_cps_same_sigs δ cps':
+    ps_sigs (update_cps cps' δ) = ps_sigs δ.
+  Proof using. by destruct δ. Qed.
+
   Lemma owm_om_trans_ms_le πτ τ τs n s δ0
     (NTH: tr S!! n = Some δ0)
     (PH: ps_phases δ0 !! τ = Some πτ)
@@ -608,8 +627,6 @@ Section Termination.
       destruct B as (?&?&B). inversion B. subst. 
       assert (ps_phases mb !! τ = Some πτ) as PH'.
       { eapply loc_steps_rep_phase_exact_pres; eauto. }
-      (* rewrite LOC_PHASE in PH'. inversion PH'. subst π__max.         *)
-      (* eapply burns_cp_own_ms_lt with (πb := x); eauto. *)
       eapply burns_cp_ms_le; eauto.
     }
     
@@ -622,7 +639,6 @@ Section Termination.
     rewrite NTH in IDTH. inversion IDTH. subst δ0. clear IDTH. 
     rewrite LBL in IDTHl. inversion IDTHl. subst τ'. clear IDTHl.
 
-    (* destruct (ps_sigs δk !! s) as [[ls ?]|] eqn:SIG__min.  *)
     pose proof (never_set_after_eq_false _ _ NEVER_SET _ _ ltac:(reflexivity) NTH) as X.
     destruct X as (ls&SIGsn).
     pose proof (never_set_after_eq_false _ _ NEVER_SET (n + 1) _ ltac:(lia) IDTH') as X.
@@ -630,6 +646,17 @@ Section Termination.
 
     forward eapply sig_st_le_lookup_helper with (i := n) (j := n + 1) (s := s); eauto; [lia| ].
     rewrite SIGsn SIGsn'. simpl. intros [<- _].   
+
+    assert (forall sid, sig_st_le (ps_sigs mb !! sid) (ps_sigs δk' !! sid)) as SIG_LE''.
+    { intros.
+      etrans.
+      { eapply loc_step_sig_st_le_pres; [reflexivity| ].
+        red. eexists. red. left. eauto. }
+      inversion FSTEP as [? F| ]; subst.
+      2: { reflexivity. }
+      destruct F as (?&?&F).
+      eapply fork_step_sig_st_le_pres; [reflexivity| ].
+      eexists. eauto. }      
 
     apply clos_refl_nsteps in FSTEP as [r FSTEP]. 
     forward eapply signal_false_between; [apply SIGsn | apply SIGsn'| ..].
@@ -640,24 +667,27 @@ Section Termination.
       - eapply nsteps_mono; [| apply FSTEP].
         do 2 red. rewrite /obls_any_step_of. eauto. }
     intros SIGmb. 
-
-    (* { intros. apply (loc_step_sig_st_le_pres sid (Some (l, false))). } *)
-    (* { intros. apply fork_step_sig_st_le_pres. } *)
-    (* assert (forall sid, sig_st_le ps_sigs *)
     
-    clear dependent mf. rename δk' into δ''. 
+    clear dependent mf. rename δk' into δ''.
     
     generalize dependent mb. induction k.
     { intros ? ->%obls_utils.nsteps_0.
       rewrite Nat.add_0_r. reflexivity. }
-    intros mb (δ' & STEPS & STEP)%nsteps_inv_r SF.
+    intros mb (δ' & STEPS & STEP)%nsteps_inv_r SIG_LE'' SF.
 
     assert (ps_sigs δ' !! s = Some (ls, false)) as SIG'.
     { eapply signal_false_between; [apply SIGsn | apply SF| ..].
       - eapply nsteps_mono; [| apply STEPS].
         do 2 red. rewrite /obls_any_step_of. eauto.
-      - apply nsteps_1. left. eauto. }
-    specialize (IHk ltac:(lia) _ STEPS ltac:(done)).
+      - apply nsteps_1. left. eauto.
+      (* TODO: get rid of it *)
+      Unshelve. exact τ. 
+    }
+    specialize (IHk ltac:(lia) _ STEPS).
+    specialize_full IHk.
+    2: done.
+    { intros. etrans; [| by apply SIG_LE''].
+      eapply loc_step_sig_st_le_pres; eauto. reflexivity. }
     etrans; eauto.
 
     destruct STEP as [τc STEP]. 
@@ -671,16 +701,23 @@ Section Termination.
     replace πτ with (default π0 (ps_phases δ' !! τ)).
     2: { rewrite PHδ'. done. }
 
+    assert (om_st_wf δ') as WF'. 
+    { eapply pres_by_loc_step_implies_rep.
+      3: { apply STEPS. }
+      { apply wf_preserved_by_loc_step. }
+      eauto. }
+
     destruct (decide (τc = τ)) as [-> | NEQ]. 
-    2: admit. 
+    2: { eapply other_expect_ms_le; eauto.
+         rewrite PHδ'.
+         apply om_step_wf_dom in STEP; [rewrite -om_wf_dpo in STEP| ]; eauto.
+         apply elem_of_dom in STEP as [π' PH']. rewrite PH'. simpl.
+         symmetry. eapply om_wf_ph_disj; eauto. }
     
     apply min_owner_expect_ms_le.
     3: { rewrite PHδ'. simpl. eapply elem_of_map_img. eauto. }
-    2: { eapply pres_by_loc_step_implies_rep.
-         3: { apply STEPS. }
-         { apply wf_preserved_by_loc_step. }
-         eauto. }
-    
+    2: done.
+
     intros sid π d EXP. simpl.
     inversion EXP. subst.
     rewrite PHδ' in LOC_PHASE. inversion LOC_PHASE. subst π__max.
@@ -699,7 +736,7 @@ Section Termination.
       2: { split.
            2: { eapply WF; eauto. }
            red. right. exists τ, πτ. set_solver. }           
-      simpl in STEPS. destruct STEPS as [ASG' WF']. red in ASG'.
+      simpl in STEPS. destruct STEPS as [ASG' _]. red in ASG'.
       destruct ASG' as [[? ?] | PH']; [congruence| ].
       destruct PH' as (τ' & π' & IN' & PH' & LE').
       destruct (decide (τ' = τ)) as [| NEQ]; [congruence| ].
@@ -718,16 +755,16 @@ Section Termination.
 
     assert (exists i, sig_is_set_at sid i) as EVsid.
     { by_classical_contradiction X.
+
+      specialize (SIG_LE'' sid). rewrite update_cps_same_sigs SIG in SIG_LE''.
+      destruct (ps_sigs δ'' !! sid) as [[??]| ] eqn:SIG''; [| done].
+      simpl in SIG_LE''. destruct SIG_LE'' as [-> ?]. 
+      
       forward eapply (signal_created_never_set _ (n + 1)); eauto.
-      { admit. }
+      { rewrite IDTH'. simpl. eapply elem_of_dom; eauto. }
       intros NEVER_SET'.
       
-      (* assert (never_set_after sid (max n c)) as NEVER_SET'. *)
-      (* { eapply never_set_after_after; [| apply NEVER_SET_]. lia. }  *)
-      (* (* clear NEVER_SET_. *) *)
-      move MIN at bottom. red in MIN.
-      
-      (* specialize (MIN (_, _) NEVER_SET'). *)
+      move MIN at bottom. red in MIN.      
       specialize (MIN (sid, n + 1) ltac:(split; [done| simpl; lia])). 
       
       eapply never_set_after_eq_false in NEVER_SET'; [| reflexivity| eauto].
@@ -735,22 +772,8 @@ Section Termination.
       rewrite /tr_sig_lt /MR in MIN. simpl in MIN.
       rewrite NTH in MIN. simpl in MIN. rewrite IDTH' in MIN. simpl in MIN.
       
-      (* forward eapply pres_by_valid_trace with (i := c) (j := max n c); eauto. *)
-      (* { intros. apply (loc_step_sig_st_le_pres sid (Some (l, false))). } *)
-      (* { intros. apply fork_step_sig_st_le_pres. } *)
-      (* { red in NEVER_SET_. specialize (NEVER_SET_ _ ltac:(reflexivity)). *)
-      (*   rewrite /sig_val_at in NEVER_SET_. *)
-      (*   destruct (tr S!! c) eqn:CTH; [| done]. simpl in *. *)
-      (*   destruct (ps_sigs m !! sid) as [[??]| ]eqn:CTHsid; [| done]. simpl in *. *)
-      (*   subst. enough (l = l0); [done| ]. admit. } *)
-      (* { lia. } *)
-      (* rewrite NC //= NCsig. intros [<- _]. done. *)
-      
-      
       rewrite NCsig SIGsn in MIN. simpl in MIN.
-      assert (x = l) as -> by admit.
-      done. 
-    }
+      rewrite SIG'' in NCsig. inversion NCsig. by subst. }
        
     generalize (SET_BEFORE_SPEC sid). rewrite /sb_prop. intros [? | SETsid]; [tauto| ].
     destruct SETsid as (f & SETf & LEf_sb).
@@ -764,7 +787,7 @@ Section Termination.
     { apply loc_step_sig_st_le_pres. }
     2: { simpl. eapply reflexive_eq. symmetry. apply SIDn. }
     simpl in STEPS. rewrite SIG in STEPS. tauto. 
-  Qed. 
+  Qed.
 
   Lemma other_om_trans_ms_le πτ τ n
     (PH: from_option (fun δ => ps_phases δ !! τ = Some πτ) False (tr S!! n))
