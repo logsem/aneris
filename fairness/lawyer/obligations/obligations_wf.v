@@ -150,6 +150,17 @@ Section Wf.
     preserved_by (obls_any_step_of τ) P. 
   Proof using.
     red. intros ??? [? | ?]; eauto.
+  Qed.
+
+  (* TODO: move *)
+  Lemma label_lookup_prev:
+  ∀ {St L : Type} (tr : trace St L) (i : nat),
+    is_Some (tr L!! i) → ∀ j : nat, j ≤ i → is_Some (tr L!! j).
+  Proof using.
+    intros * DOM j LE.   
+    intros. pose proof (trace_len.trace_has_len tr) as [len ?].
+    eapply label_lookup_dom in DOM; eauto.
+    eapply label_lookup_dom; eauto. destruct len; eauto. simpl in *. lia.
   Qed. 
 
   Lemma pres_by_valid_trace_strong (tr: obls_trace) i j P (T: Locale -> Prop)
