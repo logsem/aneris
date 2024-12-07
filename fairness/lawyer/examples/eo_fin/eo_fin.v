@@ -219,8 +219,7 @@ Section EoFin.
       ⊢ smap_repr K n smap -∗ 
          cp π__cp d2 (oGS := oGS) -∗
          th_phase_ge τ π (oGS := oGS) -∗
-         |==> OU τ
-           (∃ s, ith_sig i s ∗
+         |==> OU (∃ s, ith_sig i s ∗
              ep s π__cp d1 (oGS := oGS) ∗ smap_repr K n smap ∗
             th_phase_ge τ π (oGS := oGS)) (oGS := oGS).
     Proof using.
@@ -293,7 +292,7 @@ Section EoFin.
                                           ⌜lvl2nat l0 = k⌝) -∗
   (sgn s lm (Some true) (oGS := oGS)) -∗
   own eofin_smap (● ((to_agree <$> smap): gmap _ _)) -∗
-  BMU (⊤ ∖ ↑nroot.@"eofin") τ 1
+  BMU (⊤ ∖ ↑nroot.@"eofin") 1
     (⌜B ≤ m + 2⌝ ∗ obls τ ∅ (oGS := oGS) ∗ smap_repr (B `min` (m + 2)) (m + 1) smap
      ∨ (|==> ⌜m + 2 < B⌝ ∗
           (∃ (s' : SignalId) (lm': EOLevel B),
@@ -364,7 +363,7 @@ Section EoFin.
       ⊢ ep sw π__e d1 (oGS := oGS) -∗ th_phase_ge τ π (oGS := oGS) -∗
          smap_repr N m smap -∗ ith_sig i sw -∗
          ith_sig (i + 1) s -∗ obls τ {[ s ]} (oGS := oGS) -∗
-         OU τ (∃ π', cp π' d1 (oGS := oGS) ∗ smap_repr N m smap ∗ th_phase_ge τ π' (oGS := oGS) ∗ obls τ {[ s ]} (oGS := oGS) ∗ ⌜ phase_le π π' /\ phase_le π__e π' ⌝) (oGS := oGS).
+         OU (∃ π', cp π' d1 (oGS := oGS) ∗ smap_repr N m smap ∗ th_phase_ge τ π' (oGS := oGS) ∗ obls τ {[ s ]} (oGS := oGS) ∗ ⌜ phase_le π π' /\ phase_le π__e π' ⌝) (oGS := oGS).
     Proof using.
       iIntros "#EP PH SR #SW #S OBLS". 
       iDestruct (ith_sig_in with "[$] [$]") as "%ITH".
@@ -461,7 +460,7 @@ Section EoFin.
         rewrite (subseteq_empty_difference_L {[ s ]}); [| done].        
         
         iPoseProof (BMU_smap_restore with "OBLS [$] [$] [$]") as "BMU"; eauto.
-        iApply (BMU_lower _ _ 1); [lia| ].
+        iApply (BMU_lower _ 1); [lia| ].
         iApply (BMU_wand with "[-BMU] [$]"). iIntros "COND".
         
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
@@ -743,7 +742,7 @@ Section EoFin.
       (* (i := 0) *)
       :
       obls τ ∅ (oGS := oGS) -∗ l ↦ #0 -∗ 
-        BMU ⊤ τ 2 (|={∅}=> ∃ (eoG: EoFinG Σ) (sigs: list SignalId),
+        BMU ⊤ 2 (|={∅}=> ∃ (eoG: EoFinG Σ) (sigs: list SignalId),
                        even_res 0 (H := eoG)∗
                        odd_res 1 (H := eoG) ∗
                        eofin_inv l (H := eoG) ∗
@@ -758,7 +757,7 @@ Section EoFin.
       iMod (thread_res_alloc 1) as "(%γ' & AUTH' & FRAG')".
       
       set (m := min B 2).
-      iAssert (BMU ⊤ τ 2 
+      iAssert (BMU ⊤ 2 
                  (|==> ∃ γ smap, smap_repr' γ m 0 smap ∗
                                  (* let sigs := map_img smap in *)
                                  let sigs := sigs_block smap 0 m in
