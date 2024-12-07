@@ -319,8 +319,8 @@ Section ProgramLogic.
       simpl. Unshelve. 2: exact (Some ζ). done. 
     Qed.
 
-    Lemma OU_BMU E ζ P b:
-       ⊢ OU ζ (BMU E b P) (oGS := oGS) -∗ BMU E (S b) P.
+    Lemma OU_BMU E P b:
+       ⊢ OU (BMU E b P) (oGS := oGS) -∗ BMU E (S b) P.
     Proof using.
       iIntros "OU". rewrite {2}/BMU /OAM_st_interp_interim_step.
       iIntros (c c' δ τ n f) "TI'".
@@ -331,9 +331,7 @@ Section ProgramLogic.
       { rewrite /OAM_st_interp_interim_step. iExists _. iFrame.
         iPureIntro. repeat split; eauto.
         - eapply rel_compose_nsteps_next. eexists. split; eauto.
-          red. eauto. 
-        - eapply loc_step_dom_obls_pres; eauto.
-          red. eauto. }
+        - eapply loc_step_dom_obls_pres; eauto. }
       iMod "CONT" as "(%n' & TI' & %BOUND' & P)". iModIntro.
       rewrite FF. 
       iExists _. iFrame. iSplitL.

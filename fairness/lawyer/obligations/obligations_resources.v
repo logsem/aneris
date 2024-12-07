@@ -297,13 +297,13 @@ Section ObligationsRepr.
       by apply gset_included, singleton_subseteq_l in SUB.
     Qed. 
 
-    Let OU' (R: ProgressState -> Locale -> ProgressState -> Prop) ζ P: iProp Σ :=
-      ∀ δ, obls_msi δ ==∗ ∃ δ', obls_msi δ' ∗ ⌜ R δ ζ δ'⌝ ∗ P. 
+    Let OU' (R: ProgressState -> ProgressState -> Prop) P: iProp Σ :=
+      ∀ δ, obls_msi δ ==∗ ∃ δ', obls_msi δ' ∗ ⌜ R δ δ'⌝ ∗ P. 
 
-    Definition OU := OU' (loc_step).
+    Definition OU := OU' (loc_step_ex).
 
-    Lemma OU_wand ζ P Q:
-      (P -∗ Q) -∗ OU ζ P -∗ OU ζ Q.
+    Lemma OU_wand P Q:
+      (P -∗ Q) -∗ OU P -∗ OU Q.
     Proof using.
       iIntros "PQ OU".
       rewrite /OU /OU'. iIntros "**".
@@ -311,23 +311,23 @@ Section ObligationsRepr.
       iExists _. iFrame. by iApply "PQ".
     Qed.
         
-    Global Instance OU_entails ζ:
-      Proper (bi_entails ==> bi_entails) (OU ζ).
+    Global Instance OU_entails:
+      Proper (bi_entails ==> bi_entails) OU.
     Proof using.
       intros ?? IMPL. iIntros "OU".
       iApply (OU_wand with "[] [$]").  
       iApply IMPL. 
     Qed.
 
-    Global Instance OU_equiv ζ:
-      Proper (equiv ==> equiv) (OU ζ).
+    Global Instance OU_equiv:
+      Proper (equiv ==> equiv) OU.
     Proof using.
       intros ?? [PQ QP]%bi.equiv_entails.
       iSplit; iApply OU_entails; [iApply PQ | iApply QP].  
     Qed.
 
     Lemma OU_create_sig ζ R l:
-      ⊢ obls ζ R -∗ OU ζ (∃ sid, sgn sid l (Some false) ∗ obls ζ (R ∪ {[ sid ]}) ∗
+      ⊢ obls ζ R -∗ OU (∃ sid, sgn sid l (Some false) ∗ obls ζ (R ∪ {[ sid ]}) ∗
                                  ⌜ sid ∉ R ⌝).
     Proof using.
       clear H1 H0 H. 
@@ -342,11 +342,11 @@ Section ObligationsRepr.
 
       rewrite bi.sep_comm bi.sep_assoc.  
       iSplitL.
-      2: { iPureIntro.
+      2: { iPureIntro. exists ζ. 
            red. do 2 right. left. exists l. 
            erewrite (f_equal (creates_signal _ _)).
            { econstructor; eauto. simpl. eapply elem_of_dom; eauto. }
-           simpl. reflexivity. }      
+           simpl. reflexivity. }
 
       iMod (own_update with "[OB OBLS]") as "X".
       2: iCombine "OBLS OB" as "?"; iFrame.
@@ -380,7 +380,7 @@ Section ObligationsRepr.
     Lemma OU_set_sig ζ R sid l v
       (IN: sid ∈ R):
       ⊢ obls ζ R -∗ sgn sid l (Some v) -∗
-        OU ζ (sgn sid l (Some true) ∗ obls ζ (R ∖ {[ sid ]})).
+        OU (sgn sid l (Some true) ∗ obls ζ (R ∖ {[ sid ]})).
     Proof using H1 H0. 
       rewrite /OU /OU'. iIntros "OB SIG %δ MSI".
       iDestruct (sigs_msi_exact with "[$] [$]") as %Sζ.
@@ -393,7 +393,7 @@ Section ObligationsRepr.
 
       rewrite bi.sep_comm -!bi.sep_assoc.  
       iSplitR.
-      { iPureIntro.
+      { iPureIntro. exists ζ.
         red. do 3 right. left. exists sid. 
         erewrite (f_equal (sets_signal _ _)).
         { econstructor; eauto. simpl. eapply elem_of_dom; eauto. }
@@ -427,7 +427,7 @@ Section ObligationsRepr.
     Lemma exchange_cp_upd ζ π d d' b k
       (LE: k <= b)
       (DEG: deg_lt d' d):
-      ⊢ cp π d -∗ th_phase_ge ζ π -∗ exc_lb b -∗ OU ζ (cp_mul π d' k ∗ th_phase_ge ζ π). 
+      ⊢ cp π d -∗ th_phase_ge ζ π -∗ exc_lb b -∗ OU (cp_mul π d' k ∗ th_phase_ge ζ π).
     Proof using.
       rewrite /OU /OU'. iIntros "CP PH #LB %δ MSI".
       iDestruct (exc_lb_msi_bound with "[$] [$]") as %LB.
@@ -441,7 +441,7 @@ Section ObligationsRepr.
 
       rewrite bi.sep_comm -!bi.sep_assoc.  
       iSplitR.
-      { iPureIntro.
+      { iPureIntro. exists ζ. 
         red. right. left. exists π, d, d', k. 
         erewrite (f_equal (exchanges_cp _ _)).
         { econstructor; eauto. simpl. lia. }
@@ -464,7 +464,7 @@ Section ObligationsRepr.
       (PH_LE: phase_le π__cp π)
       :
       ⊢ cp π__cp d -∗ sgn sid l ov -∗ th_phase_ge ζ π -∗ 
-        OU ζ (ep sid π__cp d' ∗ sgn sid l ov ∗ th_phase_ge ζ π).
+        OU (ep sid π__cp d' ∗ sgn sid l ov ∗ th_phase_ge ζ π).
     Proof using H1 H0.
       rewrite /OU /OU'. iIntros "CP SIG PH %δ MSI".
       iDestruct (sigs_msi_in with "[$] [$]") as %[v Sζ].
@@ -478,7 +478,7 @@ Section ObligationsRepr.
  
       rewrite bi.sep_comm -!bi.sep_assoc.
       iSplitR.
-      { iPureIntro.
+      { iPureIntro. exists ζ. 
         red. do 4 right. left. exists sid, π__cp. do 2 eexists. 
         erewrite (f_equal (creates_ep _ _)).
         { econstructor; eauto.
@@ -524,7 +524,7 @@ Section ObligationsRepr.
       :
       ⊢ ep sid π__e d -∗ sgn sid l (Some false) -∗ obls ζ R -∗
         sgns_level_gt R l -∗ th_phase_ge ζ π -∗
-        OU ζ (∃ π', cp π' d ∗ sgn sid l (Some false) ∗ obls ζ R ∗ th_phase_ge ζ π' ∗ ⌜ phase_le π π' /\ phase_le π__e π'⌝).
+        OU (∃ π', cp π' d ∗ sgn sid l (Some false) ∗ obls ζ R ∗ th_phase_ge ζ π' ∗ ⌜ phase_le π π' /\ phase_le π__e π'⌝).
     Proof using H1 H0.
       rewrite /OU /OU'. iIntros "#EP SIG OBLS #SIGS_LT PH %δ MSI".
       iDestruct (sigs_msi_exact with "[$] [$]") as %Sζ.
@@ -542,7 +542,7 @@ Section ObligationsRepr.
       rewrite /cp /cps_repr /eps_repr. 
       rewrite bi.sep_comm -bi.sep_assoc.
       iSplitR.
-      { iPureIntro.
+      { iPureIntro. exists ζ. 
         red. do 5 right. do 3 eexists. 
         erewrite (f_equal (expects_ep _ _)).
         { econstructor.
@@ -590,7 +590,7 @@ Section ObligationsRepr.
 
     Lemma burn_cp_upd_burn ζ π deg:
       ⊢ cp π deg -∗ th_phase_ge ζ π -∗ 
-        OU' (fun δ1 ζ' δ2 => burns_cp δ1 ζ' δ2 π deg) ζ (th_phase_ge ζ π). 
+        OU' (fun δ1 δ2 => burns_cp δ1 ζ δ2 π deg) (th_phase_ge ζ π).
     Proof using.
       rewrite /OU'. iIntros "CP PH % MSI".
       iDestruct (th_phase_msi_ge with "[$] [$]") as %(? & ? & ?). 
@@ -599,14 +599,14 @@ Section ObligationsRepr.
     Qed.
 
     Lemma burn_cp_upd ζ π deg:
-      ⊢ cp π deg -∗ th_phase_ge ζ π -∗ OU ζ (th_phase_ge ζ π). 
+      ⊢ cp π deg -∗ th_phase_ge ζ π -∗ OU (th_phase_ge ζ π). 
     Proof using.
       iIntros "??".
       iPoseProof (burn_cp_upd_burn with "[$] [$]") as "OU'".
       rewrite /OU /OU'. iIntros "% MSI".
       iMod ("OU'" with "[$]") as "(%&?&%&?)". iModIntro.
       iExists _. iFrame. iPureIntro.
-      red. eauto.
+      red. eexists. left. eauto. 
     Qed.
 
     Lemma cp_mul_take ph deg n:
