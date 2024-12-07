@@ -38,7 +38,7 @@ Section ObligationsEM.
     destruct c1 as [tp1 σ1], c2 as [tp2 σ2].
     red. rewrite NOFORK.
     unshelve forward eapply (pres_by_loc_step_implies_progress _ _ _ _ _ _ TRANS). 
-    2: { eapply @loc_step_obls_pres. }
+    2: { eapply @loc_step_dom_obls_pres. }
     { reflexivity. }
     intros EQ. by rewrite EQ. 
   Qed.
@@ -123,11 +123,11 @@ Section ObligationsEM.
     |}.
 
   Definition init_phases (n: nat): list Phase :=
-    (fun i => ext_phase phase0 i) <$> seq 0 n. 
+    (fun i => ext_phase π0 i) <$> seq 0 n. 
 
   Definition init_om_state (c: cfg Λ) (degs: gmultiset Degree) (eb: nat)
     : mstate OM := {|
-      ps_cps := mset_map (pair phase0) degs;
+      ps_cps := mset_map (pair π0) degs;
       ps_sigs := ∅;
       ps_obls := gset_to_gmap ∅ (locales_of_cfg c);
       ps_eps := ∅;
@@ -163,7 +163,7 @@ Section ObligationsEM.
     list_to_map $ zip 
       (elements (locales_of_cfg ([e], σ)))
       (init_phases (size (locales_of_cfg ([e], σ)))) 
-    = ({[locale_of [] e := ext_phase phase0 0]}: gmap Locale Phase).
+    = ({[locale_of [] e := ext_phase π0 0]}: gmap Locale Phase).
   Proof using.
     rewrite locales_of_cfg_singleton. rewrite size_singleton.
     rewrite elements_singleton. simpl.
@@ -187,7 +187,7 @@ Section ObligationsEM.
       rewrite lookup_singleton_Some.
       rewrite elem_of_mset_map. simpl.
       intros ([<- <-] & (?&[=]&?) & LT). subst.
-      pose proof (phase_lt_fork phase0 0) as LT'.
+      pose proof (phase_lt_fork π0 0) as LT'.
       apply strict_spec in LT.
       rewrite strict_spec in LT. destruct LT as [? N].
       destruct N. apply LT'. 

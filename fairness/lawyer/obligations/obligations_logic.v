@@ -59,17 +59,17 @@ Section ProgramLogic.
       (δ: amSt OAM) (τ: locale heap_lang) (k: nat) oτ': iProp Σ :=
           ∃ δ__k,
             obls_msi δ__k (oGS := oGS) ∗
-            ⌜ nsteps (fun p1 p2 => loc_step p1 τ p2) k δ δ__k  ⌝ ∗
+            ⌜ nsteps (fun p1 p2 => loc_step_ex p1 p2) k δ δ__k ⌝ ∗
             ⌜ threads_own_obls c δ ⌝ ∗
             ⌜ dom_phases_obls δ ⌝ ∗
-            ⌜ obls_eq (dom $ ps_obls δ) δ__k ⌝ ∗
+            ⌜ dom_obls_eq (dom $ ps_obls δ) δ__k ⌝ ∗
            ⌜ locale_step c (Some τ) c' ⌝ ∗
            ⌜ step_fork c c' = oτ' ⌝
     .
 
 
-    Definition BMU E ζ b (P : iProp Σ) : iProp Σ :=
-      ∀ c c' δ n f,
+    Definition BMU E (* ζ *) b (P : iProp Σ) : iProp Σ :=
+      ∀ c c' δ ζ n f,
       OAM_st_interp_interim_step c c' δ ζ n f ={E}=∗
       ∃ n', OAM_st_interp_interim_step c c' δ ζ n' f ∗ 
             ⌜ n' - n <= b ⌝ ∗
@@ -93,7 +93,7 @@ Section ProgramLogic.
       iMod (burn_cp_upd_impl with "[$] [$]") as "X".
       { eexists. split; eauto.
         rewrite -PH.
-        unshelve eapply (pres_by_loc_step_implies_rep _ _ _ _ _ _) in TRANSS.
+        unshelve eapply (pres_by_loc_step_implies_rep _ _ _ _ _) in TRANSS.
         { eapply loc_step_phases_pres. }
         3: reflexivity.
         2: { rewrite TRANSS. reflexivity. } 
@@ -152,9 +152,9 @@ Section ProgramLogic.
         red. etrans; eauto. }
       iDestruct "X" as "(%δ' & MSI & %BURNS)".
 
-      assert (obls_eq (dom (ps_obls δ)) δ') as OBLS'.
+      assert (dom_obls_eq (dom (ps_obls δ)) δ') as OBLS'.
       { eapply pres_by_loc_step_implies_progress.
-        { apply loc_step_obls_pres. }
+        { apply loc_step_dom_obls_pres. }
         { reflexivity. }
         eexists. do 2 (esplit; eauto). }
       assert (dom_phases_obls δ') as DPO'.
@@ -197,29 +197,29 @@ Section ProgramLogic.
         + left. red. eauto.
     Qed.
       
-    Lemma BMU_intro E ζ b (P : iProp Σ):
-      ⊢ P -∗ BMU E ζ b P.
+    Lemma BMU_intro E b (P : iProp Σ):
+      ⊢ P -∗ BMU E b P.
     Proof using. 
       rewrite /BMU. iIntros "**". iModIntro.
       iExists _. iFrame. iPureIntro. lia.
     Qed. 
 
     Global Instance BMU_proper:
-      Proper (equiv ==> eq ==> eq ==> equiv ==> equiv) BMU.
+      Proper (equiv ==> eq ==> equiv ==> equiv) BMU.
     Proof using. solve_proper. Qed. 
 
-    Lemma BMU_frame E ζ b (P Q : iProp Σ):
-      ⊢ P -∗ BMU E ζ b Q -∗ BMU E ζ b (P ∗ Q).
+    Lemma BMU_frame E b (P Q : iProp Σ):
+      ⊢ P -∗ BMU E b Q -∗ BMU E b (P ∗ Q).
     Proof using. 
       rewrite /BMU. iIntros "P BMU **".
       iMod ("BMU" with "[$]") as "(%&?&?&?)". iModIntro. 
       iExists _. iFrame.
     Qed.
 
-    Lemma BMU_weaken ζ E1 E2 m1 m2 P1 P2
+    Lemma BMU_weaken E1 E2 m1 m2 P1 P2
       (LE: m1 <= m2)
       (SUB: E1 ⊆ E2):
-      ⊢ (P1 -∗ P2) -∗ BMU E1 ζ m1 P1 -∗ BMU E2 ζ m2 P2.
+      ⊢ (P1 -∗ P2) -∗ BMU E1 m1 P1 -∗ BMU E2 m2 P2.
     Proof using.
       rewrite /BMU.
       iIntros "IMPL BMU". iIntros "**".
@@ -230,14 +230,14 @@ Section ProgramLogic.
       by iApply "IMPL".
     Qed.
 
-    Lemma BMU_wand E ζ b (P Q : iProp Σ):
-      ⊢ (P -∗ Q) -∗ BMU E ζ b P -∗ BMU E ζ b Q.
+    Lemma BMU_wand E b (P Q : iProp Σ):
+      ⊢ (P -∗ Q) -∗ BMU E b P -∗ BMU E b Q.
     Proof using.
       iIntros "**". by iApply (BMU_weaken with "[$]"). 
     Qed.
 
-    Lemma BMU_lower E ζ m n P (LE: m <= n):
-      ⊢ BMU E ζ m P -∗ BMU E ζ n P.
+    Lemma BMU_lower E m n P (LE: m <= n):
+      ⊢ BMU E m P -∗ BMU E n P.
     Proof using.
       clear -LE OM. 
       iIntros "**". iApply (BMU_weaken); try done. set_solver. 
@@ -246,7 +246,7 @@ Section ProgramLogic.
     Lemma BMU_AMU E ζ b (P : iProp Σ) π
       (BOUND: b <= LIM_STEPS)
       :
-      ⊢ (th_phase_ge ζ π (oGS := oGS) -∗ BMU E ζ b ((P) ∗ ∃ ph deg, cp ph deg (oGS := oGS) ∗ ⌜ phase_le ph π ⌝)) -∗
+      ⊢ (th_phase_ge ζ π (oGS := oGS) -∗ BMU E b ((P) ∗ ∃ ph deg, cp ph deg (oGS := oGS) ∗ ⌜ phase_le ph π ⌝)) -∗
         th_phase_ge ζ π (oGS := oGS) -∗
         AMU E ζ obls_act P (aeGS := oGS).
     Proof using.
@@ -260,12 +260,13 @@ Section ProgramLogic.
       (* { rewrite /AM_st_interp_interim. *)
       (*   simpl. iDestruct "TI'" as "((?&?&?)&?&?)". iFrame. } *)
       iSpecialize ("BMU" with "[$]").
-      iSpecialize ("BMU" $! c c' δ 0 None with "[MSI]").
+      iSpecialize ("BMU" $! c c' δ ζ 0 None with "[MSI]").
       { rewrite /OAM_st_interp_interim_step /AM_st_interp_interim.
         iDestruct "MSI" as "(MSI&%OBLS&%DPO)".
         iExists _. iFrame. iPureIntro.
         repeat split; try done.
-        by constructor. }
+        by apply nsteps_0.         
+      }
       iMod "BMU" as (n') "(TI'' & %BOUND' & P & (%ph & %deg & CP & %PH'))".
       iMod (finish_obls_steps with "[$] [$]") as (?) "(SI & %TRANS)".
       { lia. }
@@ -281,7 +282,7 @@ Section ProgramLogic.
     Lemma BMU_AMU__f E ζ ζ' b (P : iProp Σ) π R0 R'
       (BOUND: b <= LIM_STEPS)
       :
-      ⊢ (th_phase_ge ζ π (oGS := oGS) -∗ BMU E ζ b
+      ⊢ (th_phase_ge ζ π (oGS := oGS) -∗ BMU E b
            (P ∗ (∃ ph deg, cp ph deg (oGS := oGS) ∗ ⌜ phase_le ph π ⌝) ∗
            th_phase_ge ζ π (oGS := oGS) ∗
            obls ζ R0 (oGS := oGS))) -∗
@@ -299,7 +300,7 @@ Section ProgramLogic.
       { rewrite /AM_st_interp_interim.
         simpl. iDestruct "MSI" as "(?&?&?)". iFrame. }
       iSpecialize ("BMU" with "[$]").
-      iSpecialize ("BMU" $! c c' δ 0 (Some ζ') with "[MSI]").
+      iSpecialize ("BMU" $! c c' δ ζ 0 (Some ζ') with "[MSI]").
       { rewrite /OAM_st_interp_interim_step /AM_st_interp_interim.
         iDestruct "MSI" as "(MSI&%OBLS&%DPO)".
         iExists _. iFrame. iPureIntro.
@@ -319,10 +320,10 @@ Section ProgramLogic.
     Qed.
 
     Lemma OU_BMU E ζ P b:
-       ⊢ OU ζ (BMU E ζ b P) (oGS := oGS) -∗ BMU E ζ (S b) P.
+       ⊢ OU ζ (BMU E b P) (oGS := oGS) -∗ BMU E (S b) P.
     Proof using.
       iIntros "OU". rewrite {2}/BMU /OAM_st_interp_interim_step.
-      iIntros (c c' δ n f) "TI'".
+      iIntros (c c' δ τ n f) "TI'".
       iDestruct "TI'" as "(%δ_ & MSI & %TRANS1 & %TH_OWN & %DPO & %OBLS_EQ & %STEP & %FF)".
       rewrite /OU. iMod ("OU" with "[$]") as "(%δ' & MSI & %TRANS2 & CONT)".
       
@@ -330,7 +331,9 @@ Section ProgramLogic.
       { rewrite /OAM_st_interp_interim_step. iExists _. iFrame.
         iPureIntro. repeat split; eauto.
         - eapply rel_compose_nsteps_next. eexists. split; eauto.
-        - eapply loc_step_obls_pres; eauto. }
+          red. eauto. 
+        - eapply loc_step_dom_obls_pres; eauto.
+          red. eauto. }
       iMod "CONT" as "(%n' & TI' & %BOUND' & P)". iModIntro.
       rewrite FF. 
       iExists _. iFrame. iSplitL.
@@ -341,7 +344,7 @@ Section ProgramLogic.
 
     (* an example usage of OU *)
     Lemma BMU_step_create_signal E ζ P b l R:
-       ⊢ (∀ sid, sgn sid l (Some false) (oGS := oGS) -∗ obls ζ (R ∪ {[ sid ]}) (oGS := oGS) -∗ BMU E ζ b P) -∗ obls ζ R (oGS := oGS) -∗ BMU E ζ (S b) P.
+       ⊢ (∀ sid, sgn sid l (Some false) (oGS := oGS) -∗ obls ζ (R ∪ {[ sid ]}) (oGS := oGS) -∗ BMU E b P) -∗ obls ζ R (oGS := oGS) -∗ BMU E (S b) P.
     Proof using.
       iIntros "CONT OB".
       iApply OU_BMU. iApply (OU_wand with "[CONT]").

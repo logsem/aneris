@@ -122,7 +122,7 @@ Section FiniteBranching.
   Proof using.
     set (add_cp (ep: @ExpectPermission Degree) :=
            τ ← elements $ dom $ ps_phases δ;
-           let πτ := default phase0 (ps_phases δ !! τ) in
+           let πτ := default π0 (ps_phases δ !! τ) in
            let cps' := let '(_, _, d) := ep in ps_cps δ ⊎ {[+ (πτ, d) +]} in
            let δ' := update_cps cps' δ in
            mret δ'
