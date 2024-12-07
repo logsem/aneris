@@ -1626,16 +1626,34 @@ Section Termination.
     
     (* TODO: extract the lemma below? *)
     
-    clear δ' NTH'. 
+    (* clear δ' NTH'.  *)
     intros τ' IDTHl. 
-    red. intros δn δn' mb mf k ITH%trace_state_lookup BOUND NSTEPS BSTEP FSTEP.
-    clear dependent BSTEP FSTEP δn'. 
+    red. intros δn δn' mb mf k ITH%state_label_lookup BOUND NSTEPS BSTEP FSTEP.
+    destruct ITH as (ITH & ITH' & _).
+    rewrite Nat.add_1_r NTH' in ITH'. inversion ITH'. subst. clear ITH'.
+
+    (* TODO: get rid of duplicate *)
+    assert (forall sid, sig_st_le (ps_sigs mb !! sid) (ps_sigs δn' !! sid)) as SIG_LE''.
+    { intros.
+      etrans.
+      { eapply loc_step_sig_st_le_pres; [reflexivity| ].
+        red. eexists. red. left. eauto. }
+      inversion FSTEP as [? F| ]; subst.
+      2: { reflexivity. }
+      destruct F as (?&?&F).
+      eapply fork_step_sig_st_le_pres; [reflexivity| ].
+      eexists. eauto. }
+    
+    clear dependent BSTEP FSTEP. 
     
     generalize dependent mb. induction k.
     { intros ? ->%obls_utils.nsteps_0.
       rewrite Nat.add_0_r. reflexivity. }
-    intros δ'' (δ' & STEPS & [τ STEP])%nsteps_inv_r.
-    specialize (IHk ltac:(lia) _ STEPS).
+    intros δ'' (δ' & STEPS & [τ STEP])%nsteps_inv_r SIG_LE'''.
+    specialize (IHk ltac:(lia) _ STEPS). specialize_full IHk.
+    { intros. etrans; [| apply SIG_LE'''].
+      eapply loc_step_sig_st_le_pres; [reflexivity| ]. red. eauto. }    
+    
     etrans; eauto.
     eapply ms_le_Proper; [| | eapply loc_step_ms_le]; eauto.
     { rewrite -PeanoNat.Nat.add_succ_comm. simpl. reflexivity. }
@@ -1660,7 +1678,14 @@ Section Termination.
     { destruct ALL_SET. exists (S n). split.
       { by apply label_lookup_states'. }
       red. intros j LEj [δj JTH]. rewrite /sig_val_at JTH. simpl.
-      admit. }
+      rewrite update_cps_same_sigs in SIG_LE'''. specialize (SIG_LE''' sid).
+      rewrite SIG in SIG_LE'''.
+      destruct (ps_sigs δn' !! sid) as [[??]|] eqn:SIG'; [| done].
+      eapply sig_st_le_lookup_helper with (s := sid) in LEj; eauto.
+      rewrite SIG' in LEj. destruct (ps_sigs δj !! sid) as [[??]|] eqn:SIGj; [| done].
+      simpl in *. destruct SIG_LE''' as [-> ?], LEj as [-> ?]. 
+      destruct b0; try tauto.
+      destruct SB. exists j. red. rewrite JTH. simpl. by rewrite SIGj. }
 
     (* TODO: unify with previous case? *)
     destruct SB as (f & SETf & LEf_sb).
@@ -1676,7 +1701,7 @@ Section Termination.
     2: { simpl. eapply reflexive_eq. symmetry. apply SIDn. }
     simpl in STEPS. rewrite SIG in STEPS. tauto. 
     
-  Admitted. 
+  Qed. 
 
   Theorem trace_terminates
     (FAIR: forall τ, obls_trace_fair τ tr)
