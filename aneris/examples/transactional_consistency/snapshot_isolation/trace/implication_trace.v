@@ -1249,8 +1249,8 @@ Section trace_proof.
       iPureIntro.
       by simpl.
     }
-    iDestruct "Hinv_si_res'" as "(%mnames_si & Hghost_map_mnames_si & %ms & Hghot_map_m_si & 
-      %Hkeys_some_ms & Hown_exec & %Hrel_exec & Hopen_trans_state)".
+    iDestruct "Hinv_si_res'" as "(%mnames_si & Hghost_map_mnames_si & %m_gl & Hghot_map_m_gl & 
+      %Hkeys_some_m_gl & Hown_exec & %Hrel_exec & Hopen_trans_state)".
     iDestruct (get_obs with "Hown_exec") as "#Hown_exec_hist".
     rewrite /open_transactions_state.
     rewrite {4} Heq_sa_clients.
@@ -1260,9 +1260,9 @@ Section trace_proof.
     iDestruct (@ghost_map_lookup with "[$Hghost_map_mnames_si][$Hsa_pointer_si]") as "%Hlookup'".
     iDestruct "Hopen_trans_state_sa" as "[%Hfalse|(%c_sa & %st_sa & %γ_sa & %γ''_sa & %γupd_st_sa & %Hextract_c_sa 
       & Hfrag_half' & Hopen_state)]"; first (exfalso; set_solver).
-    iAssert (⌜m ⊆ ms⌝)%I as "%Hsubset".
+    iAssert (⌜m ⊆ m_gl⌝)%I as "%Hsubset".
     {
-      iApply (@ghost_map_lookup_big with "[$Hghot_map_m_si][Hkeys2]").
+      iApply (@ghost_map_lookup_big with "[$Hghot_map_m_gl][Hkeys2]").
       iApply (big_sepM_wand with "[$Hkeys2]").
       iApply big_sepM_intro.
       iModIntro.
@@ -1286,7 +1286,7 @@ Section trace_proof.
       (∃ m_conn', ghost_map_auth γm_conn 1 m_conn' ∧ ⌜∀ k ov, k ∈ KVS_keys → k ∈ dom m → (m_conn' !! k = Some ov → (∃ h, m !! k = Some h ∧ last h = ov))⌝)))%I)
       with "[Hghost_map_m_conn Hkeys_conn_si]" as ">(Hkeys_conn_si & (%m_conn' & Hghost_map_m_conn & %Hm_conn'_st_new_rel))".
     {
-      clear Hnone Hkeys_some_ms Hrel_exec.
+      clear Hnone Hkeys_some_m_gl Hrel_exec.
       iRevert "Hghost_map_m_conn".
       iRevert (m_conn).
       iInduction KVS_keys as [|k KVS_Keys Hnin] "IH" using set_ind_L.
@@ -1358,16 +1358,16 @@ Section trace_proof.
         iIntros (k Hk_in) "(%ov & Hke1 & _ & Hkey2)".
         iExists ov; iFrame.
     }
-    iMod ("Hclose'" with "[Hfrag_half Hghost_map_mnames_si Hghot_map_m_si Hown_exec Hopen_state 
+    iMod ("Hclose'" with "[Hfrag_half Hghost_map_mnames_si Hghot_map_m_gl Hown_exec Hopen_state 
       Hopen_trans_state Htr_is' HOwnLin' Hghost_map_mname' Hghost_map_m' 
       Hghost_map_mstate' Hkeys_conn_res2 Hlin_res' Hpost_res' Hdisj_trace_res]").
     {
       iModIntro.
       iExists T', exec'.
-      iSplitL "Hghost_map_mnames_si Hghot_map_m_si Hown_exec Hopen_state Hopen_trans_state Hfrag_half".
+      iSplitL "Hghost_map_mnames_si Hghot_map_m_gl Hown_exec Hopen_state Hopen_trans_state Hfrag_half".
       {
         iExists mnames_si; iFrame.
-        iExists ms; iFrame.
+        iExists m_gl; iFrame.
         iSplit; first by iPureIntro.
         iSplit; first by (iPureIntro; exists st_new).
         rewrite /open_transactions_state.
@@ -1476,7 +1476,7 @@ Section trace_proof.
         iExists γm_conn, γsnap, γupd_st, m_conn'.
         iFrame "∗#".
         iRight.
-        iExists ms, m.
+        iExists m_gl, m.
         iSplit; first by iPureIntro.
         iFrame.
         iSplit; first by iPureIntro.
