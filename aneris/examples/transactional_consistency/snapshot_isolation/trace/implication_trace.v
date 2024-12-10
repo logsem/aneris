@@ -864,6 +864,20 @@ Section trace_proof.
         do 2 (apply list_exist_dec; intros).
         apply _.
       }
+      assert (lin_trace_of (lt' ++ [(#tag1, (c, (#"WrLin", (#k, v))))%V]) t') as Hlin_of_add.
+      {
+        apply (lin_trace_lin lt' (#tag1, (c, #"WrPre"))%V 
+            (#tag1, (c, (#"WrLin", (#k, v))))%V tag1 c t'); try done;
+            rewrite /is_lin_event /is_wr_lin_event /is_pre_event /is_wr_pre_event; 
+            do 2 right; left; eauto.
+      }
+      iAssert (⌜valid_sequence (lt' ++ [(#tag1, (c, (#"WrLin", (#k, v))))%V])⌝)%I as "%Hvalid_seq_add".
+      {
+        iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & %Hopen_start & Hrest)".
+        iPureIntro.
+        apply (valid_sequence_wr_rd_cm_lin _ _ tag1 c tail); try done; last by exists t'.
+        rewrite /is_wr_lin_event; set_solver.
+      }
       destruct (decide (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation), 
         op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans)) 
           as [(trans & Htrans_in & Hop)|Hdec].
@@ -883,44 +897,25 @@ Section trace_proof.
         iSplitL "Hinv_si_res'"; first (by iApply inv_ext_si_wr_imp1).
         iExists t', (lt' ++ [(#tag1, (c, (#"WrLin", (#k, v))))%V]).
         iFrame.
-        iSplit.
+        iSplit; first done.
+        iSplit; first (iPureIntro; by apply trans_add_non_empty).
+        iSplit; first (iPureIntro; by apply extraction_of_add2).
+        do 2 (iSplit; first done).
+        iSplit; first (iPureIntro; eapply based_on_add1; rewrite /is_cm_op; set_solver).
+        iSplit; first by simpl.
+        iApply (trace_state_resources_write_lin2 clients c tag1 lt' T1 T2 trans k v sa 
+          s γ γmstate γmname extract mstate mname m with "[][][][][][][][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
+          [$Hmap_m][$Hdisj_trace_res][$Htrace_res]"); try by iPureIntro.
         + iPureIntro.
-          apply (lin_trace_lin lt' (#tag1, (c, #"WrPre"))%V 
-            (#tag1, (c, (#"WrLin", (#k, v))))%V tag1 c t'); try done;
-            rewrite /is_lin_event /is_wr_lin_event /is_pre_event /is_wr_pre_event; 
-            do 2 right; left; eauto.
-        + iSplit.
-          * iPureIntro.
-            by apply trans_add_non_empty.
-          * iSplit.
-            -- iPureIntro.
-               by apply extraction_of_add2.
-            -- iSplit; first done.
-               iSplit.
-               ++ iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & 
-                    %Hopen_start & Hrest)".
-                  iPureIntro.
-                  apply (valid_sequence_wr_rd_cm_lin _ _ tag1 c tail); try done.
-                  ** rewrite /is_wr_lin_event.
-                     set_solver.
-                  ** by exists t'.
-              ++ iSplit.
-                 ** iPureIntro. 
-                    eapply based_on_add1; rewrite /is_cm_op; set_solver.
-                 ** iSplit; first by simpl.
-                    iApply (trace_state_resources_write_lin2 clients c tag1 lt' T1 T2 trans k v sa 
-                      s γ γmstate γmname extract mstate mname m with "[][][][][][][][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
-                      [$Hmap_m][$Hdisj_trace_res][$Htrace_res]"); try by iPureIntro.
-                    --- iPureIntro.
-                        intros Hfalse.
-                        eapply two_trans_implies_false_app_cons; try done.
-                        exists (Wr (tag1, c) k v); simpl.
-                        rewrite last_snoc; set_solver.
-                    --- iPureIntro.
-                        destruct Hinit as (e & Hin'' & Hconn'' & Hevent'').
-                        exists e.
-                        split_and!; try done.
-                        apply elem_of_app; eauto.
+          intros Hfalse.
+          eapply two_trans_implies_false_app_cons; try done.
+          exists (Wr (tag1, c) k v); simpl.
+          rewrite last_snoc; set_solver.
+        + iPureIntro.
+          destruct Hinit as (e & Hin'' & Hconn'' & Hevent'').
+          exists e.
+          split_and!; try done.
+          apply elem_of_app; eauto.
       - iExists (T' ++ [[Wr (tag1, c) k v]]), exec'.
         assert (valid_transactions (T' ++ [[Wr (tag1, c) k v]])) as Hvalid_added.
         {
@@ -941,41 +936,20 @@ Section trace_proof.
         iSplitL "Hinv_si_res'"; first (by iApply inv_ext_si_wr_imp2).
         iExists t', (lt' ++ [(#tag1, (c, (#"WrLin", (#k, v))))%V]).
         iFrame.
-        iSplit.
-        + iPureIntro.
-          apply (lin_trace_lin lt' (#tag1, (c, #"WrPre"))%V 
-            (#tag1, (c, (#"WrLin", (#k, v))))%V tag1 c t'); try done;
-            rewrite /is_lin_event /is_wr_lin_event /is_pre_event /is_wr_pre_event; 
-            do 2 right; left; eauto.
-        + iSplit.
-          * iPureIntro.
-            intros t'' Ht''_in.
-            rewrite elem_of_app in Ht''_in.
-            destruct Ht''_in as [Ht''_in | Ht''_in]; set_solver.
-          * iSplit.
-            -- iPureIntro.
-               by apply extraction_of_add1.
-            -- iSplit; first done.
-               iSplit.
-                ++ iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & 
-                       %Hopen_start & Hrest)".
-                    iPureIntro.
-                    apply (valid_sequence_wr_rd_cm_lin _ _ tag1 c tail); try done.
-                    ** rewrite /is_wr_lin_event.
-                       set_solver.
-                    ** by exists t'.
-                ++ iSplit. 
-                   ** iPureIntro.
-                      apply based_on_add2; rewrite /is_cm_op; set_solver.
-                   ** iSplit; first by simpl.
-                      iApply (trace_state_resources_write_lin1 clients c tag1 lt' T' k v.(SV_val) sa
-                        s γ γmstate γmname extract mstate mname m with "[][][][][][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
-                        [$Hmap_m][$Hdisj_trace_res][$Htrace_res]"); try by iPureIntro.
-                      iPureIntro.
-                      destruct Hinit as (e & Hin'' & Hconn'' & Hevent'').
-                      exists e.
-                      split_and!; try done.
-                      apply elem_of_app; eauto.
+        iSplit; first done.
+        iSplit; first (iPureIntro; set_solver).
+        iSplit; first (iPureIntro; by apply extraction_of_add1).
+         do 2 (iSplit; first done).
+        iSplit; first (iPureIntro; apply based_on_add2; rewrite /is_cm_op; set_solver).
+        iSplit; first by simpl.
+        iApply (trace_state_resources_write_lin1 clients c tag1 lt' T' k v.(SV_val) sa
+          s γ γmstate γmname extract mstate mname m with "[][][][][][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
+          [$Hmap_m][$Hdisj_trace_res][$Htrace_res]"); try by iPureIntro.
+        iPureIntro.
+        destruct Hinit as (e & Hin'' & Hconn'' & Hevent'').
+        exists e.
+        split_and!; try done.
+        apply elem_of_app; eauto.
     }
     iMod ("Hshift" with "[Hkey_loc_st Hkey_internal Hkey_c Hkey_upd_disj]").
     {
