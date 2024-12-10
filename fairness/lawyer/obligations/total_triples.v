@@ -56,7 +56,7 @@ Section TotalTriples.
       Context
         (ε: coPset)
         (π: Phase)
-        (Φ: iProp Σ)
+        (Φ: val -> iProp Σ)
         (O: gset SignalId)
         (RR: option RO -> iProp Σ)
       .
@@ -68,7 +68,7 @@ Section TotalTriples.
         |={ε, ∅}=> ∃ x, P x ∗ (
                            let abort := P x ={∅, ε}=∗ V in
                            ((∃ r__p, RR r__p) ∗ ⌜ TGT x ⌝ ∗ obls τ O (oGS := oGS) -∗
-                              BMU ∅ c (oGS := oGS) (∀ y, Q y x ={∅, ε}=∗ Φ)) ∧
+                              BMU ∅ c (oGS := oGS) (∀ y, Q y x ={∅, ε}=∗ Φ #())) ∧
                              abort
                          ).
       
@@ -96,7 +96,7 @@ Section TotalTriples.
                       )
               ) ∧
               ((∃ r__p, RR r__p) ∗ ⌜ TGT x ⌝ ∗ obls τ O (oGS := oGS) -∗
-               BMU ∅ c (oGS := oGS) (∀ y, Q y x ={∅, ε}=∗ Φ)) ∧
+               BMU ∅ c (oGS := oGS) (∀ y, Q y x ={∅, ε}=∗ Φ #())) ∧
               abort
       ).
       
@@ -110,15 +110,15 @@ Section TotalTriples.
     Context `{hGS: @heapGS Σ _ EM}.
     Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
 
-    Let TLAT__impl (tau: coPset → Phase -> iProp Σ → gset SignalId → (option RO → iProp Σ) -> iProp Σ)
+    Let TLAT__impl (tau: coPset → Phase -> (val -> iProp Σ) → gset SignalId → (option RO → iProp Σ) -> iProp Σ)
       (e: expr) (s: stuckness): iProp Σ :=
-      ∀ (Φ: iProp Σ) (π: Phase) (O: gset SignalId) (RR: option RO -> iProp Σ),
+      ∀ (Φ: val -> iProp Σ) (π: Phase) (O: gset SignalId) (RR: option RO -> iProp Σ),
         let ε := ⊤ ∖ ε__m in
         ⌜ B c <= LIM_STEPS ⌝ -∗
         RR None ∗ obls τ O (oGS := oGS) ∗ sgns_level_gt' O L ∗
         th_phase_ge τ π (oGS := oGS) ∗ cp π d__m (oGS := oGS) -∗
         tau ε π Φ O RR -∗
-        WP e @ s; τ; ⊤ {{ _, Φ }}.
+        WP e @ s; τ; ⊤ {{ v, Φ v }}.
     
     Definition TLAT1 := TLAT__impl TAU1. 
     Definition TLAT2 := TLAT__impl TAU2.
@@ -150,12 +150,13 @@ Section FairLockSpec.
 
   Context `{EM: ExecutionModel heap_lang M}. 
   Context `{hGS: @heapGS Σ _ EM}.
-  Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).    
+  Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
 
   Record FairLock := {
     fl_create: expr; fl_acquire: expr; fl_release: expr;
     fl_c__cr: nat; fl_B: nat -> nat;
     fl_LK: val * nat * bool -> iProp Σ;
+    fl_is_lock: val -> nat -> iProp Σ;               
     fl_lvls: gset Level;
     fl_d__h: Degree;
     fl_d__l: Degree;
@@ -163,26 +164,36 @@ Section FairLockSpec.
     fl_degs_lh: deg_lt fl_d__l fl_d__h;
     fl_degs_hm: deg_lt fl_d__h fl_d__m;
     fl_ι: namespace;
-    fl_create_spec: ⊢ ⌜ fl_c__cr <= LIM_STEPS ⌝ -∗
-      ∀ τ c,
-      {{{ ⌜ True ⌝ }}} fl_create #() @ τ {{{ lk, RET lk; fl_LK (lk, 0, false) ∗
-        ∀ τ',
-        TLAT2 τ' (fun x => fl_LK x ∗ ⌜ x.1.1 = lk ⌝) (fun y x => fl_LK y ∗ ⌜ y = x /\ x.2 = false ⌝)
+
+    (* fl_spec_helper tlat c P Q tgt e τ := *)
+    (*     tlat τ P Q *)
+    (*       fl_lvls *)
+    (*       (fun '(_, r, _) => r) tgt *)
+    (*       fl_d__h fl_d__l fl_d__m *)
+    (*       c fl_B *)
+    (*       (↑ fl_ι) (e #()) NotStuck; *)
+    fl_is_lock_pers lk c :> Persistent (fl_is_lock lk c);
+
+    fl_create_spec: ⊢ ⌜ fl_c__cr <= LIM_STEPS ⌝ -∗ ∀ τ c,
+      {{{ ⌜ True ⌝ }}} fl_create #() @ τ {{{ lk, RET lk; fl_LK (lk, 0, false) ∗ fl_is_lock lk c }}};
+
+    fl_acquire_spec (lk: loc) c τ: fl_is_lock #lk c ⊢
+        TLAT2 τ (fun x => fl_LK x ∗ ⌜ x.1.1 = #lk ⌝) (fun y x => fl_LK y ∗ ⌜ y = x /\ x.2 = false ⌝)
           fl_lvls
           (fun '(_, r, _) => r) (fun '(_, _, b) => b = false)
           fl_d__h fl_d__l fl_d__m
           c fl_B                        
-          (↑ fl_ι) (fl_acquire #()) NotStuck
-          (oGS := oGS) ∗
-        
-        TLAT1 τ' (fun x => fl_LK x ∗ ⌜ x.2 = true /\ x.1.1 = lk⌝) (fun y x => fl_LK y ∗ ⌜ y.1.2 = (x.1.2 + 1)%nat /\ y.2 = false /\ y.1.1 = x.1.1 ⌝)
+          (↑ fl_ι) (fl_acquire #lk) NotStuck
+          (oGS := oGS);               
+
+    fl_release_spec (lk: loc) c τ: fl_is_lock #lk c ⊢
+        TLAT1 τ (fun x => fl_LK x ∗ ⌜ x.2 = true /\ x.1.1 = #lk⌝) (fun y x => fl_LK y ∗ ⌜ y.1.2 = (x.1.2 + 1)%nat /\ y.2 = false /\ y.1.1 = x.1.1 ⌝)
           fl_lvls
           (fun '(_, r, _) => r) (fun _ => True%type)
           fl_d__h fl_d__l fl_d__m
           c fl_B
-          (↑ fl_ι) (fl_release #()) NotStuck
+          (↑ fl_ι) (fl_release #lk) NotStuck
           (oGS := oGS)
-      }}}
   }. 
 
 End FairLockSpec.
@@ -190,6 +201,7 @@ End FairLockSpec.
 
 From iris.algebra Require Import auth gmap gset excl excl_auth csum.
 From iris.proofmode Require Import tactics.
+From iris.base_logic.lib Require Import invariants.
 
 (* TODO: move *)
 Section OneShot.
@@ -292,8 +304,43 @@ Section MotivatingClient.
     Definition client_inv_inner lk flag s__f: iProp Σ :=
       ∃ r b oo, fl_LK FL (lk, r, b) ∗ lock_owner_auth oo ∗
         (⌜ b = true ⌝ ∗ (∃ o, ⌜ oo = Some o ⌝ ∗ sgn o l__o (Some false) (oGS := oGS)) ∨
-         ⌜ b = false ⌝ ∗ lock_owner_frag None ∗ ∃ f, P__lock flag s__f f). 
+         ⌜ b = false ⌝ ∗ lock_owner_frag None ∗ ∃ f, P__lock flag s__f f).
+
+    Definition client_ns := nroot .@ "client". 
+      
+    Definition client_inv lk flag sf: iProp Σ :=
+      inv client_ns (client_inv_inner lk flag sf).
+
+    Definition left_thread: val :=
+      λ: "lk" "flag",
+          (fl_acquire FL) "lk" ;;
+           "flag" <- #true ;;
+           (fl_release FL) "lk"
+    .
+
+    Definition c__cl: nat := 4.
+
+    Context (d2 d1 d0: Degree).
+
+    Existing Instance fl_is_lock_pers.
+
+    Definition RR__cl (r': option nat): iProp Σ := 
+      match r' with
+      | None => ⌜ True ⌝
+      | Some r => ⌜ False ⌝
+      end. 
+
+    Lemma acquire_left τ (lk: loc) flag s__f π:
+      {{{ fl_is_lock FL #lk c__cl ∗ client_inv #lk flag s__f ∗ flag_unset ∗
+          obls τ {[ s__f ]} (oGS := oGS) ∗ cp_mul π d2 20 (oGS := oGS) ∗ th_phase_ge τ π (oGS := oGS)
+      }}}
+        (fl_acquire FL) #lk @ τ
+      {{{ v, RET v; ∃ s__o, obls τ {[ s__f; s__o ]} (oGS := oGS) ∗ flag_unset ∗
+                          P__lock lk s__f false ∗ lock_owner_frag (Some s__o) }}}.
+    Proof using.
+      iIntros (Φ). iIntros "(#LOCK & #INV & UNSET & OB & CPS & PH) POST".
+      iPoseProof (fl_acquire_spec FL with "[$]") as "ACQ".
+      rewrite /TLAT2. iApply "ACQ".  
       
     
-  
 End MotivatingClient.
