@@ -166,8 +166,8 @@ Section FairLockSpec.
     fl_create_spec: ⊢ ⌜ fl_c__cr <= LIM_STEPS ⌝ -∗
       ∀ τ c,
       {{{ ⌜ True ⌝ }}} fl_create #() @ τ {{{ lk, RET lk; fl_LK (lk, 0, false) ∗
-        
-        TLAT2 τ (fun x => fl_LK x ∗ ⌜ x.1.1 = lk ⌝) (fun y x => fl_LK y ∗ ⌜ y = x /\ x.2 = false ⌝)
+        ∀ τ',
+        TLAT2 τ' (fun x => fl_LK x ∗ ⌜ x.1.1 = lk ⌝) (fun y x => fl_LK y ∗ ⌜ y = x /\ x.2 = false ⌝)
           fl_lvls
           (fun '(_, r, _) => r) (fun '(_, _, b) => b = false)
           fl_d__h fl_d__l fl_d__m
@@ -175,7 +175,7 @@ Section FairLockSpec.
           (↑ fl_ι) (fl_acquire #()) NotStuck
           (oGS := oGS) ∗
         
-        TLAT1 τ (fun x => fl_LK x ∗ ⌜ x.2 = true /\ x.1.1 = lk⌝) (fun y x => fl_LK y ∗ ⌜ y.1.2 = (x.1.2 + 1)%nat /\ y.2 = false /\ y.1.1 = x.1.1 ⌝)
+        TLAT1 τ' (fun x => fl_LK x ∗ ⌜ x.2 = true /\ x.1.1 = lk⌝) (fun y x => fl_LK y ∗ ⌜ y.1.2 = (x.1.2 + 1)%nat /\ y.2 = false /\ y.1.1 = x.1.1 ⌝)
           fl_lvls
           (fun '(_, r, _) => r) (fun _ => True%type)
           fl_d__h fl_d__l fl_d__m
@@ -188,3 +188,112 @@ Section FairLockSpec.
 End FairLockSpec.
 
 
+From iris.algebra Require Import auth gmap gset excl excl_auth csum.
+From iris.proofmode Require Import tactics.
+
+(* TODO: move *)
+Section OneShot.
+  Context {V: ofe}.
+  
+  Definition one_shotR := csumR (exclR unitO) (agreeR V).
+  Definition Pending : one_shotR := Cinl (Excl ()).
+  Definition Shot (v : V) : one_shotR := Cinr (to_agree v).
+  
+  Class one_shotG Σ := { one_shot_inG : inG Σ one_shotR }.
+  Global Existing Instance one_shot_inG.
+  
+  Definition one_shotΣ : gFunctors := #[GFunctor one_shotR].
+  Global Instance subG_one_shotΣ {Σ} : subG one_shotΣ Σ → one_shotG Σ.
+  Proof. solve_inG. Qed.
+
+  Section Lemmas.
+    Context `{one_shotG}. 
+    
+    Lemma os_shoot γ v: ⊢ own γ Pending ==∗ own γ $ Shot v.
+    Proof using.
+      iIntros "P".
+      iApply own_update; [| by iFrame].
+      by apply cmra_update_exclusive.
+    Qed. 
+
+    (* Lemma os_pending_excl γ (os': one_shotR): *)
+    (*   ⊢ own γ Pending -∗ own γ os' -∗ False.  *)
+    (* Proof using. *)
+    (*   rewrite bi.wand_curry -own_op. *)
+    (*   iIntros "P". eauto 10.  *)
+    (*   iDestruct (own_valid with "P") as "%V". *)
+    (* Qed.  *)
+
+  End Lemmas.
+
+End OneShot.
+
+
+Class ClientPreG Σ := {
+    cl_ow_sig_pre :> inG Σ (excl_authUR (optionUR SignalId));
+    (* eofin_sigs :> inG Σ (authUR (gmapUR nat (agreeR SignalId))); *)
+    cl_one_shot_pre :> @one_shotG unitR Σ;
+}.
+
+Class ClientG Σ := {
+    cl_PreG :> ClientPreG Σ;
+    cl_γ__ow: gname;
+    cl_γ__os: gname;
+}.
+
+Section MotivatingClient.
+  Context `{OfeDiscrete DegO} `{OfeDiscrete LevelO}.
+  Context `{@LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}. 
+  
+  Let Degree := ofe_car DegO.
+  Let Level := ofe_car LevelO.
+
+  Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}.
+  Let OP := LocaleOP (Locale := locale heap_lang).
+  Existing Instance OP.
+  Let OM := ObligationsModel.
+  
+  Let OAM := ObligationsAM.
+  Let ASEM := ObligationsASEM.
+
+  Context `{EM: ExecutionModel heap_lang M}. 
+
+  Context {Σ: gFunctors}.
+  Context {invs_inΣ: invGS_gen HasNoLc Σ}.
+  Context {oGS: @asem_GS _ _ ASEM Σ}.
+  Context `{hGS: @heapGS Σ _ EM}.
+  Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
+
+  Context {FL: FairLock (oGS := oGS)}.
+
+  Context (l__o l__f: Level).
+  Hypothesis
+    (LVL_ORDo: forall l, l ∈ fl_lvls FL -> lvl_lt l__o l)
+    (LVL_ORDf: forall l, l ∈ fl_lvls FL -> lvl_lt l l__f)
+    (* in case fl_lvls is empty *)
+    (LVL_ORDof: lvl_lt l__o l__f).
+
+
+  Section AfterInit.
+    Context {CL: ClientG Σ}. 
+    
+    Definition flag_unset := own cl_γ__os Pending.
+    Definition flag_set := own cl_γ__os (Shot ()).
+
+    Definition lock_owner_auth (oo: option SignalId) :=
+      own cl_γ__ow (● Excl' oo). 
+    Definition lock_owner_frag (oo: option SignalId) :=
+      own cl_γ__ow (◯ Excl' oo). 
+    
+    Definition P__lock flag s__f (b: bool): iProp Σ :=
+      flag ↦ #b ∗ (⌜ b = false ⌝ ∗ sgn s__f l__f (Some false) (oGS := oGS) ∨
+                    ⌜ b = true ⌝ ∗ flag_set).
+    
+    Definition client_inv_inner lk flag s__f: iProp Σ :=
+      ∃ r b oo, fl_LK FL (lk, r, b) ∗ lock_owner_auth oo ∗
+        (⌜ b = true ⌝ ∗ (∃ o, ⌜ oo = Some o ⌝ ∗ sgn o l__o (Some false) (oGS := oGS)) ∨
+         ⌜ b = false ⌝ ∗ lock_owner_frag None ∗ ∃ f, P__lock flag s__f f). 
+      
+    
+  
+End MotivatingClient.
