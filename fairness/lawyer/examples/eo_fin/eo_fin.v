@@ -167,15 +167,15 @@ Section SignalMap.
     - by apply lookup_delete_ne.
   Qed.                          
 
-  Lemma smap_sgns_extend (B0: nat -> nat -> bool)
+  Lemma smap_sgns_extend (B B': nat -> bool)
     (smap: gmap nat SignalId) (s : SignalId) (m : nat) (* lm *)
     (DOM: dom smap = set_seq 0 m)
-    (PRES: forall i, i ∈ dom smap -> B0 (m + 1) i = B0 m i)
+    (PRES: forall i, i ∈ dom smap -> B' i = B i)
     (* (LVL: lvl2nat lm = m) *)
     :
-    ⊢ ([∗ map] k↦y ∈ smap, sgn y (L k) (Some (B0 m k)) (oGS := oGS)) -∗
-       sgn s (L m) (Some (B0 (m + 1) m)) (oGS := oGS) -∗
-       [∗ map] i↦s0 ∈ <[m := s]> smap, sgn s0 (L i) (Some $ B0 (m + 1) i) (oGS := oGS).
+    ⊢ ([∗ map] k↦y ∈ smap, sgn y (L k) (Some (B k)) (oGS := oGS)) -∗
+       sgn s (L m) (Some (B' m)) (oGS := oGS) -∗
+       [∗ map] i↦s0 ∈ <[m := s]> smap, sgn s0 (L i) (Some $ B' i) (oGS := oGS).
   Proof using.
     iIntros "SIGS SG".
     rewrite big_opM_insert_delete. 
@@ -199,13 +199,47 @@ Section SignalMap.
     (* destruct H2; [| done]. rewrite H2. done. *)
   Qed.
 
-  Lemma BMU_smap_extend `{invGS_gen HasNoLc Σ} τ m smap R B0
-    (PRES: forall i, i ∈ dom smap -> B0 (m + 1) i = B0 m i)
-    (FRESH_UNSET: B0 (m + 1) m = false):
-    ⊢ obls τ R (oGS := oGS) -∗ smap_repr (B0 m) m smap -∗
+  (* Lemma smap_sgns_extend (B0: nat -> nat -> bool) *)
+  (*   (smap: gmap nat SignalId) (s : SignalId) (m : nat) (* lm *) *)
+  (*   (DOM: dom smap = set_seq 0 m) *)
+  (*   (PRES: forall i, i ∈ dom smap -> B0 (m + 1) i = B0 m i) *)
+  (*   (* (LVL: lvl2nat lm = m) *) *)
+  (*   : *)
+  (*   ⊢ ([∗ map] k↦y ∈ smap, sgn y (L k) (Some (B0 m k)) (oGS := oGS)) -∗ *)
+  (*      sgn s (L m) (Some (B0 (m + 1) m)) (oGS := oGS) -∗ *)
+  (*      [∗ map] i↦s0 ∈ <[m := s]> smap, sgn s0 (L i) (Some $ B0 (m + 1) i) (oGS := oGS). *)
+  (* Proof using. *)
+  (*   iIntros "SIGS SG". *)
+  (*   rewrite big_opM_insert_delete.  *)
+  (*   iSplitL "SG"; [done| ]. *)
+  (*   rewrite lookup_delete_ne'. *)
+  (*   2: { rewrite DOM. intros ?%elem_of_set_seq. lia. } *)
+  (*   iApply (big_sepM_impl with "[$]"). iModIntro. *)
+  (*   iIntros (??) "% ?". *)
+  (*   rewrite PRES; [done| ]. *)
+  (*   eapply elem_of_dom; eauto.  *)
+  (*   (* apply lookup_delete_Some in H0 as [??]. *) *)
+  (*   (* apply mk_is_Some, elem_of_dom in H1. *) *)
+  (*   (* rewrite DOM in H1. apply elem_of_set_seq in H1. *) *)
+  (*   (* assert ((k <? m) = (k <? m + 1) \/ k = m). *) *)
+  (*   (* { destruct (decide (k = m)); [tauto| ]. left. *) *)
+  (*   (*   destruct (k <? m) eqn:LT. *) *)
+  (*   (*   - rewrite (proj2 (PeanoNat.Nat.ltb_lt _ _)); [done | ]. *) *)
+  (*   (*     apply PeanoNat.Nat.ltb_lt in LT. lia. *) *)
+  (*   (*   - rewrite (proj2 (PeanoNat.Nat.ltb_ge _ _)); [done | ]. *) *)
+  (*   (*     apply PeanoNat.Nat.ltb_ge in LT. lia. } *) *)
+  (*   (* destruct H2; [| done]. rewrite H2. done. *) *)
+  (* Qed.
+ *)
+  Lemma BMU_smap_extend `{invGS_gen HasNoLc Σ} τ m smap R
+    (* B0 *)
+    (B B': nat -> bool)
+    (PRES: forall i, i ∈ dom smap -> B' i = B i)
+    (FRESH_UNSET: B' m = false):
+    ⊢ obls τ R (oGS := oGS) -∗ smap_repr B m smap -∗
       BMU ∅ 1 (
         |==> (∃ s',
-             smap_repr (B0 (m + 1)) (m + 1) (<[m := s']> smap) ∗
+             smap_repr B' (m + 1) (<[m := s']> smap) ∗
              ith_sig m s' ∗ obls τ (R ∪ {[s']}) (oGS := oGS) ∗
              ⌜ s' ∉ R ⌝)) (oGS := oGS).
     Proof using LEQUIV__l DISCR__l DISCR__d.
@@ -522,6 +556,60 @@ Section EoFin.
 
     Lemma lt_B_LIM: B < LIM. lia. Qed. 
 
+  (*   Lemma BMU_smap_restore τ s m smap *)
+  (*     (DOM : dom smap = set_seq 0 (B `min` (m + 2))) *)
+  (*     (IN : smap !! m = Some s) *)
+  (*     (lm : sigO (λ i : nat, i < LIM)) *)
+  (*     (LVL : lvl2nat lm = m): *)
+  (*       ⊢ *)
+  (* obls τ ∅ (oGS := oGS) -∗ *)
+  (* ([∗ map] k↦y ∈ delete m smap, ∃ l0 : sigO (λ i : nat, i < LIM), *)
+  (*                                         sgn y l0 (Some (k <? m)) (oGS := oGS) ∗ *)
+  (*                                         ⌜lvl2nat l0 = k⌝) -∗ *)
+  (* (sgn s lm (Some true) (oGS := oGS)) -∗ *)
+  (* own eofin_smap (● ((to_agree <$> smap): gmap _ _)) -∗ *)
+  (* BMU (⊤ ∖ ↑nroot.@"eofin") 1 *)
+  (*   (⌜B ≤ m + 2⌝ ∗ obls τ ∅ (oGS := oGS) ∗ smap_repr_eo (B `min` (m + 2)) (m + 1) smap *)
+  (*    ∨ (|==> ⌜m + 2 < B⌝ ∗ *)
+  (*         (∃ (s' : SignalId) (lm': EOLevel B), *)
+  (*            smap_repr_eo (B `min` (m + 3)) (m + 1) (<[m + 2:=s']> smap) ∗ *)
+  (*            ith_sig (m + 2) s' ∗ obls τ {[s']} (oGS := oGS) ∗ *)
+  (*            ⌜lvl2nat lm' = (m + 2)%nat⌝))) (oGS := oGS). *)
+
+
+    Lemma BMU_update_SR smap τ m:
+  obls τ ∅ (oGS := oGS) -∗
+  smap_repr_eo (m + 1) (B `min` (m + 2)) smap -∗
+      BMU ∅ 1 (
+        |==> ∃ smap' R', smap_repr_eo (m + 1) (B `min` (m + 3)) smap' ∗
+                         obls τ R' (oGS := oGS) ∗
+          (⌜ B <= m + 2 /\ smap' = smap /\ R' = ∅ ⌝ ∨
+           ∃ s', ith_sig (m + 2) s' ∗ ⌜ m + 2 < B /\ smap' = (<[(m + 2)%nat := s']> smap) /\ R' = {[ s' ]} ⌝)) (oGS := oGS).
+    Proof using OBLS_AMU.
+      iIntros "OBLS SR".
+      destruct (Nat.le_gt_cases B (m + 2)).
+      { rewrite !PeanoNat.Nat.min_l; try lia.
+        iApply BMU_intro. iModIntro. do 2 iExists _. iFrame.
+        iLeft. done. }
+
+      iDestruct (smap_expose_dom with "[$]") as "%SM_DOM".
+      iApply BMU_wand.
+      2: { rewrite /smap_repr_eo. simpl.
+           rewrite !PeanoNat.Nat.min_r; [| lia].
+           rewrite PeanoNat.Nat.min_r in SM_DOM; [| lia].
+           iPoseProof (BMU_smap_extend B__eo τ (m + 2) smap ∅
+(flip Nat.ltb (m + 1)) (flip Nat.ltb (m + 1)) with "[$] [$]") as "foo".
+           2: { simpl. apply Nat.ltb_ge. lia. }
+           { done. }
+           iFrame. }
+
+      iIntros "UPD". iMod "UPD" as (?) "(SR & SIG & OB & %)".
+      iModIntro. rewrite Nat.min_r; [| lia]. rewrite -Nat.add_assoc. 
+      do 2 iExists _. iFrame. iRight. iExists _. iFrame. iPureIntro.
+      eexists. repeat split; eauto. set_solver.
+      Unshelve. apply _.
+    Qed.
+
     Lemma thread_spec_holds τ l (π π2: Phase) n
       (PH_LE2: phase_le π2 π)
       `(ThreadResource th_res cond)
@@ -587,7 +675,7 @@ Section EoFin.
           intros NEQ [? [??]%Nat.min_glb_lt_iff].
           assert (j < m \/ j = m + 1) as [? | ->] by lia.
           - rewrite !(proj2 (PeanoNat.Nat.ltb_lt _ _)); lia.
-          - rewrite !(proj2 (PeanoNat.Nat.ltb_ge _ _)); lia. }        
+          - rewrite !(proj2 (PeanoNat.Nat.ltb_ge _ _)); lia. }
         
         MU_by_BMU. iApply OU_BMU.
         iDestruct (OU_set_sig with "OB [SG]") as "OU".
@@ -600,28 +688,30 @@ Section EoFin.
         iSpecialize ("SR_CLOS" with "[SIG]").
         { rewrite /ex_ith_sig. simpl.
           rewrite !(proj2 (PeanoNat.Nat.ltb_lt _ _)); [iFrame | lia]. }
-        iApply (BMU_lower _ 1); [lia| ].
-        Unshelve. 2: by apply _.
-        (* iApply (BMU_wand with "[-BMU] [$]"). iIntros "COND". *)
-        iApply BMU_intro. 
+        
+        iApply (BMU_weaken ∅ _ 1 _ _ _); [lia| set_solver|iIntros "X"; iApply "X"|].
+                
+        iApply (BMU_wand with "[-OBLS SR_CLOS]").
+        2: { iApply (BMU_update_SR with "[$] [$]"). }
+        iIntros "UPD".
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
         iSplitR "CP".
         2: { do 2 iExists _. iFrame. done. }
+        iMod "UPD" as (smap' R') "(SR & OB & COND)". 
         iApply wp_value.
         
         iMod (tr_update with "[$] TH") as "[AUTH TH]"; eauto. 
 
         destruct (Nat.le_gt_cases B (m + 2)). 
         + iDestruct "COND" as "[COND | CC]".
-          2: { iMod "CC" as "[% ?]". lia. }
-          iDestruct "COND" as "(% & OBLS & SM)".
+          2: { iDestruct "CC" as "(%&?&%&?)". lia. }
+          iDestruct "COND" as "(_ & -> & ->)".
           
-          iMod ("CLOS" with "[AUTH SM L]") as "?".
+          iMod ("CLOS" with "[AUTH SR L]") as "?".
           { rewrite /eofin_inv_inner. iNext. iExists (m + 1), smap.
             (* rewrite even_plus1_negb odd_plus1_negb E -O. simpl.  *)
             rewrite -Nat.add_assoc. rewrite Nat2Z.inj_add. 
-            iFrame.
-            rewrite Nat.min_l; [| done]. rewrite Nat.min_l; [| lia]. done. }
+            iFrame. }
           
           iModIntro.
           wp_bind (Snd _)%E.           
@@ -638,10 +728,11 @@ Section EoFin.
           rewrite bool_decide_true; [| lia].
           pure_steps. by iApply "POST". 
         + iDestruct "COND" as "[CC | COND]".
-          { iDestruct "CC" as "(% & ? & ?)". lia. }
+          { iDestruct "CC" as "(% & % & %)". lia. }
           iClear "SN".  
-          iMod "COND" as "[% (%s' & %lm' & SM & SN & OBLS & %LVL')]". 
-          iMod ("CLOS" with "[AUTH SM L]") as "?".
+          (* iMod "COND" as "[% (%s' & %lm' & SM & SN & OBLS & %LVL')]".  *)
+          iDestruct "COND" as "(%s'& SN & (%LT & -> & ->))".
+          iMod ("CLOS" with "[AUTH SR L]") as "?".
           { rewrite /eofin_inv_inner. iNext. iExists (m + 1), _.
             (* rewrite even_plus1_negb odd_plus1_negb E -O. simpl.  *)
             rewrite -Nat.add_assoc. rewrite Nat2Z.inj_add. 
@@ -653,7 +744,7 @@ Section EoFin.
           
           wp_bind (_ + _)%E.
 
-          red in H2. apply Nat.le_sum in H2 as [? LE].
+          red in LT. apply Nat.le_sum in LT as [? LE].
           rewrite {4}LE.
           rewrite -plus_n_Sm. 
           rewrite !plus_Sn_m. rewrite !PeanoNat.Nat.sub_succ_l; try lia.
@@ -696,14 +787,17 @@ Section EoFin.
         iDestruct "EXTRA" as "[CP2' | EXP]". 
         + MU_by_BMU. 
           (* TODO: avoid unfolding BMU *)
-          iMod (smap_create_ep m with "[$] [$] [$]") as "OU"; eauto.
+          rewrite Nat.min_r; [| lia].
+          rewrite /smap_repr_eo. 
+          iMod (smap_create_ep B__eo m with "[$] [$] [$]") as "OU"; eauto.
           { lia. }
+          { apply d12_lt. }
           iApply OU_BMU.
           iApply (OU_wand with "[-OU]"); [| done]. iIntros "(%sw & #SW & #EP & SR & PH)".
           (* rewrite -E in H0. *)
-          rewrite Nat.min_r; [| lia].
-          
-          iDestruct (ith_sig_expect with "[$] [$] [$] [$] [$] [$]") as "OU".
+
+          foobar. 
+          iDestruct (ith_sig_expect B__eo with "[$] [$] [$] [$] [$] [$]") as "OU".
           { done. }
           { reflexivity. }
           iApply OU_BMU.
