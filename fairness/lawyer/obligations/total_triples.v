@@ -65,10 +65,10 @@ Section TotalTriples.
       Admitted.
 
       Definition TAU1_acc (V: iProp Σ): iProp Σ :=
-        |={ε, ∅}=> ∃ x, P x ∗ (
+        |={ε, ∅}=> ∃ x, ▷ P x ∗ (
                            let abort := P x ={∅, ε}=∗ V in
                            ((∃ r__p, RR r__p) ∗ ⌜ TGT x ⌝ ∗ obls τ O (oGS := oGS) -∗
-                              BMU ∅ c (oGS := oGS) (∀ y, Q y x ={∅, ε}=∗ Φ #())) ∧
+                              BMU ∅ c (oGS := oGS) (∀ y, ▷ Q y x ={∅, ε}=∗ Φ #())) ∧
                              abort
                          ).
       
@@ -81,27 +81,32 @@ Section TotalTriples.
 
       (* TODO: unify with TAU1_acc *)
       Definition TAU2_acc (V: iProp Σ): iProp Σ :=
-        |={ε, ∅}=> ∃ x, P x ∗ (
-              let abort := P x ={∅, ε}=∗ V in
+        |={ε, ∅}=> ∃ x, ▷ P x ∗ (
+              let abort := ▷ P x ={∅, ε}=∗ V in
               (let r := round x in
-               ∀ O', obls τ O' (oGS := oGS) ∗ sgns_level_ge' O' L ∗
-                      th_phase_ge τ π (oGS := oGS) ∗
-                      (∃ r__p, RR r__p ∗ (⌜ r__p = Some r ⌝ ∨ cp π d__h (oGS := oGS))) ∗
+               ∀ O' π', obls τ O' (oGS := oGS) ∗ sgns_level_ge' O' L ∗
+                        th_phase_ge τ π' (oGS := oGS) ∗ ⌜ phase_le π π' ⌝ ∗
+                      (∃ r__p, RR r__p ∗ (⌜ r__p = Some r ⌝ ∨ cp π' d__h (oGS := oGS))) ∗
                       ⌜ ¬ TGT x ⌝ -∗
-                      BMU ∅ c (oGS := oGS) (
-                        RR (Some r) ∗ cp π d__l (oGS := oGS) ∗
-                        th_phase_ge τ π (oGS := oGS) ∗
+                      BMU ∅ c (oGS := oGS) (∃ π'', ⌜ phase_le π' π'' ⌝ ∗
+                        RR (Some r) ∗ cp π'' d__l (oGS := oGS) ∗
+                        th_phase_ge τ π'' (oGS := oGS) ∗
                         obls τ O' (oGS := oGS) ∗
                         abort
                       )
               ) ∧
-              ((∃ r__p, RR r__p) ∗ ⌜ TGT x ⌝ ∗ obls τ O (oGS := oGS) -∗
-               BMU ∅ c (oGS := oGS) (∀ y, Q y x ={∅, ε}=∗ Φ #())) ∧
+              ((∃ r__p, RR r__p) ∗ ⌜ TGT x ⌝ ∗ obls τ O (oGS := oGS) ∗ th_phase_ge τ π (oGS := oGS) -∗
+               BMU ∅ c (oGS := oGS) (∀ y, ▷ Q y x ={∅, ε}=∗ Φ #())) ∧
               abort
       ).
       
       Lemma TAU2_elim:
         TAU2 ⊣⊢ TAU2_acc TAU2.
+      Proof using. Admitted.
+
+      Lemma TAU2_intro (R: iProp Σ):
+        (R ⊢ TAU2_acc R) ->
+        (R ⊢ TAU2).
       Proof using. Admitted.
 
     End AtomicUpdates.
@@ -178,7 +183,7 @@ Section FairLockSpec.
       {{{ ⌜ True ⌝ }}} fl_create #() @ τ {{{ lk, RET lk; fl_LK (lk, 0, false) ∗ fl_is_lock lk c }}};
 
     fl_acquire_spec (lk: loc) c τ: fl_is_lock #lk c ⊢
-        TLAT2 τ (fun x => fl_LK x ∗ ⌜ x.1.1 = #lk ⌝) (fun y x => fl_LK y ∗ ⌜ y = x /\ x.2 = false ⌝)
+        TLAT2 τ (fun x => fl_LK x ∗ ⌜ x.1.1 = #lk ⌝) (fun y x => ▷ fl_LK y ∗ ⌜ y = x /\ x.2 = false ⌝)
           fl_lvls
           (fun '(_, r, _) => r) (fun '(_, _, b) => b = false)
           fl_d__h fl_d__l fl_d__m
@@ -202,6 +207,7 @@ End FairLockSpec.
 From iris.algebra Require Import auth gmap gset excl excl_auth csum.
 From iris.proofmode Require Import tactics.
 From iris.base_logic.lib Require Import invariants.
+From trillium.fairness.lawyer.examples Require Import signal_map.
 
 (* TODO: move *)
 Section OneShot.
@@ -245,12 +251,14 @@ Class ClientPreG Σ := {
     cl_ow_sig_pre :> inG Σ (excl_authUR (optionUR SignalId));
     (* eofin_sigs :> inG Σ (authUR (gmapUR nat (agreeR SignalId))); *)
     cl_one_shot_pre :> @one_shotG unitR Σ;
+    cl_sig_map_pre :> SigMapPreG Σ;
 }.
 
 Class ClientG Σ := {
     cl_PreG :> ClientPreG Σ;
     cl_γ__ow: gname;
     cl_γ__os: gname;
+    cl_sig_map :> SigMapG Σ;
 }.
 
 Section MotivatingClient.
@@ -287,7 +295,8 @@ Section MotivatingClient.
 
 
   Section AfterInit.
-    Context {CL: ClientG Σ}. 
+    Context {CL: ClientG Σ}.
+    Existing Instance cl_sig_map. 
     
     Definition flag_unset := own cl_γ__os Pending.
     Definition flag_set := own cl_γ__os (Shot ()).
@@ -300,14 +309,19 @@ Section MotivatingClient.
     Definition P__lock flag s__f (b: bool): iProp Σ :=
       flag ↦ #b ∗ (⌜ b = false ⌝ ∗ sgn s__f l__f (Some false) (oGS := oGS) ∨
                     ⌜ b = true ⌝ ∗ flag_set).
+
+    Let s__def: SignalId := 0.
+
+    Definition smap_repr_cl r := smap_repr (fun _ => l__o) (flip Nat.ltb r) (oGS := oGS).
     
     Definition client_inv_inner lk flag s__f: iProp Σ :=
-      ∃ r b oo, fl_LK FL (lk, r, b) ∗ lock_owner_auth oo ∗
-        (⌜ b = true ⌝ ∗ (∃ o, ⌜ oo = Some o ⌝ ∗ sgn o l__o (Some false) (oGS := oGS)) ∨
-         ⌜ b = false ⌝ ∗ lock_owner_frag None ∗ ∃ f, P__lock flag s__f f).
+      ∃ r b oo smap, fl_LK FL (lk, r, b) ∗ lock_owner_auth oo ∗
+        (⌜ b = true ⌝ ∗ (∃ s__o, ⌜ oo = Some s__o /\ smap !! r = Some s__o⌝ ∗ sgn s__o l__o (Some false) (oGS := oGS)) ∨
+         ⌜ b = false ⌝ ∗ lock_owner_frag None ∗ ∃ f, P__lock flag s__f f) ∗
+        smap_repr_cl r (r + (if b then 1 else 0)) smap.
 
     Definition client_ns := nroot .@ "client". 
-      
+    
     Definition client_inv lk flag sf: iProp Σ :=
       inv client_ns (client_inv_inner lk flag sf).
 
@@ -324,23 +338,157 @@ Section MotivatingClient.
 
     Existing Instance fl_is_lock_pers.
 
-    Definition RR__cl (r': option nat): iProp Σ := 
+    Hypothesis (FL_STEPS: fl_B FL c__cl ≤ LIM_STEPS).
+    Hypothesis (INVS_DISJ: fl_ι FL ## client_ns). 
+
+    Definition RR__L π (r': option nat): iProp Σ := 
       match r' with
       | None => ⌜ True ⌝
-      | Some r => ⌜ False ⌝
+      | Some r => ∃ s, ith_sig r s ∗ ep s π (fl_d__l FL) (oGS := oGS)
       end. 
+
+    From iris.proofmode Require Import tactics coq_tactics.
+
+    Ltac remember_goal :=
+      match goal with | |- envs_entails _ ?P =>
+        iAssert (P -∗ P)%I as "GOAL"; [iIntros "X"; by iApply "X"| ]
+      end.
+
+    (* need to assume at least one FL level *)
+    (* TODO: can we change either TAU or levels order? *)
+    Context (l__fl: Level).
+    Hypothesis (L__FL: l__fl ∈ fl_lvls FL). 
+
+    Lemma BMU_wait_owner τ π O r m smap π__e
+      (PH_EXP: phase_le π__e π):
+      obls τ O (oGS := oGS) ∗ sgns_level_ge' O (fl_lvls FL) (oGS := oGS)∗
+      th_phase_ge τ π (oGS := oGS) ∗ RR__L π__e (Some r) ∗ smap_repr_cl r m smap ⊢ 
+      BMU ∅ 1 (∃ π', cp π' (fl_d__l FL) (oGS := oGS) ∗ th_phase_ge τ π' (oGS := oGS) ∗ 
+          obls τ O (oGS := oGS) ∗ smap_repr_cl r m smap ∗
+          ⌜ phase_le π π' /\ phase_le π__e π' ⌝) (oGS := oGS).
+    Proof using LVL_ORDo L__FL.
+      iIntros "(OBLS & #LVLS & PH & #RR & SR)".
+      rewrite /RR__L. iDestruct "RR" as (s) "[#ITH #EP]".
+      iApply OU_BMU. 
+      iApply (OU_wand with "[]").
+      2: { rewrite /smap_repr_cl. 
+           iApply (ith_sig_expect (λ _, l__o) with "[$] [$] [$] [$] [$] []").
+           { done. }
+           { apply Nat.ltb_irrefl. }
+           rewrite /sgns_level_ge' /sgns_level_gt /sgns_level_ge.
+           iDestruct (big_sepS_forall with "LVLS") as "LVLS'".
+           iSpecialize ("LVLS'" $! l__fl with "[//]").
+           iApply big_sepS_impl; [by iFrame| ].
+           iModIntro. iIntros (??) "(%l & ? & %LE)".
+           iExists _. iFrame. iPureIntro.
+           eapply strict_transitive_l; [| apply LE]. by apply LVL_ORDo. }
+      iIntros "(%&?&?&?&?&?)". iApply BMU_intro. 
+      iExists _. iFrame.
+    Qed.
+
+    Lemma BMU_create_wait_owner τ π O r m smap π__e
+      (PH_EXP: phase_le π__e π):
+      obls τ O (oGS := oGS) ∗ sgns_level_ge' O (fl_lvls FL) (oGS := oGS) ∗
+      th_phase_ge τ π (oGS := oGS) ∗ cp π (fl_d__h FL) (oGS := oGS) ∗ smap_repr_cl r m smap ⊢ 
+      BMU ∅ 2 (∃ π', cp π' (fl_d__l FL) (oGS := oGS) ∗ th_phase_ge τ π' (oGS := oGS) ∗ 
+          obls τ O (oGS := oGS) ∗ smap_repr_cl r m smap ∗
+          ⌜ phase_le π π' /\ phase_le π__e π' ⌝) (oGS := oGS).
+    Proof using LVL_ORDo L__FL.
+      iIntros "(OBLS & #LVLS & PH & CP & SR)".
+      rewrite /RR__L.
+      iApply OU_BMU. 
+      iApply (OU_wand with "[OBLS]").
+      2: { iApply (smap_create_ep (λ _, l__o) with "[$] [$] [$]"). 
+           foobar. 
+
+
+      2: { rewrite /smap_repr_cl. 
+           iApply (ith_sig_expect (λ _, l__o) with "[$] [$] [$] [$] [$] []").
+           { done. }
+           { apply Nat.ltb_irrefl. }
+           rewrite /sgns_level_ge' /sgns_level_gt /sgns_level_ge.
+           iDestruct (big_sepS_forall with "LVLS") as "LVLS'".
+           iSpecialize ("LVLS'" $! l__fl with "[//]").
+           iApply big_sepS_impl; [by iFrame| ].
+           iModIntro. iIntros (??) "(%l & ? & %LE)".
+           iExists _. iFrame. iPureIntro.
+           eapply strict_transitive_l; [| apply LE]. by apply LVL_ORDo. }
+      iIntros "(%&?&?&?&?&?)". iApply BMU_intro. 
+      iExists _. iFrame.
+    Qed.
 
     Lemma acquire_left τ (lk: loc) flag s__f π:
       {{{ fl_is_lock FL #lk c__cl ∗ client_inv #lk flag s__f ∗ flag_unset ∗
-          obls τ {[ s__f ]} (oGS := oGS) ∗ cp_mul π d2 20 (oGS := oGS) ∗ th_phase_ge τ π (oGS := oGS)
+          obls τ {[ s__f ]} (oGS := oGS) ∗ th_phase_ge τ π (oGS := oGS) ∗
+          cp_mul π d2 20 (oGS := oGS) ∗ cp_mul π (fl_d__m FL) 20 (oGS := oGS) ∗
+          sgn s__f l__f None (oGS := oGS)
       }}}
         (fl_acquire FL) #lk @ τ
       {{{ v, RET v; ∃ s__o, obls τ {[ s__f; s__o ]} (oGS := oGS) ∗ flag_unset ∗
+                          th_phase_ge τ π (oGS := oGS) ∗
                           P__lock lk s__f false ∗ lock_owner_frag (Some s__o) }}}.
     Proof using.
-      iIntros (Φ). iIntros "(#LOCK & #INV & UNSET & OB & CPS & PH) POST".
-      iPoseProof (fl_acquire_spec FL with "[$]") as "ACQ".
-      rewrite /TLAT2. iApply "ACQ".  
+      iIntros (Φ). iIntros "(#LOCK & #INV & UNSET & OB & PH & CPS2 & CPSm & #SF') POST".
+      iPoseProof (fl_acquire_spec FL _ _ τ with "[$]") as "ACQ".
+      rewrite /TLAT2.
+
+      iDestruct (cp_mul_take with "CPSm") as "[CPSm CP]".
+      iSpecialize ("ACQ" $! Φ _ _ (RR__L π) with "[] [OB PH CP]").
+      { done. }
+      { iFrame. rewrite /sgns_level_gt'.
+        iApply big_sepS_forall. iIntros (??).
+        rewrite /sgns_level_gt. rewrite big_opS_singleton.
+        iExists _. iFrame "#∗". iPureIntro.
+        by apply LVL_ORDf. }
+      iSpecialize ("ACQ" with "[UNSET]").
+      { iApply TAU2_intro.
+        2: { (* iAccu. *)
+             iCombine "INV SF' UNSET" as "X". iApply "X". }
+        iIntros "(#INV & #SF' & UNSET)".
+        rewrite /TAU2_acc.
+        iInv "INV" as "inv" "CLOS".
+        iApply fupd_mask_intro; [set_solver| ]. iIntros "CLOS'".
+        rewrite {1}/client_inv_inner.
+        iDestruct "inv" as (r b oo smap) "(LK & LOCK_OW & ST & SR)".        
+        iExists (#lk, r, b). iFrame "LK". iSplit; [done| ]. 
+        iSplit.
+        { iIntros (O' π') "(OB & #LVLS' & PH & %PH' & (%r' & #RR' & CASES) & %BB)".
+          apply not_false_is_true in BB as ->.
+          (* TODO: don't unfold BMU *)
+          remember_goal.
+          iDestruct "ST" as "[>(_ & (%s__o & [-> %SMAP__o] & SIGo)) | [>% ?]]"; [| done].
+          iMod "LOCK_OW". iMod "SR".
+          iApply "GOAL". iClear "GOAL".
+          iDestruct "CASES" as "[-> | FRESH]".
+          - iApply (BMU_lower _ 1); [unfold c__cl; lia| ].
+            iApply (BMU_wand with "[-OB PH SR RR']").
+            2: { iApply BMU_wait_owner; [| iFrame "#∗"]. done. }
+            iIntros "(%π'' & CP & PH & OB & SR & [%PH'' %PH'''])".
+            iExists _. iFrame. do 2 (iSplit; [done| ]).
+            iFrame "#∗". iIntros "[LK >%]".
+            iMod "CLOS'" as "_".
+            iMod ("CLOS" with "[-]") as "_"; [| done].
+            iNext. rewrite /client_inv_inner. do 4 iExists _. iFrame.
+            iLeft. iSplit; [done| ]. iExists _. iFrame "#∗". done.
+          -  
+          
+
+          fold (BMU ∅ c__cl
+    (RR__L π (Some r) ∗ cp π (fl_d__l FL) ∗ th_phase_ge τ π ∗ 
+     obls τ O' ∗
+     (▷ (fl_LK FL (#lk, r, true) ∗ ⌜(#lk, r, true).1.1 = #lk⌝) ={∅,
+      ⊤ ∖ ↑fl_ι FL}=∗ client_inv #lk flag s__f ∗ sgn s__f l__f None ∗ flag_unset)) (oGS := oGS)).
+
+          
+          2: { set_solver. 
+        
+
+        
+          Unshelve. 2: { 
+        
+
+      iApply "ACQ". 
+      Set Printing Implicit.
       
     
 End MotivatingClient.
