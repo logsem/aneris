@@ -117,7 +117,7 @@ Section SignalMap.
     ⊢ smap_repr B K smap -∗ 
       cp π__cp d__h (oGS := oGS) -∗
       th_phase_ge τ π (oGS := oGS) -∗
-      |==> OU (∃ s, ith_sig i s ∗
+      OU (|==> ∃ s, ith_sig i s ∗
                     ep s π__cp d__l (oGS := oGS) ∗ smap_repr B K smap ∗
                     th_phase_ge τ π (oGS := oGS)) (oGS := oGS).
   Proof using DISCR__d DISCR__l LEQUIV__l.

@@ -388,12 +388,13 @@ Section EoFin.
           (* TODO: avoid unfolding BMU *)
           rewrite Nat.min_r; [| lia].
           rewrite /smap_repr_eo. 
-          iMod (smap_create_ep B__eo m with "[$] [$] [$]") as "OU"; eauto.
+          iPoseProof (smap_create_ep B__eo m with "[$] [$] [$]") as "OU"; eauto.
           { lia. }
           { apply d12_lt. }
           Unshelve. 2: by apply _.
           iApply OU_BMU.
-          iApply (OU_wand with "[-OU]"); [| done]. iIntros "(%sw & #SW & #EP & SR & PH)".
+          iApply (OU_wand with "[-OU]"); [| done].
+          iIntros "X". iMod "X" as "(%sw & #SW & #EP & SR & PH)".
           iDestruct (ith_sig_sgn with "SN [$]") as "#EX". 
           iDestruct (ith_sig_expect B__eo with "[$] [$] [$] SW [$] []") as "OU".
           { done. }
