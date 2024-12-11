@@ -1,11 +1,12 @@
 From trillium.prelude Require Import classical_instances.
 From trillium.program_logic Require Import language.
 From trillium Require Import finitary.
+From aneris.aneris_lang.program_logic Require Import aneris_adequacy.
 From aneris.aneris_lang Require Import adequacy aneris_lang proofmode adequacy_no_model.
 From iris.base_logic.lib Require Import invariants.
 From aneris.examples.transactional_consistency Require Import code_api wrapped_library.
 
-Definition aneris_invariance `{anerisPreG Σ unit_model} (N : namespace) (I : list val → Prop) 
+Definition aneris_invariance `{anerisPreG Σ unit_model} (N : namespace) (I : list val → Prop) (φ : val → Prop)
   ip e σ A IPs lbls obs_send_sas obs_rec_sas : 
   state_heaps σ = {[ip:=∅]} →
   state_sockets σ = {[ip:=∅]} →
@@ -27,18 +28,20 @@ Definition aneris_invariance `{anerisPreG Σ unit_model} (N : namespace) (I : li
         observed_send obs_send_sas ∗
         observed_receive obs_rec_sas }}} 
     e @[ip]
-    {{{ v, RET v; True }}}) →
-  ∀ σ' t,
+    {{{ v, RET v; ⌜φ v⌝ }}}) →
+  (∀ σ' t,
     rtc step ([(mkExpr ip e)], σ) (t, σ') →
-    I (state_trace σ').
+    I (state_trace σ')) ∧
+    aneris_adequate e ip σ φ.
 Proof.
-  intros Hheaps Hsock Hms Htrace Hip_nin Hobs_send Hobs_rec HI Hwp σ' t Hsteps.
-  assert (@continued_simulation aneris_lang (aneris_to_trace_model unit_model)
+  intros Hheaps Hsock Hms Htrace Hip_nin Hobs_send Hobs_rec HI Hwp.
+  assert ((@continued_simulation aneris_lang (aneris_to_trace_model unit_model)
             (λ ex _, ∀ conf, trace_ends_in ex conf → I (state_trace conf.2))
             (trace_singleton ([(mkExpr ip e)], σ))
-            (trace_singleton ())) as Hsim.
+            (trace_singleton ())) ∧ 
+            aneris_adequate e ip σ φ) as (Hsim & Haneris_adequate).
   {
-    eapply (simulation_adequacy1 Σ (aneris_to_trace_model unit_model) 
+    eapply (simulation_adequacy Σ (aneris_to_trace_model unit_model) 
               NotStuck IPs lbls A obs_send_sas obs_rec_sas); try done.
     - intros ?.
       intros.
@@ -53,7 +56,7 @@ Proof.
       apply make_proof_irrel.
     - iIntros.
       iModIntro.
-      iExists (λ v, (∃ w : val, ⌜v = {| val_n := ip; val_e := w |}⌝ ∗ True)%I).
+      iExists (λ v, (∃ w : val, ⌜v = {| val_n := ip; val_e := w |}⌝ ∗ ⌜φ w⌝)%I).
       iIntros "Hunalloc Hobs Hfree_ip His_node Hlbs Hsend_evs Hrec_evs 
         Hobs_send Hobs_rec ? Hfrag_trace Htrace_is".
       iMod (inv_alloc N _ (∃ t, trace_half_frag t ∗ ⌜I t⌝)%I with "[Hfrag_trace]") as "#Hinv".
@@ -65,22 +68,18 @@ Proof.
         by rewrite -Htrace.
       }
       iModIntro.
+      iSplitR; first set_solver.
       iSplitL.
-      + unfold aneris_wp_def in Hwp.
-        iAssert (WP e @[ip] {{ _, True}}%I) with "[Hunalloc Hobs Hfree_ip 
+      + 
+        unfold aneris_wp_def in Hwp.
+        iAssert (WP e @[ip] {{ v, ⌜φ v⌝}}%I) with "[Hunalloc Hobs Hfree_ip 
           Hlbs Hsend_evs Hrec_evs Hobs_send Hobs_rec Htrace_is]" as "Hwp".
         {
           iApply (Hwp anerisG0 with "[$Hinv Htrace_is $Hunalloc Hobs $Hfree_ip 
             $Hlbs $Hsend_evs $Hrec_evs $Hobs_send $Hobs_rec][]"); try done.
           rewrite Htrace.
           iFrame.
-          unfold message_history_singleton.
-          simpl.
-          iApply (big_sepS_wand with "[$Hobs][]").
-          iApply big_sepS_intro.
-          iModIntro.
-          iIntros.
-          by iFrame.
+          set_solver.
         }
         rewrite !aneris_wp_unfold /aneris_wp_def.
         iApply ("Hwp" with "[$His_node]").
@@ -98,6 +97,8 @@ Proof.
         apply last_eq_trace_ends_in in H6.
         by rewrite H6 in Hinv_res2.
   }
+  split; last done.
+  intros σ' t Hsteps.
   eapply (@trace_steps_rtc_bin _ unit) in Hsteps; last done.
   destruct Hsteps as [ex (Htrace_steps & Htrace_start & Htrace_end)].
   assert (∃ ex', trace_steps language.locale_step ex' ∧ 
@@ -116,7 +117,7 @@ Proof.
     - intros.
       apply trace_extend_starts_in_inv in Htrace_start.
       destruct x.
-      eapply IHHtrace_steps in Htrace_start; last apply H0.
+      eapply IHHtrace_steps in Htrace_start; last apply H0; last done.
       destruct Htrace_start as 
         [ex' (Htrace_steps' & Htrace_start' & Htrace_end')].
       inversion H1.
@@ -151,6 +152,39 @@ Proof.
   by apply Hsim_ex' in Htrace_end'.
 Qed.
 
+Theorem adequacy_trace_with_aneris_adequacy Σ `{anerisPreG Σ unit_model} {L : Type} (N : namespace) ip
+  (Φ : ∀ `{anerisG Σ}, L → iProp Σ) (φ : val → Prop)
+  (e : expr) (lib : L) (valid_trace: list val → Prop) 
+  (σ: state) (A : gset socket_address) (IPs : gset ip_address)  :
+  state_heaps σ = {[ip:=∅]} →
+  state_sockets σ = {[ip:=∅]} →
+  state_ms σ = ∅ →
+  state_trace σ = [] →
+  ip ∉ IPs →
+  valid_trace [] →
+  (∀ `{anerisG Σ}, ⊢ (trace_is [] ∗ trace_inv N valid_trace) ={⊤}=∗ Φ lib) →
+  (∀ `{anerisG Σ}, ⊢ 
+    {{{ Φ lib ∗ unallocated A ∗ ([∗ set] a ∈ A, a ⤳ (∅, ∅)) ∗ ([∗ set] ip ∈ IPs, free_ip ip) }}} 
+    e @[ip] 
+    {{{ v, RET v; ⌜φ v⌝ }}}) →
+  (∀ σ' e',
+    rtc step ([(mkExpr ip e)], σ) (e', σ') →
+    valid_trace (state_trace σ')) ∧
+    aneris_adequate e ip σ φ.
+Proof.
+  intros Hstate_heap Hstate_sock Hstate_ms Hstate_trace Hips_nin.
+  intros Htr Hinit Hclient.
+  rewrite -Hstate_trace in Htr.
+  eapply (aneris_invariance _ _ _ _ _ _ A _ ∅ ∅ ∅); try done.
+  iIntros (? ?) "!# (#HI & Htr & Hunalloc & Hobs & Hfree_ip & Hlbs 
+    & Hsend_evs & Hrec_evs & Hobs_send & Hobs_rec) HΦ".
+  iApply fupd_aneris_wp.
+  rewrite Hstate_trace.
+  iMod (Hinit with "[$Htr $HI]") as "Hinit'".
+  iModIntro.
+  iApply (Hclient with "[$Hunalloc $Hfree_ip $Hobs $Hinit'][HΦ]"); last done.
+Qed.
+
 Theorem adequacy_trace Σ `{anerisPreG Σ unit_model} {L : Type} (N : namespace) ip
   (Φ : ∀ `{anerisG Σ}, L → iProp Σ) 
   (e : expr) (lib : L) (valid_trace: list val → Prop) 
@@ -171,14 +205,6 @@ Theorem adequacy_trace Σ `{anerisPreG Σ unit_model} {L : Type} (N : namespace)
     valid_trace (state_trace σ').
 Proof.
   intros Hstate_heap Hstate_sock Hstate_ms Hstate_trace Hips_nin.
-  intros Htr Hinit Hclient σ' e' Hsteps.
-  rewrite -Hstate_trace in Htr.
-  eapply (aneris_invariance _ _ _ _ _ A _ ∅ ∅ ∅); try done.
-  iIntros (? ?) "!# (#HI & Htr & Hunalloc & Hobs & Hfree_ip & Hlbs 
-    & Hsend_evs & Hrec_evs & Hobs_send & Hobs_rec) HΦ".
-  iApply fupd_aneris_wp.
-  rewrite Hstate_trace.
-  iMod (Hinit with "[$Htr $HI]") as "Hinit'".
-  iModIntro.
-  iApply (Hclient with "[$Hunalloc $Hfree_ip $Hobs $Hinit'][HΦ]"); last done.
+  intros Htr Hinit Hclient.
+  eapply (adequacy_trace_with_aneris_adequacy _ _ ip _ (λ _, True)); try done.
 Qed.
