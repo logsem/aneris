@@ -5,7 +5,7 @@ From trillium.fairness.heap_lang Require Import simulation_adequacy.
 From trillium.fairness.lawyer Require Import sub_action_em action_model.
 From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_em obls_fairness_preservation obligations_am obligations_fin_branch obls_termination multiset_utils obligations_wf.
 From trillium.fairness.lawyer.examples.eo_fin Require Import eo_fin.
-From trillium.fairness.lawyer.examples Require Import bounded_nat.
+From trillium.fairness.lawyer.examples Require Import bounded_nat signal_map.
 
 
 Section EOFinAdequacy.
@@ -190,10 +190,14 @@ Section EOFinAdequacy.
     simpl in INIT. red in INIT. set_solver. 
   Qed.
 
+  (* TODO: move *)
+  Definition sig_mapΣ := #[GFunctor $ authUR (gmapUR nat (agreeR SignalId))].
+  Global Instance subG_sig_mapΣ {Σ}: subG sig_mapΣ Σ → SigMapPreG Σ.
+  Proof. solve_inG. Qed.
 
   Let eofinΣ: gFunctors := #[
       GFunctor (excl_authR natO); 
-      GFunctor (authUR (gmapUR nat (agreeR SignalId)));
+      sig_mapΣ;
       heapΣ EM
   ].
 
