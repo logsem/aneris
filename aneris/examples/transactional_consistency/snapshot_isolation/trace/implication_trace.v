@@ -885,6 +885,22 @@ Section trace_proof.
         iDestruct (ghost_map_elem_valid with "Hfalse") as "%Hfalse".
         by rewrite dfrac_valid_own in Hfalse.
     }
+    iAssert (∀ v, ⌜vo = Some v⌝ → ⌜∃ s t, t ∈ T' ∧ (Wr s k v) ∈ t⌝)%I as "%Hread_res_3".
+    {
+      iIntros (v ->).
+      iDestruct ("Hlin_hist" $! v with "[//]") as "(%lh & %tag_wr & %c_wr & #HOwnLinHist_wr & %Hwr_in)".
+      iDestruct (own_lin_prefix with "[$HOwnLin' $HOwnLinHist_wr]") as "(_ & _ & %Hprefix')".
+      assert ((#tag_wr, (c_wr, (#"WrLin", (#k, v))))%V ∈ (lt' ++ [(#tag1, (c, (#"RdLin", (#k, $ (Some v)))))%V])) 
+        as HwrLinIn; first by apply (elem_of_prefix lh).
+      rewrite elem_of_app in HwrLinIn.
+      destruct HwrLinIn as [HwrLinIn|HwrLinIn]; last set_solver.
+      destruct Hex' as (Hex' & _).
+      iPureIntro.
+      specialize (Hex' (#tag_wr, (c_wr, (#"WrLin", (#k, v))))%V (Wr (tag_wr, c_wr) k v) HwrLinIn).
+      exists (tag_wr, c_wr).
+      apply Hex'.
+      by simpl.
+    }
     iDestruct "Hinv_si_res'" as "(%mnames & Hmap_mnames & %m_gl & Hmap_m_gl & Hkey_some_m_gl & Hown_exec & 
       %Hrel_exec & Hopen_trans_state)".
     rewrite /open_transactions_state.
@@ -895,9 +911,10 @@ Section trace_proof.
     iDestruct "Hopen_trans_state_sa" as "[%Hfalse|(%c_sa & %st & %γm_conn_sa & %γsnap_sa & %γupd_st_sa & %H_sa_names & 
       Hown_st_frag & %Htrans_reads)]".
     {
+
       admit.
     }
-    iAssert ((⌜ov_last_wr = None⌝ → ⌜∃ t' c', t' ∈ T' ∧ latest_write c' k vo T' ∧ st !! k = vo⌝)%I) as "%Hread_res_3".
+    iAssert ((⌜ov_last_wr = None⌝ → ⌜st !! k = vo⌝)%I) as "%Hread_res_4".
     {
       iIntros (->).
       iDestruct ("Hloc_k_st" with "[//]") as "(%γm_conn & %γsnap & %γupd_st & #Hsa_pointer' & 
@@ -937,21 +954,9 @@ Section trace_proof.
           subst.
           assert (v = v') as <-; first set_solver.
           destruct Hex' as (_ & Hex' & _).
-          destruct (ov_last_wr) as [v_last|] eqn:Heq_ov_last_wr.
-          + destruct (Hread_res_1 v_last) as (Heq_ov_last_wr_ov & (t1 & s1 & Ht1_in & Hwr_in)); first done.
-            assert (v = v_last) as <-; first set_solver.
-            specialize (Hex' t1 (Wr s1 k v) Ht1_in Hwr_in).
-            destruct s1.
-            simpl in Hex'.
-            eauto.
-          + destruct Hread_res_3 as (t1 & c1 & Ht1_in & Hwr_latest & _); first done.
-            destruct Hwr_latest as [(Hfalse & _) | (v' & t1' & tag1' & Heq_some & Hopen_trans & 
-              Hwr_in & _)]; first done.
-            assert (v = v') as <-; first set_solver.
-            destruct Hopen_trans as (op1 & Ht1'_in & _).
-            specialize (Hex' t1' (Wr (tag1', c1) k v) Ht1'_in Hwr_in).
-            simpl in Hex'.
-            eauto.
+          destruct (Hread_res_3 v) as (s1 & t1 & Ht1_in & Hwr_in); first done.
+          specialize (Hex' t1 (Wr s1 k v) Ht1_in Hwr_in).
+          destruct s1; simpl in Hex'; eauto.
       }
       destruct (decide (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation), 
         op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans)) 
@@ -997,30 +1002,29 @@ Section trace_proof.
             destruct (ov_last_wr) as [v_last|] eqn:Heq_ov_last_wr. 
             -- destruct Hread_res_2 as [Hfalse| (v'' & trans' & tag_wr & Heq_some' & Hopen_trans & Hwr_in & Hrel)]; 
                 first set_solver.
-              assert (v_last  = v'') as <-; first set_solver.
-              exists tag_wr, v_last.
-              assert (trans = trans') as <-; first by eapply trans_eq.
-              rewrite elem_of_list_lookup in Hwr_in.
-              destruct Hwr_in as (i & Hwr_in).
-              split; first (apply rel_list_imp; set_solver).
-              assert (i < length trans) as Hlength; 
-                first by eapply lookup_lt_Some.
-              rewrite /rel_list.
-              exists i, (length trans).
-              split_and!; try done; 
-                first by apply lookup_app_l_Some.
-              assert (Init.Nat.pred (length (trans ++ [Rd (tag1, c) k vo])) = 
-                length trans) as <-; last by rewrite -last_lookup last_snoc.
-              rewrite last_length.
-              lia.
-              -- destruct Hread_res_2 as [(_ & Hread_res_2)|Hfalse]; last set_solver.
-                 exfalso.
-                 apply (Hread_res_2 trans); last eauto.
-                 destruct Hop as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
-                 exists op.
-                 rewrite /is_cm_op.
-                 split_and!; try done.
-                 destruct op; simpl in Hop_cm; set_solver.
+               assert (v_last  = v'') as <-; first set_solver.
+               exists tag_wr, v_last.
+               assert (trans = trans') as <-; first by eapply trans_eq.
+               rewrite elem_of_list_lookup in Hwr_in.
+               destruct Hwr_in as (i & Hwr_in).
+               split; first (apply rel_list_imp; set_solver).
+               assert (i < length trans) as Hlength; 
+                 first by eapply lookup_lt_Some.
+               rewrite /rel_list.
+               exists i, (length trans).
+               split_and!; try done; 
+                 first by apply lookup_app_l_Some.
+               assert (Init.Nat.pred (length (trans ++ [Rd (tag1, c) k vo])) = 
+                 length trans) as <-; last by rewrite -last_lookup last_snoc.
+               rewrite last_length; lia.
+            -- destruct Hread_res_2 as [(_ & Hread_res_2)|Hfalse]; last set_solver.
+               exfalso.
+               apply (Hread_res_2 trans); last eauto.
+               destruct Hop as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
+               exists op.
+               rewrite /is_cm_op.
+               split_and!; try done.
+               destruct op; simpl in Hop_cm; set_solver.
         * destruct Hop as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
           exists op.
           split_and!; try done.
@@ -1054,14 +1058,7 @@ Section trace_proof.
         + iPureIntro.
           apply (valid_transactions_add1 T' (Rd (tag1, c) k vo) c); try done.
           * by eapply extraction_of_not_in.
-          * destruct (ov_last_wr) as [v_last|] eqn:Heq_ov_last_wr; first set_solver.
-            destruct Hread_res_3 as (t1 & c1 & Ht1_in & Hwr_latest & _); first done.
-            intros s' k' v' Heq_read.
-            assert (Some v' = vo) as <-; first set_solver.
-            destruct Hwr_latest as [(Hfalse & _) | (v'' & t1' & tag1' & Heq_some & Hopen_trans & 
-              Hwr_in & _)]; first done.
-            destruct Hopen_trans as (op1 & Ht1'_in & _).
-            set_solver.
+          * set_solver.
           * apply valid_transaction_singleton.
           * intros (t'' & Ht''_in & (op & Hop_in & Hop_last & Hop_conn & Hop_cm)).
             apply Hdec.
