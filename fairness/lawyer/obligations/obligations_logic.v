@@ -319,6 +319,18 @@ Section ProgramLogic.
       simpl. Unshelve. 2: exact (Some ζ). done. 
     Qed.
 
+    Lemma BMU_split E P n m:
+       ⊢ BMU E n (BMU E m P) -∗ BMU E (n + m) P.
+    Proof using.
+      iIntros "BMU1".
+      rewrite {1}/BMU. 
+      iIntros (c c' δ τ k f) "TI'".
+      iMod ("BMU1" with "[$]") as (t) "(TI' & %LE & BMU')".
+      iMod ("BMU'" with "[$]") as (v) "(TI' & %LE' & P)".
+      iModIntro. iExists _. iFrame. iPureIntro. lia. 
+    Qed.
+
+    (* TODO: derive as consequence of BMU_split *)
     Lemma OU_BMU E P b:
        ⊢ OU (BMU E b P) (oGS := oGS) -∗ BMU E (S b) P.
     Proof using.
