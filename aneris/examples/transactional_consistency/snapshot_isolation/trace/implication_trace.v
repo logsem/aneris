@@ -1063,7 +1063,21 @@ Section trace_proof.
               * apply lookup_app_l_Some; set_solver.
               * rewrite -last_lookup last_snoc.
                 set_solver.
-          - admit.
+          - iApply (big_sepS_wand with "[$Hopen_trans_state]").
+            iApply big_sepS_intro.
+            iModIntro.
+            iIntros (sa'' Hsa''_in).
+            iIntros "[Hopen_state_sa|(%c'' & %m_conn'' & %γm_conn'' & %γsnap'' & 
+              (%Hextract'' & %Hnames_lookup) & Hmap_mconn & %Hopen_state)]"; first by iLeft.
+            iRight.
+            iExists c'', m_conn'', γm_conn'', γsnap''.
+            iSplit; first done.
+            iFrame.
+            iPureIntro.
+            intros trans' Hopen s'' k' v' Hin''.
+            assert (open_trans trans' c'' (T1 ++ trans :: T2)) as Hopen'; last set_solver.
+            eapply (open_trans_neq3 _ sa sa'' c c'' _ _ _ _ (Rd (tag1, c) k vo)); 
+              rewrite /connOfOp; set_solver.
         }
         iExists t', (lt' ++ [(#tag1, (c, (#"RdLin", (#k, $ vo))))%V]).
         iFrame.
@@ -1142,7 +1156,22 @@ Section trace_proof.
               destruct op; try done.
               exfalso.
               eauto.
-          - admit. 
+          - iApply (big_sepS_wand with "[$Hopen_trans_state]").
+            iApply big_sepS_intro.
+            iModIntro.
+            iIntros (sa'' Hsa''_in).
+            iIntros "[Hopen_state_sa|(%c'' & %m_conn'' & %γm_conn'' & %γsnap'' & 
+              (%Hextract'' & %Hnames_lookup) & Hmap_mconn & %Hopen_state)]"; first by iLeft.
+            iRight.
+            iExists c'', m_conn'', γm_conn'', γsnap''.
+            iSplit; first done.
+            iFrame.
+            iPureIntro.
+            intros trans Hopen s'' k' v' Hin''.
+            assert (open_trans trans c'' T') as Hopen'; last set_solver.
+            rewrite /open_trans in Hopen.
+            rewrite /open_trans.
+            set_solver.
         }
         iExists t', (lt' ++ [(#tag1, (c, (#"RdLin", (#k, $ vo))))%V]).
         iFrame.
@@ -1242,7 +1271,7 @@ Section trace_proof.
     iModIntro.
     wp_pures.
     destruct vo; simpl; iFrame.
-  Admitted.
+  Qed.
 
   Lemma write_implication γmstate γmlin γmpost γmname γl γm_gl γexec γsi_name clients (res : SI_resources Mdl Σ) 
   (lib : KVS_transaction_api) : 
