@@ -21,7 +21,6 @@ Section SignalMap.
   Context {LEQUIV__l: @LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}.   
   Let Degree := ofe_car DegO.
   Let Level := ofe_car LevelO.
-  (* Context `{OP: ObligationsParams Degree Level Locale LIM_STEPS}. *)
   Context `{OP': ObligationsParamsPre Degree Level LIM_STEPS}.
   Let EO_OP := LocaleOP (Locale := locale heap_lang). 
   Existing Instance EO_OP. 
@@ -33,18 +32,17 @@ Section SignalMap.
   Definition ex_ith_sig B (i: nat) (s: SignalId): iProp Σ :=
     sgn s (L i) (Some $ B i) (oGS := oGS). 
   
-  Definition smap_repr B K (smap: gmap nat SignalId): iProp Σ :=
+  Definition smap_repr B (smap: gmap nat SignalId): iProp Σ :=
     own sm_γ__smap (● (to_agree <$> smap: gmapUR nat (agreeR SignalId))) ∗
-    ⌜ dom smap = set_seq 0 K ⌝ ∗
     ([∗ map] i ↦ s ∈ smap, ex_ith_sig B i s).
 
   Definition ith_sig (i: nat) (s: SignalId): iProp Σ :=
     own sm_γ__smap (◯ {[ i := to_agree s ]}).
 
-  Lemma ith_sig_in i s B K (smap: gmap nat SignalId):
-    ⊢ ith_sig i s -∗ smap_repr B K smap -∗ ⌜ smap !! i = Some s ⌝.
+  Lemma ith_sig_in i s B (smap: gmap nat SignalId):
+    ⊢ ith_sig i s -∗ smap_repr B smap -∗ ⌜ smap !! i = Some s ⌝.
   Proof using.
-    iIntros "S (SM & ? & ?)". iCombine "SM S" as "SM".
+    iIntros "S (SM & ?)". iCombine "SM S" as "SM".
     iDestruct (own_valid with "SM") as %V.
     apply auth_both_valid_discrete in V as [V ?].
     apply singleton_included_l in V. destruct V as (x & ITH & LE).
@@ -63,69 +61,70 @@ Section SignalMap.
     rewrite ITH. apply to_agree_inj in EQ. by rewrite EQ.
   Qed.
 
-  Lemma ith_sig_sgn i s B K (smap: gmap nat SignalId):
-    ⊢ ith_sig i s -∗ smap_repr B K smap -∗ sgn s (L i) None (oGS := oGS).
+  Lemma ith_sig_sgn i s B (smap: gmap nat SignalId):
+    ⊢ ith_sig i s -∗ smap_repr B smap -∗ sgn s (L i) None (oGS := oGS).
   Proof using.
     iIntros "S SR".
     iDestruct (ith_sig_in with "[$] [$]") as "%ITH". 
-    iDestruct "SR" as "(SM & % & ?)".
+    iDestruct "SR" as "(SM & ?)".
     iDestruct (big_sepM_lookup with "[$]") as "ITH"; eauto.
     rewrite /ex_ith_sig.     
     by iDestruct (sgn_get_ex with "[$]") as "[??]". 
   Qed.
 
-  Lemma smap_repr_split B K smap i s:
-    ⊢ ith_sig i s -∗ smap_repr B K smap -∗
-      ex_ith_sig B i s ∗ (ex_ith_sig B i s -∗ smap_repr B K smap).
+  Lemma smap_repr_split B smap i s:
+    ⊢ ith_sig i s -∗ smap_repr B smap -∗
+      ex_ith_sig B i s ∗ (ex_ith_sig B i s -∗ smap_repr B smap).
   Proof using.
     iIntros "#ITH SR".
     iDestruct (ith_sig_in with "[$] [$]") as "%ITH".
-    rewrite /smap_repr. iDestruct "SR" as "(SM & % & SR)".
-    rewrite {2 5}(map_split smap i) ITH /=.
+    rewrite /smap_repr. iDestruct "SR" as "(SM & SR)".
+    rewrite {2 4}(map_split smap i) ITH /=.
     rewrite !big_sepM_union.
     2: apply map_disjoint_singleton_l_2; by apply lookup_delete.
     iDestruct "SR" as "[S SR]". rewrite big_sepM_singleton.
-    iFrame. iIntros. iFrame. done.
+    iFrame. iIntros. iFrame.
   Qed.
 
-  Lemma smap_repr_split_upd B B' m smap i s
+  Lemma smap_repr_split_upd B B' smap i s
     (OTHER_PRES: forall j, j ≠ i -> j ∈ dom smap -> B' j = B j):
-    ⊢ ith_sig i s -∗ smap_repr B m smap -∗
-      ex_ith_sig B i s ∗ (ex_ith_sig B' i s -∗ smap_repr B' m smap).
+    ⊢ ith_sig i s -∗ smap_repr B smap -∗
+      ex_ith_sig B i s ∗ (ex_ith_sig B' i s -∗ smap_repr B' smap).
   Proof using.
     clear LEQUIV__l DISCR__l DISCR__d.
     iIntros "#ITH SR".
     iDestruct (ith_sig_in with "[$] [$]") as "%ITH".
-    rewrite /smap_repr. iDestruct "SR" as "(SM & % & SR)".
-    rewrite {2 5}(map_split smap i) ITH /=.
+    rewrite /smap_repr. iDestruct "SR" as "(SM & SR)".
+    rewrite {2 4}(map_split smap i) ITH /=.
     rewrite !big_sepM_union.
     2: apply map_disjoint_singleton_l_2; by apply lookup_delete.
     iDestruct "SR" as "[S SR]". rewrite !big_sepM_singleton.
     iFrame.
     2: { apply map_disjoint_dom. set_solver. }
-    iIntros. iSplitR; [done| ]. iFrame.
+    iIntros. iFrame.
     iApply (big_sepM_impl with "[$]"). iIntros "!> %% %OTHER".
     apply lookup_delete_Some in OTHER as [? ?%mk_is_Some%elem_of_dom]. 
     rewrite /ex_ith_sig. rewrite OTHER_PRES; [by iIntros; iFrame| ..]; done. 
   Qed.
 
   (* TODO: use bupd in definition of OU *)
-  Lemma smap_create_ep i B K smap π π__cp τ d__h d__l
+  Lemma smap_create_ep i B smap π π__cp τ d__h d__l
     (PH_LE: phase_le π__cp π)
-    (LT: i < K)
+    (LT: i ∈ dom smap)
     (DEG_LT: deg_lt d__l d__h):
-    ⊢ smap_repr B K smap -∗ 
+    ⊢ smap_repr B smap -∗ 
       cp π__cp d__h (oGS := oGS) -∗
       th_phase_ge τ π (oGS := oGS) -∗
       OU (|==> ∃ s, ith_sig i s ∗
-                    ep s π__cp d__l (oGS := oGS) ∗ smap_repr B K smap ∗
+                    ep s π__cp d__l (oGS := oGS) ∗ smap_repr B smap ∗
                     th_phase_ge τ π (oGS := oGS)) (oGS := oGS).
   Proof using DISCR__d DISCR__l LEQUIV__l.
     iIntros "SR CP PH".
-    rewrite /smap_repr. iDestruct "SR" as "(AUTH & %DOM & SIGS)".
-    assert (i ∈ dom smap) as [s ITH]%elem_of_dom.
-    { rewrite DOM. apply elem_of_set_seq. lia. }
-    rewrite {2 5}(map_split smap i) ITH /=.
+    rewrite /smap_repr. iDestruct "SR" as "(AUTH & SIGS)".
+    (* assert (i ∈ dom smap) as [s ITH]%elem_of_dom. *)
+    (* { rewrite DOM. apply elem_of_set_seq. lia. } *)
+    apply elem_of_dom in LT as [s ITH].
+    rewrite {2 4}(map_split smap i) ITH /=.
     setoid_rewrite big_sepM_union.
     2, 3: apply map_disjoint_singleton_l_2; by apply lookup_delete.
     iDestruct "SIGS" as "[SIG SIGS]". setoid_rewrite big_sepM_singleton.
@@ -160,7 +159,8 @@ Section SignalMap.
 
   Lemma smap_sgns_extend (B B': nat -> bool)
     (smap: gmap nat SignalId) (s : SignalId) (m : nat) (* lm *)
-    (DOM: dom smap = set_seq 0 m)
+    (* (DOM: dom smap = set_seq 0 m) *)
+    (FRESH: m ∉ dom smap)
     (PRES: forall i, i ∈ dom smap -> B' i = B i)
     :
     ⊢ ([∗ map] k↦y ∈ smap, sgn y (L k) (Some (B k)) (oGS := oGS)) -∗
@@ -170,8 +170,7 @@ Section SignalMap.
     iIntros "SIGS SG".
     rewrite big_opM_insert_delete. 
     iSplitL "SG"; [done| ].
-    rewrite lookup_delete_ne'.
-    2: { rewrite DOM. intros ?%elem_of_set_seq. lia. }
+    rewrite lookup_delete_ne'; [| done].
     iApply (big_sepM_impl with "[$]"). iModIntro.
     iIntros (??) "% ?".
     rewrite PRES; [done| ].
@@ -181,11 +180,13 @@ Section SignalMap.
   Lemma BMU_smap_extend `{invGS_gen HasNoLc Σ} τ m smap R
     (B B': nat -> bool)
     (PRES: forall i, i ∈ dom smap -> B' i = B i)
-    (FRESH_UNSET: B' m = false):
-    ⊢ obls τ R (oGS := oGS) -∗ smap_repr B m smap -∗
+    (FRESH_UNSET: B' m = false)
+    (FRESH: m ∉ dom smap)
+    :
+    ⊢ obls τ R (oGS := oGS) -∗ smap_repr B smap -∗
       BMU ∅ 1 (
         |==> (∃ s',
-             smap_repr B' (m + 1) (<[m := s']> smap) ∗
+             smap_repr B' (<[m := s']> smap) ∗
              ith_sig m s' ∗ obls τ (R ∪ {[s']}) (oGS := oGS) ∗
              ⌜ s' ∉ R ⌝)) (oGS := oGS).
     Proof using LEQUIV__l DISCR__l DISCR__d.
@@ -195,29 +196,25 @@ Section SignalMap.
       iApply (OU_wand with "[-FOO]"); [| by iFrame].
       iIntros "(%s' & SG & OBLS & %NEW)".
       iApply BMU_intro.
-      rewrite /smap_repr. iDestruct "SM" as "(SM & %DOM & SIGS)". 
+      rewrite /smap_repr. iDestruct "SM" as "(SM & SIGS)".
       iMod (own_update with "SM") as "SM".
       { apply auth_update_alloc. eapply (alloc_singleton_local_update _ m (to_agree s')).
         2: done.
-        apply not_elem_of_dom. rewrite dom_fmap. rewrite DOM.
-        intros ?%elem_of_set_seq. lia. }
+        apply not_elem_of_dom. by rewrite dom_fmap. }
       iModIntro. iDestruct "SM" as "[SM S']".
       iExists s'.
       rewrite -fmap_insert. iFrame. iSplit; [| done].
-      iSplitR.
-      { iPureIntro. rewrite dom_insert_L.
-        rewrite set_seq_add_L. rewrite -DOM. set_solver. }
       iApply (smap_sgns_extend with "[$]"); try done.
       rewrite FRESH_UNSET. iFrame.
     Qed.
       
-    Lemma ith_sig_expect i sw m τ π π__e smap R d B
+    Lemma ith_sig_expect i sw τ π π__e smap R d B
       (PH_EXP: phase_le π__e π)
       (UNSETi: B i = false):
       ⊢ ep sw π__e d (oGS := oGS) -∗ th_phase_ge τ π (oGS := oGS) -∗
-         smap_repr B m smap -∗ ith_sig i sw -∗
+         smap_repr B smap -∗ ith_sig i sw -∗
          obls τ R (oGS := oGS) -∗ sgns_level_gt R (L i) (oGS := oGS) -∗ 
-         OU (∃ π', cp π' d (oGS := oGS) ∗ smap_repr B m smap ∗ th_phase_ge τ π' (oGS := oGS) ∗ obls τ R (oGS := oGS) ∗ ⌜ phase_le π π' /\ phase_le π__e π' ⌝) (oGS := oGS).
+         OU (∃ π', cp π' d (oGS := oGS) ∗ smap_repr B smap ∗ th_phase_ge τ π' (oGS := oGS) ∗ obls τ R (oGS := oGS) ∗ ⌜ phase_le π π' /\ phase_le π__e π' ⌝) (oGS := oGS).
     Proof using LEQUIV__l DISCR__l.
       iIntros "#EP PH SR #SW OBLS #OBLS_LT". 
       iDestruct (ith_sig_in with "[$] [$]") as "%ITH".
@@ -229,10 +226,6 @@ Section SignalMap.
       iExists _. iFrame. iSplitL; [| done].
       iApply "SR". rewrite /ex_ith_sig. by rewrite UNSETi.
     Qed.
-
-    Lemma smap_expose_dom B m smap:
-      ⊢ smap_repr B m smap -∗ ⌜ dom smap = set_seq 0 m ⌝.
-    Proof using. by iIntros "(?&?&?)". Qed.
 
 End SignalMap.
 
