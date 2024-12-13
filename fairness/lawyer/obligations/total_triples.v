@@ -460,7 +460,7 @@ Section MotivatingClient.
     Lemma acquire_left τ (lk: loc) flag s__f π:
       {{{ fl_is_lock FL #lk c__cl ∗ client_inv #lk flag s__f ∗ flag_unset ∗
           obls τ {[ s__f ]} (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
-          cp_mul π d2 20 (oGS := oGS) ∗ cp_mul π (fl_d__m FL) 20 (oGS := oGS) ∗
+          cp_mul π (fl_d__m FL) 20 (oGS := oGS) ∗
           sgn s__f l__f None (oGS := oGS)
       }}}
         (fl_acquire FL) #lk @ τ
@@ -468,7 +468,7 @@ Section MotivatingClient.
                           th_phase_eq τ π (oGS := oGS) ∗ 
                           P__lock flag s__f false ∗ lock_owner_frag (Some s__o) }}}.
     Proof using.
-      iIntros (Φ). iIntros "(#LOCK & #INV & UNSET & OB & PH & CPS2 & CPSm & #SF') POST".
+      iIntros (Φ). iIntros "(#LOCK & #INV & UNSET & OB & PH & CPSm & #SF') POST".
       iPoseProof (fl_acquire_spec FL _ _ τ with "[$]") as "ACQ".
       rewrite /TLAT2.
 
@@ -573,7 +573,32 @@ Section MotivatingClient.
 
     Admitted. 
 
-        
+
+    Lemma release_left (lk: loc) τ s__o flag s__f π:
+      {{{ fl_is_lock FL #lk c__cl ∗ client_inv #lk flag s__f ∗
+          flag_unset ∗ obls τ {[ s__f; s__o ]} (oGS := oGS) ∗ 
+          th_phase_eq τ π (oGS := oGS) ∗ cp_mul π (fl_d__m FL) 20 (oGS := oGS) ∗
+          P__lock flag s__f false ∗ lock_owner_frag (Some s__o) }}}
+        (fl_release FL) #lk @ τ
+      {{{ v, RET v; obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) }}}.
+    Proof using.
+      iIntros (Φ).
+      iIntros "(#LOCK & #INV & UNSET & OB & PH & CPSm & P & LOCKED) POST".
+      iPoseProof (fl_release_spec FL lk _ τ with "[$]") as "REL".
+      rewrite /TLAT1.
+      iDestruct (cp_mul_take with "CPSm") as "[CPSm CP]".
+      iSpecialize ("REL" $! Φ _ _ (RR__L π) with "[] [OB PH CP]").
+      { done. }
+      { iFrame.
+        rewrite /sgns_level_gt'.
+        iApply big_sepS_forall. iIntros (??).
+        rewrite /sgns_level_gt.
+        foobar. remove obligations set from release spec.
+        rewrite big_opS_singleton.
+        iExists _. iFrame "#∗". iPureIntro.
+        by apply LVL_ORDf. }
+
+
       
     
 End MotivatingClient.
