@@ -114,10 +114,10 @@ Section SignalMap.
     (DEG_LT: deg_lt d__l d__h):
     ⊢ smap_repr B smap -∗ 
       cp π__cp d__h (oGS := oGS) -∗
-      th_phase_ge τ π (oGS := oGS) -∗
+      th_phase_eq τ π (oGS := oGS) -∗
       OU (|==> ∃ s, ith_sig i s ∗
                     ep s π__cp d__l (oGS := oGS) ∗ smap_repr B smap ∗
-                    th_phase_ge τ π (oGS := oGS)) (oGS := oGS).
+                    th_phase_eq τ π (oGS := oGS)) (oGS := oGS).
   Proof using DISCR__d DISCR__l LEQUIV__l.
     iIntros "SR CP PH".
     rewrite /smap_repr. iDestruct "SR" as "(AUTH & SIGS)".
@@ -211,10 +211,10 @@ Section SignalMap.
     Lemma ith_sig_expect i sw τ π π__e smap R d B
       (PH_EXP: phase_le π__e π)
       (UNSETi: B i = false):
-      ⊢ ep sw π__e d (oGS := oGS) -∗ th_phase_ge τ π (oGS := oGS) -∗
+      ⊢ ep sw π__e d (oGS := oGS) -∗ th_phase_eq τ π (oGS := oGS) -∗
          smap_repr B smap -∗ ith_sig i sw -∗
          obls τ R (oGS := oGS) -∗ sgns_level_gt R (L i) (oGS := oGS) -∗ 
-         OU (∃ π', cp π' d (oGS := oGS) ∗ smap_repr B smap ∗ th_phase_ge τ π' (oGS := oGS) ∗ obls τ R (oGS := oGS) ∗ ⌜ phase_le π π' /\ phase_le π__e π' ⌝) (oGS := oGS).
+         OU (cp π d (oGS := oGS) ∗ smap_repr B smap ∗ th_phase_eq τ π (oGS := oGS) ∗ obls τ R (oGS := oGS)) (oGS := oGS).
     Proof using LEQUIV__l DISCR__l.
       iIntros "#EP PH SR #SW OBLS #OBLS_LT". 
       iDestruct (ith_sig_in with "[$] [$]") as "%ITH".
@@ -222,9 +222,8 @@ Section SignalMap.
       rewrite {1}/ex_ith_sig. rewrite UNSETi. 
       iDestruct (expect_sig_upd with "EP [$] [$] [$] [$]") as "OU"; [done| ..].
       iApply (OU_wand with "[-OU]"); [| done].
-      iIntros "(%π' & CP1 & SIGW & OBLS & PH & [%PH_LE' %PH_LE''])".
-      iExists _. iFrame. iSplitL; [| done].
-      iApply "SR". rewrite /ex_ith_sig. by rewrite UNSETi.
+      iIntros "(CP1 & SIGW & OBLS & PH)".
+      iFrame. iApply "SR". rewrite /ex_ith_sig. by rewrite UNSETi.
     Qed.
 
 End SignalMap.

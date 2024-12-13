@@ -126,11 +126,11 @@ Section ProgramLogic.
       (* (LE: exists π, ps_phases (trace_last omtr) !! τ = Some π /\ phase_le π' π) *)
       (LE: phase_le π' π)
       :
-      ⊢ OAM_st_interp_interim_step c c' δ τ n (Some τ') -∗ (cp π' deg (oGS := oGS)) -∗ obls τ R0 (oGS := oGS) -∗ th_phase_ge τ π (oGS := oGS) ==∗
+      ⊢ OAM_st_interp_interim_step c c' δ τ n (Some τ') -∗ (cp π' deg (oGS := oGS)) -∗ obls τ R0 (oGS := oGS) -∗ th_phase_eq τ π (oGS := oGS) ==∗
         ∃ δ' π1 π2,
           obls_si c' δ' (ObligationsGS0 := oGS) ∗
-          obls τ (R0 ∖ R') (oGS := oGS) ∗ th_phase_ge τ π1 (oGS := oGS) ∗ 
-          obls τ' (R0 ∩ R') (oGS := oGS) ∗ th_phase_ge τ' π2 (oGS := oGS) ∗
+          obls τ (R0 ∖ R') (oGS := oGS) ∗ th_phase_eq τ π1 (oGS := oGS) ∗ 
+          obls τ' (R0 ∩ R') (oGS := oGS) ∗ th_phase_eq τ' π2 (oGS := oGS) ∗
           ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝ ∗ ⌜ om_trans δ τ δ' ⌝.
     Proof using.
       clear H1 H0 H. 
@@ -145,11 +145,11 @@ Section ProgramLogic.
       eapply locale_step_fresh_exact in FORK; eauto.  
       destruct FORK as (LOCS' & FRESH).
 
-      iDestruct (th_phase_msi_ge with "[$] [$]") as %(π__max & PH & LE0).
+      (* iDestruct (th_phase_msi_ge with "[$] [$]") as %(π__max & PH & LE0). *)
+      iDestruct (th_phase_msi_eq_strong with "[$] [$]") as "(MSI & PH & %PH)".
       
       iMod (burn_cp_upd_impl with "[$] [$]") as "X".
-      { eexists. split; eauto.
-        red. etrans; eauto. }
+      { eexists. split; eauto. }
       iDestruct "X" as "(%δ' & MSI & %BURNS)".
 
       assert (dom_obls_eq (dom (ps_obls δ)) δ') as OBLS'.
@@ -246,8 +246,8 @@ Section ProgramLogic.
     Lemma BMU_AMU E ζ b (P : iProp Σ) π
       (BOUND: b <= LIM_STEPS)
       :
-      ⊢ (th_phase_ge ζ π (oGS := oGS) -∗ BMU E b ((P) ∗ ∃ ph deg, cp ph deg (oGS := oGS) ∗ ⌜ phase_le ph π ⌝)) -∗
-        th_phase_ge ζ π (oGS := oGS) -∗
+      ⊢ (th_phase_eq ζ π (oGS := oGS) -∗ BMU E b ((P) ∗ ∃ ph deg, cp ph deg (oGS := oGS) ∗ ⌜ phase_le ph π ⌝)) -∗
+        th_phase_eq ζ π (oGS := oGS) -∗
         AMU E ζ obls_act P (aeGS := oGS).
     Proof using.
       rewrite /AMU /AMU_impl /BMU. iIntros "BMU PH" (c c' δ) "TI'".
@@ -255,14 +255,14 @@ Section ProgramLogic.
       rewrite /AM_st_interp_interim.
       iDestruct "TI'" as "(MSI&%STEP&%FORK)". iFrame. 
 
-      iDestruct (th_phase_msi_ge with "[MSI] [$]") as %(π__max & PH & LE0).
-      { iDestruct "MSI" as "(?&?&?)". iFrame. }
+      (* iDestruct (th_phase_msi_ge with "[MSI] [$]") as %(π__max & PH & LE0). *)
+      iDestruct "MSI" as "(MSI&%OBLS&%DPO)".
+      iDestruct (th_phase_msi_eq_strong with "[$] [$]") as "(MSI & PH & %PH)".
       (* { rewrite /AM_st_interp_interim. *)
       (*   simpl. iDestruct "TI'" as "((?&?&?)&?&?)". iFrame. } *)
       iSpecialize ("BMU" with "[$]").
       iSpecialize ("BMU" $! c c' δ ζ 0 None with "[MSI]").
       { rewrite /OAM_st_interp_interim_step /AM_st_interp_interim.
-        iDestruct "MSI" as "(MSI&%OBLS&%DPO)".
         iExists _. iFrame. iPureIntro.
         repeat split; try done.
         by apply nsteps_0.         
@@ -282,27 +282,25 @@ Section ProgramLogic.
     Lemma BMU_AMU__f E ζ ζ' b (P : iProp Σ) π R0 R'
       (BOUND: b <= LIM_STEPS)
       :
-      ⊢ (th_phase_ge ζ π (oGS := oGS) -∗ BMU E b
+      ⊢ (th_phase_eq ζ π (oGS := oGS) -∗ BMU E b
            (P ∗ (∃ ph deg, cp ph deg (oGS := oGS) ∗ ⌜ phase_le ph π ⌝) ∗
-           th_phase_ge ζ π (oGS := oGS) ∗
+           th_phase_eq ζ π (oGS := oGS) ∗
            obls ζ R0 (oGS := oGS))) -∗
-        th_phase_ge ζ π (oGS := oGS) -∗
+        th_phase_eq ζ π (oGS := oGS) -∗
         AMU__f E ζ ζ' obls_act (P ∗ ∃ π1 π2, 
-                     th_phase_ge ζ π1 (oGS := oGS) ∗ obls ζ (R0 ∖ R') (oGS := oGS) ∗
-                     th_phase_ge ζ' π2 (oGS := oGS) ∗ obls ζ' (R0 ∩ R') (oGS := oGS) ∗
+                     th_phase_eq ζ π1 (oGS := oGS) ∗ obls ζ (R0 ∖ R') (oGS := oGS) ∗
+                     th_phase_eq ζ' π2 (oGS := oGS) ∗ obls ζ' (R0 ∩ R') (oGS := oGS) ∗
                      ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝
         ) (aeGS := oGS).
     Proof using.
       clear H1 H0 H. 
       rewrite /AMU__f /AMU_impl /BMU. iIntros "BMU PH" (c c' δ) "TI'".
       iDestruct "TI'" as "(MSI&%STEP&%FORK)". iFrame. 
-      iDestruct (th_phase_msi_ge with "[MSI] [$]") as %(π__max & PH & LE0).
-      { rewrite /AM_st_interp_interim.
-        simpl. iDestruct "MSI" as "(?&?&?)". iFrame. }
+      iDestruct "MSI" as "(MSI&%OBLS&%DPO)".
+      iDestruct (th_phase_msi_eq_strong with "[$] [$]") as "(MSI & PH & %PH)".
       iSpecialize ("BMU" with "[$]").
       iSpecialize ("BMU" $! c c' δ ζ 0 (Some ζ') with "[MSI]").
       { rewrite /OAM_st_interp_interim_step /AM_st_interp_interim.
-        iDestruct "MSI" as "(MSI&%OBLS&%DPO)".
         iExists _. iFrame. iPureIntro.
         repeat split; try done.
         by constructor. }
@@ -408,7 +406,7 @@ Section TestProg.
   Lemma test_spec (τ: locale heap_lang) (π: Phase) (d d': Degree) (l: Level)
     (DEG: deg_lt d' d)
     :
-    {{{ cp_mul π d 10 (oGS := oGS) ∗ th_phase_ge τ π (oGS := oGS) ∗ obls τ ∅ (oGS := oGS) ∗ exc_lb 5 (oGS := oGS) }}}
+    {{{ cp_mul π d 10 (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗ obls τ ∅ (oGS := oGS) ∗ exc_lb 5 (oGS := oGS) }}}
       test_prog @ τ
       {{{ x, RET #x; obls τ ∅ (oGS := oGS) }}}.
   Proof.
@@ -426,6 +424,7 @@ Section TestProg.
     iApply OU_BMU.
     iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
     iDestruct (exchange_cp_upd with "[$] [$] [$]") as "OU"; eauto.
+    { done. }
     iApply (OU_wand with "[-OU]"); [| done].
     iIntros "[CPS' PH]". 
     iApply BMU_intro.
@@ -489,7 +488,7 @@ Section TestProg.
       iApply OU_BMU.
       iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
       iApply (OU_wand with "[-CP PH]"). 
-      2: { iApply (burn_cp_upd with "CP [$]"). }
+      2: { iApply (burn_cp_upd with "CP [$]"). done. }
       iIntros "PH".
       
       iApply BMU_intro. iFrame "PH OBLS".
