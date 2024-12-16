@@ -50,7 +50,7 @@ Section definition.
       that can be aborted back to [P]. *)
   Definition BMU_atomic_acc Eo Ei α P β Φ: PROP :=
     |={Eo, Ei}=> ∃.. x, α x ∗
-          ((α x ={Ei, Eo}=∗ P) ∧ (∀.. y, β x y -∗ bmu Ei (|={Ei, Eo}=> Φ x y))).
+          ((α x ={Ei, Eo}=∗ P) ∧ (∀.. y, β x y ={Ei}=∗ bmu Ei (|={Ei, Eo}=> Φ x y))).
 
   Lemma BMU_atomic_acc_wand Eo Ei α P1 P2 β Φ1 Φ2 :
     ((P1 -∗ P2) ∧ (∀.. x y, Φ1 x y -∗ Φ2 x y)) -∗
@@ -61,7 +61,8 @@ Section definition.
     - iIntros "Hα". iDestruct "Hclose" as "[Hclose _]".
       iApply "HP12". iApply "Hclose". done.
     - iIntros (y) "Hβ". iDestruct "Hclose" as "[_ Hclose]".
-      iSpecialize ("Hclose" with "[$]"). iApply (BMU_wand with "[-Hclose] [$]").
+      iMod ("Hclose" with "[$]") as "Hclose".
+      iModIntro. iApply (BMU_wand with "[-Hclose] [$]").
       iIntros "X". iMod "X". iModIntro. 
       by iApply "HP12". 
   Qed.
@@ -92,7 +93,9 @@ Section definition.
     iFrame. iSplitWith "Hclose2".
     - iIntros "Hα". iMod ("Hclose2" with "Hα") as "$". done.
     - iIntros (y) "Hβ".
-      iSpecialize ("Hclose2" with "[$]"). iApply (BMU_wand with "[-Hclose2] [$]").
+      iSpecialize ("Hclose2" with "[$]").
+      iMod "Hclose2" as "Hclose2". iModIntro.
+      iApply (BMU_wand with "[-Hclose2] [$]").
       iIntros "X". iMod "X". iMod "Hclose1". done. 
   Qed.
 
@@ -323,7 +326,7 @@ Section lemmas.
               (∃.. x, α x ∗
                        (α x ={Ei,E}=∗ BMU_atomic_update c Eo Ei α β Φ (oGS := oGS)) ∧
                        (* (∀.. y, β x y ={Ei,E}=∗ Φ x y) *)
-                        (∀.. y, β x y -∗ BMU Ei c (|={Ei, E}=> Φ x y) (oGS := oGS))
+                        (∀.. y, β x y ={Ei}=∗ BMU Ei c (|={Ei, E}=> Φ x y) (oGS := oGS))
               )
               Q Q'.
   Proof using H1 H0 H. 
@@ -348,7 +351,7 @@ Section lemmas.
 
   Lemma BMU_aacc_intro c Eo Ei α P β Φ :
     Ei ⊆ Eo → ⊢ (∀.. x, α x -∗
-    ((α x ={Eo}=∗ P) ∧ (∀.. y, β x y -∗ BMU Ei c (|={Ei, Eo}=> Φ x y) (oGS := oGS))) -∗
+    ((α x ={Eo}=∗ P) ∧ (∀.. y, β x y ={Ei}=∗ BMU Ei c (|={Ei, Eo}=> Φ x y) (oGS := oGS))) -∗
     BMU_atomic_acc c Eo Ei α P β Φ (oGS := oGS)).
   Proof.
     iIntros (? x) "Hα Hclose".
@@ -452,13 +455,16 @@ Section lemmas.
         iDestruct "Hcont" as (y) "[Hβ HΦ']".
 
         iSpecialize ("Hclose" with "[$]"). 
-        iIntros (??????) "X". iMod ("Hclose" with "X") as "X".
-        iDestruct "X" as (k) "(TI & %BOUND & Φ)".
+        iIntros (??????) "X".
+        iMod "Hclose".
+        rewrite /BMU.
+        iSpecialize ("Hclose" with "X"). iMod "Hclose" as (k) "(TI & % & CLOS)".
+        iMod "CLOS".
         iExists k. iFrame. 
         iApply fupd_frame_l. iSplit.
         { iPureIntro. lia. }
-        iMod "Φ". iMod ("HΦ'" with "Φ"). iFrame.  
-        iApply fupd_mask_subseteq. done. 
+        iMod ("HΦ'" with "CLOS"). 
+        iApply fupd_mask_intro_subseteq; done. 
   Qed.
 
   Notation "'PROP'" := (iProp Σ). 
