@@ -132,10 +132,10 @@ Global Arguments BMU_atomic_update {Σ _ _ _ _ _ _ TA TB} c Eo Ei _ _ _ : simpl 
 (** Notation: Atomic updates *)
 (** We avoid '<<'/'>>' since those can also reasonably be infix operators
 (and in fact Autosubst uses the latter). *)
-Notation "'BAU' '<{' ∃∃ x1 .. xn , α '}>' @ Eo , Ei '<{' ∀∀ y1 .. yn , β , 'COMM' Φ '}>'" :=
+Notation "'BAU' c '<{' ∃∃ x1 .. xn , α '}>' @ Eo , Ei '<{' ∀∀ y1 .. yn , β , 'COMM' Φ '}>'" :=
 (* The way to read the [tele_app foo] here is that they convert the n-ary
 function [foo] into a unary function taking a telescope as the argument. *)
-  (BMU_atomic_update (TA:=TeleS (λ x1, .. (TeleS (λ xn, TeleO)) .. ))
+  (BMU_atomic_update c (TA:=TeleS (λ x1, .. (TeleS (λ xn, TeleO)) .. ))
                  (TB:=TeleS (λ y1, .. (TeleS (λ yn, TeleO)) .. ))
                  Eo Ei
                  (tele_app $ λ x1, .. (λ xn, α%I) ..)
@@ -147,10 +147,10 @@ function [foo] into a unary function taking a telescope as the argument. *)
                         ) .. )
   )
   (at level 20, Eo, Ei, α, β, Φ at level 200, x1 binder, xn binder, y1 binder, yn binder,
-   format "'[hv   ' 'BAU'  '<{'  '[' ∃∃  x1  ..  xn ,  '/' α  ']' '}>'  '/' @  '[' Eo ,  '/' Ei ']'  '/' '<{'  '[' ∀∀  y1  ..  yn ,  '/' β ,  '/' COMM  Φ  ']' '}>' ']'") : bi_scope.
+   format "'[hv   ' 'BAU' c  '<{'  '[' ∃∃  x1  ..  xn ,  '/' α  ']' '}>'  '/' @  '[' Eo ,  '/' Ei ']'  '/' '<{'  '[' ∀∀  y1  ..  yn ,  '/' β ,  '/' COMM  Φ  ']' '}>' ']'") : bi_scope.
 
-Notation "'BAU' '<{' ∃∃ x1 .. xn , α '}>' @ Eo , Ei '<{' β , 'COMM' Φ '}>'" :=
-  (BMU_atomic_update (TA:=TeleS (λ x1, .. (TeleS (λ xn, TeleO)) .. ))
+Notation "'BAU' c '<{' ∃∃ x1 .. xn , α '}>' @ Eo , Ei '<{' β , 'COMM' Φ '}>'" :=
+  (BMU_atomic_update c (TA:=TeleS (λ x1, .. (TeleS (λ xn, TeleO)) .. ))
                  (TB:=TeleO)
                  Eo Ei
                  (tele_app $ λ x1, .. (λ xn, α%I) ..)
@@ -158,10 +158,10 @@ Notation "'BAU' '<{' ∃∃ x1 .. xn , α '}>' @ Eo , Ei '<{' β , 'COMM' Φ '}>
                  (tele_app $ λ x1, .. (λ xn, tele_app Φ%I) .. )
   )
   (at level 20, Eo, Ei, α, β, Φ at level 200, x1 binder, xn binder,
-   format "'[hv   ' 'BAU'  '<{'  '[' ∃∃  x1  ..  xn ,  '/' α  ']' '}>'  '/' @  '[' Eo ,  '/' Ei ']'  '/' '<{'  '[' β ,  '/' COMM  Φ  ']' '}>' ']'") : bi_scope.
+   format "'[hv   ' 'BAU' c  '<{'  '[' ∃∃  x1  ..  xn ,  '/' α  ']' '}>'  '/' @  '[' Eo ,  '/' Ei ']'  '/' '<{'  '[' β ,  '/' COMM  Φ  ']' '}>' ']'") : bi_scope.
 
-Notation "'BAU' '<{' α '}>' @ Eo , Ei '<{' ∀∀ y1 .. yn , β , 'COMM' Φ '}>'" :=
-  (BMU_atomic_update (TA:=TeleO)
+Notation "'BAU' c '<{' α '}>' @ Eo , Ei '<{' ∀∀ y1 .. yn , β , 'COMM' Φ '}>'" :=
+  (BMU_atomic_update c (TA:=TeleO)
                  (TB:=TeleS (λ y1, .. (TeleS (λ yn, TeleO)) .. ))
                  Eo Ei
                  (tele_app α%I)
@@ -169,21 +169,21 @@ Notation "'BAU' '<{' α '}>' @ Eo , Ei '<{' ∀∀ y1 .. yn , β , 'COMM' Φ '}>
                  (tele_app $ tele_app (λ y1, .. (λ yn, Φ%I) ..))
   )
   (at level 20, Eo, Ei, α, β, Φ at level 200, y1 binder, yn binder,
-   format "'[hv   ' 'BAU'  '<{'  '[' α  ']' '}>'  '/' @  '[' Eo ,  '/' Ei ']'  '/' '<{'  '[' ∀∀  y1  ..  yn ,  '/' β ,  '/' COMM  Φ  ']' '}>' ']'") : bi_scope.
+   format "'[hv   ' 'BAU' c  '<{'  '[' α  ']' '}>'  '/' @  '[' Eo ,  '/' Ei ']'  '/' '<{'  '[' ∀∀  y1  ..  yn ,  '/' β ,  '/' COMM  Φ  ']' '}>' ']'") : bi_scope.
 
-Notation "'BAU' '<{' α '}>' @ Eo , Ei '<{' β , 'COMM' Φ '}>'" :=
-  (BMU_atomic_update (TA:=TeleO) (TB:=TeleO)
+Notation "'BAU' c '<{' α '}>' @ Eo , Ei '<{' β , 'COMM' Φ '}>'" :=
+  (BMU_atomic_update c (TA:=TeleO) (TB:=TeleO)
                  Eo Ei
                  (tele_app α%I)
                  (tele_app $ tele_app β%I)
                  (tele_app $ tele_app Φ%I)
   )
   (at level 20, Eo, Ei, α, β, Φ at level 200,
-   format "'[hv   ' 'BAU'  '<{'  '[' α  ']' '}>'  '/' @  '[' Eo ,  '/' Ei ']'  '/' '<{'  '[' β ,  '/' COMM  Φ  ']' '}>' ']'") : bi_scope.
+   format "'[hv   ' 'BAU' c  '<{'  '[' α  ']' '}>'  '/' @  '[' Eo ,  '/' Ei ']'  '/' '<{'  '[' β ,  '/' COMM  Φ  ']' '}>' ']'") : bi_scope.
 
 (** Notation: Atomic accessors *)
-Notation "'BAACC' '<{' ∃∃ x1 .. xn , α , 'ABORT' P '}>' @ Eo , Ei '<{' ∀∀ y1 .. yn , β , 'COMM' Φ '}>'" :=
-  (BMU_atomic_acc (TA:=TeleS (λ x1, .. (TeleS (λ xn, TeleO)) .. ))
+Notation "'BAACC' c '<{' ∃∃ x1 .. xn , α , 'ABORT' P '}>' @ Eo , Ei '<{' ∀∀ y1 .. yn , β , 'COMM' Φ '}>'" :=
+  (BMU_atomic_acc c (TA:=TeleS (λ x1, .. (TeleS (λ xn, TeleO)) .. ))
               (TB:=TeleS (λ y1, .. (TeleS (λ yn, TeleO)) .. ))
               Eo Ei
               (tele_app $ λ x1, .. (λ xn, α%I) ..)
@@ -196,10 +196,10 @@ Notation "'BAACC' '<{' ∃∃ x1 .. xn , α , 'ABORT' P '}>' @ Eo , Ei '<{' ∀�
                      ) .. )
   )
   (at level 20, Eo, Ei, α, P, β, Φ at level 200, x1 binder, xn binder, y1 binder, yn binder,
-   format "'[hv     ' 'BAACC'  '<{'  '[' ∃∃  x1  ..  xn ,  '/' α ,  '/' ABORT  P  ']' '}>'  '/' @  '[' Eo ,  '/' Ei ']'  '/' '<{'  '[' ∀∀  y1  ..  yn ,  '/' β ,  '/' COMM  Φ  ']' '}>' ']'") : bi_scope.
+   format "'[hv     ' 'BAACC' c  '<{'  '[' ∃∃  x1  ..  xn ,  '/' α ,  '/' ABORT  P  ']' '}>'  '/' @  '[' Eo ,  '/' Ei ']'  '/' '<{'  '[' ∀∀  y1  ..  yn ,  '/' β ,  '/' COMM  Φ  ']' '}>' ']'") : bi_scope.
 
-Notation "'BAACC' '<{' ∃∃ x1 .. xn , α , 'ABORT' P '}>' @ Eo , Ei '<{' β , 'COMM' Φ '}>'" :=
-  (BMU_atomic_acc (TA:=TeleS (λ x1, .. (TeleS (λ xn, TeleO)) .. ))
+Notation "'BAACC' c '<{' ∃∃ x1 .. xn , α , 'ABORT' P '}>' @ Eo , Ei '<{' β , 'COMM' Φ '}>'" :=
+  (BMU_atomic_acc c (TA:=TeleS (λ x1, .. (TeleS (λ xn, TeleO)) .. ))
               (TB:=TeleO)
               Eo Ei
               (tele_app $ λ x1, .. (λ xn, α%I) ..)
@@ -208,10 +208,10 @@ Notation "'BAACC' '<{' ∃∃ x1 .. xn , α , 'ABORT' P '}>' @ Eo , Ei '<{' β ,
               (tele_app $ λ x1, .. (λ xn, tele_app Φ%I) .. )
   )
   (at level 20, Eo, Ei, α, P, β, Φ at level 200, x1 binder, xn binder,
-   format "'[hv     ' 'BAACC'  '<{'  '[' ∃∃  x1  ..  xn ,  '/' α ,  '/' ABORT  P  ']' '}>'  '/' @  '[' Eo ,  '/' Ei ']'  '/' '<{'  '[' β ,  '/' COMM  Φ  ']' '}>' ']'") : bi_scope.
+   format "'[hv     ' 'BAACC' c  '<{'  '[' ∃∃  x1  ..  xn ,  '/' α ,  '/' ABORT  P  ']' '}>'  '/' @  '[' Eo ,  '/' Ei ']'  '/' '<{'  '[' β ,  '/' COMM  Φ  ']' '}>' ']'") : bi_scope.
 
-Notation "'BAACC' '<{' α , 'ABORT' P '}>' @ Eo , Ei '<{' ∀∀ y1 .. yn , β , 'COMM' Φ '}>'" :=
-  (BMU_atomic_acc (TA:=TeleO)
+Notation "'BAACC' c '<{' α , 'ABORT' P '}>' @ Eo , Ei '<{' ∀∀ y1 .. yn , β , 'COMM' Φ '}>'" :=
+  (BMU_atomic_acc c (TA:=TeleO)
               (TB:=TeleS (λ y1, .. (TeleS (λ yn, TeleO)) .. ))
               Eo Ei
               (tele_app α%I)
@@ -220,10 +220,10 @@ Notation "'BAACC' '<{' α , 'ABORT' P '}>' @ Eo , Ei '<{' ∀∀ y1 .. yn , β ,
               (tele_app $ tele_app (λ y1, .. (λ yn, Φ%I) ..))
   )
   (at level 20, Eo, Ei, α, P, β, Φ at level 200, y1 binder, yn binder,
-   format "'[hv     ' 'BAACC'  '<{'  '[' α ,  '/' ABORT  P  ']' '}>'  '/' @  '[' Eo ,  '/' Ei ']'  '/' '<{'  '[' ∀∀  y1  ..  yn ,  '/' β ,  '/' COMM  Φ  ']' '}>' ']'") : bi_scope.
+   format "'[hv     ' 'BAACC' c  '<{'  '[' α ,  '/' ABORT  P  ']' '}>'  '/' @  '[' Eo ,  '/' Ei ']'  '/' '<{'  '[' ∀∀  y1  ..  yn ,  '/' β ,  '/' COMM  Φ  ']' '}>' ']'") : bi_scope.
 
-Notation "'BAACC' '<{' α , 'ABORT' P '}>' @ Eo , Ei '<{' β , 'COMM' Φ '}>'" :=
-  (BMU_atomic_acc (TA:=TeleO)
+Notation "'BAACC' c '<{' α , 'ABORT' P '}>' @ Eo , Ei '<{' β , 'COMM' Φ '}>'" :=
+  (BMU_atomic_acc c (TA:=TeleO)
               (TB:=TeleO)
               Eo Ei
               (tele_app α%I)
@@ -232,7 +232,7 @@ Notation "'BAACC' '<{' α , 'ABORT' P '}>' @ Eo , Ei '<{' β , 'COMM' Φ '}>'" :
               (tele_app $ tele_app Φ%I)
   )
   (at level 20, Eo, Ei, α, P, β, Φ at level 200,
-   format "'[hv     ' 'BAACC'  '<{'  '[' α ,  '/' ABORT  P  ']' '}>'  '/' @  '[' Eo ,  '/' Ei ']'  '/' '<{'  '[' β ,  '/' COMM  Φ  ']' '}>' ']'") : bi_scope.
+   format "'[hv     ' 'BAACC' c  '<{'  '[' α ,  '/' ABORT  P  ']' '}>'  '/' @  '[' Eo ,  '/' Ei ']'  '/' '<{'  '[' β ,  '/' COMM  Φ  ']' '}>' ']'") : bi_scope.
 
 (** Lemmas about AU *)
 Section lemmas.
