@@ -107,6 +107,24 @@ Section SignalMap.
     rewrite /ex_ith_sig. rewrite OTHER_PRES; [by iIntros; iFrame| ..]; done. 
   Qed.
 
+  Lemma smap_set_sig i s B B' smap τ R
+    (SET': B' i = true)
+    (Rs: s ∈ R)
+    (OTHER_PRES: forall j, j ≠ i -> j ∈ dom smap -> B' j = B j):
+    ⊢ smap_repr B smap -∗ 
+      ith_sig i s -∗
+      obls τ R (oGS := oGS) -∗
+      OU (smap_repr B' smap ∗ obls τ (R ∖ {[ s ]})) (oGS := oGS).
+  Proof using LEQUIV__l DISCR__l.
+    iIntros "SR #ITH OB".
+    iDestruct (smap_repr_split_upd with "[$] [$]") as "[SIGi SR']"; [done| ].
+    rewrite {1}/ex_ith_sig.
+    iApply (OU_wand with "[SR']").
+    2: { iApply (OU_set_sig with "[$] [$]"). done. }
+    iIntros "[SIGi OB]". iFrame. 
+    iApply "SR'". by rewrite /ex_ith_sig SET'.
+  Qed. 
+
   (* TODO: use bupd in definition of OU *)
   Lemma smap_create_ep i B smap π π__cp τ d__h d__l
     (PH_LE: phase_le π__cp π)

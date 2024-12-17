@@ -281,30 +281,27 @@ Section EoFin.
         iApply (wp_cmpxchg_suc with "[$]"); try done.
         { econstructor. done. }
         iNext. iIntros "L".
-        
-        iPoseProof (smap_repr_split_upd B__eo _ (flip Nat.ltb (m + 1)) with "[$] [$]") as "[SG SR_CLOS]".
-        { intros ?. rewrite DOM elem_of_set_seq. simpl.
-          intros NEQ [? [??]%Nat.min_glb_lt_iff].
-          assert (j < m \/ j = m + 1) as [? | ->] by lia.
-          - rewrite !(proj2 (PeanoNat.Nat.ltb_lt _ _)); lia.
-          - rewrite !(proj2 (PeanoNat.Nat.ltb_ge _ _)); lia. }
-        
+       
         MU_by_BMU. iApply OU_BMU.
-        iDestruct (OU_set_sig with "OB [SG]") as "OU".
-        { apply elem_of_singleton. reflexivity. }
-        { rewrite /ex_ith_sig. simpl. rewrite Nat.ltb_irrefl. iFrame. }
-        iApply (OU_wand with "[-OU]"); [| done]. iIntros "(SIG & OBLS)".
+        iApply (OU_wand with "[-OB SR]").
+        2: { iApply (smap_set_sig B__eo with "[$] [$] [$]").
+             { Unshelve. 2: exact (flip Nat.ltb (S m)).
+               simpl. apply Nat.ltb_lt. lia. }
+             { set_solver. }
+             intros. simpl.
+             rewrite DOM in H2. apply elem_of_set_seq in H2.
+             destruct (Nat.lt_trichotomy j (S m)) as [LT | [-> | LT]]; revgoals.
+             1,2: rewrite !(proj2 (Nat.ltb_ge _ _)); lia.
+             rewrite !(proj2 (Nat.ltb_lt _ _)); try lia. }
+        
+        iIntros "(SR & OBLS)".
         rewrite (subseteq_empty_difference_L {[ s ]}); [| done].
-        
-        iSpecialize ("SR_CLOS" with "[SIG]").
-        { rewrite /ex_ith_sig. simpl.
-          rewrite !(proj2 (PeanoNat.Nat.ltb_lt _ _)); [iFrame | lia]. }
-        
+                
         iApply (BMU_weaken ∅ _ 1 _ _ _); [lia| set_solver|iIntros "X"; iApply "X"|].
                 
-        iApply (BMU_wand with "[-OBLS SR_CLOS]").
-        2: { iApply (BMU_update_SR with "[$] [SR_CLOS]").
-             rewrite /smap_repr_eo. iFrame. done. }
+        iApply (BMU_wand with "[-OBLS SR]").
+        2: { iApply (BMU_update_SR with "[$] [SR]").
+             rewrite /smap_repr_eo. rewrite Nat.add_1_r. iFrame. done. }
         iIntros "UPD".
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
         iSplitR "CP".
