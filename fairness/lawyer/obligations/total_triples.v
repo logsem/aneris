@@ -2,6 +2,7 @@ From iris.base_logic Require Export gen_heap.
 From trillium.program_logic Require Export weakestpre adequacy ectx_lifting.
 From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_am obligations_em obligations_logic.
 From trillium.fairness.lawyer Require Import sub_action_em.
+From iris.proofmode Require Import tactics.
 
 
 Section TotalTriples.
@@ -78,6 +79,20 @@ Section TotalTriples.
 
       Definition TAU2: iProp Σ.
       Admitted.
+
+      Lemma BMU_merge_equiv (PP QQ: bool -> iProp Σ) E n:
+        let bmu := BMU (oGS := oGS) in
+        (PP true -∗ bmu E n (QQ true)) ∧ (PP false -∗ bmu E n (QQ false)) ⊣⊢ (∀ b, PP b -∗ bmu E n (QQ b)).
+      Proof using.
+        iSplit. 
+        - iIntros "B %b P".
+          destruct b. 
+          + iDestruct (bi.and_elim_l with "B") as "B". iSpecialize ("B" with "P").
+            iApply (BMU_wand with "[] [$]"). iIntros "?". iFrame.
+          + iDestruct (bi.and_elim_r with "B") as "B". iSpecialize ("B" with "P").
+            iApply (BMU_wand with "[] [$]"). iIntros "?". iFrame.
+        - iIntros "B". iSplit; iApply "B".
+      Qed. 
 
       (* TODO: unify with TAU1_acc *)
       Definition TAU2_acc (V: iProp Σ): iProp Σ :=
@@ -205,7 +220,6 @@ End FairLockSpec.
 
 
 From iris.algebra Require Import auth gmap gset excl excl_auth csum.
-From iris.proofmode Require Import tactics.
 From iris.base_logic.lib Require Import invariants.
 From trillium.fairness.lawyer.examples Require Import signal_map.
 
