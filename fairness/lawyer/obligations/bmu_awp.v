@@ -298,19 +298,6 @@ Section lemmas.
     by iApply "P". 
   Qed.
 
-  From iris.proofmode Require Import coq_tactics.
-  Tactic Notation "BMUiAaccIntro" "with" constr(sel) :=
-  iStartProof; lazymatch goal with
-  | |-
-    (* envs_entails _ (@atomic_acc ?PROP ?H ?TA ?TB ?Eo ?Ei ?α ?P ?β ?Φ) => *)
-    envs_entails _ (@BMU_atomic_acc ?Σ ?H ?DegO ?LevelO ?LIM_STEPS
-                      ?OPRE ?oGS ?TA ?TB ?c ?Eo ?Ei ?α ?P ?β ?Φ) => (*16*)
-    iApply (@BMU_aacc_intro Σ H DegO LevelO LIM_STEPS
-                      OPRE oGS TA TB c Eo Ei α P β Φ with sel);
-    first try solve_ndisj; last iSplit
-  | _ => fail "BMUiAAccIntro: Goal is not an atomic accessor"
-  end.
-
   (* Atomic triples imply sequential triples. *)
   Lemma BMU_atomic_wp_seq τ e E c α β POST f :
     BMU_atomic_wp τ e c E α β POST f (oGS := oGS) -∗
@@ -331,7 +318,7 @@ Section lemmas.
     BMUiAaccIntro with "Hα".
     { eauto. }
     iIntros (y) "Hβ".
-    iApply BMU_intro. do 2 iModIntro. 
+    iApply BMU_intro. iModIntro. 
     (* FIXME: Using ssreflect rewrite does not work, see Coq bug #7773. *)
     rewrite ->!tele_app_bind. iIntros (z) "Hpost HΦ". iApply ("HΦ" with "Hβ Hpost").
   Qed.
@@ -414,7 +401,7 @@ Section lemmas.
       iIntros "[HI $]". by eauto with iFrame.
     - (* commit *)
       iIntros (y). rewrite ->!tele_app_bind. iIntros "[HI Hβ]".
-      iModIntro. iApply BMU_intro. iModIntro. 
+      iApply BMU_intro. iModIntro. 
       iRight.
       iExists y. rewrite ->!tele_app_bind. by eauto with iFrame.
   Qed.
