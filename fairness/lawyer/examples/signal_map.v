@@ -61,6 +61,28 @@ Section SignalMap.
     rewrite ITH. apply to_agree_inj in EQ. by rewrite EQ.
   Qed.
 
+  Lemma ith_sig_retrieve i s B (smap: gmap nat SignalId):
+    ⊢ ⌜ smap !! i = Some s ⌝ -∗ smap_repr B smap ==∗ ith_sig i s ∗ smap_repr B smap. 
+  Proof using.
+    clear LEQUIV__l DISCR__l DISCR__d.    
+    iIntros "%ITH [S SR]".
+    rewrite /smap_repr. iFrame "SR".
+    rewrite /ith_sig -own_op cmra_comm. 
+    iApply own_update. 
+    1: eapply auth_update_alloc.
+    2: by iFrame.
+    etrans. 
+    - eapply core_id_local_update.
+      2: { apply singleton_included_l with (i := i).
+           eexists. split; [| reflexivity].
+           rewrite lookup_fmap ITH.
+           simpl. reflexivity. }
+      apply _.
+    - rewrite gmap_disj_op_union.
+      { rewrite map_empty_union. reflexivity. }
+      apply map_disjoint_dom. simpl. set_solver.
+  Qed.
+
   Lemma ith_sig_sgn i s B (smap: gmap nat SignalId):
     ⊢ ith_sig i s -∗ smap_repr B smap -∗ sgn s (L i) None (oGS := oGS).
   Proof using.
