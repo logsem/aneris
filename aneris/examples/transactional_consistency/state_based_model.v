@@ -703,6 +703,20 @@ Proof.
       lia.
 Qed.
 
+Lemma latest_write_imp_cm k v trans b s :
+  latest_write_trans k v trans →
+  latest_write_trans k v (trans ++ [Cm s b]).
+Proof.
+  intros (s' & Hwr_in & Hnot).
+  exists s'.
+  split; first set_solver.
+  intros (s'' & v' & Hrel).
+  apply Hnot.
+  exists s'', v'.
+  eapply rel_list_last_neq; try done.
+  set_solver.
+Qed.
+
 Lemma latest_write_read exec T k v trans test : 
   valid_execution test exec →
   based_on exec T →

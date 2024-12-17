@@ -620,7 +620,36 @@ Section trace_proof.
     split_and!.
     - rewrite split_split; simpl.
       by rewrite last_snoc.
-    - intros k ov Hk_in.
+    - destruct Hrel as (s'' & Hlast' & Hrel & _).
+      apply last_Some in Hlast.
+      destruct Hlast as (exec' & Heq_exec).
+      subst.
+      rewrite split_split in Hlast'.
+      simpl in Hlast'.
+      rewrite last_snoc in Hlast'.
+      assert (s' = s'') as ->; first set_solver.
+      intros k ov Hk_in.
+      destruct (m !! k) as [h|] eqn:Heq; last first.
+      {
+        specialize (His_some_m k Hk_in).
+        rewrite Heq /is_Some in His_some_m.
+        set_solver.
+      }
+      assert (¬ (∃ v, mc !! k = Some (Some v, true)) → m' !! k = m !! k) as Himp.
+      {
+        intros Hnot.
+        destruct (mc !! k) as [(p1, p2)|] eqn:Hlookup; last set_solver.
+        destruct (m' !! k) as [h'|] eqn:Heq'; last first.
+        {
+          specialize (His_some_m' k Hk_in).
+          rewrite Heq' /is_Some in His_some_m'.
+          set_solver.
+        }
+        specialize (Hsome_mc k h (p1, p2) Heq Hlookup).
+        simpl in Hsome_mc.
+        destruct p1 as [v|]; last set_solver.
+        destruct p2; set_solver.
+      }
       destruct Happlied as (Happlied1 & Happlied2).
       split.
       + intros Hlookup.
@@ -628,24 +657,49 @@ Section trace_proof.
         * specialize (Happlied1 k v Hlookup).
           destruct (Hwrites_mc k) as [(v' & Hlookup_mc & Hlatest)|Hwrites_mc'].
           -- destruct Happlied1 as (Happlied1 & Happlied1').
-             assert (latest_write_trans k v' (trans ++ [Cm s true])) as Hlatest'.
-             {
-              admit. (* doable *)
-             }
+             assert (latest_write_trans k v' (trans ++ [Cm s true])) as Hlatest'; 
+              first by apply latest_write_imp_cm.
              specialize (Happlied1 v' Hlatest').
              subst.
-             admit. (* doable *) 
-          -- admit. (* doable *)
-        * exfalso.
-          admit. (* doable *)
+             specialize (Hsome_mc k h (Some v', true) Heq Hlookup_mc).
+             simpl in Hsome_mc.
+             exists (h ++ [v']).
+             rewrite last_snoc.
+             set_solver.
+          -- assert (m' !! k = m !! k) as Heq'; first set_solver.
+             exists h.
+             rewrite -Heq.
+             split; first done.
+             assert (s'' !! k = Some v) as Hlookup'; first set_solver.
+             specialize (Hrel k (Some v) Hk_in).
+             set_solver.
+        * destruct (Hwrites_mc k) as [(v' & Hlookup_mc & Hlatest)|Hwrites_mc'].
+          -- assert (k ∈ dom st) as Hdom_in.
+             {
+               apply Happlied2; left.
+               rewrite /latest_write_trans in Hlatest.
+               set_solver.
+             }
+             apply not_elem_of_dom_2 in Hlookup.
+             set_solver.
+          -- assert (m' !! k = m !! k) as Heq'; first set_solver.
+             destruct (last h) as [v|] eqn:Hlast; last first.
+             {
+               exists h; split; last done.
+               rewrite -Heq; set_solver.
+             }
+             assert (s'' !! k = Some v) as Hlookup'; first set_solver.
+             assert (k ∈ dom s'') as Hdom_in.
+             {
+              apply elem_of_dom.
+              rewrite /is_Some.
+              set_solver.
+             }
+             assert (k ∈ dom st) as Hdom_in'; first by (apply Happlied2; right).
+             apply not_elem_of_dom_2 in Hlookup.
+             set_solver.
       + intros (h' & Hlookup & Hlast_h).
-        destruct (m !! k) as [h|] eqn:Heq; last first.
-        {
-          specialize (His_some_m k Hk_in).
-          rewrite Heq /is_Some in His_some_m.
-          set_solver.
-        }
-        destruct (st !! k) as [v|]  eqn:Hlookup_st.
+        destruct (st !! k) as [v|] eqn:Hlookup_st.
         * destruct (Hwrites_mc k) as [(v' & Hlookup_mc & Hlatest)|Hwrites_mc'].
           -- specialize (Hsome_mc k h (Some v', true) Heq Hlookup_mc).
              simpl in Hsome_mc.
@@ -656,11 +710,45 @@ Section trace_proof.
              specialize (Happlied1 k v Hlookup_st).
              destruct Happlied1 as (Happlied1 & Happlied1').
              assert (latest_write_trans k v' (trans ++ [Cm s true])) as Hlatest'; last set_solver.
-             admit. (* doable *)
-          -- admit. (* doable *)
-        * destruct (Hwrites_mc k) as [(v' & Hlookup_mc & Hlatest)|Hwrites_mc'].
-          -- admit.
-          -- admit. (* doable *)
+             by apply latest_write_imp_cm.
+          -- assert (m' !! k = m !! k) as Heq'; first set_solver.
+             assert (s'' !! k = Some v) as Hlookup'; first set_solver.
+             destruct (Hrel k (Some v) Hk_in) as (Hrel' & _).
+             apply Hrel' in Hlookup'.
+             destruct Hlookup' as (h'' & Hlookup_h'' & Hlast_h'').
+             rewrite -Hlast_h'' -Hlast_h. 
+             assert (Some h'' = Some h'); last set_solver.
+             rewrite -Hlookup_h'' -Hlookup.
+             set_solver.
+        * destruct ov as [v|]; last done.
+          exfalso.
+          destruct (Hwrites_mc k) as [(v' & Hlookup_mc & Hlatest)|Hwrites_mc'].
+          -- assert (k ∈ dom st) as Hdom_in.
+             {
+               apply Happlied2; left.
+               rewrite /latest_write_trans in Hlatest.
+               set_solver.
+             }
+             apply not_elem_of_dom_2 in Hlookup_st.
+             set_solver.
+          -- assert (m' !! k = m !! k) as Heq'; first set_solver.
+             assert (s'' !! k = Some v) as Hlookup'.
+             {
+               apply (Hrel k (Some v) Hk_in).
+               exists h'.
+               split; last done.
+               rewrite -Hlookup.
+               set_solver.
+             }
+             assert (k ∈ dom s'') as Hdom_in.
+             {
+              apply elem_of_dom.
+              rewrite /is_Some.
+              set_solver.
+             }
+             assert (k ∈ dom st) as Hdom_in'; first by (apply Happlied2; right).
+             apply not_elem_of_dom_2 in Hlookup_st.
+             set_solver.
     - intros k h Hlookup.
       assert (exec ≠ []) as Hneq.
       {
@@ -691,7 +779,7 @@ Section trace_proof.
         rewrite -Hlookup.
         rewrite (Hsome_mc k h' (p1, p2) Heq' Heq).
         destruct p2; simpl; destruct p1 as [v|]; set_solver.
-  Admitted.
+  Qed.
 
   Lemma inv_ext_si_wr_imp1 (γm_gl γexec γsi_name γm_conn γsnap : gname) (T1 T2 : list transaction) 
   (exec : execution) (extract : val → option val) (clients : gset socket_address) (sa : socket_address) trans tag c k v :
