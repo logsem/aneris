@@ -2825,74 +2825,114 @@ Section trace_proof.
     iDestruct (@ghost_map.ghost_map_auth_agree _ Key (option val) 
       with "[$Hghost_map_m_conn][$Hghost_map_m_conn_sa]") as "<-".
     iCombine "Hghost_map_m_conn" "Hghost_map_m_conn_sa" as "Hghost_map_m_conn".
-    (* iAssert ((|==> (([∗ set] k ∈ KVS_keys, ∃ (ov : option val), ghost_map_elem γm_conn k (DfracOwn 1%Qp) ov ∗ ⌜k ∈ dom m → (∃ h, m !! k = Some h ∧ last h = ov)⌝ ∗
-      ⌜k ∉ dom m → ov = None⌝ ∗ ghost_map_elem γsnap k (DfracOwn 1%Qp) None) ∗ 
-      (∃ m_conn', ghost_map_auth γm_conn 1 m_conn' ∧ ⌜∀ k ov, k ∈ KVS_keys → k ∈ dom m → (m_conn' !! k = Some ov → (∃ h, m !! k = Some h ∧ last h = ov))⌝)))%I)
-      with "[Hghost_map_m_conn Hkeys_conn_si]" as ">(Hkeys_conn_si & (%m_conn' & Hghost_map_m_conn & %Hm_conn'_st_new_rel))". *)
     iAssert ((|==> (([∗ set] k ∈ KVS_keys, ((∃ (ov : option val), ⌜k ∈ dom m⌝ ∗ ⌜(∃ h, m !! k = Some h ∧ last h = ov)⌝ ∗ ghost_map_elem γm_conn k (DfracOwn 1%Qp) ov) ∨ ⌜k ∉ dom m⌝) ∗
       ghost_map_elem γsnap k (DfracOwn 1%Qp) None) ∗ 
-      (∃ m_conn', ⌜∀ k, k ∈ KVS_keys → k ∉ dom m → m_conn' !! k = None⌝ ∗ ghost_map_auth γm_conn 1 m_conn' ∧ 
+      (∃ m_conn', ⌜∀ k, k ∉ KVS_keys → m_conn !! k = m_conn' !! k⌝ ∧ 
+        ⌜∀ k, k ∈ KVS_keys → k ∉ dom m → m_conn' !! k = None⌝ ∗ ghost_map_auth γm_conn 1 m_conn' ∧ 
         ⌜∀ k ov, k ∈ KVS_keys → k ∈ dom m → (m_conn' !! k = Some ov → (∃ h, m !! k = Some h ∧ last h = ov))⌝)))%I)
-      with "[Hghost_map_m_conn Hkeys_conn_si]" as ">(Hkeys_conn_si & (%m_conn' & %Hm_conn'_none & Hghost_map_m_conn & %Hm_conn'_st_new_rel))".
+      with "[Hghost_map_m_conn Hkeys_conn_si]" as ">(Hkeys_conn_si & (%m_conn' & _ & %Hm_conn'_none & Hghost_map_m_conn & %Hm_conn'_st_new_rel))".
     {
-      admit.
-      (* clear Hnone Hkeys_some_m_gl Hrel_exec.
-      iRevert "Hghost_map_m_conn".
+      clear Hnone Hkeys_some_m_gl Hrel_exec.
+      iRevert "Hghost_map_m_conn Hkeys_conn_si".
       iRevert (m_conn).
       iInduction KVS_keys as [|k KVS_Keys Hnin] "IH" using set_ind_L.
-      - iIntros (m_conn) "Hghost_map_m_conn".
+      - iIntros (m_conn) "Hghost_map_m_conn Hkeys_conn_si".
         iModIntro.
+        iSplit; first done.
+        iExists m_conn.
         set_solver.
-      - iIntros (m_conn) "Hghost_map_m_conn".
+      - iIntros (m_conn) "Hghost_map_m_conn Hkeys_conn_si".
         rewrite big_sepS_union; last set_solver.
         iDestruct "Hkeys_conn_si" as "(Hkeys_conn_si_k & Hkeys_conn_si)".
         rewrite big_sepS_singleton.
         iDestruct "Hkeys_conn_si_k" as "(%ov & Hkey1 & Hkey2)".
+        iMod ("IH" with "[$Hghost_map_m_conn][$Hkeys_conn_si]") as 
+          "(Hkeys_conn_si & (%m_conn' & %Himp0 & %Himp1 & Hghost_map_m_conn & %Himp2))".
         destruct (m !! k) as [h|] eqn:Hlookup_k_m; last first.
-        + iMod (@ghost_map_update _ Key (option val) _ _ _ _ _ k ov None with "[$Hghost_map_m_conn] [$Hkey1]") 
-            as "(Hghost_map_m_conn & Hkey1)".
-          iMod ("IH" with "[$Hkeys_conn_si][$Hghost_map_m_conn]") as "(Hkeys_conn_si & Hghost_map_m_conn)".
-          iDestruct "Hghost_map_m_conn" as "(%m_conn' & Hghost_map_m_conn & %Hm_conn'_pure)".
-          iDestruct (@ghost_map_lookup with "[$Hghost_map_m_conn][$Hkey1]") as "%Hlookup_k".
-          iModIntro.
-          rewrite big_sepS_union; last set_solver.
-          iFrame.
-          rewrite big_sepS_singleton.
-          apply not_elem_of_dom_2 in Hlookup_k_m.
-          iSplitR "Hghost_map_m_conn".
-          * iExists None.
-            iFrame.
-            iPureIntro.
-            set_solver.
-          * iExists m_conn'.
-            iFrame.
-            iPureIntro.
-            intros k' ov' Hk_in Hlookup_k'.
-            apply elem_of_union in Hk_in.
-            destruct Hk_in as [Hk_in|Hk_in]; set_solver.
-        + iMod (@ghost_map_update _ Key (option val) _ _ _ _ _ k ov (last h) with "[$Hghost_map_m_conn] [$Hkey1]") 
-            as "(Hghost_map_m_conn & Hkey1)".
-          iMod ("IH" with "[$Hkeys_conn_si][$Hghost_map_m_conn]") as "(Hkeys_conn_si & Hghost_map_m_conn)".
-          iDestruct "Hghost_map_m_conn" as "(%m_conn' & Hghost_map_m_conn & %Hm_conn'_pure)".
-          iDestruct (@ghost_map_lookup with "[$Hghost_map_m_conn][$Hkey1]") as "%Hlookup_k".
+        + iAssert (|==>(ghost_map_auth γm_conn 1 (delete k m_conn')))%I with "[Hkey1 Hghost_map_m_conn]" 
+            as ">Hghost_map_m_conn".
+          {
+            iDestruct "Hkey1" as "[Hkey1|%Hkey1]".
+            - iApply (@ghost_map_delete with "[$Hghost_map_m_conn][$Hkey1]").
+            - iModIntro.
+              assert (m_conn' !! k = None) as Hlookup_m_conn'; first by rewrite -(Himp0 k Hnin).
+              by rewrite delete_notin; first iFrame.
+          }
           iModIntro.
           rewrite big_sepS_union; last set_solver.
           iFrame.
           rewrite big_sepS_singleton.
           iSplitR "Hghost_map_m_conn".
-          * iExists (last h).
+          * iFrame.
+            iRight; iPureIntro.
+            by apply not_elem_of_dom_2.
+          * iExists (delete k m_conn').
             iFrame.
+            apply not_elem_of_dom_2 in Hlookup_k_m.
             iPureIntro.
-            split; first eauto.
-            intros Hfalse.
-            apply not_elem_of_dom_1 in Hfalse.
-            set_solver.
-          * iExists m_conn'.
+            split_and!.
+            -- intros k' Hn_in.
+               rewrite lookup_delete_ne; set_solver.
+            -- intros k' Hk_in Hnin_m.
+               rewrite elem_of_union in Hk_in.
+               destruct (decide (k = k')) as [<-|Hneq]; first apply lookup_delete.
+               assert (k' ∈ KVS_Keys) as Hk_in'; first set_solver.
+               specialize (Himp1 k' Hk_in' Hnin_m).
+               rewrite lookup_delete_ne; set_solver.
+            -- intros k' ov' Hk'_in Hk'_dom Hdelete_eq.
+               destruct (decide (k = k')) as [<-|Hneq]; first set_solver.
+               apply Himp2; try done; first set_solver.
+               rewrite lookup_delete_ne in Hdelete_eq; set_solver.
+        + iAssert (|==>(ghost_map_elem γm_conn k (DfracOwn 1%Qp) (last h) ∗ ghost_map_auth γm_conn 1 (<[k:=(last h)]> (delete k m_conn'))))%I 
+            with "[Hkey1 Hghost_map_m_conn]" as ">(Hkey1 & Hghost_map_m_conn)".
+          {
+            rewrite insert_delete_insert.
+            iDestruct "Hkey1" as "[Hkey1|%Hkey1]".
+            - iMod (@ghost_map_update _ Key (option val) _ _ _ _ _ k ov (last h) 
+                with "[$Hghost_map_m_conn] [$Hkey1]") as "(Hghost_map_m_conn & Hkey1)".
+              by iFrame.
+            - assert (m_conn' !! k = None) as Hlookup_m_conn'; first by rewrite -(Himp0 k Hnin).
+              iMod (ghost_map_insert k (last h) Hlookup_m_conn' with "[$Hghost_map_m_conn]") 
+                as "(Hghost_map_m_conn & Hkey)".
+              by iFrame.
+          }
+          rewrite big_sepS_union; last set_solver.
+          iFrame.
+          rewrite big_sepS_singleton.
+          iSplitR "Hghost_map_m_conn".
+          * iFrame.
+            iLeft.
+            iExists (last h).
+            iFrame; iPureIntro.
+            split; last eauto.
+            apply elem_of_dom.
+            rewrite /is_Some; set_solver.
+          * iExists (<[k:=last h]> (delete k m_conn')).
             iFrame.
+            iModIntro.
             iPureIntro.
-            intros k' ov' Hk_in Hlookup_k'.
-            apply elem_of_union in Hk_in.
-            destruct Hk_in as [Hk_in|Hk_in]; set_solver. *)
+            split_and!.
+            -- intros k' Hn_in.
+               rewrite lookup_insert_ne; last set_solver.
+               rewrite lookup_delete_ne; set_solver.
+            -- intros k' Hk_in Hnin_m.
+               rewrite elem_of_union in Hk_in.
+               destruct (decide (k = k')) as [<-|Hneq].
+               {
+                  apply not_elem_of_dom_1 in Hnin_m.
+                  set_solver.
+               }
+               rewrite lookup_insert_ne; last done.
+               rewrite lookup_delete_ne; set_solver.
+            -- intros k' ov' Hk'_in Hk'_dom Hdelete_eq.
+               destruct (decide (k = k')) as [<-|Hneq]. 
+               {
+                 rewrite lookup_insert in Hdelete_eq.
+                 set_solver.
+               } 
+               apply Himp2; try done; first set_solver.
+               rewrite lookup_insert_ne in Hdelete_eq; last done.
+               rewrite lookup_delete_ne in Hdelete_eq; set_solver.
     }
     iAssert ((([∗ set] k ∈ (dom m) ∩ KVS_keys, ∃ (ov : option val), ghost_map_elem γm_conn k (DfracOwn 1%Qp) ov ∗ ⌜k ∈ dom m → (∃ h, m !! k = Some h ∧ last h = ov)⌝ ∗
       ghost_map_elem γsnap k (DfracOwn 1%Qp) None) ∗ 
@@ -3458,7 +3498,7 @@ Section trace_proof.
           rewrite /is_st_lin_event in Hstart.
           set_solver.
         * iSplit. 
-          -- iPureIntro. 
+          -- iPureIntro.
              intros (trans & (op & Ht'_in & Hlast & Hconn_last & _)).
              destruct Hex' as (_ & Hex' & _).
              apply last_Some_elem_of in Hlast.
