@@ -1129,7 +1129,46 @@ Section trace_proof.
         ¬ (∃ s' v', rel_list trans (Wr s' k v') (Rd s k ov)) →
         reads_from_last_state exec_pre k ov⌝)%I as "%Htrans_reads".
       {
-        admit.
+        rewrite /open_transactions_state.
+        rewrite {4} Heq_sa_clients.
+        rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
+        iDestruct "Hopen_trans" as "(Hopen_trans & _)".
+        rewrite big_sepS_singleton.
+        iDestruct (@ghost_map_lookup with "[$Hghost_map_mnames_si][$Hsa_pointer_si']") as "%Hlookup_mnames_si".
+        iDestruct "Hopen_trans" as "[%Hfalse|(%c_sa & %m_conn_sa & %γm_conn_sa & %γsnap_sa & %Hextract_c_sa 
+          & Hghost_map_m_conn_sa & %Hopen_state)]"; first set_solver.
+        iIntros (s k ov Hread_in Hnot).
+        assert (c = c_sa) as <-; first set_solver.
+        assert (open_trans trans c (T1 ++ trans :: T2)) as Hopen.
+        {
+          destruct Hop as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
+          exists op.
+          split_and!; try done.
+          rewrite /is_cm_op.
+          destruct op; set_solver.
+        }
+        rewrite /reads_from_last_state.
+        assert (m_conn_sa !! k = (Some ov)) as Hlookup_mc_conn_sa; first by eapply Hopen_state.
+        destruct Hrel_exec_pre as ((st' & Hlast_st' & Hreads_st' & _) & Hsub').
+        iExists st'.
+        iSplit; first done.
+        assert (γm_conn = γm_conn_sa) as <-; first set_solver.
+        iDestruct (@ghost_map.ghost_map_auth_agree _ Key (option val) 
+          with "[$Hghost_map_m_conn][$Hghost_map_m_conn_sa]") as "<-".
+        assert (k ∈ KVS_keys) as Hk_in.
+        {
+          admit.
+        }
+        assert (k ∈ dom ms_conn_sub) as Hk_in_dom.
+        {
+          admit.
+        }
+        destruct (Hdom4 k ov Hk_in Hk_in_dom Hlookup_mc_conn_sa) as (h & Hlookup_ms_conn_sub & Hlast_h).
+        iPureIntro.
+        assert (ms_conn !! k = Some h) as Hlookup_mc_conn; first by eapply lookup_weaken.
+        destruct (Hreads_st' k ov Hk_in) as (_ & Hreads_st'').
+        apply Hreads_st''.
+        eauto.
       }
       iAssert (⌜∀ s k v, Wr s k v ∈ trans → ∃ h, ms_conn !! k = Some h ∧ m_gl !! k = Some h⌝)%I as "%Htrans_writes".
       {
