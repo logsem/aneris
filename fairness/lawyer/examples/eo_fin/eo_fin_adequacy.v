@@ -320,13 +320,15 @@ Section EOFinAdequacy.
     red. intros ?. iStartProof. iIntros "[HEAP INIT] !>".
     iSplitL.
     - simpl. 
-      iApply (main_spec with "[-]"); try done.
+      iApply (main_spec with "[-]").
+      4: { apply (phase_lt_fork π0 0). }
       5: { simpl. iNext. iIntros (_) "X". iApply "X". }
       3: { simpl. iIntros (? _) "X". iApply "X". }
       { apply AMU_lift_top. }
       { intros. rewrite /AMU_lift_MU__f.
         rewrite -nclose_nroot.
         apply AMU_lift_top. }
+      (* iFrame.  *)
       rewrite /obls_init_resource. subst s1. simpl.
       rewrite EX0.
       
@@ -343,9 +345,7 @@ Section EOFinAdequacy.
       rewrite map_fmap_singleton.      
       iFrame.
       rewrite !bi.sep_assoc. iSplitR "PH". 
-      2: { iExists _.
-           rewrite /phases_repr. rewrite map_fmap_singleton. iFrame.
-           iPureIntro. apply phase_lt_fork. }
+      2: { rewrite /th_phase_eq /phases_repr. rewrite map_fmap_singleton. iFrame. }
       rewrite mset_map_disj_union.
       rewrite auth_frag_op.
       iDestruct (own_op with "CPS") as "[CPS2 CPS0]".
@@ -362,7 +362,7 @@ Section EOFinAdequacy.
         apply gmultiset.gmultiset_included. 
         apply scalar_mul_le. lia.
     - subst s1. rewrite EX0. iApply om_sim_RAH. 
-  Qed. 
+  Qed.
 
 End EOFinAdequacy.
 

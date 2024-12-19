@@ -717,11 +717,12 @@ Section EoFin.
     Context {OBLS_AMU__f: forall τ, @AMU_lift_MU__f _ _ _ τ oGS _ EM _ ⊤}.
     Context {NO_OBS_POST: ∀ τ v, obls τ ∅ (oGS := oGS) -∗ fork_post τ v}. 
 
-    Theorem main_spec τ π
+    Theorem main_spec τ π π__cp
+      (PH_LE: phase_le π__cp π)
       :
       {{{ exc_lb 20 (oGS := oGS) ∗
-           cp_mul π d2 (S (2 * (S B))) (oGS := oGS) ∗
-           cp_mul π d0 40 (oGS := oGS) ∗
+           cp_mul π__cp d2 (S (2 * (S B))) (oGS := oGS) ∗
+           cp_mul π__cp d0 40 (oGS := oGS) ∗
            th_phase_eq τ π (oGS := oGS) ∗
            obls τ ∅ (oGS := oGS) }}}
       start #(0%nat) #B @ τ
@@ -774,9 +775,9 @@ Section EoFin.
         destruct sigs as [| si [| si' [|]]]; try by (simpl in SIGS_LEN; lia).
 
         rewrite !big_sepL_cons. simpl. rewrite union_empty_r_L.  
-        iDestruct "SIGS" as "(ITH & ITH' & _)". 
+        iDestruct "SIGS" as "(ITH & ITH' & _)".
 
-        iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
+        iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
         iApply sswp_MUf_wp. iIntros (τ'). iApply (MU__f_wand with "[-CP PH OB]").
         2: { iApply OBLS_AMU__f; [done| ]. 
              iApply (BMU_AMU__f with "[-PH]"); [reflexivity| ..].
@@ -797,7 +798,7 @@ Section EoFin.
         replace ({[si; si']} ∩ {[si]}) with ({[si]}: gset _) by set_solver.
         iSplitL "RE CPS2 CPS_FORK PH3 OB2".
         { iApply (thread_spec_wrapper with "[-]").
-          { apply strict_include in LT2. apply LT2. }
+          { apply strict_include in LT2. etrans; [apply PH_LE| apply LT2]. }
           { reflexivity. }
           { apply even_thread_resource. }
           2: { iNext. iIntros (v) "OB". by iApply NO_OBS_POST. }
@@ -808,7 +809,9 @@ Section EoFin.
           iExists _. by iFrame. }
 
         apply strict_include in LT1. iRename "PH1" into "PH".
-        wp_bind (Rec _ _ _)%V. pure_step.
+        wp_bind (Rec _ _ _)%V.
+        assert (phase_le π__cp π1) as PH_LE1 by (etrans; eauto). 
+        pure_step.
         iApply wp_value. pure_step.
 
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
@@ -833,12 +836,14 @@ Section EoFin.
         
         apply strict_include in LT4. iRename "PH3" into "PH".
         wp_bind (_ + _)%E. rewrite Nat2Z.inj_0.
-        assert (phase_le π π4) as LT' by (by etrans). 
+        assert (phase_le π__cp π4) as LT' by (by etrans). 
         do 2 pure_step_cases.
         replace (0 + 1)%Z with 1%Z; [| done].
-        replace 1%Z with (Z.of_nat 1%nat); [| done].         
+        replace 1%Z with (Z.of_nat 1%nat); [| done].
         iApply (thread_spec_wrapper with "[-]").
-        { etrans; [apply LT1| apply LT4]. }
+        {
+          (* etrans; [apply LT1| apply LT4]. } *)
+          apply LT'. }
         { reflexivity. }
         { apply odd_thread_resource. }
         2: { iNext. iIntros (v) "OB". by iApply NO_OBS_POST. }
@@ -857,7 +862,7 @@ Section EoFin.
         rewrite !big_sepL_cons. simpl. rewrite union_empty_r_L.  
         iDestruct "SIGS" as "(ITH & _)". 
 
-        iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
+        iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
         iApply sswp_MUf_wp. iIntros (τ'). iApply (MU__f_wand with "[-CP PH OB]").
         2: { iApply OBLS_AMU__f; [done| ]. 
              iApply (BMU_AMU__f with "[-PH]"); [reflexivity| ..].
@@ -876,7 +881,8 @@ Section EoFin.
         rewrite difference_diag_L. rewrite intersection_idemp_L.
         iSplitL "RE CPS2 CPS_FORK PH3 OB2".
         { iApply (thread_spec_wrapper with "[-]").
-          { apply strict_include in LT2. apply LT2. }
+          (* { apply strict_include in LT2. apply LT2. } *)
+          { apply strict_include in LT2. etrans; [apply PH_LE| apply LT2]. }
           { reflexivity. }
           { apply even_thread_resource. }
           2: { iNext. iIntros (v) "OB". by iApply NO_OBS_POST. }
@@ -885,6 +891,7 @@ Section EoFin.
           iExists _. by iFrame. }
 
         apply strict_include in LT1. iRename "PH1" into "PH".
+        assert (phase_le π__cp π1) as PH_LE1 by (etrans; eauto).
         wp_bind (Rec _ _ _)%V. pure_step.
         iApply wp_value. pure_step.
 
@@ -910,12 +917,12 @@ Section EoFin.
         
         apply strict_include in LT4. iRename "PH3" into "PH".
         wp_bind (_ + _)%E. rewrite Nat2Z.inj_0.
-        assert (phase_le π π4) as LT' by (by etrans). 
+        assert (phase_le π__cp π4) as LT' by (by etrans).
         do 2 pure_step_cases.
         replace (0 + 1)%Z with 1%Z; [| done].
         replace 1%Z with (Z.of_nat 1%nat); [| done].         
         iApply (thread_spec_wrapper with "[-]").
-        { etrans; [apply LT1| apply LT4]. }
+        { etrans; [apply PH_LE1| apply LT4]. }
         { reflexivity. }
         { apply odd_thread_resource. }
         2: { iNext. iIntros (v) "OB". by iApply NO_OBS_POST. }
@@ -949,7 +956,8 @@ Section EoFin.
         rewrite difference_diag_L. rewrite intersection_idemp_L.
         iSplitL "RE CPS2 CPS_FORK PH3 OB2".
         { iApply (thread_spec_wrapper with "[-]").
-          { apply strict_include in LT2. apply LT2. }
+          { apply strict_include in LT2.
+            trans π; eauto. }
           { reflexivity. }
           { apply even_thread_resource. }
           2: { iNext. iIntros (v) "OB". by iApply NO_OBS_POST. }
@@ -957,6 +965,7 @@ Section EoFin.
           rewrite Nat.sub_0_r. iFrame "CPS2". iFrame "#∗". }
 
         apply strict_include in LT1. iRename "PH1" into "PH".
+        assert (phase_le π__cp π1) as LT0 by (by etrans).
         wp_bind (Rec _ _ _)%V. pure_step.
         iApply wp_value. pure_step.
 
@@ -982,13 +991,15 @@ Section EoFin.
         
         apply strict_include in LT4. iRename "PH3" into "PH".
         wp_bind (_ + _)%E. rewrite Nat2Z.inj_0.
-        assert (phase_le π π4) as LT' by (by etrans). 
+        assert (phase_le π__cp π4) as LT' by (by etrans). 
         do 2 pure_step_cases.
         replace (0 + 1)%Z with 1%Z; [| done].
         replace 1%Z with (Z.of_nat 1%nat); [| done].         
         replace 0%Z with (Z.of_nat 0%nat); [| done].         
         iApply (thread_spec_wrapper with "[-]").
-        { etrans; [apply LT1| apply LT4]. }
+        {
+          (* etrans; [apply PH_LE| apply LT4]. } *)
+          apply LT'. }
         { reflexivity. }        
         { apply odd_thread_resource. }
         2: { iNext. iIntros (v) "OB". by iApply NO_OBS_POST. }
