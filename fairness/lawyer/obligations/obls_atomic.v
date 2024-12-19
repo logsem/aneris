@@ -160,6 +160,11 @@ End TotalTriples.
 
 (* TODO: move to another file *)
 Section FairLockSpec.
+
+  Definition FL_st: Type := val * nat * bool.
+
+  Definition fl_round: FL_st -> nat := fun '(_, r, _) => r. 
+
   Context `{OfeDiscrete DegO} `{OfeDiscrete LevelO}.
   Context `{@LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}. 
   
@@ -171,58 +176,87 @@ Section FairLockSpec.
   Existing Instance OP.
   Let OM := ObligationsModel.
   
-  Context {Σ: gFunctors}.
-  Context {invs_inΣ: invGS_gen HasNoLc Σ}.
-
-  Let OAM := ObligationsAM. 
-  Let ASEM := ObligationsASEM.
-  Context {oGS: @asem_GS _ _ ASEM Σ}.
-
-  Context `{EM: ExecutionModel heap_lang M}. 
-  Context `{hGS: @heapGS Σ _ EM}.
-  Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
-
-  Record FairLock := {
-    fl_create: val; fl_acquire: val; fl_release: val;
+  Record FairLockPre := {
     fl_c__cr: nat; fl_B: nat -> nat;
-    fl_LK: val * nat * bool -> iProp Σ;
-    fl_is_lock: val -> nat -> iProp Σ;               
-    fl_lvls: gset Level;
+    fl_GS :> gFunctors -> Set;
+    fl_LK `{FLG: fl_GS Σ} {HEAP: gen_heapGS loc val Σ}: FL_st -> iProp Σ;
     fl_d__h: Degree;
     fl_d__l: Degree;
     fl_d__m: Degree;
     fl_degs_lh: deg_lt fl_d__l fl_d__h;
     fl_degs_hm: deg_lt fl_d__h fl_d__m;
     fl_ι: namespace;
+    fl_acq_lvls: gset Level;                                     
+  }.
 
-    fl_is_lock_pers lk c :> Persistent (fl_is_lock lk c);
 
-    fl_create_spec: ⊢ ⌜ fl_c__cr <= LIM_STEPS ⌝ -∗ ∀ τ c,
-      {{{ ⌜ True ⌝ }}} fl_create #() @ τ {{{ lk, RET lk; fl_LK (lk, 0, false) ∗ fl_is_lock lk c }}};
+  Context {Σ: gFunctors}.
+  (* Context {invs_inΣ: invGS_gen HasNoLc Σ}. *)
+  
+  Let OAM := ObligationsAM. 
+  Let ASEM := ObligationsASEM.
+  Context {oGS: @asem_GS _ _ ASEM Σ}.
+  
+  Context `{EM: ExecutionModel heap_lang M}.
+  Context `{hGS: @heapGS Σ _ EM}.
+  Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
+  
+  Context {FLP: FairLockPre}.
+  
+  Definition TAU_FL τ P Q L TGT c π (Φ: val -> iProp Σ) O RR: iProp Σ := 
+    TAU τ P Q L fl_round TGT (fl_d__h FLP) (fl_d__l FLP)
+      c
+      (⊤ ∖ ↑(fl_ι FLP))
+      π
+      (fun _ _ => Φ #()) (* (fun y x => POST y x -∗? Φ (get_ret y x)) *)
+      O RR
+      (oGS := oGS). 
+  
+  Definition TLAT_FL τ P Q L TGT c e : iProp Σ := 
+    TLAT τ P Q L          
+      fl_round TGT
+      (fl_d__h FLP) (fl_d__l FLP) (fl_d__m FLP)
+      c (fl_B FLP)
+      (↑ (fl_ι FLP)) e NotStuck
+      (fun _ _ => None)
+      (fun _ _ => #())
+      (oGS := oGS).
+  
+  Definition acquire_at_pre {FLG: fl_GS FLP Σ} (lk: val) (x: FL_st): iProp Σ :=
+    ▷ fl_LK FLP x (FLG := FLG) ∗ ⌜ x.1.1 = lk ⌝. 
+  Definition acquire_at_post {FLG: fl_GS FLP Σ} (lk: val) (y x: FL_st): iProp Σ :=
+    fl_LK FLP y (FLG := FLG) ∗ ⌜ y.1 = x.1 /\ x.2 = false /\ y.2 = true⌝.
+  Definition release_at_pre {FLG: fl_GS FLP Σ} (lk: val) (x: FL_st): iProp Σ :=
+    ▷ fl_LK FLP x (FLG := FLG) ∗ ⌜ x.2 = true /\ x.1.1 = lk⌝. 
+  Definition release_at_post {FLG: fl_GS FLP Σ} (lk: val) (y x: FL_st): iProp Σ :=
+    fl_LK FLP y (FLG := FLG) ∗ ⌜ y.1.2 = (x.1.2 + 1)%nat /\ y.2 = false /\ y.1.1 = x.1.1 ⌝.
+  
+  Record FairLock := {    
+    fl_create: val; fl_acquire: val; fl_release: val;
+    fl_is_lock `{FLG: fl_GS FLP Σ} {HEAP: gen_heapGS loc val Σ}: val -> nat -> iProp Σ;
+    fl_is_lock_pers {FLG: fl_GS FLP Σ} lk c :> Persistent (fl_is_lock lk c (FLG := FLG));
 
-    fl_acquire_spec (lk: loc) c τ: fl_is_lock #lk c ⊢
-        TLAT τ (fun x => ▷ fl_LK x ∗ ⌜ x.1.1 = #lk ⌝) (fun y x => ▷ fl_LK y ∗ ⌜ y.1 = x.1 /\ x.2 = false /\ y.2 = true⌝)
-          fl_lvls
-          (fun '(_, r, _) => r) (fun '(_, _, b) => b = false)
-          fl_d__h fl_d__l fl_d__m
-          c fl_B                        
-          (↑ fl_ι) (fl_acquire #lk) NotStuck
-          (fun _ _ => None)
-          (fun _ _ => #())
-          (oGS := oGS);               
+    fl_create_spec: ⊢ ⌜ fl_c__cr FLP <= LIM_STEPS ⌝ -∗ ∀ τ c,
+      {{{ ⌜ True ⌝ }}} fl_create #() @ τ {{{ lk, RET lk;
+         ∃ FLG: fl_GS FLP Σ, fl_LK FLP (lk, 0, false) (FLG := FLG) ∗ fl_is_lock lk c (FLG := FLG) }}};
 
-    fl_release_spec (lk: loc) c τ: fl_is_lock #lk c ⊢
-        TLAT τ (fun x => ▷ fl_LK x ∗ ⌜ x.2 = true /\ x.1.1 = #lk⌝) (fun y x => ▷ fl_LK y ∗ ⌜ y.1.2 = (x.1.2 + 1)%nat /\ y.2 = false /\ y.1.1 = x.1.1 ⌝)
-          ∅
-          (fun '(_, r, _) => r) (fun _ => True%type)
-          fl_d__h fl_d__l fl_d__m
-          c fl_B
-          (↑ fl_ι) (fl_release #lk) NotStuck
-          (fun _ _ => None)
-          (fun _ _ => #())
-          (oGS := oGS)
-  }. 
-
+    fl_acquire_spec {FLG: fl_GS FLP Σ} (lk: val) c τ: (fl_is_lock (FLG := FLG)) lk c ⊢
+        TLAT_FL τ 
+        (acquire_at_pre lk (FLG := FLG))
+        (acquire_at_post lk (FLG := FLG))
+        (fl_acq_lvls FLP)
+        (fun '(_, _, b) => b = false)
+        c (fl_acquire lk);
+                                     
+    fl_release_spec {FLG: fl_GS FLP Σ} (lk: val) c τ: (fl_is_lock (FLG := FLG)) lk c ⊢
+        TLAT_FL τ
+        (release_at_pre lk (FLG := FLG))
+        (release_at_post lk (FLG := FLG))
+        ∅
+        (fun _ => True%type)
+        c (fl_release lk);
+  }.
+  
 End FairLockSpec.
 
 
@@ -306,18 +340,20 @@ Section MotivatingClient.
   Context `{hGS: @heapGS Σ _ EM}.
   Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
 
-  Context {FL: FairLock (oGS := oGS)}.
+  Context {FLP: FairLockPre} (FL: FairLock (FLP := FLP) (oGS := oGS)).
 
   Context (l__o l__f: Level).
   Hypothesis
-    (LVL_ORDo: forall l, l ∈ fl_lvls FL -> lvl_lt l__o l)
-    (LVL_ORDf: forall l, l ∈ fl_lvls FL -> lvl_lt l l__f)
+    (LVL_ORDo: forall l, l ∈ fl_acq_lvls FLP -> lvl_lt l__o l)
+    (LVL_ORDf: forall l, l ∈ fl_acq_lvls FLP -> lvl_lt l l__f)
     (* in case fl_lvls is empty *)
     (LVL_ORDof: lvl_lt l__o l__f).
 
 
   Section AfterInit.
     Context {CL: ClientG Σ}.
+    Context {FLG: fl_GS FLP Σ}. 
+
     Existing Instance cl_sig_map. 
     
     Definition flag_unset := own cl_γ__os Pending.
@@ -336,10 +372,10 @@ Section MotivatingClient.
 
     Definition smap_repr_cl r K smap: iProp Σ :=
       smap_repr (fun _ => l__o) (flip Nat.ltb r) (oGS := oGS) smap ∗
-      ⌜ dom smap = set_seq 0 K ⌝. 
+      ⌜ dom smap = set_seq 0 K ⌝.
     
     Definition client_inv_inner lk flag s__f: iProp Σ :=
-      ∃ r b oo smap, fl_LK FL (lk, r, b) ∗ lock_owner_auth oo ∗
+      ∃ r b oo smap, fl_LK FLP (lk, r, b) (FLG := FLG) ∗ lock_owner_auth oo ∗
         (⌜ b = true ⌝ ∗ (∃ s__o, ⌜ oo = Some s__o /\ smap !! r = Some s__o⌝
          (* ∗ sgn s__o l__o (Some false) (oGS := oGS) *)
                  )
@@ -361,18 +397,16 @@ Section MotivatingClient.
 
     Definition c__cl: nat := 4.
 
-    Context (d2 d1 d0: Degree).
+    Context (d2 d1 d0: Degree).    
 
-    Existing Instance fl_is_lock_pers.
-
-    Hypothesis (FL_STEPS: fl_B FL c__cl ≤ LIM_STEPS).
-    Hypothesis (INVS_DISJ: fl_ι FL ## client_ns). 
+    Hypothesis (FL_STEPS: fl_B FLP c__cl ≤ LIM_STEPS).
+    Hypothesis (INVS_DISJ: fl_ι FLP ## client_ns). 
 
     Definition RR__L π (r': option nat): iProp Σ := 
       match r' with
       | None => ⌜ True ⌝
       | Some r => ∃ s (* π__e *),
-      ith_sig r s ∗ ep s π (fl_d__l FL) (oGS := oGS)
+      ith_sig r s ∗ ep s π (fl_d__l FLP) (oGS := oGS)
         (* ∗ ⌜ phase_le π__e π ⌝ *)
       end.
 
@@ -395,14 +429,14 @@ Section MotivatingClient.
     (* need to assume at least one FL level *)
     (* TODO: can we change either TAU or levels order? *)
     Context (l__fl: Level).
-    Hypothesis (L__FL: l__fl ∈ fl_lvls FL). 
+    Hypothesis (L__FL: l__fl ∈ fl_acq_lvls FLP). 
 
     Lemma BMU_wait_owner τ π O r m smap π__e i
       (PH_EXP: phase_le π__e π)
       (WAIT: r <= i):
-      obls τ O (oGS := oGS) ∗ sgns_level_ge' O (fl_lvls FL) (oGS := oGS)∗
+      obls τ O (oGS := oGS) ∗ sgns_level_ge' O (fl_acq_lvls FLP) (oGS := oGS)∗
       th_phase_eq τ π (oGS := oGS) ∗ RR__L π__e (Some i) ∗ smap_repr_cl r m smap ⊢ 
-      BMU ∅ 1 (cp π (fl_d__l FL) (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗ 
+      BMU ∅ 1 (cp π (fl_d__l FLP) (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗ 
           obls τ O (oGS := oGS) ∗ smap_repr_cl r m smap
       ) (oGS := oGS).
     Proof using LVL_ORDo L__FL ODl LEl.
@@ -427,12 +461,12 @@ Section MotivatingClient.
       iFrame. iPureIntro. repeat split; try done.
     Qed.
 
-    Hypothesis (DEG_LH: deg_lt (fl_d__l FL) (fl_d__h FL)). 
+    Hypothesis (DEG_LH: deg_lt (fl_d__l FLP) (fl_d__h FLP)). 
 
     Lemma BMU_create_wait_owner τ π r m smap i
       (DOM: i ∈ dom smap)
       :
-      th_phase_eq τ π (oGS := oGS) ∗ cp π (fl_d__h FL) (oGS := oGS) ∗ smap_repr_cl r m smap ⊢ 
+      th_phase_eq τ π (oGS := oGS) ∗ cp π (fl_d__h FLP) (oGS := oGS) ∗ smap_repr_cl r m smap ⊢ 
       BMU ∅ 1 (th_phase_eq τ π (oGS := oGS) ∗ RR__L π (Some i) ∗ 
                 smap_repr_cl r m smap) (oGS := oGS).
     Proof using LVL_ORDo L__FL DEG_LH ODd ODl LEl.
@@ -478,20 +512,22 @@ Section MotivatingClient.
       apply excl_auth_update.
     Qed.
 
-    Lemma acquire_left τ (lk: loc) flag s__f π:
-      {{{ fl_is_lock FL #lk c__cl ∗ client_inv #lk flag s__f ∗ flag_unset ∗
+    Lemma acquire_left τ (lk: val) flag s__f π:
+      {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗ flag_unset ∗
           obls τ {[ s__f ]} (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
-          cp π (fl_d__m FL) (oGS := oGS) ∗
+          cp π (fl_d__m FLP) (oGS := oGS) ∗
           sgn s__f l__f None (oGS := oGS)
       }}}
-        (fl_acquire FL) #lk @ τ
+        (fl_acquire FL) lk @ τ
       {{{ v, RET v; ∃ s__o, obls τ {[ s__f; s__o ]} (oGS := oGS) ∗ flag_unset ∗
                           th_phase_eq τ π (oGS := oGS) ∗ 
                           P__lock flag s__f false ∗ lock_owner_frag (Some s__o) ∗
                           ⌜ s__o ≠ s__f ⌝
       }}}.
     Proof using All.
-      iIntros (Φ). iIntros "(#LOCK & #INV & UNSET & OB & PH & CPm & #SF') POST".
+      iIntros (Φ).
+      pose proof (fl_is_lock_pers FL lk c__cl (FLG := FLG)) as PERS. (* TODO: why Existing Instance doesn't work? *)
+      iIntros "(#LOCK & #INV & UNSET & OB & PH & CPm & #SF') POST".
 
       iApply (wp_step_fupd _ _ ⊤ _ _ with "[POST]").
       { done. }
@@ -519,7 +555,7 @@ Section MotivatingClient.
       iApply fupd_mask_intro; [set_solver| ]. iIntros "CLOS'".
       rewrite {1}/client_inv_inner.
       iDestruct "inv" as (r b oo smap) "(LK & LOCK_OW & ST & SR)".
-      iExists (#lk, r, b).
+      iExists (lk, r, b).
       iFrame "LK". iSplit; [done| ]. 
       
       iSplit; [| iSplit].
@@ -597,19 +633,20 @@ Section MotivatingClient.
     Qed.
 
 
-    Lemma release_left (lk: loc) τ s__o flag s__f π
+    Lemma release_left (lk: val) τ s__o flag s__f π
       (SIGS_NEQ: s__o ≠ s__f):
-      {{{ fl_is_lock FL #lk c__cl ∗ client_inv #lk flag s__f ∗
+      {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗
           flag_unset ∗ obls τ {[ s__f; s__o ]} (oGS := oGS) ∗ 
-          th_phase_eq τ π (oGS := oGS) ∗ cp π (fl_d__m FL) (oGS := oGS) ∗
+          th_phase_eq τ π (oGS := oGS) ∗ cp π (fl_d__m FLP) (oGS := oGS) ∗
           (* P__lock flag s__f false ∗ *)
           flag ↦ #true ∗ sgn s__f l__f (Some false) (oGS := oGS) ∗
           
           lock_owner_frag (Some s__o) }}}
-        (fl_release FL) #lk @ τ
+        (fl_release FL) lk @ τ
       {{{ v, RET v; obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) }}}.
     Proof using All.
       iIntros (Φ).
+      pose proof (fl_is_lock_pers FL lk c__cl (FLG := FLG)) as PERS. (* TODO: why Existing Instance doesn't work? *)
       iIntros "(#LOCK & #INV & UNSET & OB & PH & CPm & FLAG & SGNf & LOCKED) POST".
 
       iApply (wp_step_fupd _ _ ⊤ _ _ with "[POST]").
@@ -678,7 +715,8 @@ Section MotivatingClient.
         iIntros "[SGNf OB]". rewrite difference_diag_L.
 
         iApply BMU_intro.
-        iIntros (st). destruct st as ((?&?)&?). simpl.
+        iIntros (st). destruct st as ((?&?)&?). 
+        rewrite /release_at_post. simpl.
         iIntros "(LK & (->&->&->))".
         iMod (lock_owner_update _ _ None with "[$] [$]") as "[UNL' UNL]".
         iMod (os_shoot _ () with "[$]") as "#SET".
@@ -695,45 +733,47 @@ Section MotivatingClient.
     From trillium.fairness.lawyer Require Import program_logic.
 
     (* TODO: move, remove duplicates *)
-  Ltac BMU_burn_cp :=
-    iApply BMU_intro;
-    iDestruct (cp_mul_take with "CPS") as "[CPS CP]";
-    iSplitR "CP";
-    [| do 2 iExists _; iFrame; iPureIntro; done].   
-  
-  Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS _ EM hGS (↑ nroot)}.
+    Ltac BMU_burn_cp :=
+      iApply BMU_intro;
+      iDestruct (cp_mul_take with "CPS") as "[CPS CP]";
+      iSplitR "CP";
+      [| do 2 iExists _; iFrame; iPureIntro; done].   
+    
+    Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS _ EM hGS (↑ nroot)}.
+    
+    Ltac MU_by_BMU :=
+      iApply OBLS_AMU; [by rewrite nclose_nroot| ];
+      iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH". 
+    
+    Ltac MU_by_burn_cp := MU_by_BMU; BMU_burn_cp.
+    
+    Ltac pure_step_hl := 
+      iApply sswp_MU_wp; [done| ];
+      iApply sswp_pure_step; [done| ]; simpl;
+      iNext.
+    
+    Ltac pure_step := pure_step_hl; MU_by_burn_cp.   
+    Ltac pure_step_cases := pure_step || (iApply wp_value; []) || wp_bind (RecV _ _ _ _)%V.
+    Ltac pure_steps := repeat (pure_step_cases; []).
 
-  Ltac MU_by_BMU :=
-    iApply OBLS_AMU; [by rewrite nclose_nroot| ];
-    iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH". 
-  
-  Ltac MU_by_burn_cp := MU_by_BMU; BMU_burn_cp.
-  
-  Ltac pure_step_hl := 
-    iApply sswp_MU_wp; [done| ];
-    iApply sswp_pure_step; [done| ]; simpl;
-    iNext.
-  
-  Ltac pure_step := pure_step_hl; MU_by_burn_cp.   
-  Ltac pure_step_cases := pure_step || (iApply wp_value; []) || wp_bind (RecV _ _ _ _)%V.
-  Ltac pure_steps := repeat (pure_step_cases; []).
-
-    Theorem left_thread_spec (lk: loc) τ flag s__f π:
-      {{{ fl_is_lock FL #lk c__cl ∗ client_inv #lk flag s__f ∗ flag_unset ∗
+    Theorem left_thread_spec (lk: val) τ flag s__f π:
+      {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗ flag_unset ∗
           obls τ {[ s__f ]} (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
-          cp_mul π (fl_d__m FL) 2 (oGS := oGS) ∗
+          cp_mul π (fl_d__m FLP) 2 (oGS := oGS) ∗
           sgn s__f l__f None (oGS := oGS) ∗
 
           cp_mul π d0 20 (oGS := oGS)
       }}}
-        left_thread #lk #flag @ τ
+        left_thread lk #flag @ τ
       {{{ v, RET v; obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) }}}.
     Proof using All.
-      iIntros (Φ). iIntros "(#LOCK & #INV & ?&?&PH&CPSm&? & CPS) POST".
+      iIntros (Φ).
+      pose proof (fl_is_lock_pers FL lk c__cl (FLG := FLG)) as PERS. (* TODO: why Existing Instance doesn't work? *)
+      iIntros "(#LOCK & #INV & ?&?&PH&CPSm&? & CPS) POST".
       rewrite /left_thread.
       pure_steps. simpl.
 
-      wp_bind (fl_acquire FL #lk).
+      wp_bind (fl_acquire FL lk).
       iDestruct (cp_mul_take with "CPSm") as "[CPSm CPm]". 
       iApply (acquire_left with "[-CPSm CPS POST]").
       { iFrame "#∗". }
@@ -755,6 +795,171 @@ Section MotivatingClient.
       { done. }
       { iFrame "#∗". }
       iNext. done. 
-    Qed.      
+    Qed.
+
+  End AfterInit.
     
 End MotivatingClient.
+
+
+Section Ticketlock.
+  Context `{ODd: OfeDiscrete DegO} `{ODl: OfeDiscrete LevelO}.
+  Context `{LEl: @LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}. 
+  
+  Let Degree := ofe_car DegO.
+  Let Level := ofe_car LevelO.
+
+  Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}.
+  Let OP := LocaleOP (Locale := locale heap_lang).
+  Existing Instance OP.
+  Let OM := ObligationsModel.
+
+  Let Tid := locale heap_lang.
+
+  Local Infix "*'" := prod (at level 10, left associativity). 
+  (* Definition tau_codom Σ: Type := (((Tid * Phase) * gset SignalId) * gset Level) *  *)
+  (*                                   (* (iProp Σ) *) *)
+  (*                                   (ofe_mor val (iProp Σ)) *)
+  Definition tau_codom Σ: Type := 
+    Tid *' Phase *' (gset SignalId) *' (gset Level) *'
+    (ofe_mor val (iProp Σ)) *' (ofe_mor (option nat) (iProp Σ)).
+
+  Local Infix "**" := prodO (at level 10, left associativity). 
+
+  (* Definition tau_codomO Σ: ofe := prodO (prodO (prodO (prodO Tid Phase) (gsetO SignalId)) (gsetR Level)) *)
+  (*                                   (* ((iPropO Σ)) *) *)
+  (*                                       (ofe_morO valO (iPropO Σ)) *)
+  (* . *)
+  Definition tau_codomO Σ: ofe := 
+    Tid ** Phase ** (gsetO SignalId) ** (gsetR Level) ** 
+    (ofe_morO valO (iPropO Σ)) ** (ofe_morO (optionR natO) (iPropO Σ)).
+ 
+  Class TicketlockPreG Σ := {
+      tl_tau_map_pre :> inG Σ (authUR (gmapUR nat (exclR $ tau_codomO Σ)));
+      tl_tokens_pre :> inG Σ (authUR (gset_disjUR natO));
+      tl_held_pre :> inG Σ (excl_authUR boolO);
+  }.
+
+  Class TicketlockG Σ := {
+      tl_pre :> TicketlockPreG Σ;
+      tl_γ_tau_map: gname;
+      tl_γ_tokens: gname;
+      tl_γ_held: gname;
+  }.
+
+  Definition tau_map_auth `{TicketlockG Σ} (M: gmap nat (tau_codom Σ)) :=
+    own tl_γ_tau_map ((● (Excl <$> M)): authUR (gmapUR nat (exclR $ tau_codomO Σ))). 
+  Definition ticket_tau `{TicketlockG Σ} (n: nat) (cd: tau_codom Σ) :=
+    own tl_γ_tau_map ((◯ {[ n := Excl cd ]}): authUR (gmapUR nat _)).
+
+  Definition tokens_auth `{TicketlockG Σ} (T: gset_disj nat) :=
+    own tl_γ_tokens ((● T): authUR (gset_disjUR natO)).
+  Definition ticket_token `{TicketlockG Σ} (i: nat) :=
+    own tl_γ_tokens ((◯ (GSet {[ i ]})): authUR (gset_disjUR natO)).
+
+  Definition held_auth `{TicketlockG Σ} (b: bool) :=
+    own tl_γ_held ((● Excl' b): (excl_authUR boolO)).
+  Definition held_frag `{TicketlockG Σ} (b: bool) :=
+    own tl_γ_held ((◯ Excl' b): (excl_authUR boolO)).
+
+  Definition tl_LK `{TicketlockG Σ} `{gen_heapGS loc val Σ}
+    (st: FL_st): iProp Σ :=
+    let '(lk, r, b) := st in
+    ∃ (l__ow l__tk: loc),
+      ⌜ lk = (#l__ow, #l__tk)%V ⌝ ∗ l__ow ↦{/ 2} #r ∗
+      held_auth b.
+
+  (* Right now we just assume that the resulting OM has all needed degrees and levels *)
+  Context (d__h0 d__l0 d__m0: Degree). 
+  Hypothesis (fl_degs_lh0: deg_lt d__l0 d__h0)
+    (fl_degs_hm0: deg_lt d__h0 d__m0). 
+    
+  Definition tl_ns := nroot .@ "tl".
+
+  Definition TLPre: FairLockPre := {|
+    fl_c__cr := 2;
+    fl_B := id;
+    fl_GS := TicketlockG;
+    fl_LK := fun Σ FLG HEAP => tl_LK;
+    fl_degs_lh := fl_degs_lh0;
+    fl_degs_hm := fl_degs_hm0;
+    fl_ι := tl_ns;
+    fl_acq_lvls := ∅;
+  |}.
+
+
+  Let OAM := ObligationsAM.
+  Let ASEM := ObligationsASEM.
+
+  Context {Σ: gFunctors}.
+  (* Context {invs_inΣ: invGS_gen HasNoLc Σ}. *)
+  Context {oGS: @asem_GS _ _ ASEM Σ}.
+  Context `{EM: ExecutionModel heap_lang M}.
+  Context `{hGS: @heapGS Σ _ EM}.
+  Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
+           
+  Let tl_TAU := TAU_FL (FLP := TLPre) (oGS := oGS).
+
+  Definition TAU_stored `{TLG: TicketlockG Σ} (lk: val) (c: nat) (cd: tau_codom Σ): iProp Σ :=
+    let '(τ, π, Ob, L, Φ, RR) := cd in
+    obls τ Ob (oGS := oGS) ∗ sgns_level_gt' Ob L (oGS := oGS) ∗
+    (* TODO: add later credit ∗ *)
+    tl_TAU τ (acquire_at_pre lk (FLP := TLPre) (FLG := TLG)) (acquire_at_post lk (FLP := TLPre) (FLG := TLG))
+        L
+        (fun '(_, _, b) => b = false)
+        c π Φ Ob RR.
+
+  Definition tau_map_interp `{TicketlockG Σ} (lk: val) (c: nat) (ow: nat) (M: gmap nat (tau_codom Σ)): iProp Σ :=
+    [∗ map] i ↦ cd ∈ M,
+      let Φ := cd.1.2 in
+      (TAU_stored lk c cd ∗ ⌜ ow < i ⌝ ∨
+       ((Φ #() ∨ ticket_token i) ∗ ⌜ ow = i ⌝) ∨
+       ticket_token i ∗ ⌜ i < ow ⌝).      
+  
+  Definition tl_inv_inner `{TicketlockG Σ} (tl: val) (c: nat): iProp Σ :=
+    ∃ (l__ow l__tk: loc) (ow tk: nat) M,
+      ⌜ tl = (#l__ow, #l__tk)%V ⌝ ∗ ⌜ ow <= tk ⌝ ∗
+      l__ow ↦{/ 2} #ow ∗ l__tk ↦ #tk ∗
+      tokens_auth (GSet $ set_seq 0 (S tk)) ∗
+      ⌜ dom M = set_seq 0 tk ⌝ ∗ tau_map_auth M ∗ tau_map_interp tl c ow M.
+
+  Definition tl_wait: val :=
+    rec: "tl_wait" "x" "lk" :=
+      let: "o" := !(Fst "lk") in
+      if: "x" = "o"
+      then #() (* my turn *)
+      else "tl_wait" "x" "lk"
+  .
+
+  Definition tl_acquire : val :=
+    rec: "tl_acquire" "lk" :=
+      let: "n" := !(Snd "lk") in
+      if: CAS (Snd "lk") "n" ("n" + #1)
+      then tl_wait "n" "lk"
+      else "tl_acquire" "lk"
+  .
+
+  Definition tl_release: val :=
+      λ: "lk", FAA (Fst "lk") #1 
+  .
+
+  Definition tl_is_lock `{TicketlockG Σ} lk c := inv tl_ns (tl_inv_inner lk c).
+
+  Context {TLG: TicketlockG Σ}.
+  
+  Lemma tl_acquire_spec (lk: val) c τ:
+    tl_is_lock lk c ⊢
+        TLAT_FL τ
+        (acquire_at_pre lk (FLP := TLPre) (FLG := TLG))
+        (acquire_at_post lk (FLP := TLPre) (FLG := TLG))
+        ∅
+        (fun _ => True%type)
+        c (tl_acquire lk)
+        (oGS := oGS)
+        (FLP := TLPre).
+  Proof using.
+    
+
+    
+  
+End Ticketlock. 
