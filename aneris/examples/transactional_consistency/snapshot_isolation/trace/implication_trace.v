@@ -1238,7 +1238,80 @@ Section trace_proof.
         with "[Hkeys Hghost_map_m_gl]" as ">(Hghost_map_m_gl & Hkeys)".
       {
         destruct b; last (iModIntro; iSplitL "Hghost_map_m_gl"; iLeft;  by iFrame).
-        iInduction m as [|k x m Hlookup_k_m] "IH" using map_ind; admit.
+        iAssert (⌜dom m = dom mc⌝)%I as "#Hdom_mc"; first (iPureIntro; set_solver).
+        iClear "Hkeys_hist Hkeys_conn_lin_hist".
+        clear Hdom1 Hdom2 His_some Hcm_writes Htrans_writes Htrans_reads.
+        iRevert "Hdom_mc".
+        iInduction m as [|k x m Hlookup_k_m] "IH" using map_ind forall (mc).
+        - iIntros (Hdom_mc).
+          iModIntro.
+          rewrite dom_empty_L in Hdom_mc.
+          assert (mc = ∅) as ->; first by apply dom_empty_inv_L. 
+          iSplitL "Hghost_map_m_gl". 
+          + iRight.
+            iSplit; first done.
+            iExists m_gl; iFrame.
+            iSplit; first done.
+            iSplit; first (iPureIntro; set_solver).
+            iPureIntro; set_solver.
+          + iRight; iSplit; first done.
+            set_solver.
+        - iIntros (Hdom_mc).
+          rewrite {1} big_sepM_insert; last done.
+          iDestruct "Hkeys" as "(Hkey & Hkeys)".
+          destruct (mc !! k) as [(p1, p2)|] eqn:Hlookup_k_mc; last first.
+          {
+            apply not_elem_of_dom_2 in Hlookup_k_mc.
+            rewrite dom_insert_L in Hdom_mc.
+            set_solver.
+          }
+          assert (mc = <[k:=(p1, p2)]> (delete k mc)) as Hdel_mc_eq.
+          {
+            apply eq_sym.
+            by apply (insert_delete mc k (p1, p2)).
+          }
+          rewrite Hdel_mc_eq in Hdom_mc.
+          do 2 rewrite dom_insert_L in Hdom_mc.
+          iDestruct (@ghost_map_lookup with "[$Hghost_map_m_gl][$Hkey]") as "%Hlookup_m_gl".
+          iDestruct ("IH" $! (delete k mc) with "[$Hkeys][$Hghost_map_m_gl][]") as 
+            ">([(%Hfalse & _)|(_ & (%m_gl' & Hghost_map_m_gl' & %Hdom' & %Himp1 & %Himp2))] & Hkeys)".
+          {
+            iModIntro; iPureIntro.
+            apply not_elem_of_dom_2 in Hlookup_k_m.
+            destruct ((delete k mc) !! k) as [v|] eqn:Hlookup_del; 
+              first (rewrite lookup_delete in Hlookup_del; set_solver).
+            apply not_elem_of_dom_2 in Hlookup_del.
+            apply (union_cancel_l_L _ _ {[k]}); set_solver.
+          }
+          set_solver.
+          iDestruct "Hkeys" as "[(%Hfalse & _) | (_ & Hkeys)]"; first set_solver.
+          iMod (@ghost_map_update _ Key (list val) _ _ _ _ _ k x (aux_defs.commit_event (p1, p2) x) 
+            with "[$Hghost_map_m_gl'] [$Hkey]") as "(Hghost_map_m_gl' & Hkey)".
+          iModIntro.
+          iSplitR "Hkey Hkeys"; iRight; (iSplit; first done).
+          + iExists (<[k:=aux_defs.commit_event (p1, p2) x]> m_gl').
+            iFrame.
+            iPureIntro; split_and!.
+            * rewrite -(insert_id _ _ _ Hlookup_m_gl).
+              do 2 rewrite dom_insert_L.
+              set_solver.
+            * intros k' Hnone.
+              destruct (decide (k = k')) as [<-|Hneq]; first set_solver.
+              rewrite lookup_insert_ne; last done.
+              apply Himp1.
+              by rewrite lookup_delete_ne.
+            * intros k' x' (p1', p2') Hlookup_k'_m_gl Hlookup_k'_mc.
+              destruct (decide (k = k')) as [<-|Hneq].
+              -- rewrite lookup_insert.
+                 rewrite Hlookup_m_gl in Hlookup_k'_m_gl.
+                 rewrite Hlookup_k_mc in Hlookup_k'_mc.
+                 set_solver.
+              -- rewrite lookup_insert_ne; last done. 
+                 apply Himp2; try done.
+                 by rewrite lookup_delete_ne.
+          + rewrite {2} Hdel_mc_eq.
+            rewrite big_sepM2_insert; try done; last apply lookup_delete.
+            iFrame.
       }
       iAssert (|==> ((⌜b = false⌝ ∗ own_log_auth γexec 1 exec') ∨ 
         (⌜b = true⌝ ∗ own_log_auth γexec 1 (exec' ++ [(trans ++ [Cm (tag1, c) true], st)]))))%I 
@@ -3229,7 +3302,7 @@ Section trace_proof.
       set_solver.
     }
     set_solver.
-  Admitted.
+  Qed.
 
   Lemma init_client_implication γmstate γmlin γmpost γmname γl γm_gl γexec γsi_name clients (res : SI_resources Mdl Σ) 
   (lib : KVS_transaction_api) : 
