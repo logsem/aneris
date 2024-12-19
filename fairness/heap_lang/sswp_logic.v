@@ -222,4 +222,26 @@ Section SSWP.
     by iApply "HΦ".
   Qed.
     
+  Lemma wp_faa s E (l: loc) (i a: Z) (Φ : expr → iProp Σ) :
+    ▷ l ↦ #i -∗
+    ▷ (l ↦ #(i + a) -∗ Φ #i) -∗
+    sswp s E (FAA #l #a) Φ. 
+  Proof.
+    iIntros ">Hl HΦ". simpl.
+    iIntros (σ1) "Hsi".
+    iDestruct (gen_heap_valid with "Hsi Hl") as %Hheap.
+    iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
+    iSplit.
+    { destruct s; [|done]. iPureIntro. apply head_prim_reducible. by eauto. }
+    iIntros (e2 σ2 efs Hstep). iIntros "!>!>!>".
+    iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]".
+    iMod "Hclose".
+    iFrame.
+    apply head_reducible_prim_step in Hstep; [|by eauto].
+    inv_head_step.
+    iFrame. iModIntro.
+    iSplit; [|done].
+    by iApply "HΦ".
+  Qed.
+
 End SSWP.
