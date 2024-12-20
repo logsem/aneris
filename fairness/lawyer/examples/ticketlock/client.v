@@ -1,3 +1,42 @@
+(* TODO: move *)
+Section OneShot.
+  Context {V: ofe}.
+  
+  Definition one_shotR := csumR (exclR unitO) (agreeR V).
+  Definition Pending : one_shotR := Cinl (Excl ()).
+  Definition Shot (v : V) : one_shotR := Cinr (to_agree v).
+  
+  Class one_shotG Σ := { one_shot_inG : inG Σ one_shotR }.
+  Global Existing Instance one_shot_inG.
+  
+  Definition one_shotΣ : gFunctors := #[GFunctor one_shotR].
+  Global Instance subG_one_shotΣ {Σ} : subG one_shotΣ Σ → one_shotG Σ.
+  Proof. solve_inG. Qed.
+
+  Section Lemmas.
+    Context `{one_shotG}. 
+    
+    Lemma os_shoot γ v: ⊢ own γ Pending ==∗ own γ $ Shot v.
+    Proof using.
+      iIntros "P".
+      iApply own_update; [| by iFrame].
+      by apply cmra_update_exclusive.
+    Qed. 
+
+    Lemma os_pending_excl `{OfeDiscrete V} γ (os': one_shotR):
+      ⊢ own γ Pending -∗ own γ os' -∗ False.
+    Proof using.
+      rewrite bi.wand_curry -own_op.
+      iIntros "P". eauto 10.
+      iDestruct (own_valid with "P") as "%X".
+      by apply exclusive_l in X; [| apply _].   
+    Qed.
+
+  End Lemmas.
+
+End OneShot.
+
+
 Class ClientPreG Σ := {
     cl_ow_sig_pre :> inG Σ (excl_authUR (optionUR SignalId));
     (* eofin_sigs :> inG Σ (authUR (gmapUR nat (agreeR SignalId))); *)
