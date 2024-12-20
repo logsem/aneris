@@ -1203,9 +1203,67 @@ Section trace_proof.
         apply Hreads_st''.
         eauto.
       }
-      iAssert (⌜∀ s k v, Wr s k v ∈ trans → ∃ h, ms_conn !! k = Some h ∧ m_gl !! k = Some h⌝)%I as "%Htrans_writes".
-      {
-        admit.
+      iAssert (⌜b = true → ∀ s k v, Wr s k v ∈ trans → ∃ h, ms_conn !! k = Some h ∧ m_gl !! k = Some h⌝)%I as "%Htrans_writes".
+      { 
+        iIntros (-> s k v Hwr_in).
+        rewrite /open_transactions_state.
+        rewrite {4} Heq_sa_clients.
+        rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
+        iDestruct "Hopen_trans" as "(Hopen_trans & _)".
+        rewrite big_sepS_singleton.
+        iDestruct (@ghost_map_lookup with "[$Hghost_map_mnames_si][$Hsa_pointer_si']") as "%Hlookup_mnames_si".
+        iDestruct "Hopen_trans" as "[%Hfalse|(%c_sa & %m_conn_sa & %γm_conn_sa & %γsnap_sa & %Hextract_c_sa 
+          & Hghost_map_m_conn_sa & %Hopen_state)]"; first set_solver.
+        assert (c = c_sa) as <-; first set_solver.
+        assert (open_trans trans c (T1 ++ trans :: T2)) as Hopen.
+        {
+          destruct Hop as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
+          exists op.
+          split_and!; try done.
+          rewrite /is_cm_op.
+          destruct op; set_solver.
+        }
+        assert (k ∈ KVS_keys) as Hk_in.
+        {
+          destruct (Hopen_state trans Hopen) as (Hopen_state' & _).
+          by eapply Hopen_state'; right.
+        }
+        assert (∃ v', mc !! k = Some (Some v', true)) as (v' & Hlookup_mc).
+        {
+          admit.
+        }
+        iAssert (⌜m !! k = ms !! k⌝)%I as "%Hlookup_eq".
+        {
+          iDestruct "Hkeys_disj" as "[(_ & %Hcan_commit & Hkeys_disj)|(%Hfalse & _)]"; last set_solver.
+          rewrite /aux_defs.can_commit in Hcan_commit.
+          iPureIntro.
+          apply bool_decide_unpack in Hcan_commit.
+          specialize (Hcan_commit k Hk_in).
+          rewrite Hlookup_mc in Hcan_commit.
+          by apply bool_decide_unpack in Hcan_commit.
+        }
+        assert (ms = ms_conn_sub) as Heq_ms_conn; first set_solver.
+        rewrite Heq_ms_conn in Hlookup_eq.
+        destruct (m !! k) as [h|] eqn:Hlookup_m; last first.
+        {
+          iPureIntro.
+          apply not_elem_of_dom_2 in Hlookup_m.
+          assert (k ∉ dom mc) as Hfalse; first set_solver.
+          apply not_elem_of_dom_1 in Hfalse.
+          set_solver.
+        }
+        iExists h.
+        assert (ms_conn !! k = Some h) as Hlookup_ms_conn; first (apply (lookup_weaken ms_conn_sub); set_solver).
+        iSplit; first done.
+        assert (m = <[k:=h]> (delete k m)) as Hdel_m_eq.
+        {
+          apply eq_sym.
+          by apply (insert_delete m k h).
+        }
+        rewrite {2} Hdel_m_eq.
+        rewrite big_sepM_insert; last apply lookup_delete.
+        iDestruct "Hkeys" as "(Hkey & Hkeys)".
+        by iDestruct (@ghost_map_lookup with "[$Hghost_map_m_gl][$Hkey]") as "%Hlookup_m_gl".
       }
       iAssert (⌜∀ k, (∃ v, mc !! k = Some (Some v, true) ∧ latest_write_trans k v trans) ∨ 
         ((¬∃ v, mc !! k = Some (Some v, true)) ∧ (¬∃ sig v, (Wr sig k v ∈ trans)))⌝)%I as "%Hcm_writes".
