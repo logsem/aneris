@@ -386,11 +386,16 @@ Section Ticketlock.
       held_frag b.
 
   (* Right now we just assume that the resulting OM has all needed degrees and levels *)
-  Context (d__h0 d__l0 d__m0 d__w: Degree). 
-  Hypothesis (fl_degs_lh0: deg_lt d__l0 d__h0)
-    (fl_degs_hw: deg_lt d__h0 d__w)
-    (fl_degs_wm: deg_lt d__w d__m0). 
-    
+  Context (d__w d__l0 d__h0 d__e d__m0: Degree). 
+  Hypothesis
+    (fl_degs_wl0: deg_lt d__w d__l0)
+    (fl_degs_lh0: deg_lt d__l0 d__h0)
+    (fl_degs_he: deg_lt d__h0 d__e)
+    (fl_degs_em: deg_lt d__e d__m0)
+    (* (fl_degs_hw: deg_lt d__h0 d__w) *)
+    (* (fl_degs_wm: deg_lt d__w d__m0) *)
+  .
+        
   Definition tl_ns := nroot .@ "tl".
 
   Program Definition TLPre: FairLockPre := {|
@@ -405,9 +410,8 @@ Section Ticketlock.
     fl_acq_lvls := ∅;
   |}.
   Next Obligation.
-  etrans; eauto.
+    etrans; eauto.
   Defined.
-
 
   Let OAM := ObligationsAM.
   Let ASEM := ObligationsASEM.
@@ -494,17 +498,17 @@ Section Ticketlock.
     λ: "lk", FAA (Snd "lk") #1.    
 
   Definition wait: val :=
-    rec: "tl_wait" "x" "lk" :=
+    rec: "wait" "lk" "t" :=
       let: "o" := !(Fst "lk") in
-      if: "x" = "o"
-      then #() (* my turn *)
-      else "tl_wait" "x" "lk"
+      if: "t" = "o"
+      then #()
+      else "wait" "lk" "t"
   .
 
   Definition tl_acquire : val :=
     λ: "lk",
       let: "t" := get_ticket "lk" in
-      wait "t" "lk"
+      wait "lk" "t"
   .
 
   Definition tl_release: val :=
@@ -567,10 +571,10 @@ Section Ticketlock.
   Qed.
 
   Definition wait_res o' t τ π Ob Φ RR: iProp Σ :=
-    ow_lb o' ∗ cp_mul π d__h0 (S $ t - o') (oGS := oGS) ∗
+    ow_lb o' ∗ cp_mul π d__h0 (S $ t - o') (oGS := oGS) ∗ cp_mul π d__w 10 (oGS := oGS) ∗
     let cd: tau_codom Σ := (τ, π, Ob, ∅, Φ, RR) in
     ticket_token t ∗ ticket_tau t cd ∗ 
-    th_phase_eq τ π (oGS := oGS). 
+    th_phase_eq τ π (oGS := oGS).
 
   (* TODO: requires dynamic eb updates *)
   Lemma TODO_increase_eb n m:
@@ -592,30 +596,31 @@ Section Ticketlock.
         Ob RR
         (oGS := oGS) (FLP := TLPre)
         -∗
-        TLAT_pre τ ∅ d__m0 RR π Ob (oGS := oGS)
-        -∗
+        TLAT_pre τ ∅ d__e RR π Ob (oGS := oGS) -∗
+        cp_mul π d__w 10 (oGS := oGS) -∗
         WP (get_ticket lk) @ s; τ; ⊤ {{ tv, ∃ (t o': nat), ⌜ tv = #t ⌝ ∗ wait_res o' t τ π Ob Φ RR }}.
-  Proof using OBLS_AMU.
+  Proof using OBLS_AMU fl_degs_wl0.
     clear ODl ODd LEl.
     iIntros "[#INV #EB]". rewrite /TLAT_FL /TLAT.
-    iIntros "TAU PRE".
-    rewrite /TLAT_pre. simpl. iDestruct "PRE" as "(RR0 & OB & _ & PH & CP)".
+    iIntros "TAU PRE CPS".
+    rewrite /TLAT_pre. simpl. iDestruct "PRE" as "(RR0 & OB & _ & PH & CPe)".
     rewrite /get_ticket.
 
-    pure_step_hl. MU_by_BMU.
-    iApply (BMU_lower _ 2).
-    { simpl. lia. }
-    iApply OU_BMU. iApply (OU_wand with "[-CP PH]").
-    2: { (* TODO: can we remove phase restriction for exchange? *)
-         iApply (exchange_cp_upd with "[$] [$] [$]").
-         1, 2: reflexivity.
-         apply fl_degs_wm. }
-    iIntros "[CPSw PH]". iDestruct (cp_mul_take with "CPSw") as "[CPSw CPw]". 
-    iApply OU_BMU. iApply (OU_wand with "[-CPw PH]").
-    2: { iApply (exchange_cp_upd with "[$] [$] [$]").
-         1, 2: reflexivity.
-         trans d__h0; eauto. }
-    iIntros "[CPS PH]". BMU_burn_cp.
+    (* pure_step_hl. MU_by_BMU. *)
+    (* iApply (BMU_lower _ 2). *)
+    (* { simpl. lia. } *)
+    (* iApply OU_BMU. iApply (OU_wand with "[-CP PH]"). *)
+    (* 2: { (* TODO: can we remove phase restriction for exchange? *) *)
+    (*      iApply (exchange_cp_upd with "[$] [$] [$]"). *)
+    (*      1, 2: reflexivity. *)
+    (*      apply fl_degs_hm. } *)
+    (* iIntros "[CPSh PH]". iDestruct (cp_mul_take with "CPSh") as "[CPSh CPh]".  *)
+    (* iApply OU_BMU. iApply (OU_wand with "[-CPw PH]"). *)
+    (* 2: { iApply (exchange_cp_upd with "[$] [$] [$]"). *)
+    (*      1, 2: reflexivity. *)
+    (*      trans d__h0; eauto. } *)
+    (* iIntros "[CPS PH]". BMU_burn_cp. *)
+    pure_steps.
 
     (* TODO: ??? worked fine when get_ticket was inlined into tl_acquire *)
     (* wp_bind (Snd _)%E. *)
@@ -641,16 +646,24 @@ Section Ticketlock.
     iApply (wp_faa with "TK").
     iIntros "!> TK'". iNext. MU_by_BMU.
     simpl. rewrite Nat.add_comm. iApply OU_BMU.
-    iDestruct (cp_mul_take with "CPSw") as "[CPSw CPw]".
+    (* iDestruct (cp_mul_take with "CPSw") as "[CPSw CPw]". *)
     apply Nat.le_sum in LEot as [d ->].
-    iApply (OU_wand with "[-CPw PH]").
+    iApply (OU_wand with "[-CPe PH]").
     2: { iApply (exchange_cp_upd with "[$] [$]").
-         { apply (Nat.le_refl (S d)). }
+         { apply (Nat.le_refl (S (S d))). }
          { done. }
-         { apply fl_degs_hw. }
+         { apply fl_degs_he. }
          (* TODO: requires dynamic eb updates *)
          by iApply TODO_increase_eb. }
     iIntros "[CPSh PH]".
+    iDestruct (cp_mul_take with "CPSh") as "[CPSh CPh]".
+    iApply OU_BMU. iApply (OU_wand with "[-CPh PH]").
+    2: { iApply (exchange_cp_upd with "[$] [$] [$]").
+         { Unshelve. 3: exact 10. lia. shelve. }
+         { done. }
+         etrans; [apply fl_degs_wl0 | apply fl_degs_lh0]. }
+    iIntros "[CPS' PH]".
+    
     iDestruct (ow_exact_lb with "[$]") as "[EXACT LB]".
     remember_goal.
     iMod (tokens_alloc with "[$]") as "[TOKS TOK]". 
@@ -687,7 +700,7 @@ Section Ticketlock.
          by rewrite set_seq_S_end_union_L. }
 
     rewrite (proj2 (Nat.eqb_eq _ _)); [| done]. simpl.
-    replace (S (S c)) with (c + 2) by lia.
+    replace (S c) with (c + 1) by lia.
     iApply BMU_split. 
     rewrite /tl_LK. destruct st as [[]]. iDestruct "ST" as (??) "(-> & OW' & HELD')".
     rewrite !Nat.add_0_r. rewrite Nat.add_0_r in DOM__TM.
@@ -699,10 +712,10 @@ Section Ticketlock.
 
     iApply (BMU_wand with "[-COMM]"); [| done].
     iIntros "[PH COMM]".
-    BMU_burn_cp. iModIntro. iApply wp_value.
+    BMU_burn_cp. iModIntro. iApply wp_value. 
     do 2 iExists _. iFrame. iApply fupd_frame_all.
-    iSplitR.
-    { rewrite Nat.sub_diag. iApply bupd_frame_l. iSplit; [done| ]. iApply cp_mul_0. }
+    iSplitL "CPSh".
+    { rewrite Nat.sub_diag. by iFrame. }
     iMod (held_update _ _ true with "[$] [$]") as "[HELD HELD']".
     iMod ("COMM" $! (_, _, _) with "[HELD' OW']") as "Φ".
     { rewrite /acquire_at_post. simpl. rewrite /tl_LK.
@@ -718,6 +731,15 @@ Section Ticketlock.
     rewrite set_seq_add_L. simpl.
     set_solver.
   Qed.
+
+  Lemma wait_spec lk c o' t τ π Ob Φ RR
+    (LIM_STEPS': fl_B TLPre c <= LIM_STEPS):
+    wait_res o' t τ π Ob Φ RR -∗ WP (wait lk #t) @ τ {{ Φ }}.
+  Proof using.
+    rewrite /wait_res. iIntros "(OW_LB & CPSh & TOK & TAU & PH)".
+    rewrite /wait.
+    
+                  
   
 
   (* TODO: mention exc_lb in the proof OR implement its increase *)
