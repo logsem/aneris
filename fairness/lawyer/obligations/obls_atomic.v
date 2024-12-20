@@ -74,20 +74,19 @@ Section TotalTriples.
       Definition TAU_acc (V: iProp Σ): iProp Σ :=
         |={ε, ∅}=> ∃ x, P x ∗ (
               let abort := P x ={∅, ε}=∗ V in
+              let PH := th_phase_eq τ π (oGS := oGS) in
               (let r := round x in
-               ∀ O', obls τ O' (oGS := oGS) ∗ sgns_level_ge' O' L ∗
-                        th_phase_eq τ π (oGS := oGS) ∗
+               ∀ O', obls τ O' (oGS := oGS) ∗ sgns_level_ge' O' L ∗ PH ∗
                       (∃ r__p, RR r__p ∗ (⌜ r__p = Some r ⌝ ∨ cp π d__h (oGS := oGS))) ∗
                       ⌜ ¬ TGT x ⌝ -∗
                       BMU ∅ c (oGS := oGS) (
-                        RR (Some r) ∗ cp π d__l (oGS := oGS) ∗
-                        th_phase_eq τ π (oGS := oGS) ∗
+                        RR (Some r) ∗ cp π d__l (oGS := oGS) ∗ PH ∗
                         obls τ O' (oGS := oGS) ∗
                         abort
                       )
               ) ∧
-              ((∃ r__p, RR r__p) ∗ ⌜ TGT x ⌝ ∗ obls τ O (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) -∗
-               BMU ∅ c (oGS := oGS) (∀ y, Q y x ={∅, ε}=∗ Φ y x)) ∧
+              ((∃ r__p, RR r__p) ∗ ⌜ TGT x ⌝ ∗ obls τ O (oGS := oGS) ∗ PH -∗
+               BMU ∅ c (oGS := oGS) (PH ∗ ∀ y, Q y x ={∅, ε}=∗ Φ y x)) ∧
               abort
       ).
 
@@ -445,7 +444,7 @@ Section Ticketlock.
       tokens_auth tk ∗
       ⌜ dom TM = set_seq 0 tk ⌝ ∗ tau_map_auth TM ∗ tau_map_interp tl c ow TM.
 
-  Lemma tau_map_interp_extend `{TicketlockG Σ} lk c ow TM tk cd
+  Lemma TMI_extend_queue `{TicketlockG Σ} lk c ow TM tk cd
     (DOM: dom TM = set_seq 0 tk)
     (QUEUE: ow < tk):
     tau_map_interp lk c ow TM -∗ TAU_stored lk c cd -∗
@@ -455,6 +454,17 @@ Section Ticketlock.
     rewrite /tau_map_interp. rewrite big_opM_insert.
     2: { apply not_elem_of_dom. rewrite DOM. intros ?%elem_of_set_seq. lia. }
     iFrame. iLeft. by iFrame.
+  Qed.
+
+  Lemma TMI_extend_acquire `{TicketlockG Σ} lk c ow TM (cd: tau_codom Σ)
+    (DOM: dom TM = set_seq 0 ow):
+    tau_map_interp lk c ow TM -∗ cd.1.2 #() -∗
+    tau_map_interp lk c ow (<[ ow := cd ]> TM).
+  Proof using.
+    iIntros "TMI TAU".
+    rewrite /tau_map_interp. rewrite big_opM_insert.
+    2: { apply not_elem_of_dom. rewrite DOM. intros ?%elem_of_set_seq. lia. }
+    iFrame. iRight. iLeft. by iFrame. 
   Qed.
 
   (* TODO: move *)
@@ -541,6 +551,33 @@ Section Ticketlock.
     rewrite /sgns_level_gt'. by rewrite big_sepS_empty.
   Qed.
 
+  (* TODO: find existing *)
+  Lemma fupd_frame_all E1 E2 P:
+    ((|==> P) ∗ |={E1, E2}=> emp: iProp Σ) ⊢ |={E1, E2}=> P.
+  Proof using.
+    iIntros "[P ?]". iMod "P". by iFrame.
+  Qed.
+
+  (* TODO: move *)
+  Lemma cp_mul_0 π d:
+    ⊢ |==> cp_mul π d 0 (oGS := oGS).
+  Proof using.
+    rewrite /cp_mul. rewrite gmultiset_scalar_mul_0.
+    iApply own_unit.
+  Qed.
+
+  Definition wait_res o' t τ π Ob Φ RR: iProp Σ :=
+    ow_lb o' ∗ cp_mul π d__h0 (S $ t - o') (oGS := oGS) ∗
+    let cd: tau_codom Σ := (τ, π, Ob, ∅, Φ, RR) in
+    ticket_token t ∗ ticket_tau t cd ∗ 
+    th_phase_eq τ π (oGS := oGS). 
+
+  (* TODO: requires dynamic eb updates *)
+  Lemma TODO_increase_eb n m:
+    exc_lb n (oGS := oGS) ⊢ exc_lb m (oGS := oGS).
+  Proof using. Admitted. 
+
+
   (* TODO: mention exc_lb in the proof OR implement its increase *)
   Lemma get_ticket_spec s (lk: val) c (τ: locale heap_lang) π (Φ: ofe_mor val (iProp Σ))
     (Ob: gset SignalId) (RR: ofe_mor (option nat) (iProp Σ))
@@ -557,11 +594,9 @@ Section Ticketlock.
         -∗
         TLAT_pre τ ∅ d__m0 RR π Ob (oGS := oGS)
         -∗
-        WP (get_ticket lk) @ s; τ; ⊤ {{ tv, ∃ (t o': nat), ⌜ tv = #t ⌝ ∗
-            ow_lb o' ∗ cp_mul π d__h0 (t - o') (oGS := oGS) ∗
-            let cd: tau_codom Σ := (τ, π, Ob, ∅, Φ, RR) in
-            ticket_token t ∗ (⌜ t = o' ⌝ ∗ Φ #() ∗ th_phase_eq τ π (oGS := oGS) ∨ ticket_tau t cd)}}.
-  Proof using.
+        WP (get_ticket lk) @ s; τ; ⊤ {{ tv, ∃ (t o': nat), ⌜ tv = #t ⌝ ∗ wait_res o' t τ π Ob Φ RR }}.
+  Proof using OBLS_AMU.
+    clear ODl ODd LEl.
     iIntros "[#INV #EB]". rewrite /TLAT_FL /TLAT.
     iIntros "TAU PRE".
     rewrite /TLAT_pre. simpl. iDestruct "PRE" as "(RR0 & OB & _ & PH & CP)".
@@ -605,16 +640,16 @@ Section Ticketlock.
     iApply sswp_MU_wp_fupd; [done| ]. iModIntro.
     iApply (wp_faa with "TK").
     iIntros "!> TK'". iNext. MU_by_BMU.
-    simpl. rewrite Nat.add_comm. iApply BMU_split. iApply OU_BMU.
+    simpl. rewrite Nat.add_comm. iApply OU_BMU.
     iDestruct (cp_mul_take with "CPSw") as "[CPSw CPw]".
     apply Nat.le_sum in LEot as [d ->].
     iApply (OU_wand with "[-CPw PH]").
     2: { iApply (exchange_cp_upd with "[$] [$]").
-         { apply (Nat.le_refl d). }
+         { apply (Nat.le_refl (S d)). }
          { done. }
          { apply fl_degs_hw. }
          (* TODO: requires dynamic eb updates *)
-         admit. }
+         by iApply TODO_increase_eb. }
     iIntros "[CPSh PH]".
     iDestruct (ow_exact_lb with "[$]") as "[EXACT LB]".
     remember_goal.
@@ -623,18 +658,17 @@ Section Ticketlock.
     { rewrite DOM__TM. intros [_ IN]%elem_of_set_seq. simpl in IN.
       by apply Nat.lt_irrefl in IN. }
     iApply "GOAL". iClear "GOAL".
-
-    iApply BMU_intro.
+    
     destruct (Nat.eq_0_gt_0_cases d) as [-> | QUEUE].
-    2: { rewrite (proj2 (Nat.eqb_neq _ _)); [| lia]. simpl. 
-         BMU_burn_cp. iModIntro.
+    2: { BMU_burn_cp.
+         rewrite (proj2 (Nat.eqb_neq _ _)); [| lia]. simpl. 
+         iModIntro.
          pure_steps.
          do 2 iExists _. iFrame. rewrite Nat.sub_add'. iFrame.
-         rewrite -(bi.sep_emp (⌜ _  = _ ⌝%I)). 
-         iApply fupd_frame_l. iSplit; [done| ].
+         iApply fupd_frame_all. iSplitR; [done| ].
          iDestruct "TAU" as "[_ [_ AB]]".
          iMod ("AB" with "[ST]") as "TAU"; [by iFrame| ].
-         iDestruct (tau_map_interp_extend with "[$] [TAU OB]") as "TAUS"; eauto.
+         iDestruct (TMI_extend_queue with "[$] [TAU OB]") as "TAUS"; eauto.
          { lia. }
          { rewrite /TAU_stored.
            Unshelve. 2: repeat eapply pair.           
@@ -653,20 +687,38 @@ Section Ticketlock.
          by rewrite set_seq_S_end_union_L. }
 
     rewrite (proj2 (Nat.eqb_eq _ _)); [| done]. simpl.
-    rewrite /tl_LK. destruct st as [[]]. iDestruct "ST" as (??) "(-> & ? & HELD')".
+    replace (S (S c)) with (c + 2) by lia.
+    iApply BMU_split. 
+    rewrite /tl_LK. destruct st as [[]]. iDestruct "ST" as (??) "(-> & OW' & HELD')".
     rewrite !Nat.add_0_r. rewrite Nat.add_0_r in DOM__TM.
     iDestruct "TAU" as "[_ [COMM _]]".
     iDestruct (held_agree with "[$] [$]") as "<-". 
     rewrite /tl_LK.
     iSpecialize ("COMM" with "[RR0 OB PH]").
     { iFrame. iSplit; [| done]. by iExists _. }
-    iApply (BMU_wand with "[-COMM]"); [| done].
-    iIntros "COMM".
-      iPureIntro. 
-    
-    Abort.
 
-    
+    iApply (BMU_wand with "[-COMM]"); [| done].
+    iIntros "[PH COMM]".
+    BMU_burn_cp. iModIntro. iApply wp_value.
+    do 2 iExists _. iFrame. iApply fupd_frame_all.
+    iSplitR.
+    { rewrite Nat.sub_diag. iApply bupd_frame_l. iSplit; [done| ]. iApply cp_mul_0. }
+    iMod (held_update _ _ true with "[$] [$]") as "[HELD HELD']".
+    iMod ("COMM" $! (_, _, _) with "[HELD' OW']") as "Φ".
+    { rewrite /acquire_at_post. simpl. rewrite /tl_LK.
+      iFrame. iSplit; [| done]. do 2 iExists _. iFrame. done. }
+    iDestruct (TMI_extend_acquire _ _ _ _ (_, Φ, _) with "[$] [$]") as "TMI"; eauto.
+    iApply "CLOS". iNext. rewrite /tl_inv_inner.
+    rewrite -(Nat.add_1_r ow).
+    replace (Z.of_nat ow + 1)%Z with (Z.of_nat (ow + 1)) by lia. 
+    do 5 iExists _. iFrame.
+    rewrite (proj2 (Nat.eqb_neq _ _)); [| lia]. iFrame.
+    iPureIntro. split; [done| ]. split; [lia| ].
+    rewrite dom_insert_L DOM__TM.
+    rewrite set_seq_add_L. simpl.
+    set_solver.
+  Qed.
+  
 
   (* TODO: mention exc_lb in the proof OR implement its increase *)
   Lemma tl_acquire_spec (lk: val) c τ:
