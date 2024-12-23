@@ -50,11 +50,11 @@ Section TotalTriples.
 
   Section AtomicTriples. 
     Context
-      (τ: Locale)(* TODO: should it be fixed? *)
       {ST: Type}
+      {RO: Type}
+      (τ: Locale)(* TODO: should it be fixed? *)
       (P: ST -> iProp Σ) (Q: ST -> ST -> iProp Σ) (* second ST is the previous state *)
       (L: gset Level) (* TODO: only finite sets? *)
-      {RO: Type}
       (round: ST -> RO) (* TODO: can we get away with ST only? *)
       (TGT: ST -> Prop) (* `{forall x, Decision (TGT x)} *)
       (d__h d__l d__m: Degree)
@@ -161,6 +161,27 @@ Section TotalTriples.
         WP e @ s; τ; ⊤ {{ v, Φ v }}.
 
   End AtomicTriples.
+
+  Lemma TAU_acc_Proper_impl {ST RO: Type}:
+    Proper
+      (eq ==> (eq ==> equiv) ==> (eq ==> eq ==> equiv) ==> equiv ==> 
+       (eq ==> eq) ==> (eq ==> iff) ==> eq ==> eq ==> eq ==> equiv ==> 
+       eq ==> (eq ==> eq ==> equiv ) ==> equiv ==> (eq ==> equiv) ==> equiv ==> bi_entails)
+      (TAU_acc (ST := ST) (RO := RO)).
+  Proof using.
+    foobar. 
+    solve_proper. 
+    red. repeat intro. subst.
+
+  Global Instance TAU_acc_Proper {ST RO: Type}:
+    Proper
+      (eq ==> (eq ==> equiv) ==> (eq ==> eq ==> equiv) ==> equiv ==> 
+       (eq ==> eq) ==> (eq ==> iff) ==> eq ==> eq ==> eq ==> equiv ==> 
+       eq ==> (eq ==> eq ==> equiv ) ==> equiv ==> (eq ==> equiv) ==> equiv ==> equiv)
+      (TAU_acc (ST := ST) (RO := RO)).
+  Proof using.
+    red. repeat intro. subst. 
+
 
 End TotalTriples.
 
@@ -484,6 +505,11 @@ Section Ticketlock.
         L
         (fun '(_, _, b) => b = false)
         c π Φ Ob RR.
+
+  Instance TAU_stored_Proper `{TLG: TicketlockG Σ}:
+    Proper (eq ==> eq ==> equiv ==> equiv) TAU_stored.
+  Proof using.
+    solve_proper. 
 
   Definition tau_interp `{TicketlockG Σ} (lk: val) (c: nat) (ow: nat) (i: nat) (cd: tau_codom Σ): iProp Σ :=
       let Φ := cd.1.2 in
