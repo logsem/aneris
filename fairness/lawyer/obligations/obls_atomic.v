@@ -366,7 +366,58 @@ Section Ticketlock.
     rewrite fmap_insert. apply alloc_singleton_local_update.
     2: done.
     apply not_elem_of_dom. set_solver.
-  Qed.    
+  Qed.
+
+  (* Lemma tau_map_ticket `{TicketlockG Σ} TM i cd: *)
+  (*   tau_map_auth TM -∗ ticket_tau i cd -∗ ⌜ TM !! i = Some cd ⌝.  *)
+  (* Proof using. *)
+  (*   rewrite /tau_map_auth /ticket_tau. *)
+  (*   iApply bi.wand_curry. rewrite -own_op. iIntros "X". *)
+  (*   iDestruct (own_valid with "[$]") as "#V". *)
+  (*   (* iAssert ((Excl <$> TM) !! i ≡ Excl' cd)%I as "#EQ'". *) *)
+  (*   (* 2: { rewrite lookup_fmap. destruct (TM !! i) eqn:TMi. *) *)
+  (*   (*      2: { simpl. intuition. by rewrite !option_equivI. } *) *)
+  (*   (*      simpl. by rewrite !option_equivI excl_equivI. } *) *)
+  (*   rewrite auth_both_dfrac_validI. iDestruct "V" as "(_ & [% #EQ] & -#VM)". *)
+  (*   rewrite gmap_validI. iSpecialize ("VM" $! i). *)
+  (*   rewrite gmap_equivI. iSpecialize ("EQ" $! i). *)
+  (*   rewrite !lookup_fmap. rewrite lookup_op lookup_singleton. simpl.   *)
+  (*   destruct (TM !! i) eqn:TMi. *)
+  (*   2: { simpl.  *)
+    
+    
+  (*   iRewrite "EQ".  *)
+  (*   rewrite lookup_op lookup_singleton. *)
+  (*   rewrite Some_op_opM. simpl. *)
+  (*   rewrite gmap_validI. iSpecialize ("VM" $! i). *)
+  (*   destruct (c !! i) eqn:CI; rewrite CI; [| done]. *)
+  (*   simpl. iRewrite "EQ" in "VM". rewrite lookup_op CI lookup_singleton. simpl. *)
+  (*   rewrite -Some_op. rewrite option_validI. *)
+  (*   iDestruct (uPred_primitive.cmra_valid_elim with "VM") as %V. *)
+  (*   done. *)
+  (* Qed. *)
+
+  Lemma tau_map_ticket `{TicketlockG Σ} TM i cd:
+    tau_map_auth TM -∗ ticket_tau i cd -∗ TM !! i ≡ Some cd.
+  Proof using.
+    rewrite /tau_map_auth /ticket_tau.
+    iApply bi.wand_curry. rewrite -own_op. iIntros "X".
+    iDestruct (own_valid with "[$]") as "#V".
+    iAssert ((Excl <$> TM) !! i ≡ Excl' cd)%I as "#EQ'".
+    2: { rewrite lookup_fmap. destruct (TM !! i) eqn:TMi.
+         2: { simpl. intuition. by rewrite !option_equivI. }
+         simpl. by rewrite !option_equivI excl_equivI. }
+    rewrite auth_both_dfrac_validI. iDestruct "V" as "(_ & [% #EQ] & -#VM)".
+    iRewrite "EQ". 
+    rewrite lookup_op lookup_singleton.
+    rewrite Some_op_opM. simpl.
+    rewrite gmap_validI. iSpecialize ("VM" $! i).
+    destruct (c !! i) eqn:CI; rewrite CI; [| done].
+    simpl. iRewrite "EQ" in "VM". rewrite lookup_op CI lookup_singleton. simpl.
+    rewrite -Some_op. rewrite option_validI.
+    iDestruct (uPred_primitive.cmra_valid_elim with "VM") as %V.
+    done.
+  Qed.
 
   Lemma ow_exact_lb `{TicketlockG Σ} n:
     ow_exact n -∗ ow_exact n ∗ ow_lb n.
@@ -434,12 +485,36 @@ Section Ticketlock.
         (fun '(_, _, b) => b = false)
         c π Φ Ob RR.
 
-  Definition tau_map_interp `{TicketlockG Σ} (lk: val) (c: nat) (ow: nat) (TM: gmap nat (tau_codom Σ)): iProp Σ :=
-    [∗ map] i ↦ cd ∈ TM,
+  Definition tau_interp `{TicketlockG Σ} (lk: val) (c: nat) (ow: nat) (i: nat) (cd: tau_codom Σ): iProp Σ :=
       let Φ := cd.1.2 in
       (TAU_stored lk c cd ∗ ⌜ ow < i ⌝ ∨
        ((Φ #() ∨ ticket_token i) ∗ ⌜ ow = i ⌝) ∨
        ticket_token i ∗ ⌜ i < ow ⌝).
+
+  Lemma tau_interp_Proper_impl `{TicketlockG Σ}:
+    Proper (eq ==> eq ==> eq ==> eq ==> equiv ==> bi_entails) (tau_interp).
+  Proof using.
+    intros ???????????????. subst.
+    iStartProof. rewrite /tau_interp.
+    iIntros "T". iDestruct "T" as "[T | [T | T]]"; try by (iRight; iFrame).
+    2: { iRight. iLeft. iDestruct "T" as "[T ?]". iSplit; [| done].
+         iDestruct "T" as "[T | ?]"; [| by iFrame].
+         iLeft.
+         destruct x3 as [[??]?], y3 as [[??]?]. simpl. inversion H4.
+         simpl in *. inversion H0. simpl in *.
+         by iApply H3. }
+    foobar. 
+
+  Instance tau_interp_Proper `{TicketlockG Σ}:
+    Proper (eq ==> eq ==> eq ==> eq ==> equiv ==> equiv) (tau_interp).
+  Proof using.
+    intros ???????????????. subst.
+    iStartProof. rewrite /tau_interp.
+    
+    setoid_rewrite H4. 
+    
+  Definition tau_map_interp `{TicketlockG Σ} (lk: val) (c: nat) (ow: nat) (TM: gmap nat (tau_codom Σ)): iProp Σ :=
+    [∗ map] i ↦ cd ∈ TM, tau_interp lk c ow i cd.
   
   Definition tl_inv_inner `{TicketlockG Σ} (tl: val) (c: nat): iProp Σ :=
     ∃ (l__ow l__tk: loc) (ow tk: nat) TM,
@@ -447,6 +522,24 @@ Section Ticketlock.
       l__ow ↦{/ 2} #ow ∗ l__tk ↦ #tk ∗ ow_exact ow ∗ held_auth (negb (ow =? tk)) ∗
       tokens_auth tk ∗
       ⌜ dom TM = set_seq 0 tk ⌝ ∗ tau_map_auth TM ∗ tau_map_interp tl c ow TM.
+
+  Lemma tau_map_ticket_interp `{TicketlockG Σ} TM i cd lk c ow:
+    tau_map_auth TM -∗ ticket_tau i cd -∗ tau_map_interp lk c ow TM -∗
+    tau_interp lk c ow i cd ∗ (tau_interp lk c ow i cd -∗ tau_map_interp lk c ow TM).
+  Proof using.
+    iIntros "TM T TMI".
+    iDestruct (tau_map_ticket with "[$] [$]") as "#TK".
+    rewrite {1}/tau_map_interp. rewrite {3}(utils.map_split TM i).
+    rewrite big_opM_union.
+    2: { apply map_disjoint_dom. destruct lookup; set_solver. }
+    iDestruct "TMI" as "[TKI CLOS]".
+    destruct (TM !! i) eqn:TMi; rewrite option_equivI; [| done].
+    simpl. rewrite big_sepM_singleton. iRewrite "TK" in "TKI". 
+    2: { by rewrite option_equivI. } 
+    
+    big_opM
+    
+
 
   Lemma TMI_extend_queue `{TicketlockG Σ} lk c ow TM tk cd
     (DOM: dom TM = set_seq 0 tk)
@@ -732,15 +825,42 @@ Section Ticketlock.
     set_solver.
   Qed.
 
-  Lemma wait_spec lk c o' t τ π Ob Φ RR
+  Lemma wait_spec (lk: val) c o' (t: nat) τ π Ob Φ RR
     (LIM_STEPS': fl_B TLPre c <= LIM_STEPS):
-    wait_res o' t τ π Ob Φ RR -∗ WP (wait lk #t) @ τ {{ Φ }}.
+    tl_is_lock lk c ∗ exc_lb 20 (oGS := oGS) ∗ wait_res o' t τ π Ob Φ RR ⊢ WP (wait lk #t) @ τ {{ Φ }}.
   Proof using.
-    rewrite /wait_res. iIntros "(OW_LB & CPSh & TOK & TAU & PH)".
+    rewrite /wait_res. iIntros "(#INV & #EXC & OW_LB & CPSh & CPS & TOK & TAU & PH)".
     rewrite /wait.
+    pure_steps.
+
+    wp_bind (Fst _)%E.
+    (* TODO: make a lemma? and remove duplicates *)
+    iApply wp_atomic. 
+    iMod (fupd_mask_subseteq _) as "CLOS'"; [| iInv "INV" as "inv" "CLOS"]; [set_solver| ].
+    iModIntro. rewrite {1}/tl_inv_inner.
+    iDestruct "inv" as (l__ow l__tk ???) "[>%EQ inv]". subst lk.
+    pure_steps. iMod ("CLOS" with "[inv]") as "_".
+    { iNext. rewrite /tl_inv_inner. do 5 iExists _. iFrame. done. }
+    iMod "CLOS'" as "_". iModIntro.
+    clear TM ow tk.
+
+    wp_bind (! _)%E.
+    iApply wp_atomic.
+    iInv "INV" as "inv" "CLOS". rewrite {1}/tl_inv_inner.
+    iDestruct "inv" as (?? ow tk TM) "(>%EQ_ & >%LEot & >OW & >TK & >EXACT & >HELD & >TOKS & >%DOM__TM & TM & TAUS)".
+    inversion EQ_. subst l__ow0 l__tk0. clear EQ_.
+    iModIntro.
+    iApply sswp_MU_wp_fupd; [done| ]. iModIntro.
+    iApply (wp_load with "[OW]"); [done| ]. iIntros "!> OW".
+    iNext. 
+    destruct (decide (ow = tk)) as [-> | QUEUE].
+    { rewrite Nat.eqb_refl.
+      
+    I
+    { done. 
     
-                  
-  
+
+
 
   (* TODO: mention exc_lb in the proof OR implement its increase *)
   Lemma tl_acquire_spec (lk: val) c τ:
