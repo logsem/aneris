@@ -72,7 +72,6 @@ Section trace_proof.
       (∃ c (m_conn : gmap Key (option val)) (m_snap : gmap Key bool) (γm_conn γsnap : gname), 
         ⌜extract c = Some #sa ∧ mnames !! sa = Some (Some (γm_conn, γsnap, c))⌝ ∗
         ghost_map_auth γm_conn (1 / 2) m_conn ∗ ghost_map_auth γsnap (1%Qp) m_snap ∗
-        ⌜(∀ k, m_snap !! k = Some true → k ∈ KVS_keys)⌝ ∗
         ∀ trans, ⌜(open_trans trans c T) → 
           ((∀ sig k ov v, ((Rd sig k ov) ∈ trans ∨ Wr sig k v ∈ trans) → k ∈ KVS_keys) ∧
            (∀ sig k ov, (Rd sig k ov) ∈ trans → 
@@ -114,6 +113,7 @@ Section trace_proof.
                                   ghost_map_elem γsi_name sa (DfracOwn 1%Qp) (None : option (gname * gname * val)))%I;
       KeyUpdStatus c k b := (KeyUpdStatus c k b ∗ ∃ (sa : socket_address) (γm_conn γsnap : gname), ⌜extract c = Some #sa⌝ ∗
                               ghost_map_elem γsi_name sa DfracDiscarded (Some (γm_conn, γsnap, c)) ∗ 
+                              ⌜b = true → k ∈ KVS_keys⌝ ∗
                               (⌜k ∈ KVS_keys⌝ → ((⌜b = true⌝ ∧ ∃ (ov : option val), ghost_map_elem γm_conn k (DfracOwn 1%Qp) ov) ∨ 
                                 (⌜b = false⌝ ∧ ghost_map_elem γsnap k (DfracOwn 1%Qp) false))))%I;
       Seen k V := Seen k V%I;
@@ -798,7 +798,7 @@ Section trace_proof.
       last (iDestruct "Hopen" as "[%Hopen|(%c & %m_conn & %m_snap & %γ_conn & %γsnap & %Hfalse & _)]"; set_solver).
     destruct opt as [opt|]; last set_solver.
     iRight.
-    iDestruct "Hopen" as "[%Hfalse|(%c & %m_conn & %m_snap & %γ_conn & %γsnap & %Hextract & Hghost_map & Hghost_map' & %Hwrites & %Hreads)]"; 
+    iDestruct "Hopen" as "[%Hfalse|(%c & %m_conn & %m_snap & %γ_conn & %γsnap & %Hextract & Hghost_map & Hghost_map' & %Hreads)]"; 
       first set_solver.
     iExists c, m_conn, m_snap, γ_conn, γsnap.
     iFrame "%∗".
@@ -1095,7 +1095,7 @@ Section trace_proof.
     rewrite big_sepS_singleton.
     iDestruct (@ghost_map_lookup with "[$Hghost_map_mnames_si][$Hsa_pointer_si']") as "%Hlookup_mnames_si".
     iDestruct "Hopen_trans" as "[%Hfalse|(%c_sa & %m_conn_sa & %m_snap_sa & %γm_conn_sa & %γsnap_sa & %Hextract_c_sa 
-      & Hghost_map_m_conn_sa & Hghost_map_m_snap_sa & %Hwrites_true & %Hopen_state)]"; first set_solver.
+      & Hghost_map_m_conn_sa & Hghost_map_m_snap_sa & %Hopen_state)]"; first set_solver.
     assert (c = c_sa) as <-; first set_solver.
     iAssert (⌜∀ k, (k ∈ (KVS_keys ∖ (dom ms_conn_sub ∩ KVS_keys))) → m_conn !! k = None⌝)%I as "%Himp_m_conn_none".
     {
@@ -1143,9 +1143,10 @@ Section trace_proof.
       iDestruct (big_sepM_lookup _ mc k (p1, p2) with "[$Hkeys_conn1]") as 
         "(%sa1 & %γ1 & %ov_last1 & #Hsa'_pointer1 & %Hextract1 & Hkey & %Hsa'_in1 & _ & Hkey_st)"; try done.
       iDestruct (big_sepM_lookup _ mc k (p1, p2) with "[$Hkeys_conn2]") as 
-        "(%sa2 & %γm_conn2 & %γsnap2 & %Hextract2 & #Hsa'_pointer2 & Hkey2)"; try done.
+        "(%sa2 & %γm_conn2 & %γsnap2 & %Hextract2 & #Hsa'_pointer2 & %Himp_true & Hkey2)"; try done.
       destruct p2.
       - iLeft.
+        assert (k ∈ KVS_keys) as Hk_in; first (apply Himp_true; by simpl).
         admit.
       - iRight.
         iSplit; first (iPureIntro; set_solver).
@@ -1180,14 +1181,15 @@ Section trace_proof.
     rewrite (big_sepM_sep _ _ mc).
     iDestruct "Hkeys_conn1" as "(Hkeys_conn1 & Hkeys_conn1')".
     iAssert (|==>(([∗ set] k ∈ KVS_keys, ∃ ov : option val, (ghost_map_elem γm_conn k (DfracOwn 1%Qp) ov ∨ ⌜m_conn !! k = None⌝) ∗ 
-      ghost_map_elem γsnap k (DfracOwn 1%Qp) false) ∗ ∃ (m_snap_sa' : gmap Key bool), ghost_map_auth γsnap 1 m_snap_sa'))%I
-      with "[Hkeys_conn1' Hkeys_conn_unused Hkeys_conn2 Hghost_map_m_snap_sa]" as ">(Hkeys_conn & %m_snap_sa' & Hghost_map_m_snap_sa')".
+      ghost_map_elem γsnap k (DfracOwn 1%Qp) false) ∗ ∃ (m_snap_sa' : gmap Key bool), ghost_map_auth γsnap 1 m_snap_sa' ∗
+      ⌜∀ k, m_snap_sa' !! k = Some true → m_snap_sa !! k = Some true⌝))%I
+      with "[Hkeys_conn1' Hkeys_conn_unused Hkeys_conn2 Hghost_map_m_snap_sa]" as ">(Hkeys_conn & %m_snap_sa' & Hghost_map_m_snap_sa' & %Hm_snap_sa_imp)".
     {
       iClear "Hkeys_conn_lin_hist".
       assert (ms = ms_conn_sub) as <-; first set_solver.
       rewrite Hdom2.
       clear Hdom1 Hdom2 Hdom3 Hdom4 Hrel_exec_pre His_some_keys Hcm_writes_open
-        His_some Himp_m_conn_none Hopen_state Himp_m_snap_false Hcm_writes Hwrites_true.
+        His_some Himp_m_conn_none Hopen_state Himp_m_snap_false Hcm_writes.
       iInduction (KVS_keys) as [|k dom_rest Hnin] "IH" using set_ind_L forall (mc m_snap_sa).
       {
         iSplitR; first set_solver.
@@ -1200,7 +1202,7 @@ Section trace_proof.
         iDestruct "Hkeys_conn1'" as "(Hkey_conn1 & Hkeys_conn1)".
         iDestruct "Hkeys_conn2" as "(Hkey_conn2 & Hkeys_conn2)".
         iDestruct "Hkey_conn1" as "(%sa' & %γ' & %ov_last & #Hsa'_pointer & %Hextract' & %Hsa'_in & Hkey1)".
-        iDestruct "Hkey_conn2" as "(%sa'' & %γm_conn' & %γsnap' & %Hextract'' & #Hsa''_pointer & Hkey2)".
+        iDestruct "Hkey_conn2" as "(%sa'' & %γm_conn' & %γsnap' & %Hextract'' & #Hsa''_pointer & %Himp_true & Hkey2)".
         assert (sa = sa'') as <-; first set_solver.
         iDestruct (ghost_map_elem_agree sa γsi_name _ _ (Some (γm_conn, γsnap, c)) (Some (γm_conn', γsnap', c)) 
           with "[$Hsa_pointer_si'][$Hsa''_pointer]") as "%Heq_names".
@@ -1250,14 +1252,30 @@ Section trace_proof.
         * iApply (big_sepM_wand with "[$Hkeys_conn2]").
           iApply big_sepM_intro.
           iModIntro.
-          iIntros (k' p Hlookup') "(%sa' & %γm_conn' & %γsnap' & %Hextract''' & #Hsa''_pointer' & Hkey2)".
+          iIntros (k' p Hlookup') "(%sa' & %γm_conn' & %γsnap' & %Hextract''' & #Hsa''_pointer' & %Himp_true' & Hkey2)".
           iExists sa', γm_conn', γsnap'.
           iFrame "%#".
+          iSplit.
+          {
+            iPureIntro.
+            intros Htrue.
+            specialize (Himp_true' Htrue).
+            destruct (decide (k = k')) as [<-|]; last set_solver.
+            rewrite lookup_delete in Hlookup'.
+            set_solver.
+          }
           iIntros (Hk'_in).
           iApply "Hkey2"; iPureIntro; set_solver.
         * iModIntro; iFrame.
           rewrite big_sepS_singleton.
-          iExists ov; iFrame.
+          iSplitL "Hkey1 Hkey2"; first (iExists ov; iFrame).
+          iDestruct "Hghost_map" as "(%m_snap_sa' & Hghost_map & %Himp)".
+          iExists m_snap_sa'; iFrame.
+          iPureIntro; intros k' Hlookup.
+          specialize (Himp k' Hlookup).
+          destruct (decide (k = k')) as [<-|Hneq]; 
+            first by rewrite lookup_insert in Himp.
+          by rewrite lookup_insert_ne in Himp.
       + assert ((dom_rest ∖ (dom mc ∩ dom_rest)) ∪ {[k]} = ({[k]} ∪ dom_rest) ∖ (dom mc ∩ ({[k]} ∪ dom_rest))) as <-; 
           first set_solver.
         rewrite big_sepS_union; last set_solver.
@@ -1274,9 +1292,18 @@ Section trace_proof.
         * iApply (big_sepM_wand with "[$Hkeys_conn2]").
           iApply big_sepM_intro.
           iModIntro.
-          iIntros (k' p Hlookup') "(%sa' & %γm_conn' & %γsnap' & %Hextract'' & #Hsa''_pointer & Hkey2)".
+          iIntros (k' p Hlookup') "(%sa' & %γm_conn' & %γsnap' & %Hextract'' & #Hsa''_pointer & %Himp_true & Hkey2)".
           iExists sa', γm_conn', γsnap'.
           iFrame "%#".
+          iSplit.
+          {
+            iPureIntro.
+            intros Htrue.
+            specialize (Himp_true Htrue).
+            destruct (decide (k = k')) as [<-|]; last set_solver.
+            apply elem_of_dom_2 in Hlookup'.
+            set_solver.
+          }
           iIntros (Hk'_in).
           iApply "Hkey2"; iPureIntro; set_solver.
         * iModIntro.
@@ -1409,10 +1436,6 @@ Section trace_proof.
               iSplit; first done.
               iFrame.
               iPureIntro.
-              split.
-              {
-                admit.
-              }
               intros trans' Hopen'.
               exfalso.
               destruct Hvalid_trans' as (_ & Hvalid_trans' & _).
@@ -1449,7 +1472,7 @@ Section trace_proof.
                 last (iDestruct "Hopen" as "[%Hopen'|(%c' & %m_conn' & %m_snap & %γ_conn & %γsnap' & %Hfalse & _)]"; set_solver).
               destruct opt as [opt|]; last set_solver.
               iRight.
-              iDestruct "Hopen" as "[%Hfalse|(%c' & %m_conn' & %m_snap & %γ_conn & %γsnap' & %Hextract' & Hghost_map & Hghost_map' & %Hwrites_true' & %Hreads)]"; 
+              iDestruct "Hopen" as "[%Hfalse|(%c' & %m_conn' & %m_snap & %γ_conn & %γsnap' & %Hextract' & Hghost_map & Hghost_map' & %Hreads)]"; 
                 first set_solver.
               iExists c', m_conn', m_snap, γ_conn, γsnap'.
               iFrame "%∗".
@@ -1688,10 +1711,6 @@ Section trace_proof.
               iSplit; first done.
               iFrame.
               iPureIntro.
-              split.
-              {
-                admit.
-              }
               intros trans' Hopen'.
               exfalso.
               apply Hdec.
@@ -1722,7 +1741,7 @@ Section trace_proof.
                 last (iDestruct "Hopen" as "[%Hopen'|(%c' & %m_conn' & %m_snap & %γ_conn & %γsnap' & %Hfalse & _)]"; set_solver).
               destruct opt as [opt|]; last set_solver.
               iRight.
-              iDestruct "Hopen" as "[%Hfalse|(%c' & %m_conn' & %m_snap & %γ_conn & %γsnap' & %Hextract' & Hghost_map & Hghost_map' & %Hwrites_true' & %Hreads)]"; 
+              iDestruct "Hopen" as "[%Hfalse|(%c' & %m_conn' & %m_snap & %γ_conn & %γsnap' & %Hextract' & Hghost_map & Hghost_map' & %Hreads)]"; 
                 first set_solver.
               iExists c', m_conn', m_snap, γ_conn, γsnap'.
               iFrame "%∗".
@@ -1951,6 +1970,8 @@ Section trace_proof.
       }
       iModIntro.
       by wp_pures.
+      Unshelve.
+      all : apply _.
   Admitted.
 
   Lemma read_implication γmstate γmlin γmpost γmname γl γm_gl γexec γsi_name clients (res : SI_resources Mdl Σ) 
@@ -2151,7 +2172,7 @@ Section trace_proof.
     iDestruct "Hpers_pointer" as "(%γ' & (_ & (%γm_conn' & %γsnap' & #Hpers_pointer)))".
     iDestruct (@ghost_map_lookup with "[$Hmap_mnames][$Hpers_pointer]") as "%Hlookup_mnames".
     iDestruct "Hopen_trans_state_sa" as "[%Hfalse|(%c_sa & %m_conn_sa & %m_snap_sa & %γm_conn_sa & %γsnap_sa & %H_sa_names & 
-      Hmap_m_conn_half & Hmap_m_snap & %Hwrites_true & %Htrans_reads)]"; first set_solver.
+      Hmap_m_conn_half & Hmap_m_snap & %Htrans_reads)]"; first set_solver.
     iAssert (⌜c = c_sa⌝)%I as "<-"; first set_solver.
     iAssert ((⌜ov_last_wr = None⌝ → ⌜m_conn_sa !! k = Some vo⌝)%I) as "%Hread_res_4".
     {
@@ -2325,7 +2346,7 @@ Section trace_proof.
             iModIntro.
             iIntros (sa'' Hsa''_in).
             iIntros "[Hopen_state_sa|(%c'' & %m_conn'' & %m_snap'' & %γm_conn'' & %γsnap'' & 
-              (%Hextract'' & %Hnames_lookup) & Hmap_mconn & Hmap_msnap & %Hwrites_true' & %Hopen_state)]"; first by iLeft.
+              (%Hextract'' & %Hnames_lookup) & Hmap_mconn & Hmap_msnap & %Hopen_state)]"; first by iLeft.
             iRight.
             iExists c'', m_conn'', m_snap'', γm_conn'', γsnap''.
             iSplit; first done.
@@ -2430,7 +2451,7 @@ Section trace_proof.
             iModIntro.
             iIntros (sa'' Hsa''_in).
             iIntros "[Hopen_state_sa|(%c'' & %m_conn'' & %m_snap'' & %γm_conn'' & %γsnap'' & 
-              (%Hextract'' & %Hnames_lookup) & Hmap_mconn & Hmap_snap & %Hwrites_true' & %Hopen_state)]"; first by iLeft.
+              (%Hextract'' & %Hnames_lookup) & Hmap_mconn & Hmap_snap & %Hopen_state)]"; first by iLeft.
             iRight.
             iExists c'', m_conn'', m_snap'', γm_conn'', γsnap''.
             iSplit; first done.
@@ -2756,13 +2777,6 @@ Section trace_proof.
           iExists c, (gset_to_gmap None KVS_keys), (gset_to_gmap false KVS_keys), γm_conn, γsnap.
           iSplit; first (iPureIntro; set_solver).
           iFrame.
-          iSplit.
-          {
-            iPureIntro; intros k Hlookup'.
-            exfalso.
-            apply lookup_gset_to_gmap_Some in Hlookup'.
-            set_solver.
-          }
           iIntros (trans Hfalse).
           iPureIntro; set_solver.
         - iApply (big_sepS_wand with "[$Hopen_si]").
@@ -3063,7 +3077,7 @@ Section trace_proof.
     rewrite big_sepS_singleton.
     iDestruct (@ghost_map_lookup with "[$Hghost_map_mnames_si][$Hsa_pointer_si]") as "%Hlookup'".
     iDestruct "Hopen_trans_state_sa" as "[%Hfalse|(%c_sa & %m_conn_sa' & %m_snap_sa & %γ_sa & %γ''_sa & %Hextract_c_sa 
-      & Hghost_map_m_conn_sa & Hghost_map_m_snap_sa & %Hwrites_true & %Hopen_state)]"; first (exfalso; set_solver).
+      & Hghost_map_m_conn_sa & Hghost_map_m_snap_sa & %Hopen_state)]"; first (exfalso; set_solver).
     iAssert (⌜m ⊆ m_gl⌝)%I as "%Hsubset".
     {
       iApply (@ghost_map_lookup_big with "[$Hghot_map_m_gl][Hkeys2]").
@@ -3085,7 +3099,7 @@ Section trace_proof.
         ⌜∀ k ov, k ∈ KVS_keys → k ∈ dom m → (m_conn' !! k = Some ov → (∃ h, m !! k = Some h ∧ last h = ov))⌝)))%I)
       with "[Hghost_map_m_conn Hkeys_conn_si]" as ">(Hkeys_conn_si & (%m_conn' & _ & %Hm_conn'_none & Hghost_map_m_conn & %Hm_conn'_st_new_rel))".
     {
-      clear Hnone Hkeys_some_m_gl Hrel_exec Hwrites_true Hopen_state.
+      clear Hnone Hkeys_some_m_gl Hrel_exec Hopen_state.
       iRevert "Hghost_map_m_conn Hkeys_conn_si".
       iRevert (m_conn).
       iInduction KVS_keys as [|k KVS_Keys Hnin] "IH" using set_ind_L.
@@ -3413,6 +3427,7 @@ Section trace_proof.
         + iExists sa, γm_conn, γsnap.
           iFrame "#".
           iSplit; first done.
+          iSplit; first (iPureIntro; set_solver).
           iIntros (_).
           iRight.
           iSplit; first done.
@@ -3433,6 +3448,7 @@ Section trace_proof.
         + iExists sa, γm_conn, γsnap.
           iFrame "#".
           iSplit; first done.
+          iSplitR; first (iIntros (Hfalse); set_solver).
           iIntros (Hfalse); set_solver.
     }
     iModIntro.
@@ -3561,7 +3577,7 @@ Section trace_proof.
       Himp & %Hsa'_in & #Hlin_hist & Hkey_loc_st))".
     destruct (decide (sa = sa')) as [<- | Hfalse]; last set_solver.
     iDestruct "Hkey_upd" as "(Hkey_upd & %sa'' & %γm_conn & %γsnap & %Hsa''_extract & 
-      #Hsa''_pointer_si & Hkey_upd_disj)".
+      #Hsa''_pointer_si & %Himp_true & Hkey_upd_disj)".
     destruct (decide (sa = sa'')) as [<- | Hfalse]; last set_solver.
     iModIntro.
     iExists vo, b.
@@ -3638,7 +3654,7 @@ Section trace_proof.
     iDestruct "Hpers_pointer" as "(%γ' & (_ & (%γm_conn' & %γsnap' & #Hpers_pointer)))".
     iDestruct (@ghost_map_lookup with "[$Hmap_mnames][$Hpers_pointer]") as "%Hlookup_mnames".
     iDestruct "Hopen_trans_state_sa" as "[%Hfalse|(%c_sa & %m_conn_sa & %m_snap_sa & %γm_conn_sa & %γsnap_sa & %H_sa_names & 
-      Hmap_m_conn_half & Hmap_m_snap & %Hwrites_true & %Htrans_reads)]"; first set_solver.
+      Hmap_m_conn_half & Hmap_m_snap & %Htrans_reads)]"; first set_solver.
     iAssert (⌜c = c_sa⌝)%I as "<-"; first set_solver.
     iDestruct (@ghost_map_lookup with "[$Hmap_mnames][$Hsa_pointer_si]") as "%Hlookup_mnames'".
     iAssert (⌜γsnap = γsnap_sa⌝)%I as "<-"; first set_solver.
@@ -3719,13 +3735,6 @@ Section trace_proof.
             iSplit; first done.
             iFrame "∗%".
             iPureIntro.
-            split.
-            {
-              intros k' Hlookup.
-              destruct (decide (k = k')) as [->|Hneq]; first done.
-              rewrite lookup_insert_ne in Hlookup; last done.
-              by eapply Hwrites_true.
-            }
             intros trans' Hopen.
             assert (trans ++ [Wr (tag1, c) k v] = trans') as <-.
             {
@@ -3778,7 +3787,7 @@ Section trace_proof.
             iModIntro.
             iIntros (sa' Hsa'_in').
             iIntros "[Hopen_state_sa|(%c' & %m_conn' & %m_snap' & %γm_conn'' & %γsnap'' & 
-              (%Hextract' & %Hnames_lookup) & Hmap_mconn & Hmap_msnap & %Hwrites_true' & %Hopen_state)]"; first by iLeft.
+              (%Hextract' & %Hnames_lookup) & Hmap_mconn & Hmap_msnap & %Hopen_state)]"; first by iLeft.
             iRight.
             iExists c', m_conn', m_snap', γm_conn'', γsnap''.
             iSplit; first done.
@@ -3845,13 +3854,6 @@ Section trace_proof.
             iSplit; first done.
             iFrame.
             iPureIntro.
-            split.
-            {
-              intros k' Hlookup.
-              destruct (decide (k = k')) as [->|Hneq]; first done.
-              rewrite lookup_insert_ne in Hlookup; last done.
-              by eapply Hwrites_true.
-            }
             intros trans Hopen.
             assert ([Wr (tag1, c) k v] = trans) as <-.
             {
@@ -3873,7 +3875,7 @@ Section trace_proof.
             iModIntro.
             iIntros (sa' Hsa'_in').
             iIntros "[Hopen_state_sa|(%c' & %m_conn' & %m_snap' & %γm_conn'' & %γsnap'' & 
-              (%Hextract' & %Hnames_lookup) & Hmap_mconn & Hmap_msnap & %Hwrites_true' & %Hopen_state)]"; first by iLeft.
+              (%Hextract' & %Hnames_lookup) & Hmap_mconn & Hmap_msnap & %Hopen_state)]"; first by iLeft.
             iRight.
             iExists c', m_conn', m_snap', γm_conn'', γsnap''.
             iSplit; first done.
@@ -3928,6 +3930,7 @@ Section trace_proof.
       - iExists sa, γm_conn, γsnap.
         iSplit; first done.
         iFrame "#".
+        iSplit; first (iPureIntro; set_solver).
         eauto.
     }
     iModIntro.
