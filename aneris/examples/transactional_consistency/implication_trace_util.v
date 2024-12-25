@@ -373,6 +373,21 @@ Section trace_proof_util.
     by do 2 rewrite -app_assoc.
   Qed.
 
+  Lemma open_trans_eq t t' c T :
+    valid_transactions T →
+    open_trans t c T →
+    open_trans t' c T →
+    t = t'.
+  Proof.
+    intros (_ & Hvalid & _) (op1 & Hin1 & Hlast1 & Hconn1 & Hcm1) (op2 & Hin2 & Hlast2 & Hconn2 & Hcm2).
+    rewrite elem_of_list_lookup in Hin1.
+    rewrite elem_of_list_lookup in Hin2.
+    destruct Hin1 as (i & Hin1).
+    destruct Hin2 as (j & Hin2).
+    assert (i = j) as <-; last set_solver.
+    set_solver.
+  Qed.
+
   Lemma open_trans_neq1 (extract : val → option val) sa sa' c c' t T op : 
     sa ≠ sa' →
     extract c = Some #sa →
