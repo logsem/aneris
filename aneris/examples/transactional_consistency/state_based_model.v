@@ -703,6 +703,20 @@ Proof.
       lia.
 Qed.
 
+Lemma latest_write_imp_cm k v trans b s :
+  latest_write_trans k v trans →
+  latest_write_trans k v (trans ++ [Cm s b]).
+Proof.
+  intros (s' & Hwr_in & Hnot).
+  exists s'.
+  split; first set_solver.
+  intros (s'' & v' & Hrel).
+  apply Hnot.
+  exists s'', v'.
+  eapply rel_list_last_neq; try done.
+  set_solver.
+Qed.
+
 Lemma latest_write_read exec T k v trans test : 
   valid_execution test exec →
   based_on exec T →
@@ -1100,6 +1114,16 @@ Lemma tag_event_op op tag :
 Proof.
   intro Htag.
   destruct op as [(tag', c) k ov | (tag', c) k v | (tag', c) b]; 
+    try set_solver.
+  destruct ov as [v|]; set_solver.
+Qed.
+
+Lemma conn_event_op op c :
+  connOfOp op = c →
+  connOfEvent (toLinEvent op) = Some c.
+Proof.
+  intro Hop.
+  destruct op as [(tag, c') k ov | (tag, c') k v | (tag, c') b]; 
     try set_solver.
   destruct ov as [v|]; set_solver.
 Qed.

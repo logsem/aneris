@@ -49,11 +49,12 @@ Class IDBG Σ :=
     IDBG_Trace4 :> ghost_mapG Σ Key (option val);
     IDBG_Trace5 :> inG Σ (authR (gmapUR nat (agreeR (leibnizO transaction))));
     IDBG_Trace6 :> ghost_mapG Σ Key (list val);
-    IDBG_Trace7 :> ghost_mapG Σ socket_address (gname * gname * gname * val);
+    IDBG_Trace7 :> ghost_mapG Σ socket_address (option (gname * gname * val));
     IDBG_Trace8 :> ghost_mapG Σ socket_address (option val);
     IDBG_Trace9 :> inG Σ (dfrac_agreeR (gmapO Key eventO));
     IDBG_Trace10 :> inG Σ (mono_listUR (leibnizO (transaction * state)));
     IDBG_Trace11 :> inG Σ (mono_listUR (leibnizO val));
+    IDBG_Trace12 :> ghost_mapG Σ Key bool;
   }.
 
 Notation KVSG Σ := (IDBG Σ).
@@ -80,8 +81,9 @@ Definition KVSΣ : gFunctors :=
      ghost_mapΣ Key (option val);
      GFunctor (authR (gmapUR nat (agreeR (leibnizO transaction))));
      ghost_mapΣ Key (list val);
-     ghost_mapΣ socket_address (gname * gname * gname * val);
+     ghost_mapΣ socket_address (option (gname * gname * val));
      ghost_mapΣ socket_address (option val);
+     ghost_mapΣ Key bool;
      GFunctor (dfrac_agreeR (gmapO Key eventO));
      GFunctor (mono_listUR (leibnizO (transaction * state)));
      GFunctor (mono_listUR (leibnizO val));

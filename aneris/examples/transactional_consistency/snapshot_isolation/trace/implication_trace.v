@@ -42,84 +42,85 @@ Section trace_proof.
 
   Definition OwnExecHist (γ : gname) (exec : execution) : iProp Σ := own_log_obs γ exec.
 
-  Definition local_key_state (γsi_name : gname) (sa : socket_address) (c : val) (k : Key) (ov ov' : option val) : iProp Σ := 
-    ∃ (γ' γ'' γ''' : gname), ghost_map_elem γsi_name sa DfracDiscarded (γ', γ'', γ''', c) ∗
-      ((⌜ov' = None⌝ ∗ ghost_map_elem γ' k (DfracOwn 1%Qp) ov) ∨ 
-      (∃ v, ⌜ov' = Some v ∧ ov = ov'⌝ ∗ ghost_map_elem γ'' k (DfracOwn 1%Qp) None)).
+  Definition local_key_state (γsi_name γl : gname) (sa : socket_address) (c : val) (k : Key) (ov ov_last_wr : option val) : iProp Σ := 
+    ∃ (γm_conn γsnap : gname), ghost_map_elem γsi_name sa DfracDiscarded (Some (γm_conn, γsnap, c)) ∗
+      ((⌜ov_last_wr = None⌝ ∗ ghost_map_elem γm_conn k (DfracOwn 1%Qp) ov) ∨ 
+      (∃ v, ⌜ov_last_wr = Some v ∧ ov = ov_last_wr⌝ ∗ ghost_map_elem γsnap k (DfracOwn 1%Qp) true)).
 
   Definition inactive_connection_exec_state (s : aux_defs.local_state) (c : val) (sa : socket_address) 
-  (γmstate γ' γ'' γ''' : gname) : iProp Σ := 
-    ⌜s = aux_defs.CanStart⌝ ∗ ∃ (st : gmap Key val), own γ''' (to_dfrac_agree (DfracOwn 1) st) ∗
+  (γmstate γm_conn γsnap : gname) (m_conn : gmap Key (option val)) : iProp Σ := 
+    ⌜s = aux_defs.CanStart⌝ ∗
     ghost_map_elem γmstate sa (DfracOwn 1%Qp) (transactional_consistency.aux_defs.CanStart, Some c) ∗
-    ([∗ set] k ∈ KVS_keys, ∃ (ov : option val), ghost_map_elem γ' k (DfracOwn 1%Qp) ov ∗
-      ghost_map_elem γ'' k (DfracOwn 1%Qp) None).
+    ([∗ set] k ∈ KVS_keys, ∃ (ov : option val), (ghost_map_elem γm_conn k (DfracOwn 1%Qp) ov ∨ ⌜m_conn !! k = None⌝) ∗
+      ghost_map_elem γsnap k (DfracOwn 1%Qp) false).
 
-  Definition active_connection_exec_state (s : aux_defs.local_state) (c : val) (sa : socket_address) (γexec γmstate γ' γ'' γ''' : gname) 
-  (m : gmap Key (option val)) : iProp Σ := 
-    ∃ (ms : gmap Key (list val)), ⌜s = aux_defs.Active ms⌝ ∗ ⌜∀ k ov, m !! k = Some ov ↔ (∃ h, ms !! k = Some h ∧ last h = ov)⌝ ∗ 
-      ∃ exec_pre, OwnExecHist γexec exec_pre ∗ ⌜rel_exec_map exec_pre ms⌝ ∗
-        ∃ st, own γ''' (to_dfrac_agree (DfracOwn (1 / 2)) st) ∗ ⌜∀ k ov, st !! k = ov ↔ (∃ h, ms !! k = Some h ∧ last h = ov)⌝ ∗
-          ghost_map_elem γmstate sa (DfracOwn 1%Qp) (transactional_consistency.aux_defs.Active (dom ms), Some c) ∗
-          ([∗ set] k ∈ KVS_keys ∖ (dom ms), ∃ (ov : option val), ghost_map_elem γ' k (DfracOwn 1%Qp) ov ∗
-            ghost_map_elem γ'' k (DfracOwn 1%Qp) None).
+  Definition active_connection_exec_state (s : aux_defs.local_state) (c : val) (sa : socket_address) (γexec γmstate γm_conn γsnap : gname) 
+  (m_conn : gmap Key (option val)) : iProp Σ := 
+    ∃ (ms ms_sub: gmap Key (list val)), ⌜s = aux_defs.Active ms_sub⌝ ∗ 
+      ⌜∀ k (ov : option val), k ∈ KVS_keys → k ∈ dom (ms_sub) → (m_conn !! k = Some ov → (∃ h, ms_sub !! k = Some h ∧ last h = ov))⌝ ∗ 
+      ∃ exec_pre, OwnExecHist γexec exec_pre ∗ ⌜rel_exec_map exec_pre ms ∧ ms_sub ⊆ ms⌝ ∗
+        ghost_map_elem γmstate sa (DfracOwn 1%Qp) (transactional_consistency.aux_defs.Active (dom ms_sub), Some c) ∗
+        ([∗ set] k ∈ KVS_keys ∖ (dom ms_sub ∩ KVS_keys), ⌜m_conn !! k = None⌝ ∗ ghost_map_elem γsnap k (DfracOwn 1%Qp) false).
 
-  Definition connection_exec_state (s : aux_defs.local_state) (sa : socket_address) (c : val) (γexec γmstate γ' γ'' γ''' : gname) 
-  (m : gmap Key (option val)) : iProp Σ := 
-    inactive_connection_exec_state s c sa γmstate γ' γ'' γ''' ∨ active_connection_exec_state s c sa γexec γmstate γ' γ'' γ''' m.
+  Definition connection_exec_state (s : aux_defs.local_state) (sa : socket_address) (c : val) (γexec γmstate γm_conn γsnap : gname) 
+  (m_conn : gmap Key (option val)) : iProp Σ := 
+    inactive_connection_exec_state s c sa γmstate γm_conn γsnap m_conn ∨ active_connection_exec_state s c sa γexec γmstate γm_conn γsnap m_conn.
 
-  Definition open_transactions_state (T : list transaction) (mnames : gmap socket_address (gname * gname * gname * val)) 
-  (extract : val → option val) : iProp Σ := 
-    ([∗ list] _↦(trans : transaction) ∈ T, ∃ (op : operation), ⌜last trans = Some op⌝ ∧ (⌜is_cm_op op⌝ ∨ 
-      (∃ (c : val) (st : gmap Key val) (sa : socket_address) (γ γ'' γ''' : gname), 
-        ⌜open_trans trans c T⌝ ∗ ⌜extract c = Some #sa ∧ mnames !! sa = Some (γ, γ'', γ''', c)⌝ ∗
-        own γ''' (to_dfrac_agree (DfracOwn (1 / 2)) st) ∗
-        ⌜∀ sig k v, (Rd sig k (Some v)) ∈ trans → 
-        ¬ (∃ sig' v', rel_list trans (Wr sig' k v') (Rd sig k (Some v))) →  st !! k = Some v⌝))).
+  Definition open_transactions_state (T : list transaction) (mnames : gmap socket_address (option (gname * gname * val))) 
+  (extract : val → option val) (clients : gset socket_address): iProp Σ := 
+     ([∗ set] (sa : socket_address) ∈ clients, (⌜mnames !! sa = Some None⌝) ∨
+      (∃ c (m_conn : gmap Key (option val)) (m_snap : gmap Key bool) (γm_conn γsnap : gname), 
+        ⌜extract c = Some #sa ∧ mnames !! sa = Some (Some (γm_conn, γsnap, c))⌝ ∗
+        ghost_map_auth γm_conn (1 / 2) m_conn ∗ ghost_map_auth γsnap (1%Qp) m_snap ∗
+        ∀ trans, ⌜(open_trans trans c T) → 
+          ((∀ sig k ov v, ((Rd sig k ov) ∈ trans ∨ Wr sig k v ∈ trans) → k ∈ KVS_keys) ∧
+           (∀ sig k ov, (Rd sig k ov) ∈ trans → 
+            ¬ (∃ sig' v', rel_list trans (Wr sig' k v') (Rd sig k ov)) → m_conn !! k = Some ov) ∧
+           (∀ sig k v, (Wr sig k v ∈ trans) → m_snap !! k = Some true))⌝)).
 
-  Definition GlobalInvExtSI (γmap γexec γsi_mstate γsi_name : gname) (T : list transaction) (exec : execution)
+  Definition GlobalInvExtSI (γm_gl γexec γsi_name : gname) (T : list transaction) (exec : execution)
   (extract : val → option val) (clients : gset socket_address) : iProp Σ := 
-    ∃ (mstate : gmap socket_address (option val)), ghost_map_auth γsi_mstate (1%Qp) mstate ∗ 
-    ∃ (mnames : gmap socket_address (gname * gname * gname * val)), ghost_map_auth γsi_name (1%Qp) mnames ∗
-      ⌜∀ sa, sa ∈ clients → ((mstate !! sa = Some None ∧ mnames !! sa = None) ∨ (∃ (c : val), mstate !! sa = Some (Some c)))⌝ ∗
-    ∃ (m : gmap Key (list val)), 
-      ghost_map_auth γmap (1%Qp) m ∗ OwnExec γexec exec ∗ ⌜rel_exec_map exec m⌝ ∗ 
-      open_transactions_state T mnames extract.
+    ∃ (mnames : gmap socket_address (option (gname * gname * val))), ghost_map_auth γsi_name (1%Qp) mnames ∗ 
+    ∃ (m_gl : gmap Key (list val)), ghost_map_auth γm_gl (1%Qp) m_gl ∗ ⌜∀ k, k ∈ KVS_keys → is_Some (m_gl !! k)⌝ ∗
+    OwnExec γexec exec ∗ ⌜rel_exec_map exec m_gl⌝ ∗
+    open_transactions_state T mnames extract clients.
 
   (** Wrapped resources  *)
-  Global Program Instance wrapped_resources (γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name : gname) (clients : gset socket_address)
+  Global Program Instance wrapped_resources (γmstate γmlin γmpost γmname γl γm_gl γexec γsi_name : gname) (clients : gset socket_address)
   `(res : !SI_resources Mdl Σ) : SI_resources Mdl Σ :=
     {|
       GlobalInv := (GlobalInv ∗ trace_inv trace_inv_name valid_trace_si ∗ 
-                    inv KVS_InvName (∃ T exec, GlobalInvExtSI γmap γexec γsi_mstate γsi_name T exec extract clients ∗ 
+                    inv KVS_InvName (∃ T exec, GlobalInvExtSI γm_gl γexec γsi_name T exec extract clients ∗ 
                     GlobalInvExt commit_test_si T extract γmstate γmlin γmpost γmname γl clients exec))%I;
-      OwnMemKey k h := (OwnMemKey k h ∗ ghost_map_elem γmap k (DfracOwn 1%Qp) h ∗
-                        (∀ v, ⌜v ∈ h⌝ → ∃ lh tag c, OwnLinHist γl lh ∗ 
+      OwnMemKey k h := (OwnMemKey k h ∗ ghost_map_elem γm_gl k (DfracOwn 1%Qp) h ∗
+                        (∀ v, ⌜v ∈ h⌝ → ∃ lh tag c, OwnLinHist γl lh ∗
                           ⌜(#(LitString tag), (c, (#"WrLin", (#(LitString k), v))))%V ∈ lh⌝))%I;
-      OwnLocalKey k c ov := (OwnLocalKey k c ov ∗  ∃ (sa : socket_address) γ ov', ghost_map_elem γmname sa DfracDiscarded (γ, c) ∗ 
-                             ⌜extract c = Some #sa⌝ ∗ (⌜k ∈ KVS_keys⌝ → ghost_map_elem γ k (DfracOwn 1%Qp) ov') ∗ ⌜sa ∈ clients⌝ ∗ 
-                             ⌜∀ v, ov' = Some v → k ∈ KVS_keys⌝ ∗
-                             (∀ v, ⌜ov' = Some v⌝ → ∃ lh tag c, OwnLinHist γl lh ∗ ⌜(#(LitString tag), (c, (#"WrLin", (#(LitString k), v))))%V ∈ lh⌝) ∗
-                             local_key_state γsi_name sa c k ov ov')%I;
-      ConnectionState c sa s := (ConnectionState c sa s ∗ ghost_map_elem γsi_mstate sa (DfracOwn 1%Qp) (Some c) ∗
-                                 ∃ (γ' γ'' γ''' : gname) (m : gmap Key (option val)), ghost_map_elem γsi_name sa DfracDiscarded (γ', γ'', γ''', c) ∗
-                                   ghost_map_auth γ' (1%Qp) m ∗ connection_exec_state s sa c γexec γmstate γ' γ'' γ''' m)%I;
+      OwnLocalKey k c ov := (OwnLocalKey k c ov ∗  ∃ (sa : socket_address) γ ov_last_wr, ghost_map_elem γmname sa DfracDiscarded (γ, c) ∗ 
+                             ⌜extract c = Some #sa⌝ ∗ (⌜k ∈ KVS_keys⌝ → ghost_map_elem γ k (DfracOwn 1%Qp) ov_last_wr) ∗ ⌜sa ∈ clients⌝ ∗ 
+                             (∀ v, ⌜ov = Some v⌝ → ∃ lh tag c', OwnLinHist γl lh ∗ 
+                              ⌜(#(LitString tag), (c', (#"WrLin", (#(LitString k), v))))%V ∈ lh⌝) ∗
+                             (⌜k ∈ KVS_keys⌝ → local_key_state γsi_name γl sa c k ov ov_last_wr))%I;
+      ConnectionState c sa s := (ConnectionState c sa s ∗ 
+                                 ∃ (γm_conn γsnap : gname) (m_conn : gmap Key (option val)), ghost_map_elem γsi_name sa DfracDiscarded (Some (γm_conn, γsnap, c)) ∗
+                                   ghost_map_auth γm_conn (1 / 2) m_conn ∗ connection_exec_state s sa c γexec γmstate γm_conn γsnap m_conn)%I;
       IsConnected c sa := (IsConnected c sa ∗ ⌜sa ∈ clients⌝ ∗ ⌜extract c = Some #sa⌝ ∗ 
                            ∃ (γ : gname), ghost_map_elem γmname sa DfracDiscarded (γ, c) ∗ 
-                           ∃ (γ' γ'' γ''' : gname), ghost_map_elem γsi_name sa DfracDiscarded (γ', γ'', γ''', c))%I;
+                           ∃ (γm_conn γsnap : gname), ghost_map_elem γsi_name sa DfracDiscarded (Some (γm_conn, γsnap, c)))%I;
       KVS_si := KVS_si;
       KVS_Init := KVS_Init%I;
       KVS_ClientCanConnect sa := (KVS_ClientCanConnect sa ∗ 
                                   ghost_map_elem γmstate sa (DfracOwn 1%Qp) (transactional_consistency.aux_defs.CanStart, None) ∗ ⌜sa ∈ clients⌝ ∗
-                                  ghost_map_elem γsi_mstate sa (DfracOwn 1%Qp) None)%I;
-      KeyUpdStatus c k b := (KeyUpdStatus c k b ∗ ∃ (sa : socket_address) (γ' γ'' γ''' : gname), ⌜extract c = Some #sa⌝ ∗
-                              ghost_map_elem γsi_name sa DfracDiscarded (γ', γ'', γ''', c) ∗ 
-                              ((⌜b = true⌝ ∧ ∃ ov, ghost_map_elem γ' k (DfracOwn 1%Qp) ov) ∨ 
-                               (⌜b = false⌝ ∧ ghost_map_elem γ'' k (DfracOwn 1%Qp) None)))%I;
+                                  ghost_map_elem γsi_name sa (DfracOwn 1%Qp) (None : option (gname * gname * val)))%I;
+      KeyUpdStatus c k b := (KeyUpdStatus c k b ∗ ∃ (sa : socket_address) (γm_conn γsnap : gname), ⌜extract c = Some #sa⌝ ∗
+                              ghost_map_elem γsi_name sa DfracDiscarded (Some (γm_conn, γsnap, c)) ∗ 
+                              ⌜b = true → k ∈ KVS_keys⌝ ∗
+                              (⌜k ∈ KVS_keys⌝ → ((⌜b = true⌝ ∧ ∃ (ov : option val), ghost_map_elem γm_conn k (DfracOwn 1%Qp) ov) ∨ 
+                                (⌜b = false⌝ ∧ ghost_map_elem γsnap k (DfracOwn 1%Qp) false))))%I;
       Seen k V := Seen k V%I;
       extract c := res.(snapshot_isolation.specs.resources.extract) c;
     |}.
   Next Obligation.
-    iIntros (??????????????) "(Hkey & [%sa [%γ [%ov' (Hghost_elem_per & %Hextract & Hghost_elem  & %Hin_sa & Hlin_hist & Hstate)]]])".
+    iIntros (?????????????) "(Hkey & [%sa [%γ [%ov' (Hghost_elem_per & %Hextract & Hghost_elem & Hstate)]]])".
     iDestruct (res.(snapshot_isolation.specs.resources.OwnLocalKey_serializable) 
       with "Hkey") as "(Hkey & Hser)".
     iFrame.
@@ -128,14 +129,14 @@ Section trace_proof.
   Qed.
   Next Obligation.
     iIntros (??????????????).
-    iIntros (??) "#(HGinv & Hinv) (#Hseen & Hkey & Hin)".
+    iIntros (?) "#(HGinv & Hinv) (#Hseen & Hkey & Hin)".
     iMod (res.(snapshot_isolation.specs.resources.Seen_valid) 
       with "[$HGinv][$Hseen $Hkey]") as "(Hkey & Hsub)"; first done.
     iModIntro.
     iFrame "∗#".
   Qed.
   Next Obligation.
-    iIntros (???????????????) "#(HGinv & Hinv) (Hkey & Hin)".
+    iIntros (??????????????) "#(HGinv & Hinv) (Hkey & Hin)".
     iMod (res.(snapshot_isolation.specs.resources.Seen_creation) 
       with "[$HGinv][$Hkey]") as "(Hkey & #Hseen)"; first done.
     iModIntro.
@@ -143,13 +144,13 @@ Section trace_proof.
   Qed.
   Next Obligation.
     simpl.
-    iIntros (????????? clients res sa c) "(Hconn & _)".
+    iIntros (???????? clients res sa c) "(Hconn & _)".
     iApply (res.(snapshot_isolation.specs.resources.Extraction_of_address) 
       with "[$Hconn]").
   Qed.
   Next Obligation.
     simpl.
-    iIntros (?????????).
+    iIntros (????????).
     iIntros (clients res sa sa' c c' Heq1 Heq2 Hneq).
     by eapply res.(snapshot_isolation.specs.resources.Extraction_preservation).
   Qed.
@@ -594,62 +595,3489 @@ Section trace_proof.
       all : intros Hfalse; destruct trans; set_solver.
   Qed.
 
+  Lemma rel_exec_map_cm_imp (exec : execution) (trans : transaction) (s : signature) (st : state) 
+  (m m' : gmap Key (list val)) (mc : gmap Key (option val * bool)) : 
+    (∀ k, (∃ v, mc !! k = Some (Some v, true) ∧ latest_write_trans k v trans) ∨ 
+      ((¬∃ v, mc !! k = Some (Some v, true)) ∧ (¬∃ sig v, (Wr sig k v ∈ trans)))) →
+    (∀ k, k ∈ KVS_keys → is_Some (m !! k)) →
+    (∀ k, k ∈ KVS_keys → is_Some (m' !! k)) →
+    (dom m = dom m') →
+    (∀ k, mc !! k = None → (m' !! k = m !! k)) →
+    (∀ k (y1 : aux_defs.Hist) (y2 : option val * bool), 
+      m !! k = Some y1 → mc !! k = Some y2 → m' !! k = Some (aux_defs.commit_event y2 y1)) →
+    optional_applied_transaction exec st (trans ++ [Cm s true]) →
+    valid_execution commit_test_si exec →
+    rel_exec_map exec m → 
+    rel_exec_map (exec ++ [(trans ++ [Cm s true], st)]) m'.
+  Proof.
+    intros Hwrites_mc His_some_m His_some_m' Hdom Hnone_mc Hsome_mc Hstate Hvalid_exec Hrel.
+    exists st.
+    destruct Hstate as [(s' & t' & Hlast & Happlied)|(Hfalse & _)]; last first.
+    {
+      exfalso.
+      destruct Hvalid_exec as (_ & Hvalid_exec & _).
+      apply last_None in Hfalse.
+      subst.
+      set_solver.
+    }
+    split_and!.
+    - rewrite split_split; simpl.
+      by rewrite last_snoc.
+    - destruct Hrel as (s'' & Hlast' & Hrel & _).
+      apply last_Some in Hlast.
+      destruct Hlast as (exec' & Heq_exec).
+      subst.
+      rewrite split_split in Hlast'.
+      simpl in Hlast'.
+      rewrite last_snoc in Hlast'.
+      assert (s' = s'') as ->; first set_solver.
+      intros k ov Hk_in.
+      destruct (m !! k) as [h|] eqn:Heq; last first.
+      {
+        specialize (His_some_m k Hk_in).
+        rewrite Heq /is_Some in His_some_m.
+        set_solver.
+      }
+      assert (¬ (∃ v, mc !! k = Some (Some v, true)) → m' !! k = m !! k) as Himp.
+      {
+        intros Hnot.
+        destruct (mc !! k) as [(p1, p2)|] eqn:Hlookup; last set_solver.
+        destruct (m' !! k) as [h'|] eqn:Heq'; last first.
+        {
+          specialize (His_some_m' k Hk_in).
+          rewrite Heq' /is_Some in His_some_m'.
+          set_solver.
+        }
+        specialize (Hsome_mc k h (p1, p2) Heq Hlookup).
+        simpl in Hsome_mc.
+        destruct p1 as [v|]; last set_solver.
+        destruct p2; set_solver.
+      }
+      destruct Happlied as (Happlied1 & Happlied2).
+      split.
+      + intros Hlookup.
+        destruct ov as [v|].
+        * specialize (Happlied1 k v Hlookup).
+          destruct (Hwrites_mc k) as [(v' & Hlookup_mc & Hlatest)|Hwrites_mc'].
+          -- destruct Happlied1 as (Happlied1 & Happlied1').
+             assert (latest_write_trans k v' (trans ++ [Cm s true])) as Hlatest'; 
+              first by apply latest_write_imp_cm.
+             specialize (Happlied1 v' Hlatest').
+             subst.
+             specialize (Hsome_mc k h (Some v', true) Heq Hlookup_mc).
+             simpl in Hsome_mc.
+             exists (h ++ [v']).
+             rewrite last_snoc.
+             set_solver.
+          -- assert (m' !! k = m !! k) as Heq'; first set_solver.
+             exists h.
+             rewrite -Heq.
+             split; first done.
+             assert (s'' !! k = Some v) as Hlookup'; first set_solver.
+             specialize (Hrel k (Some v) Hk_in).
+             set_solver.
+        * destruct (Hwrites_mc k) as [(v' & Hlookup_mc & Hlatest)|Hwrites_mc'].
+          -- assert (k ∈ dom st) as Hdom_in.
+             {
+               apply Happlied2; left.
+               rewrite /latest_write_trans in Hlatest.
+               set_solver.
+             }
+             apply not_elem_of_dom_2 in Hlookup.
+             set_solver.
+          -- assert (m' !! k = m !! k) as Heq'; first set_solver.
+             destruct (last h) as [v|] eqn:Hlast; last first.
+             {
+               exists h; split; last done.
+               rewrite -Heq; set_solver.
+             }
+             assert (s'' !! k = Some v) as Hlookup'; first set_solver.
+             assert (k ∈ dom s'') as Hdom_in.
+             {
+              apply elem_of_dom.
+              rewrite /is_Some.
+              set_solver.
+             }
+             assert (k ∈ dom st) as Hdom_in'; first by (apply Happlied2; right).
+             apply not_elem_of_dom_2 in Hlookup.
+             set_solver.
+      + intros (h' & Hlookup & Hlast_h).
+        destruct (st !! k) as [v|] eqn:Hlookup_st.
+        * destruct (Hwrites_mc k) as [(v' & Hlookup_mc & Hlatest)|Hwrites_mc'].
+          -- specialize (Hsome_mc k h (Some v', true) Heq Hlookup_mc).
+             simpl in Hsome_mc.
+             assert (h' = h ++ [v']) as ->; first set_solver.
+             rewrite last_snoc in Hlast_h.
+             rewrite -Hlast_h.
+             assert (v = v') as ->; last done.
+             specialize (Happlied1 k v Hlookup_st).
+             destruct Happlied1 as (Happlied1 & Happlied1').
+             assert (latest_write_trans k v' (trans ++ [Cm s true])) as Hlatest'; last set_solver.
+             by apply latest_write_imp_cm.
+          -- assert (m' !! k = m !! k) as Heq'; first set_solver.
+             assert (s'' !! k = Some v) as Hlookup'; first set_solver.
+             destruct (Hrel k (Some v) Hk_in) as (Hrel' & _).
+             apply Hrel' in Hlookup'.
+             destruct Hlookup' as (h'' & Hlookup_h'' & Hlast_h'').
+             rewrite -Hlast_h'' -Hlast_h. 
+             assert (Some h'' = Some h'); last set_solver.
+             rewrite -Hlookup_h'' -Hlookup.
+             set_solver.
+        * destruct ov as [v|]; last done.
+          exfalso.
+          destruct (Hwrites_mc k) as [(v' & Hlookup_mc & Hlatest)|Hwrites_mc'].
+          -- assert (k ∈ dom st) as Hdom_in.
+             {
+               apply Happlied2; left.
+               rewrite /latest_write_trans in Hlatest.
+               set_solver.
+             }
+             apply not_elem_of_dom_2 in Hlookup_st.
+             set_solver.
+          -- assert (m' !! k = m !! k) as Heq'; first set_solver.
+             assert (s'' !! k = Some v) as Hlookup'.
+             {
+               apply (Hrel k (Some v) Hk_in).
+               exists h'.
+               split; last done.
+               rewrite -Hlookup.
+               set_solver.
+             }
+             assert (k ∈ dom s'') as Hdom_in.
+             {
+              apply elem_of_dom.
+              rewrite /is_Some.
+              set_solver.
+             }
+             assert (k ∈ dom st) as Hdom_in'; first by (apply Happlied2; right).
+             apply not_elem_of_dom_2 in Hlookup_st.
+             set_solver.
+    - intros k h Hlookup.
+      assert (exec ≠ []) as Hneq.
+      {
+        apply last_Some_elem_of in Hlast.
+        intros ->.
+        set_solver.
+      }
+      destruct (m !! k) as [h'|] eqn:Heq'; last first.
+      {
+        apply not_elem_of_dom_2 in Heq'.
+        assert (k ∉ dom m') as Hdom2; first set_solver.
+        apply not_elem_of_dom_1 in Hdom2.
+        set_solver.
+      }
+      destruct (Hwrites_mc k) as [(v & Hlookup_mc & Hlatest)|Hwrites_mc'].
+      + specialize (Hsome_mc k h' (Some v, true) Heq' Hlookup_mc).
+        simpl in Hsome_mc.
+        assert (h = h' ++ [v]) as ->; first set_solver.
+        apply Rel_exec_map_app1; try done.
+        * rewrite /latest_write_trans in Hlatest.
+          set_solver.
+        * destruct Hrel as (st' & _ & _ & Hrel).
+          set_solver.
+      + apply Rel_exec_map_app2; try done; first set_solver.
+        destruct Hrel as (st' & Hlast_st' & Hst_reads & Hrel).
+        apply Hrel.
+        destruct (mc !! k) as [(p1, p2)|] eqn:Heq; last by rewrite -(Hnone_mc k Heq).
+        rewrite -Hlookup.
+        rewrite (Hsome_mc k h' (p1, p2) Heq' Heq).
+        destruct p2; simpl; destruct p1 as [v|]; set_solver.
+  Qed.
+
+  Lemma open_transactions_state_cm_imp T1 T2 trans mnames_si s b extract clients: 
+    open_transactions_state (T1 ++ trans :: T2) mnames_si extract clients -∗
+    open_transactions_state (T1 ++ (trans ++ [Cm s b]) :: T2) mnames_si extract clients.
+  Proof.
+    iIntros "Hopen".
+    rewrite /open_transactions_state.
+    iApply (big_sepS_wand with "Hopen").
+    iApply big_sepS_intro.
+    iModIntro.
+    iIntros (sa Hsa_in) "Hopen".
+    destruct (mnames_si !! sa) as [opt|]; 
+      last (iDestruct "Hopen" as "[%Hopen|(%c & %m_conn & %m_snap & %γ_conn & %γsnap & %Hfalse & _)]"; set_solver).
+    destruct opt as [opt|]; last set_solver.
+    iRight.
+    iDestruct "Hopen" as "[%Hfalse|(%c & %m_conn & %m_snap & %γ_conn & %γsnap & %Hextract & Hghost_map & Hghost_map' & %Hreads)]"; 
+      first set_solver.
+    iExists c, m_conn, m_snap, γ_conn, γsnap.
+    iFrame "%∗".
+    iPureIntro.
+    intros trans' (op & Htrans'_in & Hopen).
+    specialize (Hreads trans').
+    rewrite elem_of_app in Htrans'_in.
+    destruct Htrans'_in as [Htrans'_in|Htrans'_in].
+    - apply Hreads.
+      rewrite /open_trans.
+      exists op; set_solver. 
+    - rewrite elem_of_cons in Htrans'_in.
+      destruct Htrans'_in as [Htrans'_in|Htrans'_in].
+      + exfalso. 
+        subst.
+        rewrite last_snoc /is_cm_op in Hopen.
+        set_solver.
+      + apply Hreads.
+        rewrite /open_trans.
+        exists op; set_solver. 
+  Qed.
+  
   (** Per operation implications *)
 
-  Lemma init_client_implication γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name clients (res : SI_resources Mdl Σ) 
+   Lemma commit_implication γmstate γmlin γmpost γmname γl γm_gl γexec γsi_name clients (res : SI_resources Mdl Σ) 
   (lib : KVS_transaction_api) : 
     ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
     trace_inv trace_inv_name valid_trace_si -∗
-    inv KVS_InvName (∃ T exec, GlobalInvExtSI γmap γexec γsi_mstate γsi_name T exec extract clients ∗ 
-                     GlobalInvExt commit_test_si T extract γmstate γmlin γmpost γmname γl clients exec) -∗
-    @init_client_proxy_spec _ _ _ _ lib res -∗
-    @init_client_proxy_spec _ _ _ _ (KVS_wrapped_api lib) (wrapped_resources γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name clients res).
-  Proof.
-  Admitted.
-
-  Lemma start_implication γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name clients (res : SI_resources Mdl Σ) 
-  (lib : KVS_transaction_api) : 
-    ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
-    trace_inv trace_inv_name valid_trace_si -∗
-    inv KVS_InvName (∃ T exec, GlobalInvExtSI γmap γexec γsi_mstate γsi_name T exec extract clients ∗ 
-                     GlobalInvExt commit_test_si T extract γmstate γmlin γmpost γmname γl clients exec) -∗
-    @start_spec _ _ _ _ lib res -∗
-    @start_spec _ _ _ _ (KVS_wrapped_api lib) (wrapped_resources γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name clients res).
-  Proof.
-  Admitted.
-
-  Lemma write_implication γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name clients (res : SI_resources Mdl Σ) 
-  (lib : KVS_transaction_api) : 
-    ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
-    trace_inv trace_inv_name valid_trace_si -∗
-    inv KVS_InvName (∃ T exec, GlobalInvExtSI γmap γexec γsi_mstate γsi_name T exec extract clients ∗ 
-                     GlobalInvExt commit_test_si T extract γmstate γmlin γmpost γmname γl clients exec) -∗
-    @write_spec _ _ _ _ lib res -∗
-    @write_spec _ _ _ _ (KVS_wrapped_api lib) (wrapped_resources γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name clients res).
-  Proof.
-  Admitted.
-
-  Lemma read_implication γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name clients (res : SI_resources Mdl Σ) 
-  (lib : KVS_transaction_api) : 
-    ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
-    trace_inv trace_inv_name valid_trace_si -∗
-    inv KVS_InvName (∃ T exec, GlobalInvExtSI γmap γexec γsi_mstate γsi_name T exec extract clients ∗ 
-                     GlobalInvExt commit_test_si T extract γmstate γmlin γmpost γmname γl clients exec) -∗
-    @read_spec _ _ _ _ lib res -∗
-    @read_spec _ _ _ _ (KVS_wrapped_api lib) (wrapped_resources γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name clients res).
-  Proof.
-  Admitted.
-
-  Lemma commit_implication γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name clients (res : SI_resources Mdl Σ) 
-  (lib : KVS_transaction_api) : 
-    ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
-    trace_inv trace_inv_name valid_trace_si -∗
-    inv KVS_InvName (∃ T exec, GlobalInvExtSI γmap γexec γsi_mstate γsi_name T exec extract clients ∗ 
+    inv KVS_InvName (∃ T exec, GlobalInvExtSI γm_gl γexec γsi_name T exec extract clients ∗ 
                      GlobalInvExt commit_test_si T extract γmstate γmlin γmpost γmname γl clients exec) -∗
     @commit_spec _ _ _ _ lib res -∗
-    @commit_spec _ _ _ _ (KVS_wrapped_api lib) (wrapped_resources γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name clients res).
+    @commit_spec _ _ _ _ (KVS_wrapped_api lib) (wrapped_resources γmstate γmlin γmpost γmname γl γm_gl γexec γsi_name clients res).
   Proof.
-  Admitted.
+    iIntros "%Hkvs_inv_name #Htr_inv #HinvExt #Hcommit".
+    rewrite /commit_spec.
+    iModIntro.
+    iIntros (c sa E) "%Hsub (#Hconn & %Hsa_in_clients & %Hsa_extract & (%γ & #Hsa_pointer & #Hsa_pointer_si)) !# %Φ Hshift".
+    rewrite /TC_commit /KVS_wrapped_api /wrap_commit.
+    wp_pures.
+    wp_bind (ast.Fresh _).
+    rewrite /commit_pre_emit_event.
+    wp_pures.
+    iInv "HinvExt" as ">[%T [%exec (Hinv_si_res & [%t [%lt  (Htr_is & HOwnLin & %HlinOf & %Hno_empty & %Hex 
+      & %Hvalid_trans & %Hvalid_seq & %Hbased & %Hvalid_exec & Hstate_res & Hlin_res & Hpost_res)]])]]" "Hclose".
+    wp_apply (aneris_wp_fresh with "[$Htr_inv $Htr_is]").
+    {
+      rewrite Hkvs_inv_name.
+      solve_ndisj.
+    }
+    {
+      intros tag Hnin.
+      eapply valid_trace_pre; try done.
+      rewrite /is_pre_event /is_cm_pre_event; set_solver.
+    }
+    iIntros (tag1) "(Htr_is & %Htag1_nin)".
+    iDestruct (alloc_trace_hist with "[$Htr_is]") as "(Htr_is & #Htr_hist)".
+    iMod (lin_tag_create lt t γmlin (#tag1, (c, #"CmPre"))%V with "[$Hlin_res]") 
+      as "(Hlin_res & Hlin_tag_res)".
+    {
+      iPureIntro.
+      simpl.
+      do 2 (split; first done).
+      intros Hfalse.
+      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]]; 
+        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse; 
+        set_solver.
+    }
+    iMod (post_tag_create t γmpost (#tag1, (c, #"CmPre"))%V with "[$Hpost_res]") 
+      as "(Hpost_res & Hpost_tag_res)".
+    {
+      iPureIntro.
+      simpl.
+      do 2 (split; first done).
+      intros Hfalse.
+      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]]; 
+        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse; 
+        set_solver.
+    }
+    iMod ("Hclose" with "[Hinv_si_res Htr_is HOwnLin Hstate_res Hlin_res Hpost_res]").
+    {
+      iNext.
+      iExists T, exec.
+      iFrame.
+      iExists (t ++ [(#tag1, (c, #"CmPre"))%V]), lt.
+      iFrame.
+      iSplitR; last set_solver.
+      iPureIntro.
+      apply (lin_trace_valid tag1); try done.
+      rewrite /is_pre_event /is_cm_pre_event.
+      set_solver.
+    }
+    iModIntro.
+    wp_pures.
+    wp_apply "Hcommit"; try done.
+    iClear "Hcommit".
+    iMod "Hshift" as "(%m & %ms & %mc & ((Hconn_state & %γm_conn & %γsnap & %m_conn & #Hsa_pointer_si' & Hghost_map_m_conn &
+      Hconn_exec_state) & %Hdom1 & %Hdom2 & Hkeys & Hkeys_conn) & Hshift)".
+    iModIntro.
+    iExists m, ms, mc.
+    rewrite big_sepM_sep.
+    iDestruct "Hkeys_conn" as "(Hkeys_conn1 & Hkeys_conn2)".
+    simpl.
+    do 4 rewrite big_sepM_sep.
+    iDestruct "Hkeys" as "(Hkeys_orig & Hkeys & #Hkeys_hist)".
+    iDestruct "Hkeys_conn1" as "(Hkeys_conn1_orig & Hkeys_conn1)".
+    iDestruct "Hkeys_conn2" as "(Hkeys_conn2_orig & Hkeys_conn2)".
+    iSplitL "Hconn_state Hkeys_orig Hkeys_conn1_orig Hkeys_conn2_orig".
+    {
+      rewrite big_sepM_sep.
+      iFrame.
+      iSplit; by iPureIntro.
+    }
+    iModIntro.
+    iIntros (b) "(Hconn_state & Hkeys_disj)".
+    iInv "HinvExt" as ">[%T' [%exec' (Hinv_si_res' & [%t' [%lt' (Htr_is' & HOwnLin' & %HlinOf' & %Hno_empty' & %Hex' 
+      & %Hvalid_trans' & %Hvalid_seq' & %Hbased' & %Hvalid_exec' & Hstate_res' & Hlin_res' & Hpost_res')]])]]" "Hclose'".
+    iMod (own_lin_add _ _ (#tag1, (c, (#"CmLin", #b)))%V with "[$HOwnLin']") as "HOwnLin'".
+    iMod (own_lin_hist with "[$HOwnLin']") as "(HOwnLin' & #HOwnLinHist')".
+    iPoseProof (trace_hist_trace_is_prefix with "[$Htr_is'][$Htr_hist]") as "%Hprefix".
+    assert ((#tag1, (c, #"CmPre"))%V ∈ t') as Hin'.
+    {
+      apply (elem_of_prefix (t ++ [(#tag1, (c, #"CmPre"))%V])); last done.
+      set_solver.
+    }
+    iPoseProof (lin_tag_not_in lt' t' γmlin with "[$Hlin_res' $Hlin_tag_res]") as "%Hnot_lin_in".
+    iPoseProof (post_tag_not_in t' γmpost with "[$Hpost_res' $Hpost_tag_res]") as "%Hnot_post_in".
+    iDestruct (lin_tag_add lt' t' γmlin (#tag1, (c, (#"CmLin", #b)))%V tag1 with "[$Hlin_res' $Hlin_tag_res]") 
+      as "Hlin_res'".
+    {
+      iPureIntro.
+      by simpl.
+    }
+    iDestruct "Hstate_res'" as "(%mstate & Hmap_mstate & %mname & Hmap_mname & Hdisj_trace_res)".
+    assert (clients = {[sa]} ∪ (clients ∖ {[sa]})) as Heq_sa_clients.
+    {
+      apply union_difference_L.
+      set_solver.
+    }
+    rewrite {5} Heq_sa_clients.
+    rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
+    iDestruct "Hdisj_trace_res" as "(Hdisj_trace_res_sa & Hdisj_trace_res)".
+    rewrite big_sepS_singleton.
+    iDestruct (@ghost_map_lookup with "[$Hmap_mname][$Hsa_pointer]") as "%Hlookup_mname".
+    iDestruct "Hdisj_trace_res_sa" as "[(_ & %Hnot & _) | Htrace_res]"; first set_solver.
+    iDestruct "Htrace_res" as "(%loc_st & %c' & %γ' & %m' & %Hlookup_mstate & %Hextract & #Hsa_pointer'
+      & Hmap_m & Htrace_res)".
+    iDestruct "Hconn_exec_state" as "[(%Hfalse & _)|(%ms_conn & %ms_conn_sub & %Hdom3 & %Hdom4 & %exec_pre & 
+      #Hexec_hist & %Hrel_exec_pre & Hstate_pr & Hkeys_conn_unused)]"; first (exfalso; set_solver).
+    iAssert (⌜loc_st = Active (dom ms)⌝)%I as "->".
+    {
+      iDestruct (@ghost_map_lookup with "[$Hmap_mstate][$Hstate_pr]") as "%Hlookup_mstate'".
+      iPureIntro.
+      set_solver.
+    }
+    iAssert ((⌜γ = γ'⌝ ∗ ⌜c = c'⌝)%I) as "(<- & <-)".
+    {
+      iAssert ((⌜(γ, c) = (γ', c')⌝)%I) as "%Heq_pair".
+      - iApply (ghost_map_elem_agree sa γmname _ _ (γ, c) (γ', c') with "[$Hsa_pointer][$Hsa_pointer']").
+      - iSplit; set_solver.
+    }
+    iDestruct "Htrace_res" as "(%Hinit & [(%Hfalse & _ & _)|Htrace_res])"; first done.
+    iMod (ghost_map_update (CanStart, Some c) with "[$Hmap_mstate] [$Hstate_pr]") 
+      as "(Hmap_mstate & Hstate_pr)".
+    iAssert ([∗ map] k↦p ∈ mc, (∀ v, ⌜p.1 = Some v⌝ → ∃ lh tag c, OwnLinHist γl lh ∗ 
+      ⌜(#(LitString tag), (c, (#"WrLin", (#(LitString k), v))))%V ∈ lh⌝))%I 
+      as "#Hkeys_conn_lin_hist".
+    {
+      iApply (big_sepM_wand with "[$Hkeys_conn1]").
+      iApply big_sepM_intro.
+      iModIntro.
+      iIntros (k p Hlookup) "(%sa' & %γ' & %ov & _ & _ & _ & _ & Hlin_hist & _)".
+      iFrame.
+    }
+    assert (Decision (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation), 
+      op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans)) 
+      as Hdecision.
+    {
+      do 2 (apply list_exist_dec; intros).
+      apply _.
+    }
+    assert (∀ k : Key, is_Some (m !! k) ↔ is_Some (mc !! k)) as His_some.
+    {
+      intros k; split; intros His_some.
+      all : rewrite -elem_of_dom.
+      all : rewrite -elem_of_dom in His_some.
+      all : set_solver.
+    }
+    assert (lin_trace_of (lt' ++ [(#tag1, (c, (#"CmLin", #b)))%V]) t') as Hlin_of_add.
+    {
+      apply (lin_trace_lin lt' (#tag1, (c, #"CmPre"))%V 
+        (#tag1, (c, (#"CmLin", #b)))%V tag1 c t'); try done;
+        rewrite /is_lin_event /is_cm_lin_event /is_pre_event /is_cm_pre_event;
+        set_solver.
+    }
+    iAssert (⌜valid_sequence (lt' ++ [(#tag1, (c, (#"CmLin", #b)))%V])⌝)%I as "%Hvalid_seq_add".
+    {
+      iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & Hact_eq & -> & 
+        %Hopen_start & Hrest)".
+      iPureIntro.
+      apply (valid_sequence_wr_rd_cm_lin _ _ tag1 c tail); try done; last by exists t'.
+      rewrite /is_cm_lin_event; set_solver.
+    }
+    iDestruct "Hinv_si_res'" as "(%mnames_si & Hghost_map_mnames_si & %m_gl & Hghost_map_m_gl & %His_some_keys &
+      Hown_exec & %Hrel_exec_m_gl & Hopen_trans)".
+    iDestruct (@ghost_map_lookup_big with "[$Hghost_map_m_gl][$Hkeys]") as "%Hsub_m_gl_m".
+    iAssert (|==>(((⌜b = false⌝ ∗ ghost_map_auth γm_gl 1 m_gl) ∨ 
+      (⌜b = true⌝ ∗ (∃ m_gl', ghost_map_auth γm_gl 1 m_gl' ∗ ⌜dom m_gl = dom m_gl'⌝ ∗
+        ⌜∀ k, mc !! k = None → m_gl' !! k = m_gl !! k⌝ ∗
+        ⌜∀ k y1 y2, m_gl !! k = Some y1 → mc !! k = Some y2 → m_gl' !! k = Some (aux_defs.commit_event y2 y1)⌝))) ∗ 
+      ((⌜b = false⌝  ∗ ([∗ map] k↦x ∈ m, ghost_map_elem γm_gl k (DfracOwn 1%Qp) x)) ∨ 
+      (⌜b = true⌝ ∗ ([∗ map] k↦y1;y2 ∈ m;mc, ghost_map_elem γm_gl k (DfracOwn 1%Qp) (aux_defs.commit_event y2 y1))))))%I 
+      with "[Hkeys Hghost_map_m_gl]" as ">(Hghost_map_m_gl & Hkeys)".
+    {
+      destruct b; last (iModIntro; iSplitL "Hghost_map_m_gl"; iLeft;  by iFrame).
+      iAssert (⌜dom m = dom mc⌝)%I as "#Hdom_mc"; first (iPureIntro; set_solver).
+      iClear "Hkeys_hist Hkeys_conn_lin_hist".
+      clear Hdom1 Hdom2 His_some Hsub_m_gl_m.
+      iRevert "Hdom_mc".
+      iInduction m as [|k x m Hlookup_k_m] "IH" using map_ind forall (mc).
+      - iIntros (Hdom_mc).
+        iModIntro.
+        rewrite dom_empty_L in Hdom_mc.
+        assert (mc = ∅) as ->; first by apply dom_empty_inv_L. 
+        iSplitL "Hghost_map_m_gl". 
+        + iRight.
+          iSplit; first done.
+          iExists m_gl; iFrame.
+          iSplit; first done.
+          iSplit; first (iPureIntro; set_solver).
+          iPureIntro; set_solver.
+        + iRight; iSplit; first done.
+          set_solver.
+      - iIntros (Hdom_mc).
+        rewrite {1} big_sepM_insert; last done.
+        iDestruct "Hkeys" as "(Hkey & Hkeys)".
+        destruct (mc !! k) as [(p1, p2)|] eqn:Hlookup_k_mc; last first.
+        {
+          apply not_elem_of_dom_2 in Hlookup_k_mc.
+          rewrite dom_insert_L in Hdom_mc.
+          set_solver.
+        }
+        assert (mc = <[k:=(p1, p2)]> (delete k mc)) as Hdel_mc_eq.
+        {
+          apply eq_sym.
+          by apply (insert_delete mc k (p1, p2)).
+        }
+        rewrite Hdel_mc_eq in Hdom_mc.
+        do 2 rewrite dom_insert_L in Hdom_mc.
+        iDestruct (@ghost_map_lookup with "[$Hghost_map_m_gl][$Hkey]") as "%Hlookup_m_gl".
+        iDestruct ("IH" $! (delete k mc) with "[$Hkeys][$Hghost_map_m_gl][]") as 
+          ">([(%Hfalse & _)|(_ & (%m_gl' & Hghost_map_m_gl' & %Hdom' & %Himp1 & %Himp2))] & Hkeys)".
+        {
+          iModIntro; iPureIntro.
+          apply not_elem_of_dom_2 in Hlookup_k_m.
+          destruct ((delete k mc) !! k) as [v|] eqn:Hlookup_del; 
+            first (rewrite lookup_delete in Hlookup_del; set_solver).
+          apply not_elem_of_dom_2 in Hlookup_del.
+          apply (union_cancel_l_L _ _ {[k]}); set_solver.
+        }
+        set_solver.
+        iDestruct "Hkeys" as "[(%Hfalse & _) | (_ & Hkeys)]"; first set_solver.
+        iMod (@ghost_map_update _ Key (list val) _ _ _ _ _ k x (aux_defs.commit_event (p1, p2) x) 
+          with "[$Hghost_map_m_gl'] [$Hkey]") as "(Hghost_map_m_gl' & Hkey)".
+        iModIntro.
+        iSplitR "Hkey Hkeys"; iRight; (iSplit; first done).
+        + iExists (<[k:=aux_defs.commit_event (p1, p2) x]> m_gl').
+          iFrame.
+          iPureIntro; split_and!.
+          * rewrite -(insert_id _ _ _ Hlookup_m_gl).
+            do 2 rewrite dom_insert_L.
+            set_solver.
+          * intros k' Hnone.
+            destruct (decide (k = k')) as [<-|Hneq]; first set_solver.
+            rewrite lookup_insert_ne; last done.
+            apply Himp1.
+            by rewrite lookup_delete_ne.
+          * intros k' x' (p1', p2') Hlookup_k'_m_gl Hlookup_k'_mc.
+            destruct (decide (k = k')) as [<-|Hneq].
+            -- rewrite lookup_insert.
+                rewrite Hlookup_m_gl in Hlookup_k'_m_gl.
+                rewrite Hlookup_k_mc in Hlookup_k'_mc.
+                set_solver.
+            -- rewrite lookup_insert_ne; last done. 
+                apply Himp2; try done.
+                by rewrite lookup_delete_ne.
+        + rewrite {2} Hdel_mc_eq.
+          rewrite big_sepM2_insert; try done; last apply lookup_delete.
+          iFrame.
+    }
+    rewrite /open_transactions_state.
+    rewrite {4} Heq_sa_clients.
+    rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
+    iDestruct "Hopen_trans" as "(Hopen_trans & Hopen_trans_rest)".
+    rewrite big_sepS_singleton.
+    iDestruct (@ghost_map_lookup with "[$Hghost_map_mnames_si][$Hsa_pointer_si']") as "%Hlookup_mnames_si".
+    iDestruct "Hopen_trans" as "[%Hfalse|(%c_sa & %m_conn_sa & %m_snap_sa & %γm_conn_sa & %γsnap_sa & %Hextract_c_sa 
+      & Hghost_map_m_conn_sa & Hghost_map_m_snap_sa & %Hopen_state)]"; first set_solver.
+    assert (c = c_sa) as <-; first set_solver.
+    iAssert (⌜∀ k, (k ∈ (KVS_keys ∖ (dom ms_conn_sub ∩ KVS_keys))) → m_conn !! k = None⌝)%I as "%Himp_m_conn_none".
+    {
+      iIntros (k Hk_in).
+      rewrite big_sepS_sep big_sepS_forall.
+      iDestruct "Hkeys_conn_unused" as "(%Hkeys_conn_unused & _)".
+      iPureIntro.
+      by apply Hkeys_conn_unused.
+    } 
+    assert (γsnap = γsnap_sa) as <-; first set_solver.
+    iAssert (⌜∀ k, (k ∈ (KVS_keys ∖ (dom ms_conn_sub ∩ KVS_keys))) → m_snap_sa !! k = Some false⌝)%I as "%Himp_m_snap_false".
+    {
+      iIntros (k Hk_in).
+      rewrite big_sepS_sep.
+      iDestruct "Hkeys_conn_unused" as "(_ & Hkey_conn_unused)".
+      rewrite (big_sepS_delete _ _ _ Hk_in).
+      iDestruct "Hkey_conn_unused" as "(Hkey & _)".
+      by iDestruct (@ghost_map_lookup with "[$Hghost_map_m_snap_sa][$Hkey]") as "%Hlookup_key".
+    }
+    iAssert (∀ k, ⌜k ∈ KVS_keys⌝ → ⌜k ∈ (dom mc)⌝ → ∀ (ov : option val), ⌜m' !! k = Some ov⌝ → ⌜latest_write c k ov T'⌝)%I as "%Hlatest_write".
+    {
+      iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & %Heq_act & %Hcap & _ & _ & %Himp)".
+      iPureIntro.
+      intros k Hk_in_keys Hk_in_mc.
+      assert (dom ms = domain) as <-; first set_solver.
+      rewrite -Hdom2 in Hk_in_mc.
+      assert (k ∈ sub_domain) as Hk_in_sub; first set_solver.
+      apply (Himp k Hk_in_sub).
+    }
+    iAssert (⌜∀ k ov, mc !! k = Some (ov, true) → ∃ trans, open_trans trans c T'⌝)%I as "%Hcm_writes_open".
+    {
+      iIntros (k ov Hlookup_mc).
+      iDestruct (big_sepM_lookup _ mc k (ov, true) with "[$Hkeys_conn1]") as 
+        "(%sa1 & %γ1 & %ov_last1 & #Hsa'_pointer1 & %Hextract1 & Hkey & %Hsa'_in1 & _ & Hkey_st)"; try done.
+      iDestruct (big_sepM_lookup _ mc k (ov, true) with "[$Hkeys_conn2]") as 
+        "(%sa2 & %γm_conn2 & %γsnap2 & %Hextract2 & #Hsa'_pointer2 & %Himp_true & Hkey2)"; try done. 
+      assert (sa1 = sa2) as <-; first set_solver.
+      assert (sa = sa1) as <-; first set_solver.
+      iDestruct (ghost_map_elem_agree sa γmname _ _ (γ, c) (γ1, c) with "[$Hsa_pointer][$Hsa'_pointer1]") as "%Heq_names".
+      assert (γ = γ1) as <-; first set_solver.
+      assert (k ∈ dom mc) as Hk_in_mc; first (eapply elem_of_dom_2; eauto).
+      assert (k ∈ KVS_keys) as Hk_in; first (apply Himp_true; by simpl).
+      iSpecialize ("Hkey" with "[//]").
+      iDestruct ("Hkey_st" with "[//]") as "(%γm_conn1 & %γsnap1 & #Hsa'_pointer11 & Hkey1)".
+      iDestruct ("Hkey2" with "[//]") as "Hkey2".
+      simpl.
+      iDestruct "Hkey2" as "[(_ & %ov' & Hkey2)|(%Hfalse & _)]"; last set_solver.
+      iDestruct "Hkey1" as "[(-> & Hkey1)|(%v' & (-> & %Heq_last) & Hkey1)]". 
+      {
+        iDestruct (ghost_map_elem_agree sa γsi_name _ _ (Some (γm_conn2, γsnap2, c)) (Some (γm_conn1, γsnap1, c)) 
+          with "[$Hsa'_pointer2][$Hsa'_pointer11]") as "%Heq_names'".
+        assert (γm_conn1 = γm_conn2) as <-; first set_solver.
+        iCombine "Hkey1" "Hkey2" as "Hfalse".
+        iDestruct (ghost_map_elem_valid with "Hfalse") as "%Hfalse".
+        by rewrite dfrac_valid_own in Hfalse.
+      }
+      iDestruct (@ghost_map_lookup with "[$Hmap_m][$Hkey]") as "%Hlookup_m'".
+      iPureIntro.
+      specialize (Hlatest_write k Hk_in Hk_in_mc (Some v') Hlookup_m').
+      destruct Hlatest_write as [(Hfalse & _)|(v & trans' & tag & Heq_some & Hopen' & Hwr_in & Hrel)]; first set_solver.
+      eauto.
+    }
+    iAssert (⌜∀ trans, (open_trans trans c T') → ∀ k, (∃ v, mc !! k = Some (Some v, true) ∧ latest_write_trans k v trans) ∨ 
+      ¬ (∃ v, mc !! k = Some (Some v, true)) ∧ ¬ (∃ sig v, Wr sig k v ∈ trans)⌝)%I as "%Hcm_writes".
+    {
+      iIntros (trans Hopen k).
+      specialize (Hopen_state trans Hopen).
+      destruct Hopen_state as (Hopen_state1 & Hopen_state2 & Hopen_state3).
+      destruct (mc !! k) as [(p1, p2)|] eqn:Heq; last first.
+      {
+        iRight.
+        iSplit; first (iPureIntro; set_solver).
+        iPureIntro.
+        intros (sig & v & Hin).
+        specialize (Hopen_state3 sig k v Hin).
+        apply not_elem_of_dom_2 in Heq.
+        assert (dom mc = dom ms_conn_sub) as Heq_doms; first set_solver.
+        rewrite Heq_doms in Heq.
+        assert (k ∈ KVS_keys) as Hk_in; first (by apply (Hopen_state1 sig k None v); right).
+        assert (k ∈ KVS_keys ∖ (dom ms_conn_sub ∩ KVS_keys)) as Hk_in'; first set_solver.
+        specialize (Himp_m_snap_false k Hk_in').
+        set_solver.
+      }
+      iDestruct (big_sepM_lookup _ mc k (p1, p2) with "[$Hkeys_conn1]") as 
+        "(%sa1 & %γ1 & %ov_last1 & #Hsa'_pointer1 & %Hextract1 & Hkey & %Hsa'_in1 & _ & Hkey_st)"; try done.
+      iDestruct (big_sepM_lookup _ mc k (p1, p2) with "[$Hkeys_conn2]") as 
+        "(%sa2 & %γm_conn2 & %γsnap2 & %Hextract2 & #Hsa'_pointer2 & %Himp_true & Hkey2)"; try done. 
+      assert (sa1 = sa2) as <-; first set_solver.
+      assert (sa = sa1) as <-; first set_solver.
+      iDestruct (ghost_map_elem_agree sa γmname _ _ (γ, c) (γ1, c) with "[$Hsa_pointer][$Hsa'_pointer1]") as "%Heq_names".
+      assert (γ = γ1) as <-; first set_solver.
+      assert (k ∈ dom mc) as Hk_in_mc; first (eapply elem_of_dom_2; eauto).
+      destruct p2.
+      - iLeft.
+        assert (k ∈ KVS_keys) as Hk_in; first (apply Himp_true; by simpl).
+        iSpecialize ("Hkey" with "[//]").
+        iDestruct ("Hkey_st" with "[//]") as "(%γm_conn1 & %γsnap1 & #Hsa'_pointer11 & Hkey1)".
+        iDestruct ("Hkey2" with "[//]") as "Hkey2".
+        simpl.
+        iDestruct "Hkey2" as "[(_ & %ov & Hkey2)|(%Hfalse & _)]"; last set_solver.
+        iDestruct "Hkey1" as "[(-> & Hkey1)|(%v' & (-> & %Heq_last) & Hkey1)]". 
+        {
+          iDestruct (ghost_map_elem_agree sa γsi_name _ _ (Some (γm_conn2, γsnap2, c)) (Some (γm_conn1, γsnap1, c)) 
+            with "[$Hsa'_pointer2][$Hsa'_pointer11]") as "%Heq_names'".
+          assert (γm_conn1 = γm_conn2) as <-; first set_solver.
+          iCombine "Hkey1" "Hkey2" as "Hfalse".
+          iDestruct (ghost_map_elem_valid with "Hfalse") as "%Hfalse".
+          by rewrite dfrac_valid_own in Hfalse.
+        }
+        iDestruct (@ghost_map_lookup with "[$Hmap_m][$Hkey]") as "%Hlookup_m'".
+        iPureIntro.
+        exists v'.
+        split; first set_solver.
+        specialize (Hlatest_write k Hk_in Hk_in_mc (Some v') Hlookup_m').
+        destruct Hlatest_write as [(Hfalse & _)|(v & trans' & tag & Heq_some & Hopen' & Hwr_in & Hrel)]; first set_solver.
+        assert (v = v') as <-; first set_solver.
+        exists (tag, c).
+        assert (trans = trans') as <-; first by apply (open_trans_eq trans trans' c T').
+        split; first done.
+        intros (s' & v' & (i & j & Hlt & Hlookup_i & Hlookup_j)).
+        destruct Hvalid_trans' as (Hvalid_trans' & _).
+        destruct Hopen as (op & Htrans_in & _).
+        destruct (Hvalid_trans' trans Htrans_in) as (_ & _ & Hvalid_transaction & _).
+        assert (rel_list trans (Wr s' k v') (Wr (tag, c) k v)) as (i' & j' & Hlt' & Hlookup_i' & Hlookup_j').
+        {
+          apply Hrel; first (apply elem_of_list_lookup; eauto).
+          exists s', v'.
+          split; first done.
+          intros Heq'.
+          rewrite Heq' in Hlookup_j.
+          assert (i = j) as ->; last lia.
+          by eapply Hvalid_transaction.
+        }
+        assert (i = j') as <-; first by eapply Hvalid_transaction.
+        assert (j = i') as <-; first by eapply Hvalid_transaction.
+        lia.
+      - iRight.
+        iSplit; first (iPureIntro; set_solver).
+        iIntros (Hwr).
+        destruct Hwr as (sig & v & Hwr_in).
+        assert (k ∈ KVS_keys) as Hk_in; first (eapply (Hopen_state1 sig k None v); set_solver).
+        iSpecialize ("Hkey" with "[//]").
+        iDestruct ("Hkey_st" with "[//]") as "(%γm_conn1 & %γsnap1 & #Hsa'_pointer11 & Hkey1)".
+        iDestruct ("Hkey2" with "[//]") as "Hkey2".
+        simpl.
+        iDestruct "Hkey2" as "[(%Hfalse & _)|(_ & Hkey2)]"; first set_solver.
+        iDestruct "Hkey1" as "[(-> & Hkey1)|(%v' & _ & Hkey1)]"; last first.
+        {
+          iDestruct (ghost_map_elem_agree sa γsi_name _ _ (Some (γm_conn2, γsnap2, c)) (Some (γm_conn1, γsnap1, c)) 
+            with "[$Hsa'_pointer2][$Hsa'_pointer11]") as "%Heq_names'".
+          assert (γsnap1 = γsnap2) as <-; first set_solver.
+          iCombine "Hkey1" "Hkey2" as "Hfalse".
+          iDestruct (ghost_map_elem_valid with "Hfalse") as "%Hfalse".
+          by rewrite dfrac_valid_own in Hfalse.
+        }
+        iDestruct (@ghost_map_lookup with "[$Hmap_m][$Hkey]") as "%Hlookup_m'".
+        iPureIntro.
+        specialize (Hlatest_write k Hk_in Hk_in_mc None Hlookup_m').
+        destruct Hlatest_write as [(_ & Himp)|Hfalse]; last set_solver.
+        specialize (Himp trans Hopen).
+        set_solver.
+    }
+    iAssert ([∗ map] k↦x ∈ mc, 
+      (∃ (sa : socket_address) (γ : gname) (ov_last_wr : option val), ghost_map_elem γmname sa DfracDiscarded (γ, c) ∗ 
+        ⌜extract c = Some #sa⌝ ∗ ⌜sa ∈ clients⌝ ∗ (⌜k ∈ KVS_keys⌝ → ghost_map_elem γ k (DfracOwn 1%Qp) ov_last_wr)) ∗
+      (∃ (sa : socket_address) (γ : gname) (ov_last_wr : option val), ghost_map_elem γmname sa DfracDiscarded (γ, c) ∗ 
+        ⌜extract c = Some #sa⌝ ∗ ⌜sa ∈ clients⌝ ∗ (⌜k ∈ KVS_keys⌝ → local_key_state γsi_name γl sa c k x.1 ov_last_wr))
+      )%I with "[Hkeys_conn1]" as "Hkeys_conn1".
+    {
+      iApply (big_sepM_wand with "[$Hkeys_conn1]").
+      iApply big_sepM_intro.
+      iModIntro.
+      iIntros (k p Hlookup) "(%sa' & %γ' & %ov_last_wr & #Hsa'_pointer & %Hsa'_extract & Hkey & %Hsa'_in & 
+        _ & Hkey_state)".
+      iSplitL "Hkey"; iExists sa', γ', ov_last_wr; iFrame "#%∗".
+    }
+    rewrite (big_sepM_sep _ _ mc).
+    iDestruct "Hkeys_conn1" as "(Hkeys_conn1 & Hkeys_conn1')".
+    iAssert (|==>(([∗ set] k ∈ KVS_keys, ∃ ov : option val, (ghost_map_elem γm_conn k (DfracOwn 1%Qp) ov ∨ ⌜m_conn !! k = None⌝) ∗ 
+      ghost_map_elem γsnap k (DfracOwn 1%Qp) false) ∗ ∃ (m_snap_sa' : gmap Key bool), ghost_map_auth γsnap 1 m_snap_sa' ∗
+      ⌜∀ k, m_snap_sa' !! k = Some true → m_snap_sa !! k = Some true⌝))%I
+      with "[Hkeys_conn1' Hkeys_conn_unused Hkeys_conn2 Hghost_map_m_snap_sa]" as ">(Hkeys_conn & %m_snap_sa' & Hghost_map_m_snap_sa' & %Hm_snap_sa_imp)".
+    {
+      iClear "Hkeys_conn_lin_hist".
+      assert (ms = ms_conn_sub) as <-; first set_solver.
+      rewrite Hdom2.
+      clear Hdom1 Hdom2 Hdom3 Hdom4 Hrel_exec_pre His_some_keys Hcm_writes_open
+        His_some Himp_m_conn_none Hopen_state Himp_m_snap_false Hcm_writes Hlatest_write.
+      iInduction (KVS_keys) as [|k dom_rest Hnin] "IH" using set_ind_L forall (mc m_snap_sa).
+      {
+        iSplitR; first set_solver.
+        iExists m_snap_sa; by iFrame.
+      }
+      rewrite big_sepS_union; last set_solver.
+      destruct (decide (k ∈ dom mc)) as [Hk_in | Hk_nin].
+      + apply lookup_lookup_total_dom in Hk_in.
+        do 2 (rewrite (big_sepM_delete _ mc k (mc !!! k)); last done).
+        iDestruct "Hkeys_conn1'" as "(Hkey_conn1 & Hkeys_conn1)".
+        iDestruct "Hkeys_conn2" as "(Hkey_conn2 & Hkeys_conn2)".
+        iDestruct "Hkey_conn1" as "(%sa' & %γ' & %ov_last & #Hsa'_pointer & %Hextract' & %Hsa'_in & Hkey1)".
+        iDestruct "Hkey_conn2" as "(%sa'' & %γm_conn' & %γsnap' & %Hextract'' & #Hsa''_pointer & %Himp_true & Hkey2)".
+        assert (sa = sa'') as <-; first set_solver.
+        iDestruct (ghost_map_elem_agree sa γsi_name _ _ (Some (γm_conn, γsnap, c)) (Some (γm_conn', γsnap', c)) 
+          with "[$Hsa_pointer_si'][$Hsa''_pointer]") as "%Heq_names".
+        assert (γm_conn' = γm_conn) as ->; first set_solver.
+        assert (γsnap' = γsnap) as ->; first set_solver.
+        iDestruct ("Hkey1" with "[]") as "(%γm_conn'' & %γsnap'' & #Hsa'_pointer' & Hkey1)"; first (iPureIntro; set_solver).
+        assert (sa = sa') as <-; first set_solver.
+        iDestruct (ghost_map_elem_agree sa γsi_name _ _ (Some (γm_conn, γsnap, c)) (Some (γm_conn'', γsnap'', c)) 
+          with "[$Hsa_pointer_si'][$Hsa'_pointer']") as "%Heq_names'".
+        assert (γm_conn'' = γm_conn) as ->; first set_solver.
+        assert (γsnap'' = γsnap) as ->; first set_solver.
+        iAssert (∃ (ov : option val) (b : bool), (ghost_map_elem γm_conn k (DfracOwn 1%Qp) ov ∨ ⌜m_conn !! k = None⌝) ∗ 
+          ghost_map_elem γsnap k (DfracOwn 1%Qp) b)%I with "[Hkey1 Hkey2]" as "(%ov & %b' & Hkey1 & Hkey2)".
+        {
+          iDestruct ("Hkey2" with "[]") as "[(_ & (%ov' & Hkey2))|(_ & Hkey2)]"; first (iPureIntro; set_solver).
+          - iExists ov'.
+            iDestruct "Hkey1" as "[(_ & Hkey1)|(%v' & _ & Hkey1)]".
+            + iCombine "Hkey1" "Hkey2" as "Hfalse".
+              iDestruct (ghost_map_elem_valid with "Hfalse") as "%Hfalse".
+              by rewrite dfrac_valid_own in Hfalse.
+            + iExists true; iFrame.
+          - iDestruct "Hkey1" as "[(_ & Hkey1)|(%v' & _ & Hkey1)]"; 
+              first (iExists ((mc !!! k).1), false; iFrame).
+            iCombine "Hkey1" "Hkey2" as "Hfalse".
+            iDestruct (ghost_map_elem_valid with "Hfalse") as "%Hfalse".
+            by rewrite dfrac_valid_own in Hfalse.
+        }
+        iMod (@ghost_map_update _ Key bool _ _ _ _ _ k b' false with "[$Hghost_map_m_snap_sa] [$Hkey2]") 
+          as "(Hghost_map_m_snap_sa & Hkey2)".
+        iMod ("IH" $! (delete k mc) with "[Hkeys_conn1][Hkeys_conn_unused][Hkeys_conn2][$Hghost_map_m_snap_sa]") 
+          as "(Hkeys & Hghost_map)".
+        * iApply (big_sepM_wand with "[$Hkeys_conn1]").
+          iApply big_sepM_intro.
+          iModIntro.
+          iIntros (k' p Hlookup') "(%sa' & %γ'' & %ov_last' & #Hsa'_pointer'' & %Hextract''' & %Hsa'_in' & Hkey1)".
+          iExists sa', γ'', ov_last'.
+          iFrame "%#".
+          iIntros (Hk'_in).
+          iApply "Hkey1"; iPureIntro; set_solver.
+        * assert (({[k]} ∪ dom_rest) ∖ (dom mc ∩ ({[k]} ∪ dom_rest)) = dom_rest ∖ (dom (delete k mc) ∩ dom_rest)) 
+          as <-; last iFrame.
+          apply insert_delete in Hk_in.
+          apply eq_sym in Hk_in.
+          rewrite {1} Hk_in.
+          rewrite {1} dom_insert_L.
+          set_solver.
+        * iApply (big_sepM_wand with "[$Hkeys_conn2]").
+          iApply big_sepM_intro.
+          iModIntro.
+          iIntros (k' p Hlookup') "(%sa' & %γm_conn' & %γsnap' & %Hextract''' & #Hsa''_pointer' & %Himp_true' & Hkey2)".
+          iExists sa', γm_conn', γsnap'.
+          iFrame "%#".
+          iSplit.
+          {
+            iPureIntro.
+            intros Htrue.
+            specialize (Himp_true' Htrue).
+            destruct (decide (k = k')) as [<-|]; last set_solver.
+            rewrite lookup_delete in Hlookup'.
+            set_solver.
+          }
+          iIntros (Hk'_in).
+          iApply "Hkey2"; iPureIntro; set_solver.
+        * iModIntro; iFrame.
+          rewrite big_sepS_singleton.
+          iSplitL "Hkey1 Hkey2"; first (iExists ov; iFrame).
+          iDestruct "Hghost_map" as "(%m_snap_sa' & Hghost_map & %Himp)".
+          iExists m_snap_sa'; iFrame.
+          iPureIntro; intros k' Hlookup.
+          specialize (Himp k' Hlookup).
+          destruct (decide (k = k')) as [<-|Hneq]; 
+            first by rewrite lookup_insert in Himp.
+          by rewrite lookup_insert_ne in Himp.
+      + assert ((dom_rest ∖ (dom mc ∩ dom_rest)) ∪ {[k]} = ({[k]} ∪ dom_rest) ∖ (dom mc ∩ ({[k]} ∪ dom_rest))) as <-; 
+          first set_solver.
+        rewrite big_sepS_union; last set_solver.
+        iDestruct "Hkeys_conn_unused" as "(Hkeys_conn_unused & Hkey_conn_unused)".
+        iMod ("IH" $! mc with "[Hkeys_conn1'][$Hkeys_conn_unused][Hkeys_conn2][$Hghost_map_m_snap_sa]") as "(Hkeys & Hghost_map)".
+        * iApply (big_sepM_wand with "[$Hkeys_conn1']").
+          iApply big_sepM_intro.
+          iModIntro.
+          iIntros (k' p Hlookup') "(%sa' & %γ' & %ov_last & #Hsa'_pointer & %Hextract' & %Hsa'_in & Hkey1)".
+          iExists sa', γ', ov_last.
+          iFrame "%#".
+          iIntros (Hk'_in).
+          iApply "Hkey1"; iPureIntro; set_solver.
+        * iApply (big_sepM_wand with "[$Hkeys_conn2]").
+          iApply big_sepM_intro.
+          iModIntro.
+          iIntros (k' p Hlookup') "(%sa' & %γm_conn' & %γsnap' & %Hextract'' & #Hsa''_pointer & %Himp_true & Hkey2)".
+          iExists sa', γm_conn', γsnap'.
+          iFrame "%#".
+          iSplit.
+          {
+            iPureIntro.
+            intros Htrue.
+            specialize (Himp_true Htrue).
+            destruct (decide (k = k')) as [<-|]; last set_solver.
+            apply elem_of_dom_2 in Hlookup'.
+            set_solver.
+          }
+          iIntros (Hk'_in).
+          iApply "Hkey2"; iPureIntro; set_solver.
+        * iModIntro.
+          iSplitL "Hkey_conn_unused Hkeys"; iFrame.
+          do 2 rewrite big_sepS_singleton.
+          iExists None.
+          iDestruct "Hkey_conn_unused" as "(%Hlookup & Hkey)".
+          iFrame.
+          iRight; done.
+    }
+    rewrite /OwnExec /OwnExecHist.
+    iDestruct (own_obs_prefix γexec 1 exec' exec_pre with "[$Hown_exec][$Hexec_hist]") as "%Hpre_exec".
+    destruct (decide (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation), 
+      op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans)) 
+        as [(trans & Htrans_in & Hop)|Hdec].
+    - destruct (elem_of_list_split _ _ Htrans_in) as (T1 & T2 & ->).
+      assert (open_trans trans c (T1 ++ trans :: T2)) as Hopen.
+      {
+        destruct Hop as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
+        exists op.
+        split_and!; try done.
+        rewrite /is_cm_op.
+        destruct op; set_solver.
+      }
+      specialize (Hcm_writes trans Hopen).
+      iAssert (⌜∀ s k ov, (Rd s k ov) ∈ trans →  ¬ (∃ s' v', rel_list trans (Wr s' k v') (Rd s k ov)) →
+        reads_from_last_state exec_pre k ov⌝)%I as "%Htrans_reads".
+      {
+        iIntros (s k ov Hread_in Hnot).
+        rewrite /reads_from_last_state.
+        assert (m_conn_sa !! k = (Some ov)) as Hlookup_mc_conn_sa; first by eapply Hopen_state.
+        destruct Hrel_exec_pre as ((st' & Hlast_st' & Hreads_st' & _) & Hsub').
+        iExists st'.
+        iSplit; first done.
+        assert (γm_conn = γm_conn_sa) as <-; first set_solver.
+        iDestruct (@ghost_map.ghost_map_auth_agree _ Key (option val) 
+          with "[$Hghost_map_m_conn][$Hghost_map_m_conn_sa]") as "<-".
+        assert (k ∈ KVS_keys) as Hk_in.
+        {
+          destruct (Hopen_state trans Hopen) as (Hopen_state' & _).
+          by apply (Hopen_state' s k ov c); left.
+        }
+        destruct (decide (k ∈ dom ms_conn_sub)) as [Hk_in_dom|Hk_in_dom]; last first.
+        {
+          assert (k ∈ (KVS_keys ∖ (dom ms_conn_sub ∩ KVS_keys))) as Hdom5; first set_solver.
+          exfalso.
+          set_solver.
+        }
+        destruct (Hdom4 k ov Hk_in Hk_in_dom Hlookup_mc_conn_sa) as (h & Hlookup_ms_conn_sub & Hlast_h).
+        iPureIntro.
+        assert (ms_conn !! k = Some h) as Hlookup_mc_conn; first by eapply lookup_weaken.
+        destruct (Hreads_st' k ov Hk_in) as (_ & Hreads_st'').
+        apply Hreads_st''.
+        eauto.
+      }
+      iAssert (⌜b = true → ∀ s k v, Wr s k v ∈ trans → ∃ h, ms_conn !! k = Some h ∧ m_gl !! k = Some h⌝)%I as "%Htrans_writes".
+      { 
+        iIntros (-> s k v Hwr_in).
+        assert (k ∈ KVS_keys) as Hk_in.
+        {
+          destruct (Hopen_state trans Hopen) as (Hopen_state' & _).
+          by apply (Hopen_state' s k None v); right.
+        }
+        destruct (Hcm_writes k) as [(v' & Hlookup_mc & _)|(_ & Hnot)]; 
+          last (exfalso; apply Hnot; eauto).
+        iAssert (⌜m !! k = ms !! k⌝)%I as "%Hlookup_eq".
+        {
+          iDestruct "Hkeys_disj" as "[(_ & %Hcan_commit & Hkeys_disj)|(%Hfalse & _)]"; last set_solver.
+          rewrite /aux_defs.can_commit in Hcan_commit.
+          iPureIntro.
+          apply bool_decide_unpack in Hcan_commit.
+          specialize (Hcan_commit k Hk_in).
+          rewrite Hlookup_mc in Hcan_commit.
+          by apply bool_decide_unpack in Hcan_commit.
+        }
+        assert (ms = ms_conn_sub) as Heq_ms_conn; first set_solver.
+        rewrite Heq_ms_conn in Hlookup_eq.
+        destruct (m !! k) as [h|] eqn:Hlookup_m; last first.
+        {
+          iPureIntro.
+          apply not_elem_of_dom_2 in Hlookup_m.
+          assert (k ∉ dom mc) as Hfalse; first set_solver.
+          apply not_elem_of_dom_1 in Hfalse.
+          set_solver.
+        }
+        iExists h.
+        assert (ms_conn !! k = Some h) as Hlookup_ms_conn; first (apply (lookup_weaken ms_conn_sub); set_solver).
+        iSplit; first done.
+        assert (m = <[k:=h]> (delete k m)) as Hdel_m_eq.
+        {
+          apply eq_sym.
+          by apply (insert_delete m k h).
+        }
+        iDestruct "Hkeys" as "[(%Hfalse & _) | (_ & Hkeys)]"; first set_solver.
+        iPureIntro.
+        by apply (lookup_weaken m).
+      }
+      destruct (optional_applied_transaction_exists exec' (trans ++ [Cm (tag1, c) b])) as (st & Happl).
+      iAssert (|==> ((⌜b = false⌝ ∗ own_log_auth γexec 1 exec') ∨ 
+        (⌜b = true⌝ ∗ own_log_auth γexec 1 (exec' ++ [(trans ++ [Cm (tag1, c) true], st)]))))%I 
+        with "[Hown_exec]" as ">Hown_exec".
+      {
+        destruct b.
+        - iMod (own_log_auth_update _ _ (exec' ++ [(trans ++ [Cm (tag1, c) true], st)]) with "[$Hown_exec]") 
+            as "Hown_exec"; first by apply prefix_app_r.
+          iModIntro; iRight.
+          by iFrame.
+        - iModIntro; iLeft.
+          by iFrame.
+      }
+      iMod ("Hclose'" with "[Hghost_map_m_gl Htr_is' HOwnLin' Hpost_res' Hlin_res' Htrace_res Hmap_mname
+        Hmap_m Hdisj_trace_res Hmap_mstate Hkeys_conn1 Hghost_map_mnames_si Hown_exec Hghost_map_m_snap_sa' 
+        Hghost_map_m_conn_sa Hopen_trans_rest]").
+      {
+        iModIntro.
+        iExists (T1 ++ (trans ++ [Cm (tag1, c) b]) :: T2), (optionalExtendExecution exec' (trans ++ [Cm (tag1, c) b]) st); iFrame.
+        iSplitL "Hghost_map_m_gl Hghost_map_mnames_si Hown_exec Hghost_map_m_snap_sa' Hghost_map_m_conn_sa Hopen_trans_rest".
+        {
+          iExists mnames_si; iFrame.
+          iAssert (open_transactions_state (T1 ++ (trans ++ [Cm (tag1, c) b]) :: T2) mnames_si extract clients)%I
+            with "[Hghost_map_m_snap_sa' Hghost_map_m_conn_sa Hopen_trans_rest]" as "Hopen_add".
+          {
+            rewrite /open_transactions_state.
+            rewrite {4} Heq_sa_clients.
+            rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
+            iSplitL "Hghost_map_m_snap_sa' Hghost_map_m_conn_sa".
+            - rewrite big_sepS_singleton.
+              iRight.
+              iExists c, m_conn_sa, m_snap_sa', γm_conn_sa, γsnap.
+              iSplit; first done.
+              iFrame.
+              iPureIntro.
+              intros trans' Hopen'.
+              exfalso.
+              destruct Hvalid_trans' as (_ & Hvalid_trans' & _).
+              destruct Hopen' as (op & Htrans'_in & Hlast' & Hconn' & Hcm').
+              destruct Hop as (op' & Hin'' & Hlast'' & Hconn'' & Hcm'').
+              assert ((T1 ++ trans :: T2) !! (length T1) = Some trans) as Hmiddle_lookup;
+                first by apply list_lookup_middle.
+              rewrite elem_of_list_lookup in Htrans'_in.
+              destruct (Htrans'_in) as (i & Htrans'_lookup).
+              rewrite lookup_app_Some in Htrans'_lookup.
+              destruct Htrans'_lookup as [Htrans'_lookup|(Hlt & Htrans'_lookup)].
+              + pose proof (lookup_lt_Some _ _ _ Htrans'_lookup) as Hlt.
+                assert (i = length T1) as Heq; last lia.
+                eapply (Hvalid_trans' trans' trans op op' i (length T1)); try done.
+                * rewrite lookup_app_Some; by left.
+                * rewrite /is_cm_op; destruct op'; simpl in Hcm''; set_solver.
+              + rewrite lookup_cons_Some in Htrans'_lookup.
+                destruct Htrans'_lookup as [(_ & <-) | (Hlt' & Htrans'_lookup)].
+                * rewrite last_snoc in Hlast'.
+                  assert (op = Cm (tag1, c) b) as ->; first set_solver.
+                  rewrite /is_cm_op in Hcm'.
+                  set_solver.
+                * assert (i = length T1) as Heq; last lia.
+                  eapply (Hvalid_trans' trans' trans op op' i (length T1)); try done.
+                  -- rewrite lookup_app_Some; right.
+                     rewrite lookup_cons_Some.
+                     set_solver.
+                  -- rewrite /is_cm_op; destruct op'; simpl in Hcm''; set_solver.
+            - iApply (big_sepS_wand with "Hopen_trans_rest").
+              iApply big_sepS_intro.
+              iModIntro.
+              iIntros (sa' Hsa_in) "Hopen".
+              destruct (mnames_si !! sa') as [opt|]; 
+                last (iDestruct "Hopen" as "[%Hopen'|(%c' & %m_conn' & %m_snap & %γ_conn & %γsnap' & %Hfalse & _)]"; set_solver).
+              destruct opt as [opt|]; last set_solver.
+              iRight.
+              iDestruct "Hopen" as "[%Hfalse|(%c' & %m_conn' & %m_snap & %γ_conn & %γsnap' & %Hextract' & Hghost_map & Hghost_map' & %Hreads)]"; 
+                first set_solver.
+              iExists c', m_conn', m_snap, γ_conn, γsnap'.
+              iFrame "%∗".
+              iPureIntro.
+              intros trans' (op & Htrans'_in & Hopen').
+              specialize (Hreads trans').
+              rewrite elem_of_app in Htrans'_in.
+              destruct Htrans'_in as [Htrans'_in|Htrans'_in].
+              + apply Hreads.
+                rewrite /open_trans.
+                exists op; set_solver. 
+              + rewrite elem_of_cons in Htrans'_in.
+                destruct Htrans'_in as [Htrans'_in|Htrans'_in].
+                * exfalso. 
+                  subst.
+                  rewrite last_snoc /is_cm_op in Hopen'.
+                  set_solver.
+                * apply Hreads.
+                  rewrite /open_trans.
+                  exists op; set_solver.
+          }
+          iDestruct "Hghost_map_m_gl" as "[(-> & Hghost_map_m_gl) | (-> & (%m_gl' & Hghost_map_m_gl & %Hdom5 &
+            (%Hm_gl'_reads_none & %Hm_gl'reads_some)))]".
+          - iExists m_gl; iFrame "%∗".
+            rewrite /optionalExtendExecution last_snoc /OwnExec.
+            iDestruct "Hown_exec" as "[(_ & Hown_exec)|(%Hfalse & _)]"; last set_solver.
+            iFrame "∗%".
+          - iExists m_gl'; iFrame "%∗".
+            assert (∀ k, k ∈ KVS_keys → is_Some (m_gl' !! k)) as His_some_keys'.
+            {
+              intros k Hk_in.
+              specialize (His_some_keys k Hk_in).
+              rewrite -elem_of_dom.
+              rewrite -elem_of_dom in His_some_keys.
+              set_solver.
+            }
+            iFrame "%".
+            rewrite /optionalExtendExecution last_snoc /OwnExec.
+            iDestruct "Hown_exec" as "[(%Hfalse & _)|(_ & Hown_exec)]"; first set_solver.
+            iFrame.
+            iPureIntro.
+            apply (rel_exec_map_cm_imp exec' trans (tag1, c) st m_gl m_gl' mc); try done.
+        }
+        iExists t', (lt' ++ [(#tag1, (c, (#"CmLin", #b)))%V]).
+        iFrame.
+        iSplit; first done.
+        iSplit; first (iPureIntro; by apply trans_add_non_empty).
+        iSplit; first (iPureIntro; by apply extraction_of_add2).
+        iSplit.
+        - iPureIntro.
+          apply (valid_transactions_add2 _ _ tag1 _ _ c); try done.
+          + by eapply extraction_of_not_in.
+          + by apply (extraction_of_not_tag trans lt' tag1 (T1 ++ trans :: T2)).
+          + destruct Hop as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
+            exists op.
+            split_and!; try done.
+            intros (s' & b' & ->).
+            set_solver.
+        - iSplit; first done.
+          iSplit; first (iPureIntro; apply based_on_add4; set_solver).
+          iSplit.
+          + iPureIntro.
+            rewrite /optionalExtendExecution last_snoc.
+            destruct b; last done.
+            eapply (valid_execution_si_imp exec_pre ms_conn exec'); try done.
+            * set_solver.
+            * set_solver.
+            * intros Hfalse.
+              apply Hnot_lin_in.
+              exists (toLinEvent (Cm (tag1, c) true)).
+              simpl.
+              destruct Hex' as (_ & Hex' & _).
+              split; last done.
+              apply (Hex' (trans ++ [Cm (tag1, c) true]) (Cm (tag1, c) true)); last set_solver.
+              by apply com_trans_imp2.
+          + iAssert (∃ (mc' : gmap Key (option val)), ⌜dom mc' = dom mc⌝ ∗ 
+              ([∗ map] k↦x ∈ mc', ∃ (sa : socket_address) γ, ghost_map_elem γmname sa DfracDiscarded (γ,c) ∗ 
+                ⌜extract c = Some #sa⌝ ∗ (⌜k ∈ KVS_keys⌝ → ghost_map_elem γ k (DfracOwn 1%Qp) x) ∗ ⌜sa ∈ clients⌝))%I 
+              with "[Hkeys_conn1]" as "(%mc' & %Hdom5 & Hkeys_conn1)".
+            {
+              iClear "Hkeys_conn_lin_hist".
+              clear His_some Hdom2 Hcm_writes Hcm_writes Hcm_writes_open Hlatest_write.
+              iInduction mc as [|k x mc Hlookup_k_mc] "IH" using map_ind. 
+              - iExists ∅.
+                iSplit; last set_solver.
+                iPureIntro; set_solver.
+              - rewrite big_sepM_insert_delete.
+                iDestruct "Hkeys_conn1" as "((%sa' & %γ' & %ov_last & #Hsa'_pointer & %Hextract' & 
+                  %Hsa'_in & Hkey) & Hkeys_conn1)".
+                rewrite (delete_notin mc); last done.
+                iDestruct ("IH" with "[$Hkeys_conn1]") as "(%mc' & %Hdom_mc' & Hkeys_conn1)".
+                iExists (<[k:=ov_last]> mc').
+                iSplit; first (iPureIntro; set_solver).
+                rewrite big_sepM_insert.
+                + iFrame.
+                  iExists sa', γ'.
+                  iFrame "#%∗".
+                + apply not_elem_of_dom_1. 
+                  apply not_elem_of_dom_2 in Hlookup_k_mc.
+                  set_solver.
+            }
+            iApply (trace_state_resources_commit_lin2 clients c tag1 lt' T1 T2 trans sa 
+              (dom ms) γ γmstate γmname extract b mc' mstate mname m' with 
+              "[//][][//][//][//][//][//][//][][$Hkeys_conn1][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
+              [$Hmap_m][$Hdisj_trace_res][$Htrace_res]").
+            * iPureIntro; set_solver.
+            * iPureIntro.
+              destruct Hinit as (e & Hin'' & Hconn'' & Hevent'').
+              exists e.
+              split_and!; try done.
+              apply elem_of_app; eauto.
+      }
+      iMod ("Hshift" with "[Hghost_map_m_conn Hkeys Hkeys_conn Hconn_state Hstate_pr Hkeys_disj]").
+      {
+        iFrame.
+        iSplitR "Hkeys_disj Hkeys".
+        - iExists γm_conn, γsnap, m_conn.
+          iFrame "∗#".
+          iLeft.
+          iSplit; first done.
+          iFrame.
+        - iDestruct "Hkeys_disj" as "[(-> & %Hcan_com & Hkeys_disj)| (-> & %Hcan_com & Hkeys_disj)]".
+          + iLeft.
+            do 2 (iSplit; first done).
+            do 4 rewrite big_sepM2_sep.
+            iDestruct "Hkeys_disj" as "(Hkeys_disj & Hkeys_seen)"; iFrame.
+            iDestruct "Hkeys" as "[(%Hfalse & _) | (_ & Hkeys)]"; first set_solver.
+            iFrame.
+            iDestruct (big_sepM2_sepM_2 with "[$Hkeys_hist][$Hkeys_conn_lin_hist]") as "Hkeys_hist_cm"; first done.
+            iApply (big_sepM2_wand with "[$Hkeys_hist_cm]").
+            iApply big_sepM2_intro.
+            {
+              intros k; split; intros His_some'.
+              all : rewrite -elem_of_dom.
+              all : rewrite -elem_of_dom in His_some'.
+              all : set_solver.
+            }
+            iModIntro.
+            iIntros (k h (p1, p2) Hlookup_m Hlookup_mc) "(Hhist_h & Hhist_cm)".
+            iIntros (v Hcm_event).
+            destruct p2; destruct p1 as [v'|]; simpl in Hcm_event.
+            2, 3, 4 : by iApply ("Hhist_h" $! v).
+            rewrite elem_of_app in Hcm_event.
+            destruct Hcm_event as [Hcm_event|Hcm_event]; first by iApply ("Hhist_h" $! v).
+            iApply ("Hhist_cm" $! v).
+            iPureIntro; set_solver.
+          + iRight.
+            do 2 (iSplit; first done).
+            do 4 rewrite big_sepM_sep.
+            iDestruct "Hkeys_disj" as "(Hkeys_disj & Hkeys_seen)"; iFrame "∗#".
+            iDestruct "Hkeys" as "[(_ & Hkeys) | (%Hfalse & _)]"; first iFrame.
+            set_solver.
+      }
+      iModIntro.
+      rewrite /commit_post_emit_event.
+      wp_pures.
+      wp_bind (Emit _).
+      iInv "HinvExt" as ">[%T'' [%exec'' (Hinv_si_res'' & [%t'' [%lt'' 
+        (Htr_is'' & HOwnLin'' & %HlinOf'' & %Hno_empty'' & %Hex'' & %Hvalid_trans'' & 
+        %Hvalid_seq'' & %Hbased'' & %Hvalid_exec'' & HstateRes'' & Hlin_res'' & Hpost_res'')]])]]" "Hclose''".
+      iDestruct (own_lin_prefix with "[$HOwnLin'' $HOwnLinHist']") 
+        as "(HOwnLin'' & HOwnLinHist & %Hprefix')".
+      assert ((#tag1, (c, (#"CmLin", #b)))%V ∈ lt'') as HstLinIn.
+      {
+        apply (elem_of_prefix (lt' ++ [(#tag1, (c, (#"CmLin", #b)))%V])); last done.
+        set_solver.
+      }
+      wp_apply (aneris_wp_emit with "[$Htr_inv $Htr_is'']").
+      {
+        rewrite Hkvs_inv_name.
+        solve_ndisj.
+      }
+      {
+        eapply valid_trace_post; 
+        rewrite /is_post_event /is_cm_post_event;
+        set_solver.
+      }
+      iIntros "Htr_is''".
+      iDestruct (lin_tag_add_post lt'' t'' γmlin (#tag1, (c, (#"CmPost", #b)))%V with "[$Hlin_res'']") as "Hlin_res''".
+      iDestruct (post_tag_add t'' γmpost (#tag1, (c, (#"CmPost", #b)))%V tag1 with "[$Hpost_res'' $Hpost_tag_res]")
+      as "Hpost_res''".
+      {
+        simpl.
+        iSplitL; first by iPureIntro.
+        iPureIntro.
+        rewrite /is_post_event /is_cm_post_event.
+        set_solver.
+      }
+      iMod ("Hclose''" with "[Hinv_si_res'' Htr_is'' HOwnLin'' HstateRes'' Hlin_res'' Hpost_res'']").
+      {
+        iModIntro.
+        iExists T'', exec''.
+        iFrame.
+        iExists (t'' ++ [(#tag1, (c, (#"CmPost", #b)))%V]), lt''.
+        iFrame.
+        iSplitR; last set_solver.
+        iPureIntro.
+        apply (lin_trace_valid tag1); try done.
+        rewrite /is_post_event /is_cm_post_event.
+        set_solver.
+      }
+      iModIntro.
+      by wp_pures.
+    - destruct (optional_applied_transaction_exists exec' [Cm (tag1, c) b]) as (st & Happl).
+      iAssert (|==> ((⌜b = false⌝ ∗ own_log_auth γexec 1 exec') ∨ 
+        (⌜b = true⌝ ∗ own_log_auth γexec 1 (exec' ++ [([Cm (tag1, c) b], st)]))))%I 
+        with "[Hown_exec]" as ">Hown_exec".
+      {
+        destruct b.
+        - iMod (own_log_auth_update _ _ (exec' ++ [([Cm (tag1, c) true], st)]) with "[$Hown_exec]") 
+            as "Hown_exec"; first by apply prefix_app_r.
+          iModIntro; iRight.
+          by iFrame.
+        - iModIntro; iLeft.
+          by iFrame.
+      }
+      iMod ("Hclose'" with "[Hghost_map_m_gl Htr_is' HOwnLin' Hpost_res' Hlin_res' Htrace_res Hmap_mname
+        Hmap_m Hdisj_trace_res Hmap_mstate Hkeys_conn1 Hghost_map_mnames_si Hown_exec Hghost_map_m_snap_sa' 
+        Hghost_map_m_conn_sa Hopen_trans_rest]").
+      {
+        iModIntro.
+        iExists (T' ++ [[Cm (tag1, c) b]]), (optionalExtendExecution exec' [Cm (tag1, c) b] st).
+        iSplitL "Hghost_map_m_gl Hghost_map_mnames_si Hown_exec Hghost_map_m_snap_sa' Hghost_map_m_conn_sa Hopen_trans_rest".
+        {
+          iExists mnames_si; iFrame.
+          iAssert (open_transactions_state (T' ++ [[Cm (tag1, c) b]]) mnames_si extract clients)%I
+            with "[Hghost_map_m_snap_sa' Hghost_map_m_conn_sa Hopen_trans_rest]" as "Hopen_add".
+          {
+            rewrite /open_transactions_state.
+            rewrite {4} Heq_sa_clients.
+            rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
+            iSplitL "Hghost_map_m_snap_sa' Hghost_map_m_conn_sa".
+            - rewrite big_sepS_singleton.
+              iRight.
+              iExists c, m_conn_sa, m_snap_sa', γm_conn_sa, γsnap.
+              iSplit; first done.
+              iFrame.
+              iPureIntro.
+              intros trans' Hopen'.
+              exfalso.
+              apply Hdec.
+              destruct Hopen' as (op & Htrans'_in & Hlast & Hconn & Hcm).
+              rewrite elem_of_app in Htrans'_in.
+              destruct Htrans'_in as [Htrans'_in|Htrans'_in].
+              + exists trans'.
+                split; first done.
+                exists op.
+                rewrite /is_cm_op in Hcm.
+                split_and!; try done.
+                * by apply last_Some_elem_of.
+                * destruct op; simpl; try done. 
+                  exfalso.
+                  apply Hcm.
+                  eauto.
+              + exfalso.
+                apply Hcm.
+                assert (trans' = [Cm (tag1, c) b]) as ->; first set_solver.
+                simpl in Hlast.
+                assert (op = Cm (tag1, c) b) as ->; first set_solver.
+                rewrite /is_cm_op; eauto.
+            - iApply (big_sepS_wand with "Hopen_trans_rest").
+              iApply big_sepS_intro.
+              iModIntro.
+              iIntros (sa' Hsa_in) "Hopen".
+              destruct (mnames_si !! sa') as [opt|]; 
+                last (iDestruct "Hopen" as "[%Hopen'|(%c' & %m_conn' & %m_snap & %γ_conn & %γsnap' & %Hfalse & _)]"; set_solver).
+              destruct opt as [opt|]; last set_solver.
+              iRight.
+              iDestruct "Hopen" as "[%Hfalse|(%c' & %m_conn' & %m_snap & %γ_conn & %γsnap' & %Hextract' & Hghost_map & Hghost_map' & %Hreads)]"; 
+                first set_solver.
+              iExists c', m_conn', m_snap, γ_conn, γsnap'.
+              iFrame "%∗".
+              iPureIntro.
+              intros trans' (op & Htrans'_in & Hopen').
+              specialize (Hreads trans').
+              rewrite elem_of_app in Htrans'_in.
+              destruct Htrans'_in as [Htrans'_in|Htrans'_in].
+              + apply Hreads.
+                rewrite /open_trans.
+                exists op; set_solver. 
+              + rewrite elem_of_cons in Htrans'_in.
+                destruct Htrans'_in as [Htrans'_in|Htrans'_in].
+                * exfalso.
+                  subst.
+                  simpl in Hopen'.
+                  rewrite /is_cm_op in Hopen'.
+                  set_solver.
+                * apply Hreads.
+                  rewrite /open_trans.
+                  exists op; set_solver.
+          }
+          iDestruct "Hghost_map_m_gl" as "[(-> & Hghost_map_m_gl) | (-> & (%m_gl' & Hghost_map_m_gl & %Hdom5 &
+            (%Hm_gl'_reads_none & %Hm_gl'reads_some)))]".
+          - iExists m_gl; iFrame "%∗".
+            rewrite /optionalExtendExecution /OwnExec.
+            simpl.
+            iDestruct "Hown_exec" as "[(_ & Hown_exec)|(%Hfalse & _)]"; last set_solver.
+            iFrame.
+          - iExists m_gl'; iFrame "%∗".
+            assert (∀ k, k ∈ KVS_keys → is_Some (m_gl' !! k)) as His_some_keys'.
+            {
+              intros k Hk_in.
+              specialize (His_some_keys k Hk_in).
+              rewrite -elem_of_dom.
+              rewrite -elem_of_dom in His_some_keys.
+              set_solver.
+            }
+            iFrame "%".
+            rewrite /optionalExtendExecution /OwnExec.
+            simpl.
+            iDestruct "Hown_exec" as "[(%Hfalse & _)|(_ & Hown_exec)]"; first set_solver.
+            iFrame.
+            iPureIntro.
+            apply (rel_exec_map_cm_imp exec' [] (tag1, c) st m_gl m_gl' mc); try done.
+            intros k.
+            destruct (mc !! k) as [(p1,p2)|] eqn:Hlookup; last (right; set_solver).
+            destruct p2; last (right; set_solver).
+            exfalso.
+            destruct (Hcm_writes_open k p1 Hlookup) as (trans & (op & Htrans'_in & Hlast & Hconn & Hcm)).
+            apply Hdec.
+            exists trans.
+            split; first done.
+            exists op.
+            split_and!; try done.
+            + by apply last_Some_elem_of in Hlast.
+            + rewrite /is_cm_op in Hcm.
+              destruct op; simpl; try done.
+              exfalso.
+              apply Hcm.
+              set_solver.
+        }
+        iExists t', (lt' ++ [(#tag1, (c, (#"CmLin", #b)))%V]).
+        iFrame.
+        iSplit; first done. 
+        iSplit; first (iPureIntro; set_solver).
+        iSplit; first (iPureIntro; by apply extraction_of_add1).
+        iSplit.
+        - iPureIntro.
+          apply (valid_transactions_add1 T' (Cm (tag1, c) b) c); try done.
+          + by eapply extraction_of_not_in.
+          + apply valid_transaction_singleton.
+          + intros (t'' & Ht''_in & (op & Hop_in & Hop_last & Hop_conn & Hop_cm)).
+            apply Hdec.
+            exists t''.
+            split; first done.
+            exists op.
+            split_and!; try done.
+            rewrite /is_cm_op in Hop_cm.
+            destruct op; try done.
+            exfalso.
+            eauto.
+         - iSplit; first done.
+           iSplit; first (iPureIntro; apply based_on_add3; set_solver).
+           iSplit.
+           + iPureIntro.
+             destruct b; last done.
+             assert ([Cm (tag1, c) true] = [] ++ [Cm (tag1, c) true]) as ->; first set_solver.
+             eapply (valid_execution_si_imp exec_pre ms_conn exec'); try done.
+             * set_solver.
+             * set_solver.
+             * intros Hfalse.
+               apply Hnot_lin_in.
+               exists (toLinEvent (Cm (tag1, c) true)).
+               simpl.
+               destruct Hex' as (_ & Hex' & _).
+               split; last done.
+               apply (Hex' [Cm (tag1, c) true] (Cm (tag1, c) true)); last set_solver.
+               by apply com_trans_imp2.
+             * set_solver.
+          + iAssert (∃ (mc' : gmap Key (option val)), ⌜dom mc' = dom mc⌝ ∗ 
+              ([∗ map] k↦x ∈ mc', ∃ (sa : socket_address) γ, ghost_map_elem γmname sa DfracDiscarded (γ,c) ∗ 
+                ⌜extract c = Some #sa⌝ ∗ (⌜k ∈ KVS_keys⌝ → ghost_map_elem γ k (DfracOwn 1%Qp) x) ∗ ⌜sa ∈ clients⌝))%I 
+              with "[Hkeys_conn1]" as "(%mc' & %Hdom5 & Hkeys_conn1)".
+            {
+              iClear "Hkeys_conn_lin_hist".
+              clear His_some Hdom2 Hcm_writes Hcm_writes Hcm_writes_open Hlatest_write.
+              iInduction mc as [|k x mc Hlookup_k_mc] "IH" using map_ind. 
+              - iExists ∅.
+                iSplit; last set_solver.
+                iPureIntro; set_solver.
+              - rewrite big_sepM_insert_delete.
+                iDestruct "Hkeys_conn1" as "((%sa' & %γ' & %ov_last & #Hsa'_pointer & %Hextract' & 
+                  %Hsa'_in & Hkey) & Hkeys_conn1)".
+                rewrite (delete_notin mc); last done.
+                iDestruct ("IH" with "[$Hkeys_conn1]") as "(%mc' & %Hdom_mc' & Hkeys_conn1)".
+                iExists (<[k:=ov_last]> mc').
+                iSplit; first (iPureIntro; set_solver).
+                rewrite big_sepM_insert.
+                + iFrame.
+                  iExists sa', γ'.
+                  iFrame "#%∗".
+                + apply not_elem_of_dom_1. 
+                  apply not_elem_of_dom_2 in Hlookup_k_mc.
+                  set_solver.
+            }
+            iApply (trace_state_resources_commit_lin1 clients c tag1 lt' T' sa 
+              (dom ms) γ γmstate γmname extract b mc' mstate mname m' with 
+               "[//][][//][//][//][//][//][][$Hkeys_conn1][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
+              [$Hmap_m][$Hdisj_trace_res][$Htrace_res]").
+            * iPureIntro; set_solver.
+            * iPureIntro.
+              destruct Hinit as (e & Hin'' & Hconn'' & Hevent'').
+              exists e.
+              split_and!; try done.
+              apply elem_of_app; eauto.
+      }
+      iMod ("Hshift" with "[Hghost_map_m_conn Hkeys Hkeys_conn Hconn_state Hstate_pr Hkeys_disj]").
+      {
+        iFrame.
+        iSplitR "Hkeys_disj Hkeys".
+        - iExists γm_conn, γsnap, m_conn.
+          iFrame "∗#".
+          iLeft.
+          iSplit; first done.
+          iFrame.
+        - iDestruct "Hkeys_disj" as "[(-> & %Hcan_com & Hkeys_disj)| (-> & %Hcan_com & Hkeys_disj)]".
+          + iLeft.
+            do 2 (iSplit; first done).
+            do 4 rewrite big_sepM2_sep.
+            iDestruct "Hkeys_disj" as "(Hkeys_disj & Hkeys_seen)"; iFrame.
+            iDestruct "Hkeys" as "[(%Hfalse & _) | (_ & Hkeys)]"; first set_solver.
+            iFrame.
+            iDestruct (big_sepM2_sepM_2 with "[$Hkeys_hist][$Hkeys_conn_lin_hist]") as "Hkeys_hist_cm"; first done.
+            iApply (big_sepM2_wand with "[$Hkeys_hist_cm]").
+            iApply big_sepM2_intro.
+            {
+              intros k; split; intros His_some'.
+              all : rewrite -elem_of_dom.
+              all : rewrite -elem_of_dom in His_some'.
+              all : set_solver.
+            }
+            iModIntro.
+            iIntros (k h (p1, p2) Hlookup_m Hlookup_mc) "(Hhist_h & Hhist_cm)".
+            iIntros (v Hcm_event).
+            destruct p2; destruct p1 as [v'|]; simpl in Hcm_event.
+            2, 3, 4 : by iApply ("Hhist_h" $! v).
+            rewrite elem_of_app in Hcm_event.
+            destruct Hcm_event as [Hcm_event|Hcm_event]; first by iApply ("Hhist_h" $! v).
+            iApply ("Hhist_cm" $! v).
+            iPureIntro; set_solver.
+          + iRight.
+            do 2 (iSplit; first done).
+            do 4 rewrite big_sepM_sep.
+            iDestruct "Hkeys_disj" as "(Hkeys_disj & Hkeys_seen)"; iFrame "∗#".
+            iDestruct "Hkeys" as "[(_ & Hkeys) | (%Hfalse & _)]"; first iFrame.
+            set_solver.
+      }
+      iModIntro.
+      rewrite /commit_post_emit_event.
+      wp_pures.
+      wp_bind (Emit _).
+      iInv "HinvExt" as ">[%T'' [%exec'' (Hinv_si_res'' & [%t'' [%lt'' 
+        (Htr_is'' & HOwnLin'' & %HlinOf'' & %Hno_empty'' & %Hex'' & %Hvalid_trans'' & 
+        %Hvalid_seq'' & %Hbased'' & %Hvalid_exec'' & HstateRes'' & Hlin_res'' & Hpost_res'')]])]]" "Hclose''".
+      iDestruct (own_lin_prefix with "[$HOwnLin'' $HOwnLinHist']") 
+        as "(HOwnLin'' & HOwnLinHist & %Hprefix')".
+      assert ((#tag1, (c, (#"CmLin", #b)))%V ∈ lt'') as HstLinIn.
+      {
+        apply (elem_of_prefix (lt' ++ [(#tag1, (c, (#"CmLin", #b)))%V])); last done.
+        set_solver.
+      }
+      wp_apply (aneris_wp_emit with "[$Htr_inv $Htr_is'']").
+      {
+        rewrite Hkvs_inv_name.
+        solve_ndisj.
+      }
+      {
+        eapply valid_trace_post; 
+        rewrite /is_post_event /is_cm_post_event;
+        set_solver.
+      }
+      iIntros "Htr_is''".
+      iDestruct (lin_tag_add_post lt'' t'' γmlin (#tag1, (c, (#"CmPost", #b)))%V with "[$Hlin_res'']") as "Hlin_res''".
+      iDestruct (post_tag_add t'' γmpost (#tag1, (c, (#"CmPost", #b)))%V tag1 with "[$Hpost_res'' $Hpost_tag_res]")
+      as "Hpost_res''".
+      {
+        simpl.
+        iSplitL; first by iPureIntro.
+        iPureIntro.
+        rewrite /is_post_event /is_cm_post_event.
+        set_solver.
+      }
+      iMod ("Hclose''" with "[Hinv_si_res'' Htr_is'' HOwnLin'' HstateRes'' Hlin_res'' Hpost_res'']").
+      {
+        iModIntro.
+        iExists T'', exec''.
+        iFrame.
+        iExists (t'' ++ [(#tag1, (c, (#"CmPost", #b)))%V]), lt''.
+        iFrame.
+        iSplitR; last set_solver.
+        iPureIntro.
+        apply (lin_trace_valid tag1); try done.
+        rewrite /is_post_event /is_cm_post_event.
+        set_solver.
+      }
+      iModIntro.
+      by wp_pures.
+      Unshelve.
+      all : apply _.
+  Qed.
+
+  Lemma read_implication γmstate γmlin γmpost γmname γl γm_gl γexec γsi_name clients (res : SI_resources Mdl Σ) 
+  (lib : KVS_transaction_api) : 
+    ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
+    trace_inv trace_inv_name valid_trace_si -∗
+    inv KVS_InvName (∃ T exec, GlobalInvExtSI γm_gl γexec γsi_name T exec extract clients ∗ 
+                     GlobalInvExt commit_test_si T extract γmstate γmlin γmpost γmname γl clients exec) -∗
+    @read_spec _ _ _ _ lib res -∗
+    @read_spec _ _ _ _ (KVS_wrapped_api lib) (wrapped_resources γmstate γmlin γmpost γmname γl γm_gl γexec γsi_name clients res).
+  Proof.
+    iIntros "%Hkvs_inv_name #Htr_inv #HinvExt #Hread".
+    rewrite /read_spec.
+    iModIntro.
+    iIntros (c sa E k) "%Hsub %Hin (#Hconn & %Hsa_in_clients & %Hsa_extract & #Hpers_pointer) !# %Φ Hshift".
+    rewrite /TC_read /KVS_wrapped_api /wrap_read.
+    wp_pures.
+    wp_bind (ast.Fresh _).
+    rewrite /read_pre_emit_event.
+    wp_pures.
+    iInv "HinvExt" as ">[%T [%exec (Hinv_si_res & [%t [%lt  (Htr_is & HOwnLin & %HlinOf & %Hno_empty & %Hex 
+      & %Hvalid_trans & %Hvalid_seq & %Hbased & %Hvalid_exec & Hstate_res & Hlin_res & Hpost_res)]])]]" "Hclose".
+    wp_apply (aneris_wp_fresh with "[$Htr_inv $Htr_is]").
+    {
+      rewrite Hkvs_inv_name.
+      solve_ndisj.
+    }
+    {
+      intros tag Hnin.
+      eapply valid_trace_pre; try done.
+      rewrite /is_pre_event /is_rd_pre_event; set_solver.
+    }
+    iIntros (tag1) "(Htr_is & %Htag1_nin)".
+    iDestruct (alloc_trace_hist with "[$Htr_is]") as "(Htr_is & #Htr_hist)".
+    iMod (lin_tag_create lt t γmlin (#tag1, (c, #"RdPre"))%V with "[$Hlin_res]") 
+      as "(Hlin_res & Hlin_tag_res)".
+    {
+      iPureIntro.
+      simpl.
+      do 2 (split; first done).
+      intros Hfalse.
+      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]]; 
+        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse; 
+        set_solver.
+    }
+    iMod (post_tag_create t γmpost (#tag1, (c, #"RdPre"))%V with "[$Hpost_res]") 
+      as "(Hpost_res & Hpost_tag_res)".
+    {
+      iPureIntro.
+      simpl.
+      do 2 (split; first done).
+      intros Hfalse.
+      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]]; 
+        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse; 
+        set_solver.
+    }
+    iMod ("Hclose" with "[Hinv_si_res Htr_is HOwnLin Hstate_res Hlin_res Hpost_res]").
+    {
+      iNext.
+      iExists T, exec.
+      iFrame.
+      iExists (t ++ [(#tag1, (c, #"RdPre"))%V]), lt.
+      iFrame.
+      iSplitR; last set_solver.
+      iPureIntro.
+      apply (lin_trace_valid tag1); try done.
+      rewrite /is_pre_event /is_rd_pre_event.
+      set_solver.
+    }
+    iModIntro.
+    wp_pures.
+    wp_apply "Hread"; try done.
+    iClear "Hread".
+    iMod "Hshift" as "(%vo & Hkey_c & Hshift)".
+    iDestruct "Hkey_c" as "(Hkey_c & %sa' & %γ & %ov_last_wr & #Hsa'_pointer & %Hsa'_extract & 
+      Himp & %Hsa'_in & #Hlin_hist & Hloc_k_st)".
+    destruct (decide (sa = sa')) as [<- | Hfalse]; last set_solver.
+    iModIntro.
+    iExists vo.
+    iFrame.
+    iNext.
+    iIntros "Hkey_c".
+    iInv "HinvExt" as ">[%T' [%exec' (Hinv_si_res' & [%t' [%lt' (Htr_is' & HOwnLin' & %HlinOf' & %Hno_empty' & %Hex' 
+      & %Hvalid_trans' & %Hvalid_seq' & %Hbased' & %Hvalid_exec' & Hstate_res' & Hlin_res' & Hpost_res')]])]]" "Hclose'".
+    iMod (own_lin_add _ _ (#tag1, (c, (#"RdLin", (#k, $vo))))%V with "[$HOwnLin']") as "HOwnLin'".
+    iMod (own_lin_hist with "[$HOwnLin']") as "(HOwnLin' & #HOwnLinHist')".
+    iPoseProof (trace_hist_trace_is_prefix with "[$Htr_is'][$Htr_hist]") as "%Hprefix".
+    assert ((#tag1, (c, #"RdPre"))%V ∈ t') as Hin'.
+    {
+      apply (elem_of_prefix (t ++ [(#tag1, (c, #"RdPre"))%V])); last done.
+      set_solver.
+    }
+    iPoseProof (lin_tag_not_in lt' t' γmlin with "[$Hlin_res' $Hlin_tag_res]") as "%Hnot_lin_in".
+    iPoseProof (post_tag_not_in t' γmpost with "[$Hpost_res' $Hpost_tag_res]") as "%Hnot_post_in".
+    iDestruct (lin_tag_add lt' t' γmlin (#tag1, (c, (#"RdLin", (#k, $vo))))%V tag1 with "[$Hlin_res' $Hlin_tag_res]") 
+      as "Hlin_res'".
+    {
+      iPureIntro.
+      by simpl.
+    }
+    iDestruct "Hstate_res'" as "(%mstate & Hmap_mstate & %mname & Hmap_mname & Hdisj_trace_res)".
+    assert (clients = {[sa]} ∪ (clients ∖ {[sa]})) as Heq_sa_clients.
+    {
+      apply union_difference_L.
+      set_solver.
+    }
+    rewrite {5} Heq_sa_clients.
+    rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
+    iDestruct "Hdisj_trace_res" as "(Hdisj_trace_res_sa & Hdisj_trace_res)".
+    rewrite big_sepS_singleton.
+    iDestruct (@ghost_map_lookup with "[$Hmap_mname][$Hsa'_pointer]") as "%Hlookup_mname".
+    iDestruct "Hdisj_trace_res_sa" as "[(_ & %Hnot & _) | Htrace_res]"; first set_solver.
+    iAssert (ghost_map_elem γ k (DfracOwn 1%Qp) ov_last_wr) with "[Himp]" as "Hkey_internal"; 
+      first by iApply "Himp".
+    assert (KVS_keys = {[k]} ∪ (KVS_keys ∖ {[k]})) as Heq_k_keys.
+    {
+      apply union_difference_L.
+      set_solver.
+    }
+    iDestruct "Htrace_res" as "(%s & %c' & %γ' & %m & %Hlookup_mstate & %Hextract & #Hsa_pointer
+      & Hmap_m & Htrace_res)".
+    iAssert ((⌜γ = γ'⌝ ∗ ⌜c = c'⌝)%I) as "(<- & <-)".
+    {
+      iAssert ((⌜(γ, c) = (γ', c')⌝)%I) as "%Heq_pair".
+      - iApply (ghost_map_elem_agree sa γmname _ _ (γ, c) (γ', c') with "[$Hsa'_pointer][$Hsa_pointer]").
+      - iSplit; set_solver.
+    }
+    iDestruct "Htrace_res" as "(%Hinit & [(_ & _ & _ & Hfalse)|Htrace_res])".
+    {
+      rewrite {2} Heq_k_keys.
+      rewrite (big_sepS_union _ {[k]} (KVS_keys ∖ {[k]})); last set_solver.
+      rewrite big_sepS_singleton.
+      iDestruct "Hfalse" as "((%ov' & Hfalse) & _)".
+      iCombine "Hkey_internal" "Hfalse" as "Hfalse".
+      iDestruct (ghost_map_elem_valid with "Hfalse") as "%Hfalse".
+      by rewrite dfrac_valid_own in Hfalse.
+    }
+    iAssert (((∀ v, ⌜ov_last_wr = Some v⌝ → ⌜ov_last_wr = vo ∧ ∃ t' s', t' ∈ T' ∧ Wr s' k v ∈ t'⌝) ∗
+             ⌜latest_write c k ov_last_wr T'⌝)%I) 
+            as "(%Hread_res_1 & %Hread_res_2)".
+    {
+      iDestruct (@ghost_map_lookup with "[$Hmap_m][$Hkey_internal]") as "%Hlookup_m".
+      iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & %Hopen_tail &
+          Hkeys & Hkey_info)".
+      destruct (decide (k ∈ domain ∩ KVS_keys)) as [Hk_in_dom|Hk_nin_dom].
+      - iAssert (⌜latest_write c k ov_last_wr T'⌝%I) as "%Hlatest_write"; 
+            first iApply "Hkey_info"; try done.
+        iSplit; last iPureIntro; last eauto.
+        iIntros (v' Heq_some).
+        iDestruct ("Hloc_k_st" with "[//]") as "(%γm_conn & %γsnap & _ & 
+          [(%Hfalse & _)|(%v'' & %Heq_ov_last_wr & _)])"; first set_solver.
+        iPureIntro.
+        split; first set_solver.
+        inversion Heq_some as [Heq_v_v'].
+        rewrite Heq_v_v' in Hlatest_write.
+        destruct Hlatest_write as [Hfalse | 
+          (v & t_wr & s & Heq_some' & (_ & Ht_wr_in & _) & Hwr_in & _)];
+          set_solver.
+      - assert ((KVS_keys ∖ (domain ∩ KVS_keys)) = 
+            {[k]} ∪ ((KVS_keys ∖ (domain ∩ KVS_keys)) ∖ {[k]})) as Heq_k_keys'.
+        {
+          apply union_difference_L.
+          set_solver.
+        }
+        rewrite Heq_k_keys'.
+        rewrite (big_sepS_union _ {[k]} ((KVS_keys ∖ (domain ∩ KVS_keys)) ∖ {[k]})); 
+          last set_solver.
+        iDestruct "Hkeys" as "(Hkeys_k & _)".
+        rewrite big_sepS_singleton.
+        iDestruct "Hkeys_k" as "(%ov & Hkeys_k)".
+        iCombine "Hkeys_k" "Hkey_internal" as "Hfalse".
+        iDestruct (ghost_map_elem_valid with "Hfalse") as "%Hfalse".
+        by rewrite dfrac_valid_own in Hfalse.
+    }
+    iAssert (∀ v, ⌜vo = Some v⌝ → ⌜∃ s t, t ∈ T' ∧ (Wr s k v) ∈ t⌝)%I as "%Hread_res_3".
+    {
+      iIntros (v ->).
+      iDestruct ("Hlin_hist" $! v with "[//]") as "(%lh & %tag_wr & %c_wr & #HOwnLinHist_wr & %Hwr_in)".
+      iDestruct (own_lin_prefix with "[$HOwnLin' $HOwnLinHist_wr]") as "(_ & _ & %Hprefix')".
+      assert ((#tag_wr, (c_wr, (#"WrLin", (#k, v))))%V ∈ (lt' ++ [(#tag1, (c, (#"RdLin", (#k, $ (Some v)))))%V])) 
+        as HwrLinIn; first by apply (elem_of_prefix lh).
+      rewrite elem_of_app in HwrLinIn.
+      destruct HwrLinIn as [HwrLinIn|HwrLinIn]; last set_solver.
+      destruct Hex' as (Hex' & _).
+      iPureIntro.
+      specialize (Hex' (#tag_wr, (c_wr, (#"WrLin", (#k, v))))%V (Wr (tag_wr, c_wr) k v) HwrLinIn).
+      exists (tag_wr, c_wr).
+      apply Hex'.
+      by simpl.
+    }
+    iDestruct "Hinv_si_res'" as "(%mnames & Hmap_mnames & %m_gl & Hmap_m_gl & Hkey_some_m_gl & Hown_exec & 
+      %Hrel_exec & Hopen_trans_state)".
+    rewrite /open_transactions_state.
+    rewrite {4} Heq_sa_clients.
+    rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
+    iDestruct "Hopen_trans_state" as "(Hopen_trans_state_sa & Hopen_trans_state)".
+    rewrite big_sepS_singleton.
+    iDestruct "Hpers_pointer" as "(%γ' & (_ & (%γm_conn' & %γsnap' & #Hpers_pointer)))".
+    iDestruct (@ghost_map_lookup with "[$Hmap_mnames][$Hpers_pointer]") as "%Hlookup_mnames".
+    iDestruct "Hopen_trans_state_sa" as "[%Hfalse|(%c_sa & %m_conn_sa & %m_snap_sa & %γm_conn_sa & %γsnap_sa & %H_sa_names & 
+      Hmap_m_conn_half & Hmap_m_snap & %Htrans_reads)]"; first set_solver.
+    iAssert (⌜c = c_sa⌝)%I as "<-"; first set_solver.
+    iAssert ((⌜ov_last_wr = None⌝ → ⌜m_conn_sa !! k = Some vo⌝)%I) as "%Hread_res_4".
+    {
+      iIntros (->).
+      iDestruct ("Hloc_k_st" with "[//]") as "(%γm_conn & %γupd_st & #Hsa_pointer' & 
+        [(_ & Hkey_m_conn)|(%v'' & %Hfalse & _)])"; 
+        last (inversion Hfalse; set_solver).
+      iDestruct (@ghost_map_lookup with "[$Hmap_mnames][$Hsa_pointer']") as "%Hlookup_mnames'".
+      assert (γm_conn = γm_conn_sa) as <-; first set_solver.
+      by iDestruct (@ghost_map_lookup with "[$Hmap_m_conn_half][$Hkey_m_conn]") as "%Hlookup_m_conn".
+    }
+    iMod ("Hclose'" with "[Hmap_mnames Hmap_m_gl Hkey_some_m_gl Hown_exec Hopen_trans_state Hmap_m_conn_half
+      Hmap_m_snap Htr_is' Hmap_mstate Hmap_mname Hmap_m Htrace_res Hdisj_trace_res HOwnLin' Hpost_res' Hlin_res']").
+    {
+      iNext.
+      assert (Decision (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation), 
+        op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans)) 
+        as Hdecision.
+      {
+        do 2 (apply list_exist_dec; intros).
+        apply _.
+      }
+      assert (lin_trace_of (lt' ++ [(#tag1, (c, (#"RdLin", (#k, $ vo))))%V]) t') as Hlin_of_add.
+      {
+        apply (lin_trace_lin lt' (#tag1, (c, #"RdPre"))%V
+          (#tag1, (c, (#"RdLin", (#k, $ vo))))%V tag1 c t'); try done;
+          rewrite /is_lin_event /is_rd_lin_event /is_pre_event /is_rd_pre_event;
+          destruct vo; set_solver.
+      }
+      iAssert (⌜valid_sequence (lt' ++ [(#tag1, (c, (#"RdLin", (#k, $ vo))))%V])⌝)%I as "%Hvalid_seq_add".
+      {
+        iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & %Hopen_start & Hrest)".
+        iPureIntro.
+        apply (valid_sequence_wr_rd_cm_lin _ _ tag1 c tail); try done.
+        - right.
+          rewrite /is_rd_lin_event.
+          destruct vo; set_solver.
+        - by exists t'.
+        - intros tag' c' k' v' Heq.
+          inversion Heq.
+          destruct vo as [v|]; last done.
+          subst.
+          assert (v = v') as <-; first set_solver.
+          destruct Hex' as (_ & Hex' & _).
+          destruct (Hread_res_3 v) as (s1 & t1 & Ht1_in & Hwr_in); first done.
+          specialize (Hex' t1 (Wr s1 k v) Ht1_in Hwr_in).
+          destruct s1; simpl in Hex'; eauto.
+      }
+      destruct (decide (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation), 
+        op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans)) 
+          as [(trans & Htrans_in & Hop)|Hdec].
+      - destruct (elem_of_list_split _ _ Htrans_in) as (T1 & T2 & ->).
+        iExists (T1 ++ (trans ++ [Rd (tag1, c) k vo]) :: T2), exec'.
+        assert (valid_transactions (T1 ++ (trans ++ [Rd (tag1, c) k vo]) :: T2)) as Hvalid_trans_add.
+        {
+          apply (valid_transactions_add2 _ _ tag1 _ _ c); try done.
+          - by eapply extraction_of_not_in.
+          - by apply (extraction_of_not_tag trans lt' tag1 (T1 ++ trans :: T2)).
+          - intros s' k' ov' tag' v' Heq Hin_wr Hnot.
+            destruct (decide (ov' = Some v')) as [Heq'|Hneq']; first done.
+            exfalso.
+            apply Hnot.
+            assert (k = k') as <-; first set_solver.
+            destruct (ov_last_wr) as [v_last|] eqn:Heq_ov_last_wr. 
+            + destruct Hread_res_2 as [Hfalse| (v'' & trans' & tag_wr & Heq_some' & Hopen_trans & Hwr_in & Hrel)]; 
+                first set_solver.
+              assert (v_last  = v'') as <-; first set_solver.
+              exists tag_wr, v_last.
+              assert (trans = trans') as <-; first by eapply trans_eq.
+              rewrite elem_of_list_lookup in Hwr_in.
+              destruct Hwr_in as (i & Hwr_in).
+              split; first (apply rel_list_imp; set_solver).
+              assert (i < length trans) as Hlength; 
+                first by eapply lookup_lt_Some.
+              rewrite /rel_list.
+              exists i, (length trans).
+              split_and!; try done; 
+                first by apply lookup_app_l_Some.
+              assert (Init.Nat.pred (length (trans ++ [Rd (tag1, c) k vo])) = 
+                length trans) as <-; last by rewrite -last_lookup last_snoc.
+               rewrite last_length; lia.
+            + destruct Hread_res_2 as [(_ & Hread_res_2)|Hfalse]; last set_solver.
+              exfalso.
+              apply (Hread_res_2 trans); last eauto.
+              destruct Hop as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
+              exists op.
+              rewrite /is_cm_op.
+              split_and!; try done.
+              destruct op; simpl in Hop_cm; set_solver.
+          - destruct Hop as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
+            exists op.
+            split_and!; try done.
+            intros (s' & b' & ->).
+            set_solver.
+        }
+        iSplitL "Hmap_mnames Hmap_m_gl Hkey_some_m_gl Hown_exec Hopen_trans_state Hmap_m_conn_half Hmap_m_snap".
+        {
+          iExists mnames; iFrame.
+          iExists m_gl; iFrame.
+          iSplit; first done.
+          rewrite /open_transactions_state.
+          rewrite {4} Heq_sa_clients.
+          rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
+          iSplitR "Hopen_trans_state".
+          - rewrite big_sepS_singleton.
+            iRight.
+            iExists c, m_conn_sa, m_snap_sa, γm_conn_sa, γsnap_sa.
+            iSplit; first done.
+            iFrame "∗%".
+            iPureIntro.
+            intros trans' Hopen_trans'.
+            assert ((trans ++ [Rd (tag1, c) k vo]) = trans') as <-; first eapply trans_eq; try done.
+            {
+              exists (Rd (tag1, c) k vo); simpl.
+              split_and!; try done; first set_solver.
+              apply last_snoc.
+            }
+            assert (open_trans trans c (T1 ++ trans :: T2)) as Hopen_trans.
+            {
+              destruct Hop as (op & Hop).
+              exists op.
+              split; first set_solver.
+              do 2 (split; first set_solver).
+              rewrite /is_cm_op.
+              destruct op; simpl in Hop; set_solver.
+            }
+            destruct (Htrans_reads trans Hopen_trans) as (Htrans_reads_1 & Htrans_reads_2 & Htrans_reads_3).
+            split.
+            {
+              intros sig k' ov v' [Hop_in|Hop_in]; rewrite elem_of_app in Hop_in.
+              - destruct Hop_in as [Hfalse|Hop_in]; last set_solver.
+                eapply Htrans_reads_1; left; set_solver.
+              - destruct Hop_in as [Hop_in|Hop_in].
+                + eapply Htrans_reads_1; right; set_solver.
+                + assert (k' = k) as ->; set_solver.
+            }
+            split.
+            {
+              intros sig k' ov' Hrd_in Hnot.
+              rewrite elem_of_app in Hrd_in.
+              destruct Hrd_in as [Hrd_in|Hrd_in].
+              - apply (Htrans_reads_2 sig k' ov' Hrd_in).
+                intros (sig' & v' & Hrel).
+                apply Hnot.
+                exists sig', v'.
+                by apply rel_list_imp.
+              - destruct (ov_last_wr) as [v_last|] eqn:Heq_ov_last_wr; last set_solver.
+                exfalso.
+                apply Hnot.
+                destruct Hread_res_2 as [Hfalse | (v & t_wr & s' & Heq_some' & Hopen_trans'' & Hwr_in & _)];
+                  first set_solver.
+                exists (s', c), v.
+                assert (trans = t_wr) as <-; first by eapply trans_eq.
+                apply elem_of_list_lookup in Hwr_in.
+                destruct Hwr_in  as (i & Hwr_in).
+                exists i, (Init.Nat.pred (length (trans ++ [Rd (tag1, c) k vo]))).
+                split_and!.
+                + rewrite app_length; simpl.
+                  apply lookup_lt_Some in Hwr_in.
+                  lia.
+                + apply lookup_app_l_Some; set_solver.
+                + rewrite -last_lookup last_snoc.
+                  set_solver.
+            }
+            intros sig k' v' Hop_in.
+            rewrite elem_of_app in Hop_in.
+            destruct Hop_in as [Hop_in|Hfalse]; last set_solver.
+            eapply Htrans_reads_3; eauto.
+          - iApply (big_sepS_wand with "[$Hopen_trans_state]").
+            iApply big_sepS_intro.
+            iModIntro.
+            iIntros (sa'' Hsa''_in).
+            iIntros "[Hopen_state_sa|(%c'' & %m_conn'' & %m_snap'' & %γm_conn'' & %γsnap'' & 
+              (%Hextract'' & %Hnames_lookup) & Hmap_mconn & Hmap_msnap & %Hopen_state)]"; first by iLeft.
+            iRight.
+            iExists c'', m_conn'', m_snap'', γm_conn'', γsnap''.
+            iSplit; first done.
+            iFrame "%∗".
+            iPureIntro.
+            intros trans' Hopen.
+            assert (open_trans trans' c'' (T1 ++ trans :: T2)) as Hopen'.
+            {
+              eapply (open_trans_neq3 _ sa sa'' c c'' _ _ _ _ (Rd (tag1, c) k vo)); 
+                rewrite /connOfOp; set_solver.
+            }
+            specialize (Hopen_state trans' Hopen').
+            set_solver.
+            Unshelve.
+            all : done.
+        }
+        iExists t', (lt' ++ [(#tag1, (c, (#"RdLin", (#k, $ vo))))%V]).
+        iFrame.
+        iSplit; first done.
+        iSplit; first (iPureIntro; by apply trans_add_non_empty).
+        iSplit; first (iPureIntro; destruct vo; by apply extraction_of_add2).
+        do 2 (iSplit; first done).
+        iSplit; first by (iPureIntro; eapply based_on_add1; rewrite /is_cm_op; set_solver).
+        iSplit; first by simpl.
+        iApply (trace_state_resources_read_lin2 clients c tag1 lt' T1 T2 trans k sa vo
+          s γ γmstate γmname extract mstate mname m with "[][][][][][][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
+          [$Hmap_m][$Hdisj_trace_res][$Htrace_res]"); try by iPureIntro.
+        + iPureIntro.
+          intros Hfalse.
+          eapply two_trans_implies_false_app_cons; try done.
+          exists (Rd (tag1, c) k vo); simpl.
+          split_and!; try done; first set_solver.
+          apply last_snoc.
+        + iPureIntro.
+          destruct Hinit as (e & Hin'' & Hconn'' & Hevent'').
+          exists e.
+          split_and!; try done.
+          apply elem_of_app; eauto.
+      - iExists (T' ++ [[Rd (tag1, c) k vo]]), exec'.
+        assert (valid_transactions (T' ++ [[Rd (tag1, c) k vo]])) as Hvalid_trans_add.
+        {
+          apply (valid_transactions_add1 T' (Rd (tag1, c) k vo) c); try done.
+          - by eapply extraction_of_not_in.
+          - set_solver.
+          - apply valid_transaction_singleton.
+          - intros (t'' & Ht''_in & (op & Hop_in & Hop_last & Hop_conn & Hop_cm)).
+            apply Hdec.
+            exists t''.
+            split; first done.
+            exists op.
+            split_and!; try done.
+            rewrite /is_cm_op in Hop_cm.
+            destruct op; try done.
+            exfalso.
+            eauto.
+        }
+        iSplitL "Hmap_mnames Hmap_m_gl Hkey_some_m_gl Hown_exec Hopen_trans_state Hmap_m_conn_half Hmap_m_snap".
+        {
+          iExists mnames; iFrame.
+          iExists m_gl; iFrame.
+          iSplit; first done.
+          rewrite /open_transactions_state.
+          rewrite {4} Heq_sa_clients.
+          rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
+          iSplitR "Hopen_trans_state".
+          - rewrite big_sepS_singleton.
+            iRight.
+            iExists c, m_conn_sa, m_snap_sa, γm_conn_sa, γsnap_sa.
+            iSplit; first done.
+            iFrame "%∗".
+            iPureIntro.
+            intros trans' Hopen_trans'.
+            assert ([Rd (tag1, c) k vo] = trans') as <-; first eapply trans_eq; try done.
+            {
+              exists (Rd (tag1, c) k vo); simpl.
+              split_and!; try done; first set_solver.
+            }
+            split.
+            {
+             intros s' k' ov' v' [Hin''|Hin'']; first set_solver.
+             assert (k = k') as ->; set_solver. 
+            }
+            split; last set_solver.
+            intros sig k' ov' Hrd_in Hnot.
+            destruct (ov_last_wr) as [v_last|] eqn:Heq_ov_last_wr; last set_solver.
+            exfalso.
+            apply Hdec.
+            destruct Hread_res_2 as [Hfalse | (v & t_wr & s' & Heq_some' & Hopen_trans'' & Hwr_in & _)];
+              first set_solver.
+            exists t_wr.
+            destruct Hopen_trans'' as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
+            split; first done.
+            exists op.
+            split_and!; try done.
+            + by apply last_Some_elem_of.
+            + rewrite /is_cm_op in Hop_cm.
+              destruct op; try done.
+              exfalso.
+              eauto.
+          - iApply (big_sepS_wand with "[$Hopen_trans_state]").
+            iApply big_sepS_intro.
+            iModIntro.
+            iIntros (sa'' Hsa''_in).
+            iIntros "[Hopen_state_sa|(%c'' & %m_conn'' & %m_snap'' & %γm_conn'' & %γsnap'' & 
+              (%Hextract'' & %Hnames_lookup) & Hmap_mconn & Hmap_snap & %Hopen_state)]"; first by iLeft.
+            iRight.
+            iExists c'', m_conn'', m_snap'', γm_conn'', γsnap''.
+            iSplit; first done.
+            iFrame "%∗".
+            iPureIntro.
+            intros trans Hopen.
+            assert (open_trans trans c'' T') as Hopen'.
+            {
+              rewrite /open_trans in Hopen.
+              rewrite /open_trans.
+              set_solver.
+            }
+            specialize (Hopen_state trans Hopen').
+            set_solver.
+        }
+        iExists t', (lt' ++ [(#tag1, (c, (#"RdLin", (#k, $ vo))))%V]).
+        iFrame.
+        iSplit; first done.
+        iSplit; first (iPureIntro; set_solver).
+        iSplit; first (iPureIntro; destruct vo; by apply extraction_of_add1).
+        iSplit.
+        + iPureIntro.
+          apply (valid_transactions_add1 T' (Rd (tag1, c) k vo) c); try done.
+          * by eapply extraction_of_not_in.
+          * set_solver.
+          * apply valid_transaction_singleton.
+          * intros (t'' & Ht''_in & (op & Hop_in & Hop_last & Hop_conn & Hop_cm)).
+            apply Hdec.
+            exists t''.
+            split; first done.
+            exists op.
+            split_and!; try done.
+            rewrite /is_cm_op in Hop_cm.
+            destruct op; try done.
+            exfalso.
+            eauto.
+        + iSplit; first done.
+          iSplit; first (iPureIntro; apply based_on_add2; rewrite /is_cm_op; set_solver).
+          iSplit; first by simpl.
+          iApply (trace_state_resources_read_lin1 clients c tag1 lt' T' k sa vo
+            s γ γmstate γmname extract mstate mname m with "[][][][][][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
+            [$Hmap_m][$Hdisj_trace_res][$Htrace_res]"); try by iPureIntro.
+          iPureIntro.
+          destruct Hinit as (e & Hin'' & Hconn'' & Hevent'').
+          exists e.
+          split_and!; try done.
+          apply elem_of_app; eauto.
+    }
+    iMod ("Hshift" with "[Hkey_internal Hkey_c Hloc_k_st]").
+    {
+      simpl.
+      iFrame.
+      iExists sa, γ, ov_last_wr.
+      iFrame "#".
+      iSplit; first done.
+      iSplitL "Hkey_internal"; first (iIntros (_); iFrame).
+      iSplit; first done.
+      iIntros (_).
+      by iApply "Hloc_k_st".
+    }
+    iModIntro.
+    rewrite /read_post_emit_event.
+    wp_pures.
+    wp_bind (Emit _).
+    iInv "HinvExt" as ">[%T'' [%exec'' (Hinv_si_res'' & [%t'' [%lt'' 
+      (Htr_is'' & HOwnLin'' & %HlinOf'' & %Hno_empty'' & %Hex'' & %Hvalid_trans'' & 
+      %Hvalid_seq'' & %Hbased'' & %Hvalid_exec'' & HstateRes'' & Hlin_res'' & Hpost_res'')]])]]" "Hclose''".
+    iDestruct (own_lin_prefix with "[$HOwnLin'' $HOwnLinHist']") 
+      as "(HOwnLin'' & HOwnLinHist & %Hprefix')".
+    assert ((#tag1, (c, (#"RdLin", (#k, $ vo))))%V ∈ lt'') as HstLinIn.
+    {
+      apply (elem_of_prefix (lt' ++ [(#tag1, (c, (#"RdLin", (#k, $ vo))))%V])); last done.
+      set_solver.
+    }
+    wp_apply (aneris_wp_emit with "[$Htr_inv $Htr_is'']").
+    {
+      rewrite Hkvs_inv_name.
+      solve_ndisj.
+    }
+    {
+      eapply valid_trace_post; try done; destruct vo;
+        rewrite /is_post_event /is_rd_post_event;
+        set_solver.
+    }
+    iIntros "Htr_is''".
+    iDestruct (lin_tag_add_post lt'' t'' γmlin (#tag1, (c, (#"RdPost", (#k, $vo))))%V with "[$Hlin_res'']") as "Hlin_res''".
+    iDestruct (post_tag_add t'' γmpost (#tag1, (c, (#"RdPost", (#k, $vo))))%V tag1 with "[$Hpost_res'' $Hpost_tag_res]")
+     as "Hpost_res''".
+    {
+      simpl.
+      iSplitL; first by iPureIntro.
+      iPureIntro.
+      destruct vo;
+      rewrite /is_post_event /is_rd_post_event;
+      set_solver.
+    }
+    iMod ("Hclose''" with "[Hinv_si_res'' Htr_is'' HOwnLin'' HstateRes'' Hlin_res'' Hpost_res'']").
+    {
+      iModIntro.
+      iExists T'', exec''.
+      iFrame.
+      iExists (t'' ++ [_]), lt''.
+      iFrame.
+      iSplitR; last set_solver.
+      iPureIntro.
+      apply (lin_trace_valid tag1); try done.
+      destruct vo;
+      rewrite /is_post_event /is_rd_post_event;
+      set_solver.
+    }
+    iModIntro.
+    wp_pures.
+    destruct vo; simpl; iFrame.
+  Qed.
+
+  Lemma init_client_implication γmstate γmlin γmpost γmname γl γm_gl γexec γsi_name clients (res : SI_resources Mdl Σ) 
+  (lib : KVS_transaction_api) : 
+    ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
+    trace_inv trace_inv_name valid_trace_si -∗
+    inv KVS_InvName (∃ T exec, GlobalInvExtSI γm_gl γexec γsi_name T exec extract clients ∗ 
+                     GlobalInvExt commit_test_si T extract γmstate γmlin γmpost γmname γl clients exec) -∗
+    @init_client_proxy_spec _ _ _ _ lib res -∗
+    @init_client_proxy_spec _ _ _ _ (KVS_wrapped_api lib) (wrapped_resources γmstate γmlin γmpost γmname γl γm_gl γexec γsi_name clients res).
+  Proof.
+    iIntros "%Hkvs_inv_name #Htr_inv #HinvExt #Hinit_cli".
+    rewrite /init_client_proxy_spec.
+    iIntros (sa Φ) "!# (Hunall & Hsock & Hmes & (Hcan & (Hsa_pointer & %Hsa_in & Hsa_pointer_si)) & Hfree) HΦ".
+    rewrite /TC_init_client_proxy /KVS_wrapped_api /wrap_init_client_proxy.
+    wp_pures.
+    wp_bind (ast.Fresh _).
+    iInv "HinvExt" as ">[%T [%exec (Hinv_si_res & [%t [%lt  (Htr_is & HOwnLin & %HlinOf & %Hno_empty & %Hex 
+      & %Hvalid_trans & %Hvalid_seq & %Hbased & %Hvalid_exec & Hstate_res & Hlin_res & Hpost_res)]])]]" "Hclose".
+    wp_apply (aneris_wp_fresh with "[$Htr_inv $Htr_is]").
+    {
+      rewrite Hkvs_inv_name.
+      solve_ndisj.
+    }
+    {
+      intros tag Hnin.
+      eapply valid_trace_pre; try done.
+      rewrite /is_pre_event /is_in_pre_event; set_solver.
+    }
+    iIntros (tag1) "(Htr_is & %Htag1_nin)".
+    rewrite /init_pre_emit_event.
+    iDestruct (alloc_trace_hist with "[$Htr_is]") as "(Htr_is & #Htr_hist)".
+    iMod (lin_tag_create lt t γmlin (#tag1, init_pre_emit_event)%V with "[$Hlin_res]") 
+      as "(Hlin_res & Hlin_tag_res)".
+    {
+      iPureIntro.
+      simpl.
+      do 2 (split; first done).
+      intros Hfalse.
+      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]]; 
+        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse; 
+        set_solver.
+    }
+    iMod (post_tag_create t γmpost (#tag1, init_pre_emit_event)%V with "[$Hpost_res]") 
+      as "(Hpost_res & Hpost_tag_res)".
+    {
+      iPureIntro.
+      simpl.
+      do 2 (split; first done).
+      intros Hfalse.
+      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]]; 
+        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse; 
+        set_solver.
+    }
+    iMod ("Hclose" with "[Hinv_si_res Htr_is HOwnLin Hlin_res Hpost_res Hstate_res]").
+    {
+      iNext.
+      iExists T, exec.
+      iFrame.
+      iExists (t ++ [(#tag1, init_pre_emit_event)%V]), lt.
+      iFrame.
+      iSplitR; last set_solver.
+      iPureIntro.
+      apply (lin_trace_valid tag1); try done.
+      rewrite /is_pre_event /is_in_pre_event.
+      set_solver.
+    }
+    iModIntro.
+    wp_pures.
+    wp_apply ("Hinit_cli" $! sa with "[$Hunall $Hsock $Hmes $Hcan $Hfree]").
+    iIntros (c) "(Hconn_state & #His_conn)".
+    wp_pures.
+    wp_bind (ast.Emit _).
+    rewrite /init_post_emit_event.
+    wp_pures.
+    iInv "HinvExt" as ">[%T' [%exec' (Hinv_si_res' & [%t' [%lt' (Htr_is' & HOwnLin' & %HlinOf' & %Hno_empty' & %Hex' 
+      & %Hvalid_trans' & %Hvalid_seq' & %Hbased' & %Hvalid_exec' & Hstate_res' & Hlin_res' & Hpost_res')]])]]" "Hclose'".
+    iMod (own_lin_add _ _ (#tag1, (c, #"InLin"))%V with "[$HOwnLin']") as "HOwnLin'".
+    iPoseProof (trace_hist_trace_is_prefix with "[$Htr_is'][$Htr_hist]") as "%Hprefix".
+    assert ((#tag1, #"InPre")%V ∈ t') as Hin'.
+    {
+      apply (elem_of_prefix (t ++ [(#tag1, #"InPre")%V])); last done.
+      set_solver.
+    }
+    iPoseProof (lin_tag_not_in lt' t' γmlin with "[$Hlin_res' $Hlin_tag_res]") as "%Hnot_lin_in".
+    iPoseProof (post_tag_not_in t' γmpost with "[$Hpost_res' $Hpost_tag_res]") as "%Hnot_post_in".
+    iDestruct (lin_tag_add lt' t' γmlin (#tag1, (c, #"InLin"))%V tag1 with "[$Hlin_res' $Hlin_tag_res]") 
+      as "Hlin_res'".
+    {
+      iPureIntro.
+      by simpl.
+    }
+    iDestruct "Hstate_res'" as "[%mstate (Hghost_map_mstate & [%mname (Hghost_map_mname & Hext_rest1')])]".
+    iDestruct (@ghost_map_lookup with "[$Hghost_map_mstate][$Hsa_pointer]") as "%Hlookup".
+    assert (clients = {[sa]} ∪ (clients ∖ {[sa]})) as Heq_sa_clients.
+    {
+      apply union_difference_L.
+      set_solver.
+    }
+    rewrite {6} Heq_sa_clients.
+    rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
+    iDestruct "Hext_rest1'" as "(Hext_rest1_sa & Hext_rest1)".
+    rewrite big_sepS_singleton.
+    iAssert ((⌜mname !! sa = None⌝ ∧ ⌜no_emit_with_address sa lt' extract⌝)%I) as "(%Hlookup_none & %Hno_emit)".
+    {
+      iDestruct ("Hext_rest1_sa") as "[(_ & %Hnot_lookup & %Hno_emit)|[%s [%c' [%γ [%m (%Hfalse & asd)]]]]]".
+      - iPureIntro. 
+        destruct (mname !! sa) as [γ|] eqn:Hfalse; last done.
+        exfalso.
+        apply Hnot_lookup.
+        by exists γ.
+      - set_solver.
+    }
+    iDestruct (res.(snapshot_isolation.specs.resources.Extraction_of_address) 
+          with "[$His_conn]") as "%Hextract".
+    assert (lin_trace_of (lt' ++ [(#tag1, (c, #"InLin"))%V])
+      (t' ++ [(#tag1, (c, #"InPost"))%V])) as Hlin_trace'.
+    {
+      apply (lin_trace_valid tag1); try done.
+      - right.
+        split.
+        + do 4 right. 
+          rewrite /is_in_post_event; eauto.
+        + exists (#tag1, (c, #"InLin"))%V.
+          set_solver.
+      - apply (lin_trace_lin lt' (#tag1, #"InPre")%V 
+          (#tag1, (c, #"InLin"))%V tag1 c t'); try done;
+          rewrite /is_lin_event /is_in_lin_event /is_pre_event /is_in_pre_event;
+          set_solver.
+    }
+    assert (valid_sequence (lt' ++ [(#tag1, (c, #"InLin"))%V])) as Hvalid_seq''.
+    {
+      apply valid_sequence_in_lin; try done.
+      eapply unique_init_events_add_init; try done.
+      rewrite /valid_sequence in Hvalid_seq'; set_solver.
+    }
+    wp_apply (aneris_wp_emit with "[$Htr_inv $Htr_is']").
+    {
+      rewrite Hkvs_inv_name.
+      solve_ndisj.
+    }
+    {
+      exists (lt' ++ [(#tag1, (c, #"InLin"))%V]).
+      split_and!; try done.
+      eexists T', exec'.
+      split_and!; try done.
+      apply extraction_of_add_init_lin; rewrite /is_in_lin_event;
+        set_solver.
+    }
+    iIntros "Htr_is".
+    iDestruct (lin_tag_add_post (lt' ++ [(#tag1, (c, #"InLin"))%V]) t' γmlin (#tag1, (c, #"InPost"))%V 
+      with "[$Hlin_res']") as "Hlin_res'".
+    iDestruct (post_tag_add t' γmpost (#tag1, (c, #"InPost"))%V tag1 with "[$Hpost_res' $Hpost_tag_res]")
+      as "Hpost_res'".
+    {
+      iPureIntro.
+      simpl.
+      split; first done.
+      do 4 right.
+      rewrite /is_in_post_event.
+      by eexists _, _.
+    }
+    iMod (ghost_map_alloc ((gset_to_gmap None KVS_keys : gmap Key (option val))))
+      as "[%γ (Hghost_map_m & Hghost_elems_m)]".
+    iMod (ghost_map_update (CanStart, Some c) with "[$Hghost_map_mstate] [$Hsa_pointer]") 
+      as "(Hghost_map_mstate & Hsa_pointer)".
+    iMod (ghost_map_insert_persist sa (γ, c) Hlookup_none with "[$Hghost_map_mname]") 
+      as "(Hghost_map_mname & #Hkey_pers_mname)".
+    iDestruct "Hinv_si_res'" as "(%mname_si & Hghost_map_mname_si & %m_si & Hghost_map_m_si & 
+      %Hkeys_some_m_si & Hown_exec & %Hrel_exe_map & Hopen_si)".
+    iDestruct (@ghost_map_lookup with "[$Hghost_map_mname_si][$Hsa_pointer_si]") as "%Hlookup_none'".
+    iMod (ghost_map_alloc ((gset_to_gmap None KVS_keys : gmap Key (option val))))
+      as "[%γm_conn ((Hghost_map_m_si'_half & Hghost_map_m_si'_half') & Hghost_elems_m_si')]".
+    iMod (ghost_map_alloc ((gset_to_gmap false KVS_keys : gmap Key bool)))
+      as "[%γsnap (Hghost_map_m_si'' & Hghost_elems_m_si'')]".
+    iMod (ghost_map_update (Some (γm_conn, γsnap, c)) with "[$Hghost_map_mname_si] [$Hsa_pointer_si]") 
+      as "(Hghost_map_mname_si & Hsa_pointer_si)".
+    iMod (ghost_map_elem_persist (K:=socket_address) (V:=option (gname * gname * val)) 
+      with "[$Hsa_pointer_si]") as "#Hsa_pointer_si".
+    assert (¬∃ t, open_trans t c T') as Hnot_open.
+    {
+      intros (trans & (op & Hin & Hlast & Hconn & _)).
+      apply Hno_emit.
+      destruct Hex' as (_ & Hex' & _).
+      exists (toLinEvent op), c.
+      split_and!; try done.
+      - apply last_Some_elem_of in Hlast; set_solver.
+      - by apply conn_event_op.
+    }
+    iMod ("Hclose'" with "[Hghost_map_m_si'_half Hghost_map_m_si Hown_exec Hopen_si Hghost_map_mname_si
+      Htr_is HOwnLin' Hghost_map_mname Hext_rest1 Hext_rest1_sa Hghost_map_m_si''
+      Hghost_map_mstate Hghost_map_m Hghost_elems_m Hlin_res' Hpost_res']").
+    {
+      iNext.
+      iExists T', exec'.
+      iSplitL "Hghost_map_m_si'_half Hghost_map_m_si Hown_exec Hopen_si Hghost_map_mname_si Hghost_map_m_si''".
+      {
+        iExists (<[sa:=Some (γm_conn, γsnap, c)]> mname_si); iFrame.
+        iExists m_si; iFrame.
+        do 2 (iSplit; first by iPureIntro).
+        rewrite /open_transactions_state.
+        rewrite {3} Heq_sa_clients.
+        rewrite {4} Heq_sa_clients.
+        do 2 (rewrite big_sepS_union; last set_solver).
+        iDestruct "Hopen_si" as "(_ & Hopen_si)".
+        iSplitL "Hghost_map_m_si'_half Hghost_map_m_si''".
+        - iApply big_sepS_singleton.
+          rewrite lookup_insert.
+          iRight.
+          iExists c, (gset_to_gmap None KVS_keys), (gset_to_gmap false KVS_keys), γm_conn, γsnap.
+          iSplit; first (iPureIntro; set_solver).
+          iFrame.
+          iIntros (trans Hfalse).
+          iPureIntro; set_solver.
+        - iApply (big_sepS_wand with "[$Hopen_si]").
+          iApply big_sepS_intro.
+          iModIntro.
+          iIntros (sa' Hsa'_in) "Hres".
+          rewrite lookup_insert_ne; last set_solver.
+          iFrame.
+      }
+      iExists (t' ++ [(#tag1, (c, #"InPost"))%V]), (lt' ++ [(#tag1, (c, #"InLin"))%V]).
+      iFrame.
+      do 2 (iSplit; first by iPureIntro).
+      iSplit; first iPureIntro.
+      {
+        apply extraction_of_add_init_lin; rewrite /is_in_lin_event;
+        set_solver.
+      }
+      do 4 (iSplit; first by iPureIntro).
+      iClear "HinvExt Hinit_cli Htr_inv".
+      iExists (<[sa:=(CanStart, Some c)]> mstate).
+      iFrame.
+      iExists (<[sa:=(γ, c)]> mname).
+      iFrame.
+      rewrite {2} Heq_sa_clients.
+      rewrite big_sepS_union; last set_solver.
+      iSplitL "Hghost_map_m Hghost_elems_m".
+      + iApply big_sepS_singleton.
+        iRight.
+        iExists CanStart, c, γ, (gset_to_gmap None KVS_keys).
+        rewrite lookup_insert.
+        iFrame "#∗".
+        do 2 (iSplit; first by iPureIntro).
+        iSplit.
+        {
+          iPureIntro.
+          exists (#tag1, (c, #"InLin"))%V.
+          simpl.
+          rewrite /is_in_lin_event.
+          split_and!; try done; eauto.
+          apply elem_of_app.
+          right.
+          set_solver.
+        }
+        iLeft.
+        iSplit; first by iPureIntro.
+        iSplit.
+        * iPureIntro.
+          rewrite /commit_closed.
+          intros e_st Hin Hconn Hstart.
+          exfalso.
+          apply Hno_emit.
+          assert (e_st ∈ lt') as Hin_st; last set_solver.
+          rewrite elem_of_app in Hin.
+          destruct Hin as [Hin|Hin]; first done.
+          rewrite /is_st_lin_event in Hstart.
+          set_solver.
+        * iSplit. 
+          -- iPureIntro.
+             intros (trans & (op & Ht'_in & Hlast & Hconn_last & _)).
+             destruct Hex' as (_ & Hex' & _).
+             apply last_Some_elem_of in Hlast.
+             specialize (Hex' trans op Ht'_in Hlast).
+             apply Hno_emit.
+             exists (toLinEvent op), c.
+             split_and!; try done.
+             destruct op; destruct s; 
+              simpl in Hconn_last; subst; 
+              simpl; try done.
+              by destruct ov.
+          -- rewrite big_sepM_gset_to_gmap.
+             iApply (big_sepS_wand with "[$Hghost_elems_m]").
+             iApply big_sepS_intro.
+             iModIntro.
+             iIntros (k Hk_in) "Hkey".
+             iExists None.
+             iFrame.
+      + iApply (big_sepS_wand with "[$Hext_rest1]").
+        iApply big_sepS_intro.
+        iModIntro.
+        iIntros (sa' Hsa'_in) "Hext_res".
+        iApply (client_trace_state_resources_neq3 sa sa' c with "[][][][$]"); try done.
+        iPureIntro; set_solver.
+    }
+    iModIntro.
+    wp_pures.
+    iApply "HΦ".
+    rewrite /ConnectionState.
+    simpl.
+    iFrame "∗#".
+    iSplitL.
+    - iExists γm_conn, γsnap, (gset_to_gmap None KVS_keys).
+      iFrame "∗#".
+      iLeft.
+      iSplit; first by iPureIntro.
+      iFrame.
+      do 2 (rewrite big_sepM_gset_to_gmap).
+      iAssert (([∗ set] k ∈ KVS_keys, ghost_map_elem γm_conn k (DfracOwn 1%Qp) None) ∗ 
+        ([∗ set] k ∈ KVS_keys, ghost_map_elem γsnap k (DfracOwn 1%Qp) false))%I with 
+        "[Hghost_elems_m_si' Hghost_elems_m_si'']" as "Hghost_maps"; first iFrame.
+      rewrite -(big_sepS_sep).
+      iApply (big_sepS_wand with "[$Hghost_maps]").
+      iApply big_sepS_intro.
+      iModIntro.
+      iIntros (k Hk_in) "(Hptr1 & Hptr2)".
+      iExists None; iFrame.
+    - do 2 (iSplit; first by iPureIntro).
+      iExists γ.
+      iFrame "#".
+      iExists γm_conn, γsnap.
+      iFrame "#".
+  Qed.
+
+  Lemma start_implication γmstate γmlin γmpost γmname γl γm_gl γexec γsi_name clients (res : SI_resources Mdl Σ) 
+  (lib : KVS_transaction_api) : 
+    ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
+    trace_inv trace_inv_name valid_trace_si -∗
+    inv KVS_InvName (∃ T exec, GlobalInvExtSI γm_gl γexec γsi_name T exec extract clients ∗ 
+                     GlobalInvExt commit_test_si T extract γmstate γmlin γmpost γmname γl clients exec) -∗
+    @start_spec _ _ _ _ lib res -∗
+    @start_spec _ _ _ _ (KVS_wrapped_api lib) (wrapped_resources γmstate γmlin γmpost γmname γl γm_gl γexec γsi_name clients res).
+  Proof.
+    iIntros "%Hkvs_inv_name #Htr_inv #HinvExt #Hstart".
+    rewrite /start_spec.
+    iModIntro.
+    iIntros (c sa E) "%Hsub (#Hconn & %Hsa_in_clients & %Hsa_extract & #Hpers_pointer) !# %Φ Hshift".
+    rewrite /TC_start /KVS_wrapped_api /wrap_start.
+    wp_pures.
+    wp_bind (ast.Fresh _).
+    rewrite /start_pre_emit_event.
+    wp_pures.
+    iInv "HinvExt" as ">[%T [%exec (Hinv_si_res & [%t [%lt  (Htr_is & HOwnLin & %HlinOf & %Hno_empty & %Hex 
+      & %Hvalid_trans & %Hvalid_seq & %Hbased & %Hvalid_exec & Hstate_res & Hlin_res & Hpost_res)]])]]" "Hclose".
+    wp_apply (aneris_wp_fresh with "[$Htr_inv $Htr_is]").
+    {
+      rewrite Hkvs_inv_name.
+      solve_ndisj.
+    }
+    {
+      intros tag Hnin.
+      eapply valid_trace_pre; try done.
+      rewrite /is_pre_event /is_st_pre_event; set_solver.
+    }
+    iIntros (tag1) "(Htr_is & %Htag1_nin)".
+    iDestruct (alloc_trace_hist with "[$Htr_is]") as "(Htr_is & #Htr_hist)".
+    iMod (lin_tag_create lt t γmlin (#tag1, (c, #"StPre"))%V with "[$Hlin_res]") 
+      as "(Hlin_res & Hlin_tag_res)".
+    {
+      iPureIntro.
+      simpl.
+      do 2 (split; first done).
+      intros Hfalse.
+      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]]; 
+        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse; 
+        set_solver.
+    }
+    iMod (post_tag_create t γmpost (#tag1, (c, #"StPre"))%V with "[$Hpost_res]") 
+      as "(Hpost_res & Hpost_tag_res)".
+    {
+      iPureIntro.
+      simpl.
+      do 2 (split; first done).
+      intros Hfalse.
+      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]]; 
+        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse; 
+        set_solver.
+    }
+    iMod ("Hclose" with "[Hinv_si_res Htr_is HOwnLin Hstate_res Hlin_res Hpost_res]").
+    {
+      iNext.
+      iExists T, exec.
+      iFrame.
+      iExists (t ++ [(#tag1, (c, #"StPre"))%V]), lt.
+      iFrame.
+      iSplitR; last set_solver.
+      iPureIntro.
+      apply (lin_trace_valid tag1); try done.
+      rewrite /is_pre_event /is_st_pre_event.
+      set_solver.
+    }
+    iModIntro.
+    wp_pures.
+    wp_apply "Hstart"; try done.
+    iClear "Hstart".
+    iMod "Hshift" as "[%m (((Hconn_state & %γm_conn & %γsnap & %m_conn & #Hsa_pointer_si & Hghost_map_m_conn &
+      Hconn_exec_state) & Hkeys) & Hshift)]".
+    iDestruct "Hconn_exec_state" as "[(_ & Hsa_pointer & Hkeys_conn_si)|(%ms & %ms_sub & %Hfalse & _)]"; 
+      last (exfalso; set_solver).
+    iModIntro.
+    iExists m.
+    iFrame.
+    simpl.
+    rewrite {1} big_sepM_sep.
+    iDestruct "Hkeys" as "(Hkeys1 & Hkeys2)".
+    iFrame.
+    iModIntro.
+    iIntros "(Hconn_state & Hkeys1 & Hkeys_conn & #Hseen)".
+    rewrite (big_sepM_sep _ (λ k _,  KeyUpdStatus c k false) m).
+    iDestruct "Hkeys_conn" as "(Hkeys_conn & Hkeys_status)".
+    iInv "HinvExt" as ">[%T' [%exec' (Hinv_si_res' & [%t' [%lt' (Htr_is' & HOwnLin' & %HlinOf' & %Hno_empty' & %Hex' 
+      & %Hvalid_trans' & %Hvalid_seq' & %Hbased' & %Hvalid_exec' & Hstate_res' & Hlin_res' & Hpost_res')]])]]" "Hclose'".
+    simpl.
+    iDestruct "Hstate_res'" as "(%mstate' & Hghost_map_mstate' & %mname' & Hghost_map_mname' & Hdisj_trace_res)".
+    iDestruct (@ghost_map_lookup with "[$Hghost_map_mstate'][$Hsa_pointer]") as "%Hlookup_mstate'".
+    assert (clients = {[sa]} ∪ (clients ∖ {[sa]})) as Heq_sa_clients.
+    {
+      apply union_difference_L.
+      set_solver.
+    }
+    rewrite {5} Heq_sa_clients.
+    rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
+    iDestruct "Hdisj_trace_res" as "(Hdisj_trace_res_sa & Hdisj_trace_res)".
+    rewrite big_sepS_singleton.
+    iDestruct "Hdisj_trace_res_sa" as "[(Hfalse & _) | Htrace_res]".
+    {
+      iDestruct "Hfalse" as "[%Hfalse | %Hfalse]"; set_solver.
+    }
+    iDestruct "Htrace_res" as "(%ls & %c' & %γ & %m' & %Hlookup_mstate'' & %Hextract & 
+      #Hsa_c'_pointer & Hghost_map_m' & %Hinit & [(-> & %Hclosed & %Hopen_trans & Hkeys_conn_res) | Hfalse])"; last first.
+    {
+      assert (ls = CanStart) as ->; first set_solver.
+      by iDestruct "Hfalse" as "(%domain & %sub_domain & %tail & %Hfalse & _)".
+    }
+    iMod (ghost_map_update (Active (dom m), Some c) with "[$Hghost_map_mstate'] [$Hsa_pointer]") 
+      as "(Hghost_map_mstate' & Hsa_pointer)".
+    iAssert ((|==> (([∗ set] k ∈ KVS_keys, ghost_map_elem γ k (DfracOwn 1%Qp) None) ∗ 
+              (∃ m'', ghost_map_auth γ 1 m'' ∧ ⌜∀ k, k ∈ KVS_keys → m'' !! k = Some None⌝)))%I) 
+      with "[Hkeys_conn_res Hghost_map_m']" as ">(Hkeys_conn_res & (%m'' & Hghost_map_m' & %Hnone))".
+    {
+      iRevert "Hghost_map_m'".
+      iRevert (m').
+      iInduction KVS_keys as [|k KVS_Keys Hnin] "IH" using set_ind_L.
+      - iIntros (m') "Hghost_map_m'".
+        iModIntro. 
+        iSplitR "Hghost_map_m'"; first done.
+        iExists m'.
+        iFrame.
+        iPureIntro.
+        set_solver.
+      - iIntros (m') "Hghost_map_m'".
+        rewrite big_sepS_union; last set_solver.
+        iDestruct "Hkeys_conn_res" as "(Hkeys_conn_key & Hkeys_conn_res)".
+        iMod ("IH" with "[$Hkeys_conn_res][$Hghost_map_m']") 
+          as "(Hkeys_conn_res & [%m'' (Hghost_map' & %Hnone)])".
+        rewrite big_sepS_singleton.
+        iDestruct "Hkeys_conn_key" as "(%ov & Hkeys_conn_key)".
+        iMod (@ghost_map_update _ Key (option val) _ _ _ _ _ k ov None with "[$Hghost_map'] [$Hkeys_conn_key]") 
+          as "(Hghost_map' & Hkeys_conn_key)".
+        iModIntro.
+        iSplitR "Hghost_map'".
+        + rewrite big_sepS_union; last set_solver.
+          iFrame. 
+          rewrite big_sepS_singleton.
+          iFrame.
+        + iExists _.
+          iFrame.
+          iPureIntro.
+          intros k' Hin.
+          destruct (decide (k = k')) as [->|Hneq].
+          * by rewrite lookup_insert.
+          * rewrite lookup_insert_ne; last done.
+            apply Hnone.
+            set_solver.
+    }
+    iAssert ((([∗ set] k ∈ (dom m) ∩ KVS_keys, ghost_map_elem γ k (DfracOwn 1%Qp) None) ∗ 
+              ([∗ set] k ∈ KVS_keys ∖ ((dom m) ∩ KVS_keys), ghost_map_elem γ k (DfracOwn 1%Qp) None))%I) 
+      with "[Hkeys_conn_res]" as "(Hkeys_conn_res1 & Hkeys_conn_res2)".
+    {
+      assert (KVS_keys = (dom m ∩ KVS_keys) ∪ (KVS_keys ∖ (dom m ∩ KVS_keys))) as Heq.
+      - apply union_difference_L.
+        set_solver.
+      - rewrite {1} Heq.
+        rewrite (big_sepS_union _ (dom m ∩ KVS_keys) (KVS_keys ∖ (dom m ∩ KVS_keys))); last set_solver.
+        iFrame.
+    }
+    iMod (own_lin_add _ _ (#tag1, (c, #"StLin"))%V with "[$HOwnLin']") as "HOwnLin'".
+    iMod (own_lin_hist with "[$HOwnLin']") as "(HOwnLin' & #HOwnLinHist')".
+    iPoseProof (trace_hist_trace_is_prefix with "[$Htr_is'][$Htr_hist]") as "%Hprefix".
+    assert ((#tag1, (c, #"StPre"))%V ∈ t') as Hin.
+    {
+      apply (elem_of_prefix (t ++ [(#tag1, (c, #"StPre"))%V])); last done.
+      set_solver.
+    }
+    iPoseProof (lin_tag_not_in lt' t' γmlin with "[$Hlin_res' $Hlin_tag_res]") as "%Hnot_lin_in".
+    iPoseProof (post_tag_not_in t' γmpost with "[$Hpost_res' $Hpost_tag_res]") as "%Hnot_post_in".
+    iDestruct (lin_tag_add lt' t' γmlin (#tag1, (c, #"StLin"))%V tag1 with "[$Hlin_res' $Hlin_tag_res]") 
+      as "Hlin_res'".
+    {
+      iPureIntro.
+      by simpl.
+    }
+    iDestruct "Hinv_si_res'" as "(%mnames_si & Hghost_map_mnames_si & %m_gl & Hghot_map_m_gl & 
+      %Hkeys_some_m_gl & Hown_exec & %Hrel_exec & Hopen_trans_state)".
+    iDestruct (get_obs with "Hown_exec") as "#Hown_exec_hist".
+    rewrite /open_transactions_state.
+    rewrite {4} Heq_sa_clients.
+    rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
+    iDestruct "Hopen_trans_state" as "(Hopen_trans_state_sa & Hopen_trans_state)".
+    rewrite big_sepS_singleton.
+    iDestruct (@ghost_map_lookup with "[$Hghost_map_mnames_si][$Hsa_pointer_si]") as "%Hlookup'".
+    iDestruct "Hopen_trans_state_sa" as "[%Hfalse|(%c_sa & %m_conn_sa' & %m_snap_sa & %γ_sa & %γ''_sa & %Hextract_c_sa 
+      & Hghost_map_m_conn_sa & Hghost_map_m_snap_sa & %Hopen_state)]"; first (exfalso; set_solver).
+    iAssert (⌜m ⊆ m_gl⌝)%I as "%Hsubset".
+    {
+      iApply (@ghost_map_lookup_big with "[$Hghot_map_m_gl][Hkeys2]").
+      iApply (big_sepM_wand with "[$Hkeys2]").
+      iApply big_sepM_intro.
+      iModIntro.
+      iIntros (k h Hlookup_k) "(Hkey_res & _)".
+      iFrame.
+    }
+    destruct Hrel_exec as (st_new & Hrel_exec).
+    assert (γ_sa = γm_conn) as ->; first set_solver.
+    assert (γ''_sa = γsnap) as ->; first set_solver.
+    iDestruct (@ghost_map.ghost_map_auth_agree _ Key (option val) with "[$Hghost_map_m_conn][$Hghost_map_m_conn_sa]") as "<-".
+    iCombine "Hghost_map_m_conn" "Hghost_map_m_conn_sa" as "Hghost_map_m_conn".
+    iAssert ((|==> (([∗ set] k ∈ KVS_keys, ((∃ (ov : option val), ⌜k ∈ dom m⌝ ∗ ⌜(∃ h, m !! k = Some h ∧ last h = ov)⌝ ∗ ghost_map_elem γm_conn k (DfracOwn 1%Qp) ov) ∨ ⌜k ∉ dom m⌝) ∗
+      ghost_map_elem γsnap k (DfracOwn 1%Qp) false) ∗ 
+      (∃ m_conn', ⌜∀ k, k ∉ KVS_keys → m_conn !! k = m_conn' !! k⌝ ∧ 
+        ⌜∀ k, k ∈ KVS_keys → k ∉ dom m → m_conn' !! k = None⌝ ∗ ghost_map_auth γm_conn 1 m_conn' ∧ 
+        ⌜∀ k ov, k ∈ KVS_keys → k ∈ dom m → (m_conn' !! k = Some ov → (∃ h, m !! k = Some h ∧ last h = ov))⌝)))%I)
+      with "[Hghost_map_m_conn Hkeys_conn_si]" as ">(Hkeys_conn_si & (%m_conn' & _ & %Hm_conn'_none & Hghost_map_m_conn & %Hm_conn'_st_new_rel))".
+    {
+      clear Hnone Hkeys_some_m_gl Hrel_exec Hopen_state.
+      iRevert "Hghost_map_m_conn Hkeys_conn_si".
+      iRevert (m_conn).
+      iInduction KVS_keys as [|k KVS_Keys Hnin] "IH" using set_ind_L.
+      - iIntros (m_conn) "Hghost_map_m_conn Hkeys_conn_si".
+        iModIntro.
+        iSplit; first done.
+        iExists m_conn.
+        set_solver.
+      - iIntros (m_conn) "Hghost_map_m_conn Hkeys_conn_si".
+        rewrite big_sepS_union; last set_solver.
+        iDestruct "Hkeys_conn_si" as "(Hkeys_conn_si_k & Hkeys_conn_si)".
+        rewrite big_sepS_singleton.
+        iDestruct "Hkeys_conn_si_k" as "(%ov & Hkey1 & Hkey2)".
+        iMod ("IH" with "[$Hghost_map_m_conn][$Hkeys_conn_si]") as 
+          "(Hkeys_conn_si & (%m_conn' & %Himp0 & %Himp1 & Hghost_map_m_conn & %Himp2))".
+        destruct (m !! k) as [h|] eqn:Hlookup_k_m; last first.
+        + iAssert (|==>(ghost_map_auth γm_conn 1 (delete k m_conn')))%I with "[Hkey1 Hghost_map_m_conn]" 
+            as ">Hghost_map_m_conn".
+          {
+            iDestruct "Hkey1" as "[Hkey1|%Hkey1]".
+            - iApply (@ghost_map_delete with "[$Hghost_map_m_conn][$Hkey1]").
+            - iModIntro.
+              assert (m_conn' !! k = None) as Hlookup_m_conn'; first by rewrite -(Himp0 k Hnin).
+              by rewrite delete_notin; first iFrame.
+          }
+          iModIntro.
+          rewrite big_sepS_union; last set_solver.
+          iFrame.
+          rewrite big_sepS_singleton.
+          iSplitR "Hghost_map_m_conn".
+          * iFrame.
+            iRight; iPureIntro.
+            by apply not_elem_of_dom_2.
+          * iExists (delete k m_conn').
+            iFrame.
+            apply not_elem_of_dom_2 in Hlookup_k_m.
+            iPureIntro.
+            split_and!.
+            -- intros k' Hn_in.
+               rewrite lookup_delete_ne; set_solver.
+            -- intros k' Hk_in Hnin_m.
+               rewrite elem_of_union in Hk_in.
+               destruct (decide (k = k')) as [<-|Hneq]; first apply lookup_delete.
+               assert (k' ∈ KVS_Keys) as Hk_in'; first set_solver.
+               specialize (Himp1 k' Hk_in' Hnin_m).
+               rewrite lookup_delete_ne; set_solver.
+            -- intros k' ov' Hk'_in Hk'_dom Hdelete_eq.
+               destruct (decide (k = k')) as [<-|Hneq]; first set_solver.
+               apply Himp2; try done; first set_solver.
+               rewrite lookup_delete_ne in Hdelete_eq; set_solver.
+        + iAssert (|==>(ghost_map_elem γm_conn k (DfracOwn 1%Qp) (last h) ∗ ghost_map_auth γm_conn 1 (<[k:=(last h)]> (delete k m_conn'))))%I 
+            with "[Hkey1 Hghost_map_m_conn]" as ">(Hkey1 & Hghost_map_m_conn)".
+          {
+            rewrite insert_delete_insert.
+            iDestruct "Hkey1" as "[Hkey1|%Hkey1]".
+            - iMod (@ghost_map_update _ Key (option val) _ _ _ _ _ k ov (last h) 
+                with "[$Hghost_map_m_conn] [$Hkey1]") as "(Hghost_map_m_conn & Hkey1)".
+              by iFrame.
+            - assert (m_conn' !! k = None) as Hlookup_m_conn'; first by rewrite -(Himp0 k Hnin).
+              iMod (ghost_map_insert k (last h) Hlookup_m_conn' with "[$Hghost_map_m_conn]") 
+                as "(Hghost_map_m_conn & Hkey)".
+              by iFrame.
+          }
+          rewrite big_sepS_union; last set_solver.
+          iFrame.
+          rewrite big_sepS_singleton.
+          iSplitR "Hghost_map_m_conn".
+          * iFrame.
+            iLeft.
+            iExists (last h).
+            iFrame; iPureIntro.
+            split; last eauto.
+            apply elem_of_dom.
+            rewrite /is_Some; set_solver.
+          * iExists (<[k:=last h]> (delete k m_conn')).
+            iFrame.
+            iModIntro.
+            iPureIntro.
+            split_and!.
+            -- intros k' Hn_in.
+               rewrite lookup_insert_ne; last set_solver.
+               rewrite lookup_delete_ne; set_solver.
+            -- intros k' Hk_in Hnin_m.
+               rewrite elem_of_union in Hk_in.
+               destruct (decide (k = k')) as [<-|Hneq].
+               {
+                 apply not_elem_of_dom_1 in Hnin_m.
+                 set_solver.
+               }
+               rewrite lookup_insert_ne; last done.
+               rewrite lookup_delete_ne; set_solver.
+            -- intros k' ov' Hk'_in Hk'_dom Hdelete_eq.
+               destruct (decide (k = k')) as [<-|Hneq]. 
+               {
+                 rewrite lookup_insert in Hdelete_eq.
+                 set_solver.
+               } 
+               apply Himp2; try done; first set_solver.
+               rewrite lookup_insert_ne in Hdelete_eq; last done.
+               rewrite lookup_delete_ne in Hdelete_eq; set_solver.
+    }
+    iAssert ((([∗ set] k ∈ (dom m) ∩ KVS_keys, ∃ (ov : option val), ghost_map_elem γm_conn k (DfracOwn 1%Qp) ov ∗ ⌜k ∈ dom m → (∃ h, m !! k = Some h ∧ last h = ov)⌝ ∗
+      ghost_map_elem γsnap k (DfracOwn 1%Qp) false) ∗ 
+      ([∗ set] k ∈ KVS_keys ∖ ((dom m) ∩ KVS_keys), ⌜m_conn' !! k = None⌝ ∗ ghost_map_elem γsnap k (DfracOwn 1%Qp) false))%I) 
+      with "[Hkeys_conn_si]" as "(Hkeys_conn_si1 & Hkeys_conn_si2)".
+    {
+      assert (KVS_keys = (dom m ∩ KVS_keys) ∪ (KVS_keys ∖ (dom m ∩ KVS_keys))) as Heq.
+      - apply union_difference_L.
+        set_solver.
+      - rewrite {1} Heq.
+        rewrite (big_sepS_union _ (dom m ∩ KVS_keys) (KVS_keys ∖ (dom m ∩ KVS_keys))); last set_solver.
+        iDestruct "Hkeys_conn_si" as "(Hkeys_conn_si1 & Hkeys_conn_si2)".
+        iSplitL "Hkeys_conn_si1".
+        + iApply (big_sepS_wand with "[$Hkeys_conn_si1]").
+          iApply big_sepS_intro.
+          iModIntro.
+          iIntros (k Hk_in) "([(%ov & %Hdom & %Himp & Hkey1)|%Hfalse] & Hkey2)"; 
+            last (exfalso; set_solver).
+          iExists ov; iFrame.
+          iPureIntro; set_solver.
+        + iApply (big_sepS_wand with "[$Hkeys_conn_si2]").
+          iApply big_sepS_intro.
+          iModIntro.
+          iIntros (k Hk_in) "(_ & Hkey2)".
+          iFrame.
+          assert (k ∉ dom m) as Hdom; first set_solver.
+          iPureIntro; set_solver.
+    } 
+    iDestruct "Hghost_map_m_conn" as "(Hghost_map_m_conn_half & Hghost_map_m_conn_half')".
+    iMod ("Hclose'" with "[Hghost_map_m_conn_half Hghost_map_mnames_si Hghot_map_m_gl Hown_exec 
+      Hopen_trans_state Htr_is' HOwnLin' Hghost_map_mname' Hghost_map_m' Hghost_map_m_snap_sa
+      Hghost_map_mstate' Hkeys_conn_res2 Hlin_res' Hpost_res' Hdisj_trace_res]").
+    {
+      iModIntro.
+      iExists T', exec'.
+      iSplitL "Hghost_map_mnames_si Hghot_map_m_gl Hown_exec Hopen_trans_state 
+        Hghost_map_m_conn_half Hghost_map_m_snap_sa".
+      {
+        iExists mnames_si; iFrame.
+        iExists m_gl; iFrame.
+        iSplit; first by iPureIntro.
+        iSplit; first by (iPureIntro; exists st_new).
+        rewrite /open_transactions_state.
+        rewrite {4} Heq_sa_clients.
+        rewrite big_sepS_union; last set_solver.
+        iFrame.
+        rewrite big_sepS_singleton.
+        iRight.
+        iExists c, m_conn', m_snap_sa, γm_conn, γsnap.
+        iFrame "∗%".
+        iSplit; first (iPureIntro; set_solver).
+        iIntros (trans Hfalse).
+        exfalso; set_solver.
+      }
+      iFrame.
+      iExists t', (lt' ++ [(#tag1, (c, #"StLin"))%V]).
+      iFrame.
+      iSplitR.
+      {
+        iPureIntro.
+        apply (lin_trace_lin lt' ((#tag1, (c, #"StPre"))%V) ((#tag1, (c, #"StLin"))%V) tag1 c t'); 
+          try done; rewrite /is_lin_event /is_pre_event; left; by exists tag1, c.
+      }
+      iSplitR; first by iPureIntro.
+      iSplitR.
+      {
+        iPureIntro.
+        destruct Hex' as (Hex1 & Hex2 & Hex3).
+        split.
+        - intros le op Hle_in Hlin_le.
+          specialize (Hex1 le op).
+          apply Hex1; last done.
+          rewrite elem_of_app in Hle_in.
+          destruct Hle_in as [Hle_in | Hle_in]; first done.
+          assert (le = (#tag1, (c, #"StLin"))%V) as ->; first set_solver.
+          inversion Hlin_le.
+        - split.
+          + intros trans op Hin_t Hin_op.
+            specialize (Hex2 trans op Hin_t Hin_op).
+            set_solver.
+          + intros trans op1 op2 Htrans_in Hrel.
+            specialize (Hex3 trans op1 op2 Htrans_in Hrel).
+            destruct Hex3 as (i & j & Hle & Hlookup_i & Hlookup_j).
+            exists i, j.
+            split; first done.
+            split; by apply lookup_app_l_Some.
+      }
+      iSplitR; first by iPureIntro.
+      iSplitR.
+      {
+        iPureIntro.
+        apply valid_sequence_st_lin; set_solver.
+      }
+      do 2 (iSplitR; first by iPureIntro).
+      iExists (<[sa:=(Active (dom m), Some c)]> mstate').
+      iFrame.
+      iExists mname'.
+      iFrame.
+      rewrite {4} Heq_sa_clients.
+      rewrite big_sepS_union; last set_solver.
+      iSplitL "Hkeys_conn_res2 Hghost_map_m'".
+      - rewrite big_sepS_singleton.
+        iRight.
+        rewrite /initialized_trace_resources.
+        rewrite lookup_insert.
+        iExists (Active (dom m)), c, γ, m''.
+        assert (c = c') as ->; first set_solver.
+        iFrame "#∗".
+        do 3 (iSplit; first iPureIntro; first set_solver).
+        iRight.
+        iExists (dom m), ((dom m) ∩ KVS_keys), [].
+        do 2 (iSplit; first by iPureIntro).
+        iSplitR.
+        + iPureIntro.
+          exists (#tag1, (c', #"StLin"))%V, lt'.
+          do 2 (split; first done).
+          split; first by exists tag1.
+          set_solver.
+        + iSplitL.
+          * iApply (big_sepS_wand with "[$Hkeys_conn_res2]").
+            iApply big_sepS_intro.
+            iModIntro.
+            iIntros (k Hk_in) "Hkey".
+            iExists None.
+            iFrame.
+          * iIntros (k' Hk'_dom ov Hlookup).
+            iPureIntro.
+            destruct ov as [v|].
+            -- rewrite Hnone in Hlookup; first done.
+               set_solver.
+            -- left.
+               set_solver.
+      - iApply (big_sepS_wand with "[$Hdisj_trace_res]").
+        iApply big_sepS_intro.
+        iModIntro.
+        iIntros (sa' Hsa'_in) "Hsa'".
+        iApply (client_trace_state_resources_neq2 sa sa' c with "[][][][$]"); try done.
+        iPureIntro; set_solver.
+    }
+    iMod ("Hshift" with "[Hkeys_status Hkeys_conn_si1 Hkeys_conn_si2 Hghost_map_m_conn_half'
+      Hkeys1 Hkeys2 Hkeys_conn Hsa_pointer Hkeys_conn_res1 Hconn_state]").
+    {
+      iFrame.
+      iSplitL "Hkeys_conn_si2 Hsa_pointer Hghost_map_m_conn_half'".
+      {
+        iExists γm_conn, γsnap, m_conn'.
+        iFrame "∗#".
+        iRight.
+        iExists m_gl, m.
+        iSplit; first by iPureIntro.
+        iFrame.
+        iSplit; first by iPureIntro.
+        iExists exec'.
+        iFrame "#".
+        iPureIntro.
+        split; last done.
+        by exists st_new.
+      }
+      rewrite big_sepM_sep.
+      iDestruct "Hkeys2" as "(Hkeys2 & #Hkeys_hist)".
+      iSplitL "Hkeys1 Hkeys2"; first (do 2 rewrite {1} big_sepM_sep; iFrame "#∗").
+      iFrame "#".
+      clear Hm_conn'_st_new_rel Hsubset Hm_conn'_none.
+      iClear "Hseen".
+      iInduction m as [|k h m Hlookup_k_m] "IH" using map_ind; first set_solver.
+      rewrite dom_insert_L intersection_union_r_L.
+      assert ({[k]} ∩ KVS_keys ## dom m ∩ KVS_keys) as Hdisjoint.
+      {
+        assert (k ∉ dom m) as Hnin; last set_solver.
+        by apply not_elem_of_dom_2.
+      }
+      rewrite big_sepS_union; last done.
+      iDestruct "Hkeys_conn_si1" as "(Hkeys_conn_si1_k & Hkeys_conn_si1)".
+      rewrite big_sepS_union; last done.
+      iDestruct "Hkeys_conn_res1" as "(Hkeys_conn_res1_k & Hkeys_conn_res1)".
+      rewrite big_sepM_insert; last done.
+      iDestruct "Hkeys_hist" as "(#Hkeys_hist_k & #Hkeys_hist)".
+      rewrite big_sepM_insert; last done.
+      iDestruct "Hkeys_status" as "(Hkeys_status_k & Hkeys_status)".
+      rewrite big_sepM_insert; last done.
+      iDestruct "Hkeys_conn" as "(Hkeys_conn_k & Hkeys_conn)".
+      rewrite big_sepM_insert; last done.
+      iSplitR "Hkeys_status Hkeys_conn_si1 Hkeys_conn Hkeys_conn_res1"; 
+        last iApply ("IH" with "[//][$Hkeys_status][Hkeys_conn_si1][$Hkeys_conn][$Hkeys_conn_res1]");
+        last first.
+      {
+        iApply (big_sepS_wand with "[$Hkeys_conn_si1]").
+        iApply big_sepS_intro.
+        iModIntro.
+        iIntros (k' Hk_in) "(%ov & Hkey1 & %Hkey_pure & Hkey2)".
+        iExists ov.
+        iFrame.
+        iPureIntro.
+        intros Hk'_in.
+        apply not_elem_of_dom_2 in Hlookup_k_m.
+        rewrite lookup_insert_ne in Hkey_pure; set_solver.
+      }
+      iFrame.
+      assert (c = c') as <-; first set_solver.
+      destruct (decide (k ∈ KVS_keys)) as [Hk_in|Hk_nin].
+      - rewrite (subseteq_intersection_1_L {[k]} KVS_keys); last set_solver.
+        do 2 rewrite big_sepS_singleton.
+        iDestruct "Hkeys_conn_si1_k" as "(%ov & Hkeys_conn_si1_k_1 & %Hkey_conn_si1_pure & Hkeys_conn_si1_k_2)".
+        iSplitR "Hkeys_conn_si1_k_2".
+        + iExists sa, γ, None.
+          iFrame "#".
+          iSplit; first done.
+          iSplitL "Hkeys_conn_res1_k"; first (iIntros (_); iFrame).
+          iSplit; first done.
+          iSplit.
+          {
+            iIntros (v Hlast).
+            apply last_Some_elem_of in Hlast.
+            by iApply "Hkeys_hist_k".
+          }
+          iIntros (_).
+          iExists γm_conn, γsnap.
+          iFrame "#".
+          iLeft.
+          destruct Hkey_conn_si1_pure as (h' & Hlookup_m_k & Hlast_eq); first set_solver.
+          rewrite lookup_insert in Hlookup_m_k.
+          assert (last h = last h') as ->; first set_solver.
+          rewrite Hlast_eq.
+          by iFrame.
+        + iExists sa, γm_conn, γsnap.
+          iFrame "#".
+          iSplit; first done.
+          iSplit; first (iPureIntro; set_solver).
+          iIntros (_).
+          iRight.
+          iSplit; first done.
+          iFrame.
+      - iSplitL.
+        + iExists sa, γ, None.
+          iFrame "#".
+          iSplit; first done.
+          iSplitR; first (iIntros (Hfalse); set_solver).
+          iSplit; first done.
+          iSplit.
+          {
+            iIntros (v Hlast).
+            apply last_Some_elem_of in Hlast.
+            by iApply "Hkeys_hist_k".
+          }
+          iIntros (Hfalse); set_solver.
+        + iExists sa, γm_conn, γsnap.
+          iFrame "#".
+          iSplit; first done.
+          iSplitR; first (iIntros (Hfalse); set_solver).
+          iIntros (Hfalse); set_solver.
+    }
+    iModIntro.
+    rewrite /start_post_emit_event.
+    wp_pures.
+    iInv "HinvExt" as ">[%T'' [%exec'' (Hinv_si_res'' & [%t'' [%lt'' 
+      (Htr_is'' & HOwnLin'' & %HlinOf'' & %Hno_empty'' & %Hex'' & %Hvalid_trans'' & 
+      %Hvalid_seq'' & %Hbased'' & %Hvalid_exec'' & HstateRes'' & Hlin_res'' & Hpost_res'')]])]]" "Hclose''".
+    iDestruct (own_lin_prefix with "[$HOwnLin'' $HOwnLinHist']") 
+      as "(HOwnLin'' & HOwnLinHist & %Hprefix')".
+    assert ((#tag1, (c, #"StLin"))%V ∈ lt'') as HstLinIn.
+    {
+      apply (elem_of_prefix (lt' ++ [(#tag1, (c, #"StLin"))%V])); last done.
+      set_solver.
+    }
+    wp_apply (aneris_wp_emit with "[$Htr_inv $Htr_is'']").
+    {
+      rewrite Hkvs_inv_name.
+      solve_ndisj.
+    }
+    {
+      eapply valid_trace_post; 
+        rewrite /is_post_event /is_st_post_event;
+        set_solver.
+    }
+    iIntros "Htr_is''".
+    iDestruct (lin_tag_add_post lt'' t'' γmlin (#tag1, (c, #"StPost"))%V with "[$Hlin_res'']") as "Hlin_res''".
+    iDestruct (post_tag_add t'' γmpost (#tag1, (c, #"StPost"))%V tag1 with "[$Hpost_res'' $Hpost_tag_res]")
+     as "Hpost_res''".
+    {
+      simpl.
+      iSplitL; first by iPureIntro.
+      iPureIntro.
+      left.
+      by eexists _, _.
+    }
+    iMod ("Hclose''" with "[Hinv_si_res'' Htr_is'' HOwnLin'' HstateRes'' Hlin_res'' Hpost_res'']").
+    {
+      iModIntro.
+      iExists T'', exec''.
+      iFrame.
+      iExists (t'' ++ [(#tag1, (c, #"StPost"))%V]), lt''.
+      iFrame.
+      iSplitR; last set_solver.
+      iPureIntro.
+      apply (lin_trace_valid tag1); try done.
+      rewrite /is_post_event /is_st_post_event.
+      set_solver.
+    }
+    set_solver.
+  Qed.
+
+  Lemma write_implication γmstate γmlin γmpost γmname γl γm_gl γexec γsi_name clients (res : SI_resources Mdl Σ) 
+  (lib : KVS_transaction_api) : 
+    ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
+    trace_inv trace_inv_name valid_trace_si -∗
+    inv KVS_InvName (∃ T exec, GlobalInvExtSI γm_gl γexec γsi_name T exec extract clients ∗ 
+                     GlobalInvExt commit_test_si T extract γmstate γmlin γmpost γmname γl clients exec) -∗
+    @write_spec _ _ _ _ lib res -∗
+    @write_spec _ _ _ _ (KVS_wrapped_api lib) (wrapped_resources γmstate γmlin γmpost γmname γl γm_gl γexec γsi_name clients res).
+  Proof.
+    iIntros "%Hkvs_inv_name #Htr_inv #HinvExt #Hwrite".
+    rewrite /write_spec.
+    iModIntro.
+    iIntros (c sa E k v) "%Hsub %Hin (#Hconn & %Hsa_in_clients & %Hsa_extract & #Hpers_pointer) !# %Φ Hshift".
+    rewrite /TC_write /KVS_wrapped_api /wrap_write.
+    wp_pures.
+    wp_bind (ast.Fresh _).
+    rewrite /write_pre_emit_event.
+    wp_pures.
+    iInv "HinvExt" as ">[%T [%exec (Hinv_si_res & [%t [%lt  (Htr_is & HOwnLin & %HlinOf & %Hno_empty & %Hex 
+      & %Hvalid_trans & %Hvalid_seq & %Hbased & %Hvalid_exec & Hstate_res & Hlin_res & Hpost_res)]])]]" "Hclose".
+    wp_apply (aneris_wp_fresh with "[$Htr_inv $Htr_is]").
+    {
+      rewrite Hkvs_inv_name.
+      solve_ndisj.
+    }
+    {
+      intros tag Hnin.
+      eapply valid_trace_pre; try done.
+      rewrite /is_pre_event /is_wr_pre_event; set_solver.
+    }
+    iIntros (tag1) "(Htr_is & %Htag1_nin)".
+    iDestruct (alloc_trace_hist with "[$Htr_is]") as "(Htr_is & #Htr_hist)".
+    iMod (lin_tag_create lt t γmlin (#tag1, (c, #"WrPre"))%V with "[$Hlin_res]") 
+      as "(Hlin_res & Hlin_tag_res)".
+    {
+      iPureIntro.
+      simpl.
+      do 2 (split; first done).
+      intros Hfalse.
+      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]]; 
+        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse; 
+        set_solver.
+    }
+    iMod (post_tag_create t γmpost (#tag1, (c, #"WrPre"))%V with "[$Hpost_res]") 
+      as "(Hpost_res & Hpost_tag_res)".
+    {
+      iPureIntro.
+      simpl.
+      do 2 (split; first done).
+      intros Hfalse.
+      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]]; 
+        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse; 
+        set_solver.
+    }
+    iMod ("Hclose" with "[Hinv_si_res Htr_is HOwnLin Hstate_res Hlin_res Hpost_res]").
+    {
+      iNext.
+      iExists T, exec.
+      iFrame.
+      iExists (t ++ [(#tag1, (c, #"WrPre"))%V]), lt.
+      iFrame.
+      iSplitR; last set_solver.
+      iPureIntro.
+      apply (lin_trace_valid tag1); try done.
+      rewrite /is_pre_event /is_wr_pre_event.
+      set_solver.
+    }
+    iModIntro.
+    wp_pures.
+    wp_apply "Hwrite"; try done.
+    iClear "Hwrite".
+    iMod "Hshift" as "(%vo & %b & (Hkey_c & Hkey_upd) & Hshift)".
+    iDestruct "Hkey_c" as "(Hkey_c & (%sa' & %γ & %ov_last_wr & #Hsa'_pointer & %Hsa'_extract & 
+      Himp & %Hsa'_in & #Hlin_hist & Hkey_loc_st))".
+    destruct (decide (sa = sa')) as [<- | Hfalse]; last set_solver.
+    iDestruct "Hkey_upd" as "(Hkey_upd & %sa'' & %γm_conn & %γsnap & %Hsa''_extract & 
+      #Hsa''_pointer_si & %Himp_true & Hkey_upd_disj)".
+    destruct (decide (sa = sa'')) as [<- | Hfalse]; last set_solver.
+    iModIntro.
+    iExists vo, b.
+    iFrame.
+    iNext.
+    iIntros "Hkey_c".
+    iInv "HinvExt" as ">[%T' [%exec' (Hinv_si_res' & [%t' [%lt' (Htr_is' & HOwnLin' & %HlinOf' & %Hno_empty' & %Hex' 
+      & %Hvalid_trans' & %Hvalid_seq' & %Hbased' & %Hvalid_exec' & Hstate_res' & Hlin_res' & Hpost_res')]])]]" "Hclose'".
+    iMod (own_lin_add _ _ (#tag1, (c, (#"WrLin", (#k, v))))%V with "[$HOwnLin']") as "HOwnLin'".
+    iMod (own_lin_hist with "[$HOwnLin']") as "(HOwnLin' & #HOwnLinHist')".
+    iPoseProof (trace_hist_trace_is_prefix with "[$Htr_is'][$Htr_hist]") as "%Hprefix".
+    assert ((#tag1, (c, #"WrPre"))%V ∈ t') as Hin'.
+    {
+      apply (elem_of_prefix (t ++ [(#tag1, (c, #"WrPre"))%V])); last done.
+      set_solver.
+    }
+    iPoseProof (lin_tag_not_in lt' t' γmlin with "[$Hlin_res' $Hlin_tag_res]") as "%Hnot_lin_in".
+    iPoseProof (post_tag_not_in t' γmpost with "[$Hpost_res' $Hpost_tag_res]") as "%Hnot_post_in".
+    iDestruct (lin_tag_add lt' t' γmlin (#tag1, (c, (#"WrLin", (#k, v))))%V tag1 with "[$Hlin_res' $Hlin_tag_res]") 
+      as "Hlin_res'".
+    {
+      iPureIntro.
+      by simpl.
+    }
+    iDestruct "Hstate_res'" as "(%mstate & Hmap_mstate & %mname & Hmap_mname & Hdisj_trace_res)".
+    assert (clients = {[sa]} ∪ (clients ∖ {[sa]})) as Heq_sa_clients.
+    {
+      apply union_difference_L.
+      set_solver.
+    }
+    rewrite {6} Heq_sa_clients.
+    rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
+    iDestruct "Hdisj_trace_res" as "(Hdisj_trace_res_sa & Hdisj_trace_res)".
+    rewrite big_sepS_singleton.
+    iDestruct (@ghost_map_lookup with "[$Hmap_mname][$Hsa'_pointer]") as "%Hlookup_mname".
+    iDestruct "Hdisj_trace_res_sa" as "[(_ & %Hnot & _) | Htrace_res]"; first set_solver.
+    iAssert (ghost_map_elem γ k (DfracOwn 1%Qp) ov_last_wr) with "[Himp]" as "Hkey_internal"; 
+      first by iApply "Himp".
+    assert (KVS_keys = {[k]} ∪ (KVS_keys ∖ {[k]})) as Heq_k_keys.
+    {
+      apply union_difference_L.
+      set_solver.
+    }
+    iDestruct "Htrace_res" as "(%s & %c' & %γ' & %m & %Hlookup_mstate & %Hextract & #Hsa_pointer
+      & Hmap_m & Htrace_res)".
+    iAssert ((⌜γ = γ'⌝ ∗ ⌜c = c'⌝)%I) as "(<- & <-)".
+    {
+      iAssert ((⌜(γ, c) = (γ', c')⌝)%I) as "%Heq_pair".
+      - iApply (ghost_map_elem_agree sa γmname _ _ (γ, c) (γ', c') with "[$Hsa'_pointer][$Hsa_pointer]").
+      - iSplit; set_solver.
+    }
+    iDestruct "Htrace_res" as "(%Hinit & [(_ & _ & Hfalse)|Htrace_res])".
+    {
+      rewrite {3} Heq_k_keys.
+      rewrite (big_sepS_union _ {[k]} (KVS_keys ∖ {[k]})); last set_solver.
+      rewrite big_sepS_singleton.
+      iDestruct "Hfalse" as "(_ & (%ov' & Hfalse) & _)".
+      iCombine "Hkey_internal" "Hfalse" as "Hfalse".
+      iDestruct (ghost_map_elem_valid with "Hfalse") as "%Hfalse".
+      by rewrite dfrac_valid_own in Hfalse.
+    }
+    iDestruct ("Hkey_loc_st" with "[//]") as "(%γm_conn' & %γsnap' & #Hsa_pointer_si & Hdisj)".
+    iDestruct (ghost_map_elem_agree sa γsi_name _ _ (Some (γm_conn, γsnap, c)) 
+      (Some (γm_conn', γsnap', c)) with "[$Hsa''_pointer_si][$Hsa_pointer_si]") as "%Heq_names".
+    assert (γsnap' = γsnap) as ->; first set_solver.
+    assert (γm_conn' = γm_conn) as ->; first set_solver.
+    iDestruct "Hinv_si_res'" as "(%mnames & Hmap_mnames & %m_gl & Hmap_m_gl & Hkey_some_m_gl & Hown_exec & 
+      %Hrel_exec & Hopen_trans_state)".
+    rewrite /open_transactions_state.
+    rewrite {5} Heq_sa_clients.
+    rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
+    iDestruct "Hopen_trans_state" as "(Hopen_trans_state_sa & Hopen_trans_state)".
+    rewrite big_sepS_singleton.
+    iDestruct "Hpers_pointer" as "(%γ' & (_ & (%γm_conn' & %γsnap' & #Hpers_pointer)))".
+    iDestruct (@ghost_map_lookup with "[$Hmap_mnames][$Hpers_pointer]") as "%Hlookup_mnames".
+    iDestruct "Hopen_trans_state_sa" as "[%Hfalse|(%c_sa & %m_conn_sa & %m_snap_sa & %γm_conn_sa & %γsnap_sa & %H_sa_names & 
+      Hmap_m_conn_half & Hmap_m_snap & %Htrans_reads)]"; first set_solver.
+    iAssert (⌜c = c_sa⌝)%I as "<-"; first set_solver.
+    iDestruct (@ghost_map_lookup with "[$Hmap_mnames][$Hsa_pointer_si]") as "%Hlookup_mnames'".
+    iAssert (⌜γsnap = γsnap_sa⌝)%I as "<-"; first set_solver.
+    iAssert (∃ (b : bool), ghost_map_elem γsnap k (DfracOwn 1%Qp) b ∗ ∃ (ov : option val), ghost_map_elem γm_conn k (DfracOwn 1%Qp) ov)%I 
+      with "[Hdisj Hkey_upd_disj]" as "(%b' & Hkey_upd_snap & (%ov' & Hkey_conn))".
+    {
+      destruct (b).
+      - iDestruct ("Hkey_upd_disj" with "[//]") as "[(_ & (%ov' & Hkey_conn))|(%Hfalse & _)]"; last set_solver.
+        iDestruct "Hdisj" as "[(_ & Hfalse)|(%v' & _ & Hkey_upd_snap)]"; last (iFrame; eauto).
+        iDestruct (ghost_map_elem_valid_2 with "Hfalse Hkey_conn") as %[Hfalse _].
+        exfalso; set_solver.
+        iExists true; iFrame.
+        iExists ov'; iFrame.
+      - iDestruct ("Hkey_upd_disj" with "[//]") as "[(%Hfalse & _)|(_ & Hkey_upd_snap)]"; first set_solver.
+        iDestruct "Hdisj" as "[(_ & Hkey_conn)|(%v' & _ & Hfalse)]"; 
+          first (iExists false; iFrame; eauto).
+        iDestruct (ghost_map_elem_valid_2 with "Hfalse Hkey_upd_snap") as %[Hfalse _].
+        exfalso; set_solver.
+    }
+    iMod (@ghost_map_update _ Key bool _ _ _ _ _ k b' true with "[$Hmap_m_snap] [$Hkey_upd_snap]") 
+      as "(Hmap_m_snap & Hkey_upd_snap)".
+    iMod (@ghost_map_update _ Key (option val) _ _ _ _ _ k ov_last_wr (Some v.(SV_val)) with "[$Hmap_m] [$Hkey_internal]") 
+      as "(Hmap_m & Hkey_internal)".
+    iMod ("Hclose'" with "[Hmap_mnames Hmap_m_gl Hkey_some_m_gl Hown_exec Hopen_trans_state
+      Htr_is' Hmap_mstate Hmap_mname Hmap_m Htrace_res Hdisj_trace_res Hmap_m_conn_half Hmap_m_snap
+      HOwnLin' Hpost_res' Hlin_res']").
+    {
+      iNext.
+      assert (Decision (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation), 
+        op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans)) 
+        as Hdecision.
+      {
+        do 2 (apply list_exist_dec; intros).
+        apply _.
+      }
+      assert (lin_trace_of (lt' ++ [(#tag1, (c, (#"WrLin", (#k, v))))%V]) t') as Hlin_of_add.
+      {
+        apply (lin_trace_lin lt' (#tag1, (c, #"WrPre"))%V 
+            (#tag1, (c, (#"WrLin", (#k, v))))%V tag1 c t'); try done;
+            rewrite /is_lin_event /is_wr_lin_event /is_pre_event /is_wr_pre_event; 
+            do 2 right; left; eauto.
+      }
+      iAssert (⌜valid_sequence (lt' ++ [(#tag1, (c, (#"WrLin", (#k, v))))%V])⌝)%I as "%Hvalid_seq_add".
+      {
+        iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & %Hopen_start & Hrest)".
+        iPureIntro.
+        apply (valid_sequence_wr_rd_cm_lin _ _ tag1 c tail); try done; last by exists t'.
+        rewrite /is_wr_lin_event; set_solver.
+      }
+      destruct (decide (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation), 
+        op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans)) 
+          as [(trans & Htrans_in & Hop)|Hdec].
+      - destruct (elem_of_list_split _ _ Htrans_in) as (T1 & T2 & ->).
+        iExists (T1 ++ (trans ++ [Wr (tag1, c) k v]) :: T2), exec'.
+        assert (valid_transactions (T1 ++ (trans ++ [Wr (tag1, c) k v]) :: T2)) as Hvalid_added.
+        {
+          apply (valid_transactions_add2 _ _ tag1 _ _ c); try done.
+          - by eapply extraction_of_not_in.
+          - by apply (extraction_of_not_tag trans lt' tag1 (T1 ++ trans :: T2)).
+          - destruct Hop as (op & Hop_in & Hop_last & Hop_conn & Hop_cm).
+            exists op.
+            split_and!; try done.
+            intros (s' & b'' & ->).
+            set_solver.
+        }
+        iSplitL "Hmap_mnames Hmap_m_gl Hkey_some_m_gl Hown_exec Hopen_trans_state Hmap_m_conn_half Hmap_m_snap".
+        {
+          iExists mnames; iFrame.
+          iExists m_gl; iFrame.
+          iFrame "#%".
+          rewrite /open_transactions_state.
+          rewrite {4} Heq_sa_clients.
+          rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
+          iSplitR "Hopen_trans_state".
+          - rewrite big_sepS_singleton.
+            iRight.
+            iExists c, m_conn_sa, (<[k:=true]> m_snap_sa), γm_conn_sa, γsnap.
+            iSplit; first done.
+            iFrame "∗%".
+            iPureIntro.
+            intros trans' Hopen.
+            assert (trans ++ [Wr (tag1, c) k v] = trans') as <-.
+            {
+              eapply trans_eq; try done.
+              rewrite last_snoc.
+              exists (Wr (tag1, c) k v).
+              split_and!; try set_solver.
+            }
+            assert (open_trans trans c (T1 ++ trans :: T2)) as Hopen'.
+            {
+              destruct Hop as (op & Hop).
+              exists op.
+              split_and!; rewrite /is_cm_op; try set_solver.
+            }
+            specialize (Htrans_reads trans Hopen').
+            destruct Htrans_reads as (Hopen_state_1 & Hopen_state_2 & Hopen_state_3).
+            split.
+            {
+              intros sig k' ov v' [Hop_in|Hop_in]; rewrite elem_of_app in Hop_in.
+              - destruct Hop_in as [Hop_in|Hfalse]; last set_solver.
+                eapply Hopen_state_1; left; set_solver.
+              - destruct Hop_in as [Hop_in|Hop_in].
+                + eapply Hopen_state_1; right; set_solver.
+                + assert (k' = k) as ->; set_solver.
+            }
+            split.
+            {
+              intros s' k' v' Hin''.
+              rewrite elem_of_app in Hin''.
+              destruct Hin'' as [Hin''|Hfalse]; last set_solver.
+              specialize (Hopen_state_2 s' k' v' Hin'').
+              intros Hnot_exists.
+              apply Hopen_state_2.
+              intros (sig' & v'' & Hrel).
+              apply Hnot_exists.
+              exists sig', v''.
+              by apply rel_list_imp.
+            }
+            intros sig k' v' Hwr_in.
+            rewrite elem_of_app in Hwr_in.
+            destruct Hwr_in as [Hwr_in|Hwr_in].
+            + destruct (decide (k = k')) as [->|Hneq]; 
+                first by rewrite lookup_insert.
+              rewrite lookup_insert_ne; last done.
+              by eapply Hopen_state_3.
+            + assert (k = k') as <-; first set_solver.
+              by rewrite lookup_insert.
+          - iApply (big_sepS_wand with "[$Hopen_trans_state]").
+            iApply big_sepS_intro.
+            iModIntro.
+            iIntros (sa' Hsa'_in').
+            iIntros "[Hopen_state_sa|(%c' & %m_conn' & %m_snap' & %γm_conn'' & %γsnap'' & 
+              (%Hextract' & %Hnames_lookup) & Hmap_mconn & Hmap_msnap & %Hopen_state)]"; first by iLeft.
+            iRight.
+            iExists c', m_conn', m_snap', γm_conn'', γsnap''.
+            iSplit; first done.
+            iFrame "∗%".
+            iPureIntro.
+            intros trans' Hopen.
+            assert (open_trans trans' c' (T1 ++ trans :: T2)) as Hopen'. 
+            {
+              eapply (open_trans_neq3 _ sa sa' c c' _ _ _ _ (Wr (tag1, c) k v)); rewrite /connOfOp; set_solver.
+            }
+            specialize (Hopen_state trans' Hopen').
+            set_solver.
+        } 
+        iExists t', (lt' ++ [(#tag1, (c, (#"WrLin", (#k, v))))%V]).
+        iFrame.
+        iSplit; first done.
+        iSplit; first (iPureIntro; by apply trans_add_non_empty).
+        iSplit; first (iPureIntro; by apply extraction_of_add2).
+        do 2 (iSplit; first done).
+        iSplit; first (iPureIntro; eapply based_on_add1; rewrite /is_cm_op; set_solver).
+        iSplit; first by simpl.
+        iApply (trace_state_resources_write_lin2 clients c tag1 lt' T1 T2 trans k v sa 
+          s γ γmstate γmname extract mstate mname m with "[][][][][][][][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
+          [$Hmap_m][$Hdisj_trace_res][$Htrace_res]"); try by iPureIntro.
+        + iPureIntro.
+          intros Hfalse.
+          eapply two_trans_implies_false_app_cons; try done.
+          exists (Wr (tag1, c) k v); simpl.
+          rewrite last_snoc; set_solver.
+        + iPureIntro.
+          destruct Hinit as (e & Hin'' & Hconn'' & Hevent'').
+          exists e.
+          split_and!; try done.
+          apply elem_of_app; eauto.
+      - iExists (T' ++ [[Wr (tag1, c) k v]]), exec'.
+        assert (valid_transactions (T' ++ [[Wr (tag1, c) k v]])) as Hvalid_added.
+        {
+          apply (valid_transactions_add1 T' (Wr (tag1, c) k v) c); try done.
+          - by eapply extraction_of_not_in.
+          - apply valid_transaction_singleton.
+          - intros (t'' & Ht''_in & (op & Hop_in & Hop_last & Hop_conn & Hop_cm)).
+            apply Hdec.
+            exists t''.
+            split; first done.
+            exists op.
+            split_and!; try done.
+            rewrite /is_cm_op in Hop_cm.
+            destruct op; try done.
+            exfalso.
+            eauto.
+        }
+        iSplitL "Hmap_mnames Hmap_m_gl Hkey_some_m_gl Hown_exec Hopen_trans_state Hmap_m_conn_half Hmap_m_snap".
+        {
+          iExists mnames; iFrame.
+          iExists m_gl; iFrame.
+          iFrame "#%".
+          rewrite /open_transactions_state.
+          rewrite {4} Heq_sa_clients.
+          rewrite (big_sepS_union _ {[sa]} (clients ∖ {[sa]})); last set_solver.
+          iSplitR "Hopen_trans_state".
+          - rewrite big_sepS_singleton.
+            iRight.
+            iExists c, m_conn_sa, (<[k:=true]> m_snap_sa), γm_conn_sa, γsnap.
+            iSplit; first done.
+            iFrame.
+            iPureIntro.
+            intros trans Hopen.
+            assert ([Wr (tag1, c) k v] = trans) as <-.
+            {
+              eapply (trans_eq); try done.
+              exists (Wr (tag1, c) k v).
+              split_and!; set_solver.
+            }
+            split.
+            {
+              intros s' k' ov'' v' [Hin''|Hin'']; first set_solver.
+              assert (k = k') as ->; set_solver.
+            }
+            split; first set_solver.
+            intros sig k' v' Hwr_in.
+            assert (k = k') as <-; first set_solver.
+            by rewrite lookup_insert.
+          - iApply (big_sepS_wand with "[$Hopen_trans_state]").
+            iApply big_sepS_intro.
+            iModIntro.
+            iIntros (sa' Hsa'_in').
+            iIntros "[Hopen_state_sa|(%c' & %m_conn' & %m_snap' & %γm_conn'' & %γsnap'' & 
+              (%Hextract' & %Hnames_lookup) & Hmap_mconn & Hmap_msnap & %Hopen_state)]"; first by iLeft.
+            iRight.
+            iExists c', m_conn', m_snap', γm_conn'', γsnap''.
+            iSplit; first done.
+            iFrame "∗%".
+            iPureIntro.
+            intros trans Hopen.
+            assert (open_trans trans c' T') as Hopen'.
+            {
+              eapply (open_trans_neq1 _ sa sa' c c'); rewrite /connOfOp; set_solver.
+            }
+            specialize (Hopen_state trans Hopen').
+            set_solver.
+        } 
+        iExists t', (lt' ++ [(#tag1, (c, (#"WrLin", (#k, v))))%V]).
+        iFrame.
+        iSplit; first done.
+        iSplit; first (iPureIntro; set_solver).
+        iSplit; first (iPureIntro; by apply extraction_of_add1).
+         do 2 (iSplit; first done).
+        iSplit; first (iPureIntro; apply based_on_add2; rewrite /is_cm_op; set_solver).
+        iSplit; first by simpl.
+        iApply (trace_state_resources_write_lin1 clients c tag1 lt' T' k v.(SV_val) sa
+          s γ γmstate γmname extract mstate mname m with "[][][][][][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
+          [$Hmap_m][$Hdisj_trace_res][$Htrace_res]"); try by iPureIntro.
+        iPureIntro.
+        destruct Hinit as (e & Hin'' & Hconn'' & Hevent'').
+        exists e.
+        split_and!; try done.
+        apply elem_of_app; eauto.
+    }
+    iMod ("Hshift" with "[Hkey_internal Hkey_c Hkey_upd_snap Hkey_conn]").
+    {
+      iDestruct "Hkey_c" as "(Hkey_c & Hkey_upd)".
+      simpl.
+      iSplitL "Hkey_c Hkey_internal Hkey_upd_snap"; iFrame.
+      - iExists sa, γ, (Some v.(SV_val)). 
+        iFrame "#".
+        iSplit; first done.
+        iSplitL "Hkey_internal"; first (iIntros (_); iFrame).
+        iSplit; first done.
+        iSplit.
+        + iIntros (v' Heq_some).
+          iExists (lt' ++ [(#tag1, (c, (#"WrLin", (#k, v))))%V]), tag1, c.
+          iFrame "#".
+          iPureIntro; set_solver.
+        + iIntros (_).
+          iExists γm_conn, γsnap.
+          iFrame "#".
+          iRight.
+          iFrame.
+          eauto.
+      - iExists sa, γm_conn, γsnap.
+        iSplit; first done.
+        iFrame "#".
+        iSplit; first (iPureIntro; set_solver).
+        eauto.
+    }
+    iModIntro.
+    rewrite /write_post_emit_event.
+    wp_pures.
+    iInv "HinvExt" as ">[%T'' [%exec'' (Hinv_si_res'' & [%t'' [%lt'' 
+      (Htr_is'' & HOwnLin'' & %HlinOf'' & %Hno_empty'' & %Hex'' & %Hvalid_trans'' & 
+      %Hvalid_seq'' & %Hbased'' & %Hvalid_exec'' & HstateRes'' & Hlin_res'' & Hpost_res'')]])]]" "Hclose''".
+    iDestruct (own_lin_prefix with "[$HOwnLin'' $HOwnLinHist']") 
+      as "(HOwnLin'' & HOwnLinHist & %Hprefix')".
+    assert ((#tag1, (c, (#"WrLin", (#k, v))))%V ∈ lt'') as HstLinIn.
+    {
+      apply (elem_of_prefix (lt' ++ [(#tag1, (c, (#"WrLin", (#k, v))))%V])); last done.
+      set_solver.
+    }
+    wp_apply (aneris_wp_emit with "[$Htr_inv $Htr_is'']").
+    {
+      rewrite Hkvs_inv_name.
+      solve_ndisj.
+    }
+    {
+      eapply valid_trace_post; 
+      rewrite /is_post_event /is_wr_post_event;
+      set_solver.
+    }
+    iIntros "Htr_is''".
+    iDestruct (lin_tag_add_post lt'' t'' γmlin (#tag1, (c, (#"WrPost", (#k, v))))%V with "[$Hlin_res'']") as "Hlin_res''".
+    iDestruct (post_tag_add t'' γmpost (#tag1, (c, (#"WrPost", (#k, v))))%V tag1 with "[$Hpost_res'' $Hpost_tag_res]")
+     as "Hpost_res''".
+    {
+      simpl.
+      iSplitL; first by iPureIntro.
+      iPureIntro.
+      rewrite /is_post_event /is_wr_post_event.
+      set_solver.
+    }
+    iMod ("Hclose''" with "[Hinv_si_res'' Htr_is'' HOwnLin'' HstateRes'' Hlin_res'' Hpost_res'']").
+    {
+      iModIntro.
+      iExists T'', exec''.
+      iFrame.
+      iExists (t'' ++ [(#tag1, (c, (#"WrPost", (#k, v))))%V]), lt''.
+      iFrame.
+      iSplitR; last set_solver.
+      iPureIntro.
+      apply (lin_trace_valid tag1); try done.
+      rewrite /is_post_event /is_wr_post_event.
+      set_solver.
+    }
+    set_solver.
+    Unshelve.
+    all : done.
+  Qed.
 
   (* Primary lemma to be used with adequacy *)
   Lemma library_implication (clients : gset socket_address) (lib : KVS_transaction_api) :
@@ -671,7 +4099,7 @@ Section trace_proof.
       by split; [done|exists []; done]. 
     }
     iMod (ghost_map_alloc ((gset_to_gmap [] KVS_keys : gmap Key (list val))))
-      as "[%γmap (Hghost_map_mmap & Hghost_elems_mmap)]".
+      as "[%γm_gl (Hghost_map_mmap & Hghost_elems_mmap)]".
     iMod (own_alloc (A:=mono_listUR (leibnizO (transaction * state)))
       (●ML [] ⋅ ◯ML [])) as (γexec) "[Hexec_trace _]".
     { 
@@ -680,39 +4108,34 @@ Section trace_proof.
     }
     iMod (own_log_auth_update _ _ ([] ++ [([], ∅)]) with "[$Hexec_trace]") as "Hexec_trace"; 
       first by apply prefix_app_r.
-    iMod (ghost_map_alloc ((gset_to_gmap None clients : gmap socket_address (option val))))
-      as "[%γsi_mstate (Hghost_map_msi_mstate & Hghost_elems_msi_mstate)]".
-    iMod (ghost_map_alloc_empty (K:=socket_address) (V:=(gname * gname * gname * val))) as "[%γsi_name Hghost_map_msi_name]".
-    iMod (inv_alloc KVS_InvName ⊤ (∃ T exec, GlobalInvExtSI γmap γexec γsi_mstate γsi_name T exec extract clients ∗ 
+    iMod (ghost_map_alloc ((gset_to_gmap None clients : gmap socket_address (option (gname * gname * val)))))
+      as "[%γsi_name (Hghost_map_msi_name & Hghost_elems_msi_name)]".
+    iMod (inv_alloc KVS_InvName ⊤ (∃ T exec, GlobalInvExtSI γm_gl γexec γsi_name T exec extract clients ∗ 
       GlobalInvExt commit_test_si T extract γmstate γmlin γmpost γmname γl clients exec) with 
       "[Htr Hghost_map_mstate Hghost_map_mlin Hghost_map_mpost Hghost_map_mname Hltrace 
-      Hghost_map_mmap Hghost_map_msi_mstate Hghost_map_msi_name Hexec_trace]") as "#HinvExt".
+      Hghost_map_mmap Hghost_map_msi_name Hexec_trace]") as "#HinvExt".
     {
       iNext.
       iExists [], [([], ∅)].
-      iSplitL "Hghost_map_mmap Hghost_map_msi_mstate Hghost_map_msi_name Hexec_trace".
+      iSplitL "Hghost_map_mmap Hghost_map_msi_name Hexec_trace".
       {
         iExists (gset_to_gmap None clients).
         iFrame.
-        iExists ∅.
+        iExists (gset_to_gmap [] KVS_keys).
         iFrame.
         iSplit.
         - iPureIntro.
-          intros sa Hin.
-          left.
-          split; last apply lookup_empty.
+          intros k Hk_in.
+          assert (gset_to_gmap [] KVS_keys !! k = Some []) as ->; last done.
           by apply lookup_gset_to_gmap_Some.
-        - iExists (gset_to_gmap [] KVS_keys).
-          iFrame.
-          iSplit.
-          + iPureIntro.
-            apply rel_exec_map_init.
-          + rewrite /open_transactions_state.
-            iApply big_sepL_intro.
-            iModIntro.
-            iIntros (k trans Hlookup).
-            exfalso.
-            set_solver.
+        - iSplit; first (iPureIntro; apply rel_exec_map_init).
+          rewrite /open_transactions_state.
+          iApply big_sepS_intro.
+          iModIntro.
+          iIntros (sa Hsa_in).
+          iLeft.
+          iPureIntro.
+          by apply lookup_gset_to_gmap_Some.
       }
       iExists [], [].
       iFrame.
@@ -799,7 +4222,7 @@ Section trace_proof.
           set_solver.
     }
     iModIntro.
-    iExists (wrapped_resources γmstate γmlin γmpost γmname γl γmap γexec γsi_mstate γsi_name clients res).
+    iExists (wrapped_resources γmstate γmlin γmpost γmname γl γm_gl γexec γsi_name clients res).
     iFrame "Hkvs_init".
     iSplitL "Hkeys Hghost_elems_mmap".
     {
@@ -815,13 +4238,13 @@ Section trace_proof.
       set_solver.
     }
     iSplitR; iFrame "∗#".
-    iSplitL "Hghost_elems_mstate Hcan_conn Hghost_elems_msi_mstate".
+    iSplitL "Hghost_elems_mstate Hcan_conn Hghost_elems_msi_name".
     { 
       simpl.
       do 2 rewrite big_sepM_gset_to_gmap.
       do 2 rewrite big_sepS_sep.
       iFrame.
-      iApply (big_sepS_mono with "[$Hghost_elems_msi_mstate]").
+      iApply (big_sepS_mono with "[$Hghost_elems_msi_name]").
       iIntros (sa Hin) "Hkey".
       by iFrame.
     }
