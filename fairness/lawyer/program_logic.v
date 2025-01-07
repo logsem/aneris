@@ -70,7 +70,15 @@ Section ProgramLogic.
       ∃ δ2 ℓ, state_interp extr (trace_extend atr ℓ δ2) (irisG := iG) ∗ P.
 
     Definition MU := MU_impl None.
-    Definition MU__f E ζ ζ' P := MU_impl (Some ζ') E ζ P. 
+    Definition MU__f E ζ ζ' P := MU_impl (Some ζ') E ζ P.
+
+    Lemma fupd_MU_impl f E ζ P:
+      (|={E, ∅}=> MU_impl f ∅ ζ (|={∅, E}=>P)) -∗ MU_impl f E ζ P.
+    Proof using.
+      iIntros "MU". rewrite /MU_impl. iIntros.
+      iMod "MU". iMod ("MU" with "[$]") as (??) "[SI P]".
+      iMod "P". iModIntro. iExists _, _. iFrame.
+    Qed.
 
     Lemma sswp_MU_wp_fupd s E E' ζ e Φ
       (NVAL: language.to_val e = None)

@@ -243,6 +243,14 @@ Section ProgramLogic.
       iIntros "**". iApply (BMU_weaken); try done. set_solver. 
     Qed.
 
+    Lemma BMU_invs E P n:
+      (|={E, ∅}=> BMU ∅ n (|={∅, E}=>P)) -∗ BMU E n P.
+    Proof using.
+      iIntros "BMU". rewrite /BMU. iIntros.
+      iMod "BMU". iMod ("BMU" with "[$]") as (?) "(SI & % & P)".
+      iMod "P". iModIntro. iExists _. by iFrame.
+    Qed.
+
     Lemma BMU_AMU E ζ b (P : iProp Σ) π
       (BOUND: b <= LIM_STEPS)
       :
