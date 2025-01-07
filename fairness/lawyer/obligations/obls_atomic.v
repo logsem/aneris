@@ -109,7 +109,7 @@ Section TotalTriples.
           iIntros "?". iMod ("AB" with "[$]"). by iApply "V12".
       Qed.           
 
-      Local Instance TAU_pre_mono : BiMonoPred TAU_pre.
+      Global Instance TAU_pre_mono : BiMonoPred TAU_pre.
       Proof.
         constructor.
         - iIntros (P1 P2 ??) "#HP12". iIntros ([]) "AU".
@@ -162,16 +162,25 @@ Section TotalTriples.
 
   End AtomicTriples.
 
-  Lemma TAU_acc_Proper_impl {ST RO: Type}:
-    Proper
-      (eq ==> (eq ==> equiv) ==> (eq ==> eq ==> equiv) ==> equiv ==> 
-       (eq ==> eq) ==> (eq ==> iff) ==> eq ==> eq ==> eq ==> equiv ==> 
-       eq ==> (eq ==> eq ==> equiv ) ==> equiv ==> (eq ==> equiv) ==> equiv ==> bi_entails)
-      (TAU_acc (ST := ST) (RO := RO)).
-  Proof using.
-    foobar. 
-    solve_proper. 
-    red. repeat intro. subst.
+  Instance sgns_level_ge'_Proper:
+    Proper (equiv ==> equiv ==> equiv) sgns_level_ge'.
+  Proof using. solve_proper. Qed.
+
+(*   Lemma TAU_acc_Proper' {ST RO: ofe} *)
+(* (τ : Locale) (P1 P2: ofe_mor ST (iProp Σ)) (Q1 Q2: ofe_morO ST (ofe_morO ST (iProp Σ))) *)
+(*   (L : gset Level) (round : ST → RO) (TGT : ST → Prop) *)
+(*   (d__h d__l : Degree) (c : nat) (ε : coPset) (π : Phase) *)
+(*   (Φ1 Φ2 : ofe_mor ST (ofe_mor ST (iProp Σ))) (O : gset SignalId) (RR1 RR2: ofe_mor (option RO) (iProp Σ)) *)
+(*   (V1 V2 : iProp Σ): *)
+(*     ⊢ (P1 ≡ P2) -∗ (Q1 ≡ Q2) -∗ (Φ1 ≡ Φ2) -∗ (RR1 ≡ RR2) -∗ (V1 ≡ V2) -∗ *)
+(*       (TAU_acc τ P1 (Q1) L round TGT d__h d__l c ε π Φ1 O RR1 V1 ∗-∗ TAU_acc τ P2 Q2 L round TGT d__h d__l c ε π Φ2 O RR2 V2). *)
+(*     (* Proper *) *)
+(*     (*   (eq ==> (eq ==> equiv) ==> (eq ==> eq ==> equiv) ==> equiv ==>  *) *)
+(*     (*    (eq ==> eq) ==> (eq ==> iff) ==> eq ==> eq ==> eq ==> equiv ==>  *) *)
+(*     (*    eq ==> (eq ==> eq ==> equiv ) ==> equiv ==> (eq ==> equiv) ==> equiv ==> equiv) *) *)
+(*     (*   (TAU_acc (ST := ST) (RO := RO)). *) *)
+(*   Proof using. *)
+  
 
   Global Instance TAU_acc_Proper {ST RO: Type}:
     Proper
@@ -180,8 +189,43 @@ Section TotalTriples.
        eq ==> (eq ==> eq ==> equiv ) ==> equiv ==> (eq ==> equiv) ==> equiv ==> equiv)
       (TAU_acc (ST := ST) (RO := RO)).
   Proof using.
+    (* TODO: simplify *)
     red. repeat intro. subst. 
+    rewrite /TAU_acc.
+    apply leibniz_equiv_iff in H4, H10, H13. subst.
+    iApply fupd_proper. 
+    iApply bi.exist_proper. iIntros (?).
+    iApply bi.sep_proper; [by eauto| ].
+    iApply bi.and_proper.
+    { iApply bi.forall_proper. iIntros (?).
+      iApply bi.wand_proper.
+      { repeat iApply bi.sep_proper; try done. 
+        2: { iApply bi.pure_proper. apply not_iff_compat. eauto. }
+        iApply bi.exist_proper. iIntros (?).
+        iApply bi.sep_proper; eauto.
+        iApply bi.or_proper; eauto.
+        iApply bi.pure_proper. split; intros ->; subst; f_equal; [| symmetry]; eauto. }
+      rewrite -(H5 a); [| done]. rewrite -(H2 a); [| done]. rewrite H15.
+      rewrite -(H14 _); reflexivity. }
+    rewrite -(H2 a); [| done]. setoid_rewrite <- (H14 _); [| reflexivity].
+    rewrite -(H6 a); [| done].
+    rewrite H15.
+    setoid_rewrite <- (H3 _ _ _ _); try reflexivity.
+    setoid_rewrite <- (H12 _ _ _ _); reflexivity.
+  Qed. 
 
+  Global Instance TAU_Proper {ST RO: Type}:
+    Proper
+      (eq ==> (eq ==> equiv) ==> (eq ==> eq ==> equiv) ==> equiv ==> 
+       (eq ==> eq) ==> (eq ==> iff) ==> eq ==> eq ==> eq ==> equiv ==> 
+       eq ==> (eq ==> eq ==> equiv ) ==> equiv ==> (eq ==> equiv) ==> equiv)
+      (TAU (ST := ST) (RO := RO)).
+  Proof using.
+    rewrite /TAU /TAU_def.
+    red. repeat intro. subst.
+    eapply greatest_fixpoint_proper; [| done].
+    repeat intro. rewrite /TAU_pre. iApply TAU_acc_Proper; eauto.
+  Qed.
 
 End TotalTriples.
 
@@ -360,6 +404,25 @@ Section Ticketlock.
   Definition ow_lb `{TicketlockG Σ} (n: nat) :=
     own tl_γ_ow_lb (mono_nat_lb n).
 
+  Lemma ticket_token_excl `{TicketlockG Σ} i:
+    ticket_token i -∗ ticket_token i -∗ False. 
+  Proof using.
+    clear ODl ODd LEl.
+    iApply bi.wand_curry. rewrite -own_op -auth_frag_op.
+    iIntros "X". iDestruct (own_valid with "X") as %V.
+    rewrite auth_frag_valid in V. apply gset_disj_valid_op in V. set_solver.
+  Qed.
+
+  Lemma ticket_token_bound `{TicketlockG Σ} i N:
+    ticket_token i -∗ tokens_auth N -∗ ⌜ i < N ⌝.
+  Proof using.
+    iApply bi.wand_curry. rewrite bi.sep_comm -own_op.
+    iIntros "X". iDestruct (own_valid with "X") as %V.
+    apply auth_both_valid_discrete in V as [IN V].
+    apply gset_disj_included, elem_of_subseteq_singleton in IN.
+    apply elem_of_set_seq in IN. iPureIntro. lia.
+  Qed.
+
   Lemma held_agree `{TicketlockG Σ} b1 b2:
     held_auth b1-∗ held_frag b2 -∗ ⌜ b1 = b2 ⌝. 
   Proof using.
@@ -509,13 +572,65 @@ Section Ticketlock.
   Instance TAU_stored_Proper `{TLG: TicketlockG Σ}:
     Proper (eq ==> eq ==> equiv ==> equiv) TAU_stored.
   Proof using.
-    solve_proper. 
+    intros ?????????. subst. rewrite /TAU_stored.
+    destruct x1 as [[[[[]]]]], y1 as [[[[[]]]]].
+    rename H1 into X. 
+    repeat (inversion X as [X1 ?Y]; clear X; rename X1 into X). simpl in *. subst.
+    apply leibniz_equiv_iff in Y1, Y2, X, Y3. subst.
+    rewrite X.
+    rewrite /tl_TAU /TAU_FL. simpl.
+    iApply bi.sep_proper; [by eauto| ]. iApply bi.sep_proper; [by eauto| ].
+    iApply TAU_Proper; solve_proper.
+  Qed.
 
   Definition tau_interp `{TicketlockG Σ} (lk: val) (c: nat) (ow: nat) (i: nat) (cd: tau_codom Σ): iProp Σ :=
       let Φ := cd.1.2 in
       (TAU_stored lk c cd ∗ ⌜ ow < i ⌝ ∨
        ((Φ #() ∨ ticket_token i) ∗ ⌜ ow = i ⌝) ∨
        ticket_token i ∗ ⌜ i < ow ⌝).
+
+  Lemma tau_interp_Proper_impl' `{TicketlockG Σ} lk c ow i x y:
+    (x ≡ y) -∗ tau_interp lk c ow i x -∗ tau_interp lk c ow i y.
+  Proof using.
+    iIntros "#EQUIV". rewrite /tau_interp.
+    rewrite /TAU_stored.
+    destruct x as [[[[[]]]]], y as [[[[[]]]]]. simpl.
+    repeat rewrite prod_equivI. simpl. iDestruct "EQUIV" as "[[[[[%U %V] %Y]%Z] #A] #B]".
+    apply leibniz_equiv_iff in V , Y, Z. rewrite leibniz_equiv_iff in U. subst.
+    rewrite !ofe_morO_equivI.
+    iIntros "T". iDestruct "T" as "[T | [T | T]]"; try by (iRight; iFrame).
+    2: { iRight. iLeft. iDestruct "T" as "[T ->]". iSplit; [| done].
+         iDestruct "T" as "[T | ?]"; [| by iFrame].
+         iSpecialize ("A" $! #()).
+         iLeft. by iRewrite -"A". }
+    iLeft.
+    iDestruct "T" as "[[?[? T]]?]". iFrame.
+    rewrite /tl_TAU /TAU_FL.
+
+    (* TODO: extract lemma *)
+    rewrite /TAU /TAU_def.
+    iDestruct (greatest_fixpoint_strong_mono with "[] T") as "foo".
+    2: by iFrame.
+    iModIntro. iIntros (Φ ?). rewrite /TAU_pre. rewrite /TAU_acc. 
+    (* iApply fupd_mono. *)
+    iIntros "X". iMod "X" as (?) "[P T1]". iModIntro. iExists _. iFrame "P".
+    iSplit; [| iSplit].
+    - iIntros (?) "X". iDestruct "T1" as "[T1 _]".
+      iApply (BMU_wand with "[]").
+      2: { iApply "T1". iDestruct "X" as "(?&?&?&X&?)". iFrame.
+           iDestruct "X" as (?) "(?&?)". iExists _. iFrame.
+           iSpecialize ("B" $! r__p). by iRewrite "B". }
+      iIntros "(C&?&?&?&?)". iFrame. 
+      iSpecialize ("B" $! (Some (fl_round x0))). by iRewrite "B" in "C".
+    - iDestruct "T1" as "[_ [T1 _]]".
+      iIntros "([% ?]&%&?&?)".
+      iApply (BMU_wand with "[]").
+      2: { iApply "T1". iFrame. iSplit; [| done].
+           iExists r__p. by iRewrite ("B" $! r__p). }
+      iIntros "(?&P)". iFrame. iIntros (?) "?". iSpecialize ("P" with "[$]").
+      iMod "P". iModIntro. by iRewrite -("A" $! #()).
+    - by iDestruct "T1" as "[_ [_ T1]]".
+  Qed.
 
   Lemma tau_interp_Proper_impl `{TicketlockG Σ}:
     Proper (eq ==> eq ==> eq ==> eq ==> equiv ==> bi_entails) (tau_interp).
@@ -529,15 +644,15 @@ Section Ticketlock.
          destruct x3 as [[??]?], y3 as [[??]?]. simpl. inversion H4.
          simpl in *. inversion H0. simpl in *.
          by iApply H3. }
-    foobar. 
+    rewrite H4. by iLeft.
+  Qed.
 
   Instance tau_interp_Proper `{TicketlockG Σ}:
-    Proper (eq ==> eq ==> eq ==> eq ==> equiv ==> equiv) (tau_interp).
+    Proper (eq ==> eq ==> eq ==> eq ==> (fun x y => equiv (A:=tau_codom Σ) x y) ==> equiv) (tau_interp).
   Proof using.
     intros ???????????????. subst.
-    iStartProof. rewrite /tau_interp.
-    
-    setoid_rewrite H4. 
+    iStartProof. iSplit; iApply tau_interp_Proper_impl; done.
+  Qed.
     
   Definition tau_map_interp `{TicketlockG Σ} (lk: val) (c: nat) (ow: nat) (TM: gmap nat (tau_codom Σ)): iProp Σ :=
     [∗ map] i ↦ cd ∈ TM, tau_interp lk c ow i cd.
@@ -551,8 +666,9 @@ Section Ticketlock.
 
   Lemma tau_map_ticket_interp `{TicketlockG Σ} TM i cd lk c ow:
     tau_map_auth TM -∗ ticket_tau i cd -∗ tau_map_interp lk c ow TM -∗
-    tau_interp lk c ow i cd ∗ (tau_interp lk c ow i cd -∗ tau_map_interp lk c ow TM).
+    tau_interp lk c ow i cd ∗ ticket_tau i cd ∗ tau_map_auth TM ∗ (tau_interp lk c ow i cd -∗ tau_map_interp lk c ow TM).
   Proof using.
+    clear fl_degs_wl0 d__w ODl ODd LEl. 
     iIntros "TM T TMI".
     iDestruct (tau_map_ticket with "[$] [$]") as "#TK".
     rewrite {1}/tau_map_interp. rewrite {3}(utils.map_split TM i).
@@ -560,13 +676,16 @@ Section Ticketlock.
     2: { apply map_disjoint_dom. destruct lookup; set_solver. }
     iDestruct "TMI" as "[TKI CLOS]".
     destruct (TM !! i) eqn:TMi; rewrite option_equivI; [| done].
-    simpl. rewrite big_sepM_singleton. iRewrite "TK" in "TKI". 
-    2: { by rewrite option_equivI. } 
+    simpl. rewrite big_sepM_singleton.
+    iDestruct (tau_interp_Proper_impl' with "TK TKI") as "TKI". iFrame.
+    iIntros "TKI".
+    rewrite internal_eq_sym. 
+    iDestruct (tau_interp_Proper_impl' with "TK TKI") as "TKI". 
+    iDestruct (big_sepM_insert_delete with "[CLOS TKI]") as "TMI".
+    { repeat iFrame. }
+    rewrite insert_id; [| done]. iFrame.
+  Qed.
     
-    big_opM
-    
-
-
   Lemma TMI_extend_queue `{TicketlockG Σ} lk c ow TM tk cd
     (DOM: dom TM = set_seq 0 tk)
     (QUEUE: ow < tk):
@@ -852,7 +971,8 @@ Section Ticketlock.
   Qed.
 
   Lemma wait_spec (lk: val) c o' (t: nat) τ π Ob Φ RR
-    (LIM_STEPS': fl_B TLPre c <= LIM_STEPS):
+    (LIM_STEPS': fl_B TLPre c <= LIM_STEPS)
+    (LEo't: o' <= t):
     tl_is_lock lk c ∗ exc_lb 20 (oGS := oGS) ∗ wait_res o' t τ π Ob Φ RR ⊢ WP (wait lk #t) @ τ {{ Φ }}.
   Proof using.
     rewrite /wait_res. iIntros "(#INV & #EXC & OW_LB & CPSh & CPS & TOK & TAU & PH)".
@@ -873,20 +993,39 @@ Section Ticketlock.
     wp_bind (! _)%E.
     iApply wp_atomic.
     iInv "INV" as "inv" "CLOS". rewrite {1}/tl_inv_inner.
-    iDestruct "inv" as (?? ow tk TM) "(>%EQ_ & >%LEot & >OW & >TK & >EXACT & >HELD & >TOKS & >%DOM__TM & TM & TAUS)".
+    iDestruct "inv" as (?? ow tk TM) "(>%EQ_ & >%LEot & >OW & >Ltk & >EXACT & >HELD & >TOKS & >%DOM__TM & TM & TAUS)".
     inversion EQ_. subst l__ow0 l__tk0. clear EQ_.
     iModIntro.
     iApply sswp_MU_wp_fupd; [done| ]. iModIntro.
     iApply (wp_load with "[OW]"); [done| ]. iIntros "!> OW".
-    iNext. 
-    destruct (decide (ow = tk)) as [-> | QUEUE].
-    { rewrite Nat.eqb_refl.
-      
-    I
-    { done. 
+    iNext.
+    iDestruct (ticket_token_bound with "[$] [$]") as %LTttk. 
+    destruct (decide (ow = t)) as [-> | QUEUE].
+    { rewrite (proj2 (Nat.eqb_neq _ _)); [| lia].
+      iDestruct (tau_map_ticket_interp with "[$] [$] [$]") as "(TAUtk & TAU & TM & TMI_CLOS)".
+      rewrite {1}/tau_interp. iDestruct "TAUtk" as "[[? %] | [[TAUtk _] | [? %]]]".
+      1, 3: lia.
+      simpl. iDestruct "TAUtk" as "[Φ | TOK']".
+      2: { by iDestruct (ticket_token_excl with "[$] [$]") as %?. }
+      iSpecialize ("TMI_CLOS" with "[TOK]").
+      { rewrite /tau_interp. iRight. iLeft. iSplit; [| done]. iFrame. }
+      MU_by_burn_cp. iModIntro. pure_steps.
+      iMod ("CLOS" with "[TMI_CLOS OW TOKS HELD EXACT Ltk TM]") as "_".
+      { rewrite /tl_inv_inner. iNext. do 5 iExists _. iFrame.
+        rewrite (proj2 (Nat.eqb_neq _ _)); [| lia]. by iFrame. }
+      iModIntro.
+
+      wp_bind (Rec _ _ _)%V. pure_steps.
+      wp_bind (_ = _)%E. 
+      iApply sswp_MU_wp; [done| ]. 
+      iApply sswp_pure_step. 
+      { simpl. tauto. }
+      iNext. MU_by_burn_cp. rewrite bool_decide_eq_true_2; [| tauto].
+      pure_steps.
+      done. }
+
     
-
-
+      
 
   (* TODO: mention exc_lb in the proof OR implement its increase *)
   Lemma tl_acquire_spec (lk: val) c τ:
@@ -920,12 +1059,6 @@ Section Ticketlock.
          trans d__h0; eauto. }
     iIntros "[CPS PH]". BMU_burn_cp.
 
-    pure_steps.
-    Set Printing Coercions.
-    Set Printing All.
-(FAA (Snd (Val lk)) (Val (LitV (LitInt (Zpos xH)))))
-(FAA (Snd (Val lk)) (Val (LitV (LitInt (Zpos xH)))))
-    wp_bind (Snd _)%E. 
     
 
     
