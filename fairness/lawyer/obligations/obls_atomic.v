@@ -1120,6 +1120,74 @@ Section Ticketlock.
   Qed.
 
   (* TODO: mention exc_lb in the proof OR implement its increase *)
+  Lemma tl_release_spec (lk: val) c τ:
+    tl_is_lock lk c ∗ exc_lb 20 (oGS := oGS) ⊢
+        TLAT_FL τ
+        (release_at_pre lk (FLP := TLPre) (FLG := TLG))
+        (release_at_post lk (FLP := TLPre) (FLG := TLG))
+        ∅
+        (fun _ => True%type)
+        c (tl_release lk)
+        (oGS := oGS)
+        (FLP := TLPre).
+  Proof using.
+    iIntros "[#INV #EB]". rewrite /TLAT_FL /TLAT.
+    iIntros (Φ π Ob RR) "%LIM_STEPS' PRE TAU".
+    rewrite /TLAT_pre. simpl. iDestruct "PRE" as "(RR0 & OB & _ & PH & CP)".
+    rewrite /tl_release. 
+
+    pure_step_hl. MU_by_BMU.
+    iApply (BMU_lower _ 2).
+    { simpl. lia. }
+    iApply OU_BMU. iApply (OU_wand with "[-CP PH]").
+    2: { (* TODO: can we remove phase restriction for exchange? *)
+         iApply (exchange_cp_upd with "[$] [$] [$]").
+         1, 2: reflexivity.
+         trans d__e; [trans d__h0| ]; [trans d__l0|..]; eauto. }
+    iIntros "[CPS PH]". BMU_burn_cp.
+
+    assert (FAA (Fst lk) #1 = fill_item (FaaLCtx #(LitInt 1)) (Fst lk)) as CTX by done.
+    iApply (wp_bind [(FaaLCtx #1)] NotStuck ⊤ τ (Fst lk) (Λ := heap_lang)). simpl.
+    iApply wp_atomic.
+    iMod (fupd_mask_subseteq _) as "CLOS'"; [| iInv "INV" as "inv" "CLOS"]; [set_solver| ].
+    iModIntro. rewrite {1}/tl_inv_inner.
+    iDestruct "inv" as (l__ow l__tk ???) "[>%EQ inv]". subst lk.
+    pure_steps. iMod ("CLOS" with "[inv]") as "_".
+    { iNext. rewrite /tl_inv_inner. do 5 iExists _. iFrame. done. }
+    iMod "CLOS'" as "_". iModIntro.
+    clear TM ow tk.
+
+    iApply wp_atomic.
+    iInv "INV" as "inv" "CLOS". rewrite {1}/tl_inv_inner.
+    iDestruct "inv" as (?? ow tk TM) "(>%EQ_ & >%LEot & >OW & >Ltk & >EXACT & >HELD & >TOKS & >%DOM__TM & TM & TAUS)".
+    inversion EQ_. subst l__ow0 l__tk0. clear EQ_.
+    iModIntro.
+    iApply sswp_MU_wp_fupd; [done| ].
+    rewrite TAU_elim. iMod "TAU" as ([[]]) "[ST TAU]". iModIntro.
+    rewrite /release_at_pre. simpl.
+    remember_goal.
+    iDestruct "ST" as "(>(%&%&%&OW'&HELD')&[% %EQ])". subst.
+    iApply "GOAL". iClear "GOAL".
+    inversion EQ. subst. clear EQ.
+    (* iDestruct (mapsto_agree with "[$] [$]") as %EQ. inversion EQ as [EQ']. *)
+    (* apply Nat2Z.inj' in EQ'. subst r. clear EQ. *)
+    iCombine "OW OW'" as "OW". rewrite dfrac_op_own. rewrite Qp.inv_half_half.
+    iDestruct (held_agree with "[$] [$]") as %EQ.
+    destruct Nat.eqb eqn:EQ'; [done| ]. apply PeanoNat.Nat.eqb_neq in EQ'. clear EQ.
+    iApply (wp_faa with "[$]"). iIntros "!> OW".
+    iDestruct "TAU" as "[_ [TAU _]]".
+    iNext. MU_by_BMU.
+    iSpecialize ("TAU" with "[OB PH]"); [by iFrame| ].
+    iModIntro.
+    iApply (wp_load with "[OW]"); [done| ]. iIntros "!> OW".
+
+
+
+
+    
+
+
+  (* TODO: mention exc_lb in the proof OR implement its increase *)
   Lemma tl_acquire_spec (lk: val) c τ:
     tl_is_lock lk c ∗ exc_lb 20 (oGS := oGS) ⊢
         TLAT_FL τ
