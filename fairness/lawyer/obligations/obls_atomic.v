@@ -1058,7 +1058,7 @@ Section Ticketlock.
     iDestruct (tau_map_ticket_interp with "[$] [$] [$]") as "(TAUtk & TAU & TM & TMI_CLOS)".
     rewrite {1}/tau_interp.
     apply Nat.le_lteq in LEot as [LTot | EQ]. 
-    2: { iDestruct "TAUtk" as "[[? %] | [[? %] | [? %]]]".
+    2: { subst tk. iDestruct "TAUtk" as "[[? %] | [[? %] | [? %]]]".
          all: try lia. 
          by iDestruct (ticket_token_excl with "[$] [$]") as %?. }
 
@@ -1164,6 +1164,7 @@ Section Ticketlock.
     { repeat iFrame. }
     rewrite insert_id; [| done]. iFrame.
   Qed.
+    
   (* TODO: mention exc_lb in the proof OR implement its increase *)
   Lemma tl_release_spec (lk: val) c τ:
     tl_is_lock lk c ∗ exc_lb 20 (oGS := oGS) ⊢
@@ -1202,27 +1203,107 @@ Section Ticketlock.
     iMod "CLOS'" as "_". iModIntro.
     clear TM ow tk.
 
+    (* iApply sswp_MU_wp_fupd; [done| ]. *)
+    (* iInv "INV" as "inv" "CLOS". *)
+    (* iModIntro. *)
+    (* remember_goal. *)
+    (* iDestruct "inv" as (?? ow tk TM) "(>%EQ_ & >%LEot & >OW & >Ltk & >EXACT & >HELD & >TOKS & >%DOM__TM & TM & TAUS)". *)
+    (* inversion EQ_. subst l__ow0 l__tk0. clear EQ_. *)
+    (* iApply "GOAL". iClear "GOAL". *)
+
+    (* iApply (sswp_wand with "[PH]"). *)
+    (* { iIntros (?). iApply bi.later_wand. iNext. *)
+    (*   iIntros "X". MU_by_BMU. iRevert "PH". iApply "X". } *)
+
+    (* iApply sswp_fupd; [done| ].  *)
+    (* rewrite TAU_elim. *)
+    (* iMod "TAU" as ([[]]) "[ST TAU]". iModIntro. *)
+    (* rewrite /release_at_pre. simpl. *)
+    (* remember_goal. *)
+    (* iDestruct "ST" as "(>(%&%&%&OW'&HELD')&[% %EQ])". subst. *)
+    (* iApply "GOAL". iClear "GOAL". *)
+    (* inversion EQ. subst. clear EQ. *)
+    (* iDestruct (mapsto_agree with "OW' OW") as %EQ. inversion EQ as [EQ']. *)
+    (* apply Nat2Z.inj' in EQ'. subst n. clear EQ. *)
+    (* iCombine "OW OW'" as "OW". rewrite Qp.inv_half_half. *)
+    (* iDestruct (held_agree with "[$] [$]") as %EQ. *)
+    (* destruct Nat.eqb eqn:EQ'; [done| ]. apply PeanoNat.Nat.eqb_neq in EQ'. clear EQ. *)
+    (* iApply (wp_faa with "[$]"). iIntros "!> OW". *)
+    (* iDestruct "TAU" as "[_ [TAU _]]". *)
+    (* iSpecialize ("TAU" with "[OB PH]"); [by iFrame| ]. *)
+    (* iNext. MU_by_BMU. *)
+    (* simpl. iApply BMU_split. *)
+    (* iApply (BMU_wand with "[-TAU] [$]"). iIntros "[PH CLOS']". *)
+    (* iSpecialize ("CLOS'" $! (_, (ow + 1), false)). *)
+    (* remember_goal. *)
+    (* iMod (held_update _ _ false with "[$] [$]") as "[HELD HELD']". *)
+    (* iMod (ow_exact_increase _ (ow + 1) with "[$]") as "[EXACT OW_LB]"; [lia| ]. *)
+    (* iApply "GOAL". iClear "GOAL". *)
+    (* iSpecialize ("CLOS'" with  *)
+    (* iModIntro. *)
+    (* iApply (wp_load with "[OW]"); [done| ]. iIntros "!> OW". *)
+
     iApply wp_atomic.
     iInv "INV" as "inv" "CLOS". rewrite {1}/tl_inv_inner.
     iDestruct "inv" as (?? ow tk TM) "(>%EQ_ & >%LEot & >OW & >Ltk & >EXACT & >HELD & >TOKS & >%DOM__TM & TM & TAUS)".
     inversion EQ_. subst l__ow0 l__tk0. clear EQ_.
     iModIntro.
     iApply sswp_MU_wp_fupd; [done| ].
-    rewrite TAU_elim. iMod "TAU" as ([[]]) "[ST TAU]". iModIntro.
+    rewrite TAU_elim.
+    iMod "TAU" as ([[]]) "[ST TAU]". iModIntro.
     rewrite /release_at_pre. simpl.
     remember_goal.
     iDestruct "ST" as "(>(%&%&%&OW'&HELD')&[% %EQ])". subst.
     iApply "GOAL". iClear "GOAL".
     inversion EQ. subst. clear EQ.
-    (* iDestruct (mapsto_agree with "[$] [$]") as %EQ. inversion EQ as [EQ']. *)
-    (* apply Nat2Z.inj' in EQ'. subst r. clear EQ. *)
-    iCombine "OW OW'" as "OW". rewrite dfrac_op_own. rewrite Qp.inv_half_half.
+    iDestruct (mapsto_agree with "OW OW'") as %EQ. inversion EQ as [EQ'].
+    apply Nat2Z.inj' in EQ'. subst n. clear EQ.
+    iCombine "OW OW'" as "OW". rewrite Qp.inv_half_half.
     iDestruct (held_agree with "[$] [$]") as %EQ.
     destruct Nat.eqb eqn:EQ'; [done| ]. apply PeanoNat.Nat.eqb_neq in EQ'. clear EQ.
     iApply (wp_faa with "[$]"). iIntros "!> OW".
     iDestruct "TAU" as "[_ [TAU _]]".
     iNext. MU_by_BMU.
     iSpecialize ("TAU" with "[OB PH]"); [by iFrame| ].
+    simpl. iApply BMU_split.
+    iApply (BMU_wand with "[-TAU] [$]"). iIntros "[PH CLOS']".
+    iSpecialize ("CLOS'" $! (_, (ow + 1), false)).
+    remember_goal. 
+    iMod (held_update _ _ false with "[$] [$]") as "[HELD HELD']".
+    iMod (ow_exact_increase _ (ow + 1) with "[$]") as "[EXACT OW_LB]"; [lia| ].
+    iApply "GOAL". iClear "GOAL".
+    
+    rewrite -{2}Qp.inv_half_half. rewrite mapsto_fractional. iDestruct "OW" as "[OW OW']".
+    iSpecialize ("CLOS'" with "[OW' HELD']").
+    { rewrite /release_at_post. simpl. iSplit; [| by eauto].
+      do 2 iExists _. iSplitR; [by eauto| ]. iFrame.
+      Set Printing Coercions.
+      by rewrite Nat2Z.inj_add. }
+
+    iApply BMU_proper.
+    1, 2: reflexivity.
+    { apply bi.sep_comm. }
+    iApply BMU_frame.
+    { admit. }
+    iApply (BMU_mask_comm with "[-CLOS'] [$]"); [set_solver| ].
+    iIntros "Φ".
+
+    assert (ow + 1 ∈ dom TM) as NEXT by admit.
+    apply elem_of_dom in NEXT as [cd' NEXT].
+    iDestruct (tau_map_ticket_interp' with "[$]") as "[TI' TMI_CLOS]"; [eauto| ].
+    rewrite {1}/tau_interp. iDestruct "TI'" as "[[TAUs' _] | [[? %] |[? %]]]"; try lia.
+    destruct cd' as [[[[[]]]]].
+    rewrite /TAU_stored. iDestruct "TAUs'" as "(OB' & SLT' & TAUs')".
+    rewrite /tl_TAU /TAU_FL. rewrite TAU_elim. simpl.
+    rewrite /TAU_acc. 
+    iApply BMU_invs.
+    iMod "TAUs'" as ([[lk_ r] b]) "[PRE [_ [COMM _]]]".
+ 
+
+
+      rewrite Nat2Z.inj_succ. 
+      
+      2: { iPureIntro. split; eauto. 
     iModIntro.
     iApply (wp_load with "[OW]"); [done| ]. iIntros "!> OW".
 
