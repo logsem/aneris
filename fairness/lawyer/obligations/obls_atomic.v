@@ -87,8 +87,13 @@ Section TotalTriples.
               ) ∧
               (
                (* (∃ r__p, RR r__p) ∗ *)
-               ⌜ TGT x ⌝ ∗ obls τ O (oGS := oGS) ∗ PH -∗
-               BMU ∅ c (oGS := oGS) (PH ∗ ∀ y, Q y x ={∅, ε}=∗ Φ y x)) ∧
+               ⌜ TGT x ⌝ ∗ obls τ O (oGS := oGS)
+                 (* --- avoid using phase here as it'd have to be stored in invariant to support helping *)
+                 (* ∗ PH *) 
+                 -∗
+               BMU ∅ c (oGS := oGS) (
+                 (* PH ∗ *)
+                 ∀ y, Q y x ={∅, ε}=∗ Φ y x)) ∧
               abort
       ).
 
@@ -557,7 +562,7 @@ Section Ticketlock.
 
   Program Definition TLPre: FairLockPre := {|
     fl_c__cr := 2;
-    fl_B := fun c => c + 3;
+    fl_B := fun c => 2 * c + 3;
     fl_GS := TicketlockG;
     fl_LK := fun Σ FLG HEAP => tl_LK;
     fl_degs_lh := fl_degs_lh0;
@@ -585,7 +590,7 @@ Section Ticketlock.
   Definition TAU_stored `{TLG: TicketlockG Σ} (lk: val) (c: nat) (cd: tau_codom Σ): iProp Σ :=
     let '(τ, π, Ob, L, Φ, RR) := cd in
     obls τ Ob (oGS := oGS) ∗ sgns_level_gt' Ob L (oGS := oGS) ∗
-    (* TODO: add later credit ∗ *)
+    (* th_phase_eq τ π (oGS := oGS) ∗ *)
     tl_TAU τ (acquire_at_pre lk (FLP := TLPre) (FLG := TLG)) (acquire_at_post lk (FLP := TLPre) (FLG := TLG))
         L
         (fun '(_, _, b) => b = false)
@@ -601,7 +606,7 @@ Section Ticketlock.
     apply leibniz_equiv_iff in Y1, Y2, X, Y3. subst.
     rewrite X.
     rewrite /tl_TAU /TAU_FL. simpl.
-    iApply bi.sep_proper; [by eauto| ]. iApply bi.sep_proper; [by eauto| ].
+    do 2 (iApply bi.sep_proper; [by eauto| ]).
     iApply TAU_Proper; solve_proper.
   Qed.
 
@@ -626,7 +631,7 @@ Section Ticketlock.
          iSpecialize ("A" $! #()).
          iLeft. by iRewrite -"A". }
     iLeft.
-    iDestruct "T" as "[[?[? T]]?]". iFrame.
+    iDestruct "T" as "[[? (?&T)] ?]". iFrame.
     rewrite /tl_TAU /TAU_FL.
 
     (* TODO: extract lemma *)
@@ -645,10 +650,10 @@ Section Ticketlock.
       iIntros "(C&?&?&?&?)". iFrame. 
       iSpecialize ("B" $! (Some (fl_round x0))). by iRewrite "B" in "C".
     - iDestruct "T1" as "[_ [T1 _]]".
-      iIntros "(%&?&?)".
+      iIntros "(%&?)".
       iApply (BMU_wand with "[]").
       2: { iApply "T1". iFrame. done. }
-      iIntros "(?&P)". iFrame. iIntros (?) "?". iSpecialize ("P" with "[$]").
+      iIntros "P". iFrame. iIntros (?) "?". iSpecialize ("P" with "[$]").
       iMod "P". iModIntro. by iRewrite -("A" $! #()).
     - by iDestruct "T1" as "[_ [_ T1]]".
   Qed.
@@ -834,8 +839,9 @@ Section Ticketlock.
     (∃ r__p, RR r__p ∗ (⌜ r__p = Some o' ⌝ ∨ cp π d__h0 (oGS := oGS))) ∗
     cp_mul π d__w 10 (oGS := oGS) ∗
     let cd: tau_codom Σ := (τ, π, Ob, ∅, Φ, RR) in
-    ticket_token t ∗ ticket_tau t cd ∗ 
-    th_phase_eq τ π (oGS := oGS).
+    ticket_token t ∗ ticket_tau t cd
+    ∗ th_phase_eq τ π (oGS := oGS)
+  .
 
   (* TODO: requires dynamic eb updates *)
   Lemma TODO_increase_eb n m:
@@ -949,7 +955,7 @@ Section Ticketlock.
          { lia. }
          { rewrite /TAU_stored.
            Unshelve. 2: repeat eapply pair.           
-           simpl. iFrame.
+           simpl. iFrame "OB TAU".
            by iApply sgns_level_gt'_empty. }
          iMod ("CLOS" with "[HELD TK' OW EXACT TOKS TAUS TM]") as "_"; [| done].
          iNext. rewrite /tl_inv_inner.
@@ -964,18 +970,18 @@ Section Ticketlock.
          by rewrite set_seq_S_end_union_L. }
 
     rewrite (proj2 (Nat.eqb_eq _ _)); [| done]. simpl.
-    replace (S c) with (c + 1) by lia.
+    iApply (BMU_lower _ (c + (1 + c))); [lia| ].
     iApply BMU_split. 
     rewrite /tl_LK. destruct st as [[]]. iDestruct "ST" as (??) "(-> & OW' & HELD')".
     rewrite !Nat.add_0_r. rewrite Nat.add_0_r in DOM__TM.
     iDestruct "TAU" as "[_ [COMM _]]".
     iDestruct (held_agree with "[$] [$]") as "<-". 
     rewrite /tl_LK.
-    iSpecialize ("COMM" with "[OB PH]").
+    iSpecialize ("COMM" with "[OB]").
     { by iFrame. }
 
     iApply (BMU_wand with "[-COMM]"); [| done].
-    iIntros "[PH COMM]".
+    iIntros "COMM".
     BMU_burn_cp. iModIntro. iApply wp_value. 
     do 2 iExists _. iFrame. iApply fupd_frame_all.
     iSplitL "CPSh RR0".
@@ -1090,6 +1096,7 @@ Section Ticketlock.
       - rewrite Nat.add_0_r. by iLeft.
       - rewrite cp_mul_take. iDestruct "CPSh'" as "[??]". iFrame. }
     iModIntro.
+    iApply (BMU_lower _ (c + (3 + c))); [lia| ].
     iApply BMU_split. iApply (BMU_wand with "[-WAIT] [$]").
     iIntros "(RR & CP & PH & OB & CLOS')". 
     iSpecialize ("CLOS'" with "[OW' HELD']").
@@ -1266,7 +1273,7 @@ Section Ticketlock.
     iNext. MU_by_BMU.
     iSpecialize ("TAU" with "[OB PH]"); [by iFrame| ].
     simpl. iApply BMU_split.
-    iApply (BMU_wand with "[-TAU] [$]"). iIntros "[PH CLOS']".
+    iApply (BMU_wand with "[-TAU] [$]"). iIntros "CLOS'".
     iSpecialize ("CLOS'" $! (_, (ow + 1), false)).
     remember_goal. 
     iMod (held_update _ _ false with "[$] [$]") as "[HELD HELD']".
@@ -1297,7 +1304,17 @@ Section Ticketlock.
     rewrite /tl_TAU /TAU_FL. rewrite TAU_elim. simpl.
     rewrite /TAU_acc. 
     iApply BMU_invs.
-    iMod "TAUs'" as ([[lk_ r] b]) "[PRE [_ [COMM _]]]".
+    iMod "TAUs'" as ([[lk_ r] b]) "[PRE [_ [COMM _]]]". iModIntro.
+
+    rewrite /acquire_at_pre. simpl.
+    remember_goal. 
+    iDestruct "PRE" as "[>(%&%&%EQ&OW'&HELD') ->]".
+    iApply "GOAL". iClear "GOAL".
+    inversion EQ. subst l__ow0 l__tk0. clear EQ.
+    iDestruct (held_agree with "[$] [$]") as %<-.
+    iDestruct (mapsto_agree with "OW OW'") as %EQ.
+    inversion EQ as [EQ'']. assert (r = ow + 1) as -> by lia.
+    iSpecialize ("COMM" with "[$OB' //]"). ; [done| ].  
  
 
 
