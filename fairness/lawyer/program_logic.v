@@ -80,6 +80,19 @@ Section ProgramLogic.
       iMod "P". iModIntro. iExists _, _. iFrame.
     Qed.
 
+    (* TODO: move *)
+    Lemma sswp_fupd s (E E': coPset) e Φ
+      (NVAL: language.to_val e = None):
+      (|={E, E'}=> (sswp s E' e (fun k => |={E', E}=> Φ k))) -∗ (sswp s E e Φ).
+    Proof using.
+      iIntros "WP". rewrite /sswp.
+      simpl in *. rewrite NVAL. iIntros (?) "HEAP".
+      iMod ("WP" with "[$]") as "WP". iMod "WP" as "[? WP]". iModIntro.
+      iFrame. iIntros. iMod ("WP" with "[//]") as "X".
+      iModIntro. iNext. iMod "X". iModIntro. iMod "X" as "(X & Y & Z)". iFrame.
+      done.
+    Qed.
+
     Lemma sswp_MU_wp_fupd s E E' ζ e Φ
       (NVAL: language.to_val e = None)
       :
