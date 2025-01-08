@@ -515,6 +515,19 @@ Section Ticketlock.
     by rewrite cmra_assoc.
   Qed.
 
+  Lemma ow_exact_increase `{TicketlockG Σ} n m
+    (LE: n <= m):
+    ow_exact n ==∗ ow_exact m ∗ ow_lb m.
+  Proof using.
+    iIntros "EX".
+    rewrite /ow_exact. 
+    rewrite /ow_lb -!own_op.
+    iApply (own_update with "[$]").
+    etrans.
+    { apply mono_nat_update, LE. }
+    by rewrite {1}mono_nat_auth_lb_op.
+  Qed. 
+
   Lemma ow_lb_le_exact `{TicketlockG Σ} i n:
     ow_lb i -∗ ow_exact n -∗ ⌜ i <= n ⌝.
   Proof using.
@@ -1119,6 +1132,38 @@ Section Ticketlock.
     iDestruct "CPS" as "[??]". iFrame.
   Qed.
 
+  (* TODO: move *)
+  Lemma BMU_mask_comm E E' n Φ P
+    (SUB: E' ⊆ E):
+    (P -∗ BMU E n Φ (oGS := oGS)) -∗ (|={E', E}=> P) -∗ BMU E' n (|={E', E}=> Φ) (oGS := oGS).
+  Proof using.
+    iIntros "BMU CLOS".
+    rewrite /BMU. iIntros. 
+    iMod "CLOS" as "P".
+    iSpecialize ("BMU" with "[$] [$]").
+    iMod "BMU" as (?) "(?&?&?)". 
+    iApply fupd_mask_intro; [done| ].
+    iIntros "CLOS". iFrame. iExists _. iFrame.
+  Qed.
+
+  (* TODO: unify with tau_map_ticket_interp *)
+  Lemma tau_map_ticket_interp' `{TicketlockG Σ} TM i cd lk c ow
+    (ITH: TM !! i = Some cd):
+    tau_map_interp lk c ow TM -∗
+    tau_interp lk c ow i cd ∗ (tau_interp lk c ow i cd -∗ tau_map_interp lk c ow TM).
+  Proof using.
+    clear fl_degs_wl0 d__w ODl ODd LEl OBLS_AMU.
+    iIntros "TMI".
+    rewrite {1}/tau_map_interp. rewrite {1}(utils.map_split TM i).
+    rewrite big_opM_union.
+    2: { apply map_disjoint_dom. destruct lookup; set_solver. }
+    iDestruct "TMI" as "[TKI CLOS]".
+    rewrite ITH. simpl. rewrite big_sepM_singleton. iFrame. 
+    iIntros "TKI".
+    iDestruct (big_sepM_insert_delete with "[CLOS TKI]") as "TMI".
+    { repeat iFrame. }
+    rewrite insert_id; [| done]. iFrame.
+  Qed.
   (* TODO: mention exc_lb in the proof OR implement its increase *)
   Lemma tl_release_spec (lk: val) c τ:
     tl_is_lock lk c ∗ exc_lb 20 (oGS := oGS) ⊢
