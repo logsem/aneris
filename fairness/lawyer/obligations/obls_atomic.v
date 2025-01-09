@@ -272,23 +272,28 @@ Section FairLockSpec.
   
   Context {FLP: FairLockPre}.
   
-  Definition TAU_FL τ P Q L TGT c π (Φ: val -> iProp Σ) O (RR: option nat -> iProp Σ): iProp Σ := 
+  Definition TAU_FL τ P Q L TGT c π
+    (* (Φ: val -> iProp Σ) *)
+    Φ
+    O (RR: option nat -> iProp Σ): iProp Σ := 
     TAU τ P Q L fl_round TGT (fl_d__h FLP) (fl_d__l FLP)
       c
       (⊤ ∖ ↑(fl_ι FLP))
       π
-      (fun _ _ => Φ #()) (* (fun y x => POST y x -∗? Φ (get_ret y x)) *)
+      (* (fun _ _ => Φ #()) *)
+      Φ
       O RR
       (oGS := oGS). 
   
-  Definition TLAT_FL τ P Q L TGT c e : iProp Σ := 
+  Definition TLAT_FL τ P Q L TGT get_ret c e : iProp Σ := 
     TLAT τ P Q L          
       fl_round TGT
       (fl_d__h FLP) (fl_d__l FLP) (fl_d__m FLP)
       c (fl_B FLP)
       (↑ (fl_ι FLP)) e NotStuck
       (fun _ _ => None)
-      (fun _ _ => #())
+      (* (fun _ _ => #()) *)
+      get_ret
       (oGS := oGS).
   
   Definition acquire_at_pre {FLG: fl_GS FLP Σ} (lk: val) (x: FL_st): iProp Σ :=
@@ -315,6 +320,7 @@ Section FairLockSpec.
         (acquire_at_post lk (FLG := FLG))
         (fl_acq_lvls FLP)
         (fun '(_, _, b) => b = false)
+        (fun _ _ => #())
         c (fl_acquire lk);
                                      
     fl_release_spec {FLG: fl_GS FLP Σ} (lk: val) c τ: (fl_is_lock (FLG := FLG)) lk c ⊢
@@ -323,6 +329,7 @@ Section FairLockSpec.
         (release_at_post lk (FLG := FLG))
         ∅
         (fun _ => True%type)
+        (fun _ '(_, r, _) => #r)
         c (fl_release lk);
   }.
   
@@ -551,7 +558,7 @@ Section Ticketlock.
     tl_TAU τ (acquire_at_pre lk (FLP := TLPre) (FLG := TLG)) (acquire_at_post lk (FLP := TLPre) (FLG := TLG))
         L
         (fun '(_, _, b) => b = false)
-        c π Φ Ob RR.
+        c π (fun _ _ => Φ #()) Ob RR.
 
   Instance TAU_stored_Proper `{TLG: TicketlockG Σ}:
     Proper (eq ==> eq ==> equiv ==> equiv) TAU_stored.
@@ -791,7 +798,7 @@ Section Ticketlock.
         (acquire_at_post lk (FLP := TLPre) (FLG := TLG))
         ∅
         (fun '(_, _, b) => b = false)
-        c π Φ
+        c π (fun _ _ => Φ #())
         Ob RR
         (oGS := oGS) (FLP := TLPre)
         -∗
@@ -1144,10 +1151,13 @@ Section Ticketlock.
         (release_at_post lk (FLP := TLPre) (FLG := TLG))
         ∅
         (fun _ => True%type)
-        c (tl_release lk)
+        (fun _ '(_, r, _) => #r)
+         c
+         (tl_release lk)
         (oGS := oGS)
         (FLP := TLPre).
-  Proof using.
+  Proof using fl_degs_wl0 OBLS_AMU.
+    clear ODl ODd LEl.
     iIntros "[#INV #EB]". rewrite /TLAT_FL /TLAT.
     iIntros (Φ π Ob RR) "%LIM_STEPS' PRE TAU".
     rewrite /TLAT_pre. simpl. iDestruct "PRE" as "(RR0 & OB & _ & PH & CP)".
@@ -1235,12 +1245,8 @@ Section Ticketlock.
       - apply Nat.eqb_eq in OW'. apply bool_decide_eq_false. lia.
       - apply Nat.eqb_neq in OW'. apply bool_decide_eq_true. lia. }
 
-    iModIntro.
-    (* TODO: get rid of fixed unit in LAT *)
-    replace #(LitInt (Z.of_nat ow)) with #() by admit.
-    iFrame. 
-  
-  Admitted.
+    by iFrame.
+  Qed.
 
   (* TODO: mention exc_lb in the proof OR implement its increase *)
   Lemma tl_acquire_spec (lk: val) c τ:
@@ -1250,6 +1256,7 @@ Section Ticketlock.
         (acquire_at_post lk (FLP := TLPre) (FLG := TLG))
         ∅
         (fun '(_, _, b) => b = false)
+        (fun _ _ => #())
         c (tl_acquire lk)
         (oGS := oGS)
         (FLP := TLPre).
@@ -1310,6 +1317,6 @@ Section Ticketlock.
       iFrame "#∗". }
 
     simpl. intuition. 
-  Qed.   
+  Qed.
   
 End Ticketlock. 
