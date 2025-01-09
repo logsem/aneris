@@ -208,12 +208,18 @@ Section ProgramLogic.
       Proper (equiv ==> eq ==> equiv ==> equiv) BMU.
     Proof using. solve_proper. Qed. 
 
-    Lemma BMU_frame E b (P Q : iProp Σ):
+    Lemma BMU_frame_l E b (P Q : iProp Σ):
       ⊢ P -∗ BMU E b Q -∗ BMU E b (P ∗ Q).
     Proof using. 
       rewrite /BMU. iIntros "P BMU **".
       iMod ("BMU" with "[$]") as "(%&?&?&?)". iModIntro. 
       iExists _. iFrame.
+    Qed.
+
+    Lemma BMU_frame_r E b (P Q : iProp Σ):
+      ⊢ Q -∗ BMU E b P -∗ BMU E b (P ∗ Q).
+    Proof using.
+      rewrite bi.sep_comm. iApply BMU_frame_l.
     Qed.
 
     Lemma BMU_weaken E1 E2 m1 m2 P1 P2
@@ -249,6 +255,19 @@ Section ProgramLogic.
       iIntros "BMU". rewrite /BMU. iIntros.
       iMod "BMU". iMod ("BMU" with "[$]") as (?) "(SI & % & P)".
       iMod "P". iModIntro. iExists _. by iFrame.
+    Qed.
+
+    Lemma BMU_mask_comm E E' n Φ P
+      (SUB: E' ⊆ E):
+      (P -∗ BMU E n Φ) -∗ (|={E', E}=> P) -∗ BMU E' n (|={E', E}=> Φ).
+    Proof using.
+      iIntros "BMU CLOS".
+      rewrite /BMU. iIntros. 
+      iMod "CLOS" as "P".
+      iSpecialize ("BMU" with "[$] [$]").
+      iMod "BMU" as (?) "(?&?&?)". 
+      iApply fupd_mask_intro; [done| ].
+      iIntros "CLOS". iFrame. iExists _. iFrame.
     Qed.
 
     Lemma BMU_AMU E ζ b (P : iProp Σ) π

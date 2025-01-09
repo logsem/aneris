@@ -3,6 +3,7 @@ From iris.proofmode Require Import tactics coq_tactics.
 From iris.proofmode Require Import tactics.
 From iris.bi.lib Require Import fixpoint.
 From trillium.program_logic Require Export weakestpre adequacy ectx_lifting.
+From trillium.fairness Require Import utils.
 From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_am obligations_em obligations_logic.
 From trillium.fairness.lawyer Require Import sub_action_em.
 From trillium.fairness.lawyer Require Import program_logic.
@@ -33,17 +34,6 @@ Section TotalTriples.
   Let OAM := ObligationsAM. 
   Let ASEM := ObligationsASEM.
   Context {oGS: @asem_GS _ _ ASEM Σ}.
-
-  (* TODO: move *)
-  Definition sgns_level_ge (R: gset SignalId) lm: iProp Σ :=
-    [∗ set] s ∈ R, (∃ l, sgn s l None (oGS := oGS) ∗ ⌜ lvl_le lm l ⌝). 
-
-  (* TODO: move *)
-  Definition sgns_level_ge' (R: gset SignalId) (L: gset Level): iProp Σ := 
-    [∗ set] l ∈ L, sgns_level_ge R l.
-  (* TODO: move *)
-  Definition sgns_level_gt' (R: gset SignalId) (L: gset Level): iProp Σ := 
-    [∗ set] l ∈ L, sgns_level_gt R l (oGS := oGS).
 
   Let Locale := locale heap_lang. 
 
@@ -76,7 +66,7 @@ Section TotalTriples.
               let abort := P x ={∅, ε}=∗ V in
               let PH := th_phase_eq τ π (oGS := oGS) in
               (let r := round x in
-               ∀ O', obls τ O' (oGS := oGS) ∗ sgns_level_ge' O' L ∗ PH ∗
+               ∀ O', obls τ O' (oGS := oGS) ∗ sgns_level_ge' O' L (oGS := oGS) ∗ PH ∗
                       (∃ r__p, RR r__p ∗ (⌜ r__p = Some r ⌝ ∨ cp π d__h (oGS := oGS))) ∗
                       ⌜ ¬ TGT x ⌝ -∗
                       BMU ∅ c (oGS := oGS) (
@@ -155,7 +145,7 @@ Section TotalTriples.
     Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
 
     Definition TLAT_pre (RR: option RO -> iProp Σ) π (O: gset SignalId): iProp Σ :=
-      RR None ∗ obls τ O (oGS := oGS) ∗ sgns_level_gt' O L ∗
+      RR None ∗ obls τ O (oGS := oGS) ∗ sgns_level_gt' O L (oGS := oGS) ∗
       th_phase_eq τ π (oGS := oGS) ∗ cp π d__m (oGS := oGS). 
     
     Definition TLAT e s
@@ -170,7 +160,7 @@ Section TotalTriples.
   End AtomicTriples.
 
   Instance sgns_level_ge'_Proper:
-    Proper (equiv ==> equiv ==> equiv) sgns_level_ge'.
+    Proper (equiv ==> equiv ==> equiv) (sgns_level_ge' (oGS := oGS)).
   Proof using. solve_proper. Qed.
 
 (*   Lemma TAU_acc_Proper' {ST RO: ofe} *)
@@ -664,7 +654,7 @@ Section Ticketlock.
     clear fl_degs_wl0 d__w ODl ODd LEl. 
     iIntros "TM T TMI".
     iDestruct (tau_map_ticket with "[$] [$]") as "#TK".
-    rewrite {1}/tau_map_interp. rewrite {3}(utils.map_split TM i).
+    rewrite {1}/tau_map_interp. rewrite {3}(map_split TM i).
     rewrite big_opM_union.
     2: { apply map_disjoint_dom. destruct lookup; set_solver. }
     iDestruct "TMI" as "[TKI CLOS]".
@@ -701,16 +691,6 @@ Section Ticketlock.
     2: { apply not_elem_of_dom. rewrite DOM. intros ?%elem_of_set_seq. lia. }
     iFrame. iRight. iLeft. by iFrame. 
   Qed.
-
-  (* TODO: move *)
-  Lemma GSet_inj_equiv:
-    ∀ `{Countable K}, Inj equiv equiv (@GSet K _ _).
-  Proof using. solve_proper. Qed.
-
-  (* TODO: move *)
-  Lemma GSet_Proper: 
-    ∀ `{Countable K}, Proper (equiv ==> equiv) (@GSet K _ _).
-  Proof using. solve_proper. Qed.
 
   Lemma tokens_alloc `{TicketlockG Σ} (N: nat):
     tokens_auth N ==∗ tokens_auth (S N) ∗ ticket_token N.
@@ -779,26 +759,11 @@ Section Ticketlock.
   (*   tau_codom Σ := *)
   (*   (τ, π, R, Φ, RR).  *)
 
-  (* TODO: move, find duplicates *)
-  Lemma sgns_level_gt'_empty R:
-    ⊢ sgns_level_gt' R ∅ (oGS := oGS).
-  Proof using.
-    rewrite /sgns_level_gt'. by rewrite big_sepS_empty.
-  Qed.
-
   (* TODO: find existing *)
   Lemma fupd_frame_all E1 E2 P:
     ((|==> P) ∗ |={E1, E2}=> emp: iProp Σ) ⊢ |={E1, E2}=> P.
   Proof using.
     iIntros "[P ?]". iMod "P". by iFrame.
-  Qed.
-
-  (* TODO: move *)
-  Lemma cp_mul_0 π d:
-    ⊢ |==> cp_mul π d 0 (oGS := oGS).
-  Proof using.
-    rewrite /cp_mul. rewrite gmultiset_scalar_mul_0.
-    iApply own_unit.
   Qed.
 
   Definition wait_res o' t τ π Ob Φ (RR : ofe_mor (optionO natO) (iPropO Σ)): iProp Σ :=
@@ -1106,50 +1071,6 @@ Section Ticketlock.
     iDestruct "CPS" as "[??]". iFrame.
   Qed.
 
-  (* TODO: move *)
-  Lemma BMU_mask_comm E E' n Φ P
-    (SUB: E' ⊆ E):
-    (P -∗ BMU E n Φ (oGS := oGS)) -∗ (|={E', E}=> P) -∗ BMU E' n (|={E', E}=> Φ) (oGS := oGS).
-  Proof using.
-    iIntros "BMU CLOS".
-    rewrite /BMU. iIntros. 
-    iMod "CLOS" as "P".
-    iSpecialize ("BMU" with "[$] [$]").
-    iMod "BMU" as (?) "(?&?&?)". 
-    iApply fupd_mask_intro; [done| ].
-    iIntros "CLOS". iFrame. iExists _. iFrame.
-  Qed.
-
-  (* TODO: move *)
-  Lemma gmap_filter_or `{Countable K} {A: Type} (P1 P2: K * A -> Prop)
-    `{forall x, Decision (P1 x)} `{forall x, Decision (P2 x)}
-    (m: gmap K A):
-    filter (fun x => P1 x \/ P2 x) m = filter P1 m ∪ filter P2 m.
-  Proof using.
-    clear.
-    apply map_eq. intros k.
-    destruct (m !! k) eqn:KTH.
-    2: { etrans; [| symmetry].
-         { eapply map_filter_lookup_None. tauto. }
-         apply lookup_union_None_2; eapply map_filter_lookup_None; tauto. }
-    destruct (decide (P1 (k, a))).
-    { erewrite map_filter_lookup_Some_2; eauto.
-      erewrite lookup_union_Some_l; eauto. eapply map_filter_lookup_Some; eauto. }
-    erewrite lookup_union_r; eauto.
-    2: { eapply map_filter_lookup_None. set_solver. }
-    destruct (decide (P2 (k, a))).
-    { erewrite map_filter_lookup_Some_2; eauto.      
-      symmetry. apply map_filter_lookup_Some_2; eauto. }
-    etrans; [| symmetry]; eapply map_filter_lookup_None; set_solver.
-  Qed.
-
-  (* TODO: move *)
-  Lemma BMU_frame_r E b (P Q : iProp Σ):
-    ⊢ Q -∗ BMU E b P (oGS := oGS) -∗ BMU E b (P ∗ Q) (oGS := oGS).
-  Proof using.
-    rewrite bi.sep_comm. iApply BMU_frame. 
-  Qed.
-
   Lemma tau_map_interp_update `{TicketlockG Σ} TM (l__ow l__tk: loc) c ow
     (lk := (#l__ow, #l__tk)%V):
     tau_map_interp lk c ow TM -∗ held_auth false -∗ l__ow ↦{/ 2} #(ow + 1)%nat -∗
@@ -1158,12 +1079,12 @@ Section Ticketlock.
     clear fl_degs_wl0 d__w ODl ODd LEl OBLS_AMU.
     iIntros "TMI AUTH LOW". rewrite /tau_map_interp.
 
-    rewrite {1 4}(utils.map_split TM ow).
+    rewrite {1 4}(map_split TM ow).
     rewrite !big_opM_union.
     2, 3: apply map_disjoint_dom; destruct lookup; set_solver.
     iDestruct "TMI" as "[OW TMI]".
 
-    rewrite (utils.map_split (delete _ _ ) (ow + 1)).
+    rewrite (map_split (delete _ _ ) (ow + 1)).
     rewrite !big_opM_union.
     2, 3: apply map_disjoint_dom; destruct lookup; set_solver.
     iDestruct "TMI" as "[OW' TMI]".
@@ -1174,7 +1095,7 @@ Section Ticketlock.
       rewrite /tau_interp. iDestruct "TI" as "[[? %] | [[? %] | [? %]]]"; try lia.
       - iLeft. iFrame. iPureIntro. lia.
       - do 2 iRight. iFrame. iPureIntro. lia. }
-    rewrite -bi.sep_assoc bi.sep_comm -bi.sep_assoc. iApply (BMU_frame with "[OW]").
+    rewrite -bi.sep_assoc bi.sep_comm -bi.sep_assoc. iApply (BMU_frame_l with "[OW]").
     { destruct (TM !! ow) as [cd| ] eqn:OW; [| set_solver].
       simpl. rewrite !big_sepM_singleton.
       rewrite /tau_interp. iDestruct "OW" as "[[? %] | [[OW %] | [? %]]]"; try lia.
@@ -1293,7 +1214,7 @@ Section Ticketlock.
     iApply BMU_proper.
     1, 2: reflexivity.
     { apply bi.sep_comm. }
-    iApply BMU_frame.
+    iApply BMU_frame_l.
     { admit. }
     iApply (BMU_mask_comm with "[-CLOS'] [$]"); [set_solver| ].
     iIntros "Φ". simpl.

@@ -103,6 +103,15 @@ Section ObligationsRepr.
     Definition sgns_level_gt (R: gset SignalId) lm: iProp Σ :=
       [∗ set] s ∈ R, (∃ l, sgn s l None ∗ ⌜ lvl_lt lm l ⌝). 
     
+    Definition sgns_level_ge (R: gset SignalId) lm: iProp Σ :=
+      [∗ set] s ∈ R, (∃ l, sgn s l None ∗ ⌜ lvl_le lm l ⌝). 
+
+    Definition sgns_level_ge' (R: gset SignalId) (L: gset Level): iProp Σ := 
+      [∗ set] l ∈ L, sgns_level_ge R l.
+
+    Definition sgns_level_gt' (R: gset SignalId) (L: gset Level): iProp Σ := 
+      [∗ set] l ∈ L, sgns_level_gt R l.
+
     Definition ep (sid: SignalId) π d: iProp Σ :=
     own obls_eps (◯ {[ (sid, π, d) ]}). 
     
@@ -118,6 +127,12 @@ Section ObligationsRepr.
       ⊢ obls ζ R1 ∗-∗ obls ζ R2.
     Proof using. clear H H0 H1. set_solver. Qed.
     
+    Lemma sgns_level_gt'_empty R:
+      ⊢ sgns_level_gt' R ∅.
+    Proof using.
+      rewrite /sgns_level_gt'. by rewrite big_sepS_empty.
+    Qed.
+
     Lemma cp_msi_dom δ ph deg:
       ⊢ obls_msi δ -∗ cp ph deg -∗
         ⌜ (ph, deg) ∈ ps_cps δ ⌝.
@@ -638,6 +653,13 @@ Section ObligationsRepr.
       rewrite IHn. iFrame. rewrite bi.sep_assoc. iFrame. set_solver.
     Qed. 
  
+    Lemma cp_mul_0 π d:
+      ⊢ |==> cp_mul π d 0.
+    Proof using.
+      rewrite /cp_mul. rewrite gmultiset_scalar_mul_0.
+      iApply own_unit.
+    Qed.
+
     (* TODO: ? refactor these proofs about fork step *)
     Lemma fork_locale_upd_impl δ ζ ζ' π R0 R'
       (FRESH: ζ' ∉ dom $ ps_phases δ)
