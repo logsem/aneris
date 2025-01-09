@@ -152,7 +152,7 @@ Section TotalTriples.
       (POST: ST -> ST -> option (iProp Σ))
       (get_ret: ST -> ST -> val)
       : iProp Σ :=
-      ∀ Φ π O RR,
+      ∀ Φ π O (RR: option RO -> iProp Σ),
         ⌜ B c <= LIM_STEPS ⌝ -∗ TLAT_pre RR π O -∗
         TAU (⊤ ∖ ε__m) π (fun y x => POST y x -∗? Φ (get_ret y x)) O RR -∗
         WP e @ s; τ; ⊤ {{ v, Φ v }}.
@@ -272,7 +272,7 @@ Section FairLockSpec.
   
   Context {FLP: FairLockPre}.
   
-  Definition TAU_FL τ P Q L TGT c π (Φ: val -> iProp Σ) O RR: iProp Σ := 
+  Definition TAU_FL τ P Q L TGT c π (Φ: val -> iProp Σ) O (RR: option nat -> iProp Σ): iProp Σ := 
     TAU τ P Q L fl_round TGT (fl_d__h FLP) (fl_d__l FLP)
       c
       (⊤ ∖ ↑(fl_ι FLP))
@@ -767,6 +767,7 @@ Section Ticketlock.
   Qed.
 
   Definition wait_res o' t τ π Ob Φ (RR : ofe_mor (optionO natO) (iPropO Σ)): iProp Σ :=
+    ⌜ o' <= t ⌝ ∗
     ow_lb o' ∗ cp_mul π d__h0 (t - o') (oGS := oGS) ∗
     (∃ r__p, RR r__p ∗ (⌜ r__p = Some o' ⌝ ∨ cp π d__h0 (oGS := oGS))) ∗
     cp_mul π d__w 10 (oGS := oGS) ∗
@@ -880,7 +881,8 @@ Section Ticketlock.
          iFrame.
          iApply fupd_frame_all.         
          iSplitL "RR0". 
-         { iModIntro. iSplit; [done| ]. iExists _. iFrame. } 
+         { iModIntro. iSplit; [done| ]. iSplit; [iPureIntro; lia| ].
+           iExists _. iFrame. } 
          iDestruct "TAU" as "[_ [_ AB]]".
          iMod ("AB" with "[ST]") as "TAU"; [by iFrame| ].
          iDestruct (TMI_extend_queue with "[$] [TAU OB]") as "TAUS"; eauto.
@@ -918,7 +920,7 @@ Section Ticketlock.
     do 2 iExists _. iFrame. iApply fupd_frame_all.
     iSplitL "CPSh RR0".
     { rewrite Nat.sub_diag. iModIntro.
-      iSplit; [done| ]. iApply bi.sep_exist_l.
+      iSplit; [done| ]. iSplit; [done| ]. iApply bi.sep_exist_l.
       iExists _. iFrame. rewrite bi.sep_or_l. iRight.
       by rewrite -cp_mul_take. }
     iMod (held_update _ _ true with "[$] [$]") as "[HELD HELD']".
@@ -938,13 +940,12 @@ Section Ticketlock.
   Qed.
 
   Lemma wait_spec (lk: val) c o' (t: nat) τ π Ob Φ RR
-    (LIM_STEPS': fl_B TLPre c <= LIM_STEPS)
-    (LEo't: o' <= t):
+    (LIM_STEPS': fl_B TLPre c <= LIM_STEPS):
     tl_is_lock lk c ∗ exc_lb 20 (oGS := oGS) ∗ wait_res o' t τ π Ob Φ RR ⊢ WP (wait lk #t) @ τ {{ Φ }}.
   Proof using fl_degs_wl0 OBLS_AMU.
     clear ODl ODd LEl.
-    iLöb as "IH" forall (o' LEo't).
-    rewrite {2}/wait_res. iIntros "(#INV & #EXC & OW_LB & CPSh & RR & CPS & TOK & TAU & PH)".
+    iLöb as "IH" forall (o').
+    rewrite {2}/wait_res. iIntros "(#INV & #EXC & %LEo't & OW_LB & CPSh & RR & CPS & TOK & TAU & PH)".
     rewrite {2}/wait.
     pure_steps.
 
@@ -1064,8 +1065,7 @@ Section Ticketlock.
     do 2 pure_step_cases.
 
     iApply ("IH" $! ow). 
-    { iPureIntro. lia. }
-    iFrame "#∗". iSplitL "RR".
+    iFrame "#∗". iSplit; [iPureIntro; lia| ]. iSplitL "RR".
     { iExists _. iFrame. by iLeft. }
     replace 21 with (10 + 11) by lia. rewrite cp_mul_split.
     iDestruct "CPS" as "[??]". iFrame.
@@ -1241,7 +1241,6 @@ Section Ticketlock.
   
   Admitted.
 
-
   (* TODO: mention exc_lb in the proof OR implement its increase *)
   Lemma tl_acquire_spec (lk: val) c τ:
     tl_is_lock lk c ∗ exc_lb 20 (oGS := oGS) ⊢
@@ -1253,29 +1252,63 @@ Section Ticketlock.
         c (tl_acquire lk)
         (oGS := oGS)
         (FLP := TLPre).
-  Proof using.    
+  Proof using fl_degs_wl0 d__w OBLS_AMU.
     iIntros "[#INV #EB]". rewrite /TLAT_FL /TLAT.
     iIntros (Φ π Ob RR) "%LIM_STEPS' PRE TAU".
     rewrite /TLAT_pre. simpl. iDestruct "PRE" as "(RR0 & OB & _ & PH & CP)".
-    rewrite /tl_acquire /get_ticket.
 
-    pure_step_hl. MU_by_BMU.
-    iApply (BMU_lower _ 2).
+    rewrite /tl_acquire. pure_step_hl. MU_by_BMU.
+    iApply (BMU_lower _ 3).
     { simpl. lia. }
     iApply OU_BMU. iApply (OU_wand with "[-CP PH]").
     2: { (* TODO: can we remove phase restriction for exchange? *)
          iApply (exchange_cp_upd with "[$] [$] [$]").
          1, 2: reflexivity.
-         apply fl_degs_wm. }
-    iIntros "[CPSw PH]". iDestruct (cp_mul_take with "CPSw") as "[CPSw CPw]". 
-    iApply OU_BMU. iApply (OU_wand with "[-CPw PH]").
+         apply fl_degs_em. }
+    iIntros "[CPSe PH]". iDestruct (cp_mul_take with "CPSe") as "[CPSe CPe]".
+    iApply OU_BMU. iApply (OU_wand with "[-CPe PH]").
     2: { iApply (exchange_cp_upd with "[$] [$] [$]").
          1, 2: reflexivity.
-         trans d__h0; eauto. }
+         apply fl_degs_he. }
+    iIntros "[CPSh PH]". iDestruct (cp_mul_take with "CPSh") as "[CPSh CPh]".
+    iApply OU_BMU. iApply (OU_wand with "[-CPh PH]").
+    2: { iApply (exchange_cp_upd _ _ _ _ d__w with "[$] [$] [$]").
+         1, 2: reflexivity.
+         do 2 (etrans; eauto). }
     iIntros "[CPS PH]". BMU_burn_cp.
+    replace 19 with (10 + 9) at 4 by lia. iDestruct (cp_mul_split with "CPS") as "[CPS1 CPS]".
 
-    
+    Set Printing Coercions.
+    assert (NonExpansive Φ) as NE_Φ by apply _.
+    assert (NonExpansive RR) as NE_RR.
+    { (* TODO: why it's not inferred automatically? *)
+      simpl in *.
+      red. intros ????.
+      apply discrete_iff in H.
+      2: by apply _.
+      apply leibniz_equiv_iff in H. by subst. }
+    pure_steps.
+    rewrite cp_mul_take. iDestruct "CPSe" as "[CPSe CPe]".
+    iApply (wp_wand with "[TAU OB PH CPe RR0 CPS1]").
+    { iApply (get_ticket_spec with "[$] [TAU] [OB PH CPe RR0] [$]").
+      { done. }
+      { simpl. rewrite /TAU_FL. simpl. 
+        iApply (TAU_Proper with "[$]").
+        all: try reflexivity.
+        Unshelve. 4: econstructor; apply NE_RR. 3: econstructor; apply NE_Φ.
+        1, 2: done. }
+      rewrite /TLAT_pre. iFrame. iApply sgns_level_gt'_empty. }    
+    simpl. iIntros (?) "(%&%&->&WR)".
+    rewrite /wait_res. rewrite !bi.sep_assoc. iDestruct "WR" as "[WR_ PH]".
 
-    
+    wp_bind (Rec _ _ _)%V.
+    do 3 pure_step_cases.
+    iApply (wp_wand with "[WR_ PH]").
+    { iApply wait_spec; eauto.
+      rewrite -!bi.sep_assoc. iDestruct "WR_" as "(?&?&?&?&?&?&?)".
+      iFrame "#∗". }
+
+    simpl. intuition. 
+  Qed.   
   
 End Ticketlock. 
