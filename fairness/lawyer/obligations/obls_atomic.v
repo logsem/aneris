@@ -1214,8 +1214,9 @@ Section Ticketlock.
     iApply BMU_proper.
     1, 2: reflexivity.
     { apply bi.sep_comm. }
-    iApply BMU_frame_l.
-    { admit. }
+    iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
+    iApply (BMU_frame_l with "[CP]").
+    { do 2 iExists _. by iFrame. } 
     iApply (BMU_mask_comm with "[-CLOS'] [$]"); [set_solver| ].
     iIntros "Φ". simpl.
 
