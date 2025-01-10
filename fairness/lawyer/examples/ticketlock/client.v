@@ -983,6 +983,51 @@ Section MotivatingClient.
       rewrite /cp_mul. rewrite gmultiset_scalar_mul_1. done.
     Qed.
 
+    Definition RR__R (r': option nat): iProp Σ := ⌜ True ⌝.
+
+    Lemma acquire_right τ (lk: val) flag s__f π:
+      {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗ 
+          obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
+          cp π (fl_d__m FLP) (oGS := oGS)
+          (* ∗ sgn s__f l__f None (oGS := oGS) *)
+      }}}
+        (fl_acquire FL) lk @ τ
+      {{{ v, RET v; ∃ s__o, obls τ {[ s__o ]} (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗                          
+                          P__lock flag s__f false ∗ lock_owner_frag (Some s__o) ∗
+                          ⌜ s__o ≠ s__f ⌝
+      }}}.
+    Proof using All.
+      iIntros (Φ).
+      pose proof (fl_is_lock_pers FL lk c__cl (FLG := FLG)) as PERS. (* TODO: why Existing Instance doesn't work? *)
+      iIntros "(#LOCK & #INV & OB & PH & CPm) POST".
+      
+      iApply (wp_step_fupd _ _ ⊤ _ _ with "[POST]").
+      { done. }
+      { iModIntro. iNext. iModIntro. iApply "POST". }
+
+      iPoseProof (fl_acquire_spec FL _ _ τ with "[$]") as "ACQ".
+      rewrite /TLAT.
+
+      iApply ("ACQ" $! _ _ _ RR__R with "[] [OB PH CPm]").
+      { done. }
+      { iFrame.
+        (* TODO: make a lemma*)
+        rewrite /sgns_level_gt'.        
+        iApply big_sepS_forall. iIntros (??).
+        rewrite /sgns_level_gt. rewrite big_opS_empty. done. }
+
+      iApply (TAU_intro with "[]").
+      4: { iCombine "LOCK INV" as "X". iSplit; [iApply "X"| ].
+           foobar
+           
+        iSplit; [| iApply "UNSET"].
+            iApply "X". }
+      1, 2: by apply _.
+      iIntros "((#INV & #SF') & UNSET)".
+
+
+      
+
     Theorem right_thread_spec (lk: val) τ π (flag: loc) s__f:
       {{{ exc_lb 20 (oGS := oGS) ∗ 
           fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗ 
