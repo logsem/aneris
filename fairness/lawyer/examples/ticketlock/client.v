@@ -862,6 +862,181 @@ Section MotivatingClient.
       iNext. done.
     Qed.
 
+    Definition right_thread_iter: val :=
+      λ: "lk" "flag" "c",
+          (fl_acquire FL) "lk" ;;
+           "c" <- !"flag" ;;
+           (fl_release FL) "lk"
+    .
+
+    Definition right_thread_rep: val :=
+      rec: "right" "lk" "flag" "c" :=
+          right_thread_iter "lk" "flag" "c" ;;
+          if: (!"c" = #true) then #() else "right" "lk" "flag" "c"
+    .
+
+    Definition right_thread: val :=
+      λ: "lk" "flag",
+          let: "c" := ref #false in
+          right_thread_rep "lk" "flag" "c"
+    .
+
+    Hypothesis (LS_LB: 2 <= LIM_STEPS). 
+
+    (* TODO: move *)
+    Lemma cp_mul_split' (ph : listO natO) (deg : DegO) (m n : nat)
+      (LE: m <= n):
+      cp_mul ph deg n (oGS := oGS) ⊣⊢ cp_mul ph deg m (oGS := oGS) ∗ cp_mul ph deg (n - m) (oGS := oGS).
+    Proof using.
+      apply Nat.le_sum in LE as [? ->]. rewrite Nat.sub_add'.
+      apply cp_mul_split.
+    Qed.
+
+    (* TODO: move *)
+    Ltac split_cps cps_res n :=
+      let fmt := constr:(("[" ++ cps_res ++ "' " ++ cps_res ++ "]")%string) in
+      iDestruct (cp_mul_split' _ _ n with cps_res) as fmt; [lia| ].
+
+    Lemma right_thread_iter_spec (lk: val) τ π flag s__f c:
+      {{{
+          (* exc_lb 20 (oGS := oGS) ∗  *)
+          fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗ 
+          obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
+          sgn s__f l__f None (oGS := oGS) ∗
+          ep s__f π (fl_d__h FLP) (oGS := oGS) ∗
+          cp π (fl_d__h FLP) (oGS := oGS) ∗
+          c ↦ #false ∗
+          cp_mul π d0 10 (oGS := oGS)
+      }}}
+        right_thread_iter lk #flag #c @ τ
+      {{{ v, RET v; obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
+                    cp_mul π d0 20 (oGS := oGS) ∗
+                    ∃ v, c ↦ #v ∗ (⌜ v = true ⌝ ∗ flag_set ∨ ⌜ v = false ⌝ ∗ cp π (fl_d__h FLP) (oGS := oGS))
+                     }}}.
+    Proof using.
+      iIntros (Φ).
+      pose proof (fl_is_lock_pers FL lk c__cl (FLG := FLG)) as PERS. (* TODO: why Existing Instance doesn't work? *)
+      iIntros "(#LOCK & #INV & OB & PH & #SGNf & EPf & CPf & C & CPS) POST".
+      rewrite /right_thread_iter.
+
+      (* pure_steps. *)
+
+    Admitted. 
+
+    Lemma right_thread_rep_spec (lk: val) τ π (flag c: loc) s__f:
+      {{{
+          (* exc_lb 20 (oGS := oGS) ∗  *)
+          fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗ 
+          obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
+          sgn s__f l__f None (oGS := oGS) ∗
+          ep s__f π (fl_d__h FLP) (oGS := oGS) ∗
+          cp π (fl_d__h FLP) (oGS := oGS) ∗
+          c ↦ #false ∗
+          cp_mul π d0 20 (oGS := oGS)
+      }}}
+        right_thread_rep lk #flag #c @ τ
+      {{{ v, RET v; obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
+                    flag_set ∗ c ↦ #true }}}.
+    Proof using OBLS_AMU LS_LB FL_STEPS.
+      iIntros (Φ).
+      iLöb as "IH".
+      pose proof (fl_is_lock_pers FL lk c__cl (FLG := FLG)) as PERS. (* TODO: why Existing Instance doesn't work? *)
+      iIntros "(#LOCK & #INV & OB & PH & #SGNf & #EPf & CPh & C & CPS) POST".
+      rewrite /right_thread_rep.
+
+      do 1 pure_step_cases.
+
+      do 1 pure_step_cases.
+      wp_bind (Rec _ _ _)%E.
+      do 7 pure_step_cases.
+      wp_bind (right_thread_iter _ _ _)%E.
+
+      split_cps "CPS" 10.
+      iApply (right_thread_iter_spec with "[-POST CPS]").
+      { iFrame "#∗". }
+      iIntros "!> %r (OB & PH & CPS' & ITER)".
+      iDestruct (cp_mul_split with "[CPS CPS']") as "CPS"; [by iFrame| ]. 
+      wp_bind (Rec _ _ _)%E. pure_steps.
+      iDestruct "ITER" as (v) "[C ITER]".
+      wp_bind (! _)%E.
+      iApply sswp_MU_wp; [done| ]. iApply (wp_load with "[$]"). iIntros "!> C".
+      MU_by_burn_cp. pure_steps.
+      wp_bind (_ = _)%E.
+      iApply sswp_MU_wp; [done| ].
+      iApply sswp_pure_step.
+      { simpl. tauto. }
+      MU_by_burn_cp. pure_steps.
+      
+      iDestruct "ITER" as "[[-> SET] | [-> CPh]]".
+      - rewrite bool_decide_eq_true_2; [| tauto].
+        pure_steps. iApply "POST". iFrame.
+      - rewrite bool_decide_eq_false_2; [| done]. 
+        pure_step_cases.
+        iApply ("IH" with "[-POST]"); [| done]. iFrame "#∗".
+    Qed.
+
+    (* TODO: move *)
+    Lemma cp_mul_1 π d:
+      cp π d (oGS := oGS) ⊣⊢ cp_mul π d 1 (oGS := oGS).
+    Proof using.
+      rewrite /cp_mul. rewrite gmultiset_scalar_mul_1. done.
+    Qed.
+
+    Theorem right_thread_spec (lk: val) τ π (flag: loc) s__f:
+      {{{ exc_lb 20 (oGS := oGS) ∗ 
+          fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗ 
+          obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
+          sgn s__f l__f None (oGS := oGS) ∗
+          cp_mul π (fl_d__m FLP) 2 (oGS := oGS) ∗
+          (* cp π (fl_d__m FLP) (oGS := oGS) ∗ *)
+          cp_mul π d0 30 (oGS := oGS)
+      }}}
+        right_thread lk #flag @ τ
+      {{{ v, RET v; obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
+                    flag_set }}}.
+    Proof using OBLS_AMU LS_LB FL_STEPS LEl ODl.
+      iIntros (Φ).
+      pose proof (fl_is_lock_pers FL lk c__cl (FLG := FLG)) as PERS. (* TODO: why Existing Instance doesn't work? *)
+      iIntros "(#EB & #LOCK & #INV & OB & PH & #SGNf & CPSm & CPS) POST".
+      rewrite /right_thread. pure_steps. simpl.
+
+      wp_bind (ref _)%E.
+      iApply sswp_MU_wp; [done| ]. iApply wp_alloc. iIntros "!> %c C _".
+      (* MU_by_BMU. *)
+      iApply OBLS_AMU; [by rewrite nclose_nroot| ]. 
+      iApply (BMU_AMU with "[-PH] [$]").
+      { reflexivity. }
+      iIntros "PH".
+      iApply BMU_lower; [apply LS_LB| ]. iApply OU_BMU.
+      split_cps "CPSm" 1. rewrite -!cp_mul_1.
+      iApply (OU_wand with "[-CPSm PH]").
+      2: { iApply (@create_ep_upd with "[$] [$] [$]").
+           { apply fl_degs_hm. }
+           reflexivity. }
+      iIntros "(EPf & _ & PH)". iApply OU_BMU.
+      iApply (OU_wand with "[-CPSm' PH]").
+      2: { iApply (exchange_cp_upd with "[$] [$] [$]").
+           1, 2: reflexivity.
+           apply fl_degs_hm. }
+      iIntros "[CPSh PH]".
+      
+      BMU_burn_cp.
+
+      do 1 pure_step_cases.
+
+      wp_bind (Rec _ _ _)%E.
+      do 1 pure_step_cases. iApply wp_value.
+      do 1 pure_step_cases. 
+
+      split_cps "CPS" 10. simpl.
+      iApply (right_thread_rep_spec with "[-POST]").
+      2: { iNext. iIntros (?) "(?&?&?&?)". iApply "POST". iFrame. }
+      split_cps "CPSh" 1. rewrite -cp_mul_1. 
+      iFrame "#∗".
+      iDestruct (cp_mul_split with "[CPS CPS']") as "CPS"; [by iFrame| ].
+      split_cps "CPS" 20. iFrame.  
+    Qed.
+
   End AfterInit.
     
 End MotivatingClient.
