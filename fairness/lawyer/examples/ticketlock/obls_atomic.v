@@ -154,7 +154,7 @@ Section TotalTriples.
       : iProp Σ :=
       ∀ Φ π O (RR: option RO -> iProp Σ),
         ⌜ B c <= LIM_STEPS ⌝ -∗ TLAT_pre RR π O -∗
-        TAU (⊤ ∖ ε__m) π (fun y x => POST y x -∗? Φ (get_ret y x)) O RR -∗
+        TAU (⊤ ∖ ε__m) π (fun y x => th_phase_eq τ π (oGS := oGS) -∗ POST y x -∗? Φ (get_ret y x)) O RR -∗
         WP e @ s; τ; ⊤ {{ v, Φ v }}.
 
   End AtomicTriples.
@@ -338,12 +338,10 @@ End FairLockSpec.
 
 From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From iris.base_logic.lib Require Import invariants.
-From trillium.fairness.lawyer.examples Require Import signal_map.
-
 
 Section Ticketlock.
   Context `{ODd: OfeDiscrete DegO} `{ODl: OfeDiscrete LevelO}.
-  Context `{LEl: @LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}. 
+  Context `{LEl: @LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}.
   
   Let Degree := ofe_car DegO.
   Let Level := ofe_car LevelO.
@@ -355,22 +353,22 @@ Section Ticketlock.
 
   Definition Tid := locale heap_lang.
 
-  Local Infix "*'" := prod (at level 10, left associativity). 
+  Local Infix "*'" := prod (at level 10, left associativity).
   (* Definition tau_codom Σ: Type := (((Tid * Phase) * gset SignalId) * gset Level) *  *)
   (*                                   (* (iProp Σ) *) *)
   (*                                   (ofe_mor val (iProp Σ)) *)
-  Definition tau_codom Σ: Type := 
+  Definition tau_codom Σ: Type :=
     Tid *' Phase *' (gset SignalId) *' (gset Level) *'
     (ofe_mor val (iProp Σ)) *' (ofe_mor (option nat) (iProp Σ)).
 
-  Local Infix "**" := prodO (at level 10, left associativity). 
+  Local Infix "**" := prodO (at level 10, left associativity).
 
   (* Definition tau_codomO Σ: ofe := prodO (prodO (prodO (prodO Tid Phase) (gsetO SignalId)) (gsetR Level)) *)
   (*                                   (* ((iPropO Σ)) *) *)
   (*                                       (ofe_morO valO (iPropO Σ)) *)
   (* . *)
-  Definition tau_codomO Σ: ofe := 
-    Tid ** Phase ** (gsetO SignalId) ** (gsetR Level) ** 
+  Definition tau_codomO Σ: ofe :=
+    Tid ** Phase ** (gsetO SignalId) ** (gsetR Level) **
     (ofe_morO valO (iPropO Σ)) ** (ofe_morO (optionR natO) (iPropO Σ)).
  
   Class TicketlockPreG Σ := {
@@ -389,7 +387,7 @@ Section Ticketlock.
   }.
 
   Definition tau_map_auth `{TicketlockG Σ} (TM: gmap nat (tau_codom Σ)) :=
-    own tl_γ_tau_map ((● (Excl <$> TM)): authUR (gmapUR nat (exclR $ tau_codomO Σ))). 
+    own tl_γ_tau_map ((● (Excl <$> TM)): authUR (gmapUR nat (exclR $ tau_codomO Σ))).
   Definition ticket_tau `{TicketlockG Σ} (n: nat) (cd: tau_codom Σ) :=
     own tl_γ_tau_map ((◯ {[ n := Excl cd ]}): authUR (gmapUR nat _)).
 
@@ -409,7 +407,7 @@ Section Ticketlock.
     own tl_γ_ow_lb (mono_nat_lb n).
 
   Lemma ticket_token_excl `{TicketlockG Σ} i:
-    ticket_token i -∗ ticket_token i -∗ False. 
+    ticket_token i -∗ ticket_token i -∗ False.
   Proof using.
     clear ODl ODd LEl.
     iApply bi.wand_curry. rewrite -own_op -auth_frag_op.
@@ -428,16 +426,16 @@ Section Ticketlock.
   Qed.
 
   Lemma held_agree `{TicketlockG Σ} b1 b2:
-    held_auth b1-∗ held_frag b2 -∗ ⌜ b1 = b2 ⌝. 
+    held_auth b1-∗ held_frag b2 -∗ ⌜ b1 = b2 ⌝.
   Proof using.
-    iIntros "HA HB". iCombine "HB HA" as "H".      
+    iIntros "HA HB". iCombine "HB HA" as "H".
     iDestruct (own_valid with "H") as "%Hval".
-    iPureIntro. apply excl_auth_agree_L in Hval. set_solver. 
+    iPureIntro. apply excl_auth_agree_L in Hval. set_solver.
   Qed.
 
   Lemma held_update `{TicketlockG Σ} b1 b2 b':
     held_auth b1 -∗ held_frag b2 ==∗
-    held_auth b' ∗ held_frag b'. 
+    held_auth b' ∗ held_frag b'.
   Proof using.
     iIntros "HA HB". iCombine "HB HA" as "H".
     rewrite -!own_op. iApply own_update; [| by iFrame].
@@ -467,7 +465,7 @@ Section Ticketlock.
          2: { simpl. intuition. by rewrite !option_equivI. }
          simpl. by rewrite !option_equivI excl_equivI. }
     rewrite auth_both_dfrac_validI. iDestruct "V" as "(_ & [% #EQ] & -#VM)".
-    iRewrite "EQ". 
+    iRewrite "EQ".
     rewrite lookup_op lookup_singleton.
     rewrite Some_op_opM. simpl.
     rewrite gmap_validI. iSpecialize ("VM" $! i).
@@ -493,20 +491,20 @@ Section Ticketlock.
     ow_exact n ==∗ ow_exact m ∗ ow_lb m.
   Proof using.
     iIntros "EX".
-    rewrite /ow_exact. 
+    rewrite /ow_exact.
     rewrite /ow_lb -!own_op.
     iApply (own_update with "[$]").
     etrans.
     { apply mono_nat_update, LE. }
     by rewrite {1}mono_nat_auth_lb_op.
-  Qed. 
+  Qed.
 
   Lemma ow_lb_le_exact `{TicketlockG Σ} i n:
     ow_lb i -∗ ow_exact n -∗ ⌜ i <= n ⌝.
   Proof using.
     iApply bi.wand_curry. rewrite bi.sep_comm -own_op. iIntros "X".
     iDestruct (own_valid with "X") as %V%mono_nat_both_valid. done.
-  Qed.    
+  Qed.
 
   Definition tl_LK `{TicketlockG Σ} `{gen_heapGS loc val Σ}
     (st: FL_st): iProp Σ :=
@@ -516,7 +514,7 @@ Section Ticketlock.
       held_frag b.
 
   (* Right now we just assume that the resulting OM has all needed degrees and levels *)
-  Context (d__w d__l0 d__h0 d__e d__m0: Degree). 
+  Context (d__w d__l0 d__h0 d__e d__m0: Degree).
   Hypothesis
     (fl_degs_wl0: deg_lt d__w d__l0)
     (fl_degs_lh0: deg_lt d__l0 d__h0)
@@ -558,17 +556,20 @@ Section Ticketlock.
     tl_TAU τ (acquire_at_pre lk (FLP := TLPre) (FLG := TLG)) (acquire_at_post lk (FLP := TLPre) (FLG := TLG))
         L
         (fun '(_, _, b) => b = false)
-        c π (fun _ _ => Φ #()) Ob RR.
+        c π
+        (* (fun _ _ => bi_wand (th_phase_eq τ π (oGS := oGS): iProp Σ) (Φ #())) *)
+        (fun _ _ => Φ #())
+        Ob RR.
 
   Instance TAU_stored_Proper `{TLG: TicketlockG Σ}:
     Proper (eq ==> eq ==> equiv ==> equiv) TAU_stored.
   Proof using.
     intros ?????????. subst. rewrite /TAU_stored.
     destruct x1 as [[[[[]]]]], y1 as [[[[[]]]]].
-    rename H1 into X. 
+    rename H1 into X.
     repeat (inversion X as [X1 ?Y]; clear X; rename X1 into X). simpl in *. subst.
     apply leibniz_equiv_iff in Y1, Y2, X, Y3. subst.
-    rewrite X.
+    rewrite {1}X.
     rewrite /tl_TAU /TAU_FL. simpl.
     do 2 (iApply bi.sep_proper; [by eauto| ]).
     iApply TAU_Proper; solve_proper.
@@ -602,7 +603,7 @@ Section Ticketlock.
     rewrite /TAU /TAU_def.
     iDestruct (greatest_fixpoint_strong_mono with "[] T") as "foo".
     2: by iFrame.
-    iModIntro. iIntros (Φ ?). rewrite /TAU_pre. rewrite /TAU_acc. 
+    iModIntro. iIntros (Φ ?). rewrite /TAU_pre. rewrite /TAU_acc.
     (* iApply fupd_mono. *)
     iIntros "X". iMod "X" as (?) "[P T1]". iModIntro. iExists _. iFrame "P".
     iSplit; [| iSplit].
@@ -611,7 +612,7 @@ Section Ticketlock.
       2: { iApply "T1". iDestruct "X" as "(?&?&?&X&?)". iFrame.
            iDestruct "X" as (?) "(?&?)". iExists _. iFrame.
            iSpecialize ("B" $! r__p). by iRewrite "B". }
-      iIntros "(C&?&?&?&?)". iFrame. 
+      iIntros "(C&?&?&?&?)". iFrame.
       iSpecialize ("B" $! (Some (fl_round x0))). by iRewrite "B" in "C".
     - iDestruct "T1" as "[_ [T1 _]]".
       iIntros "(%&?)".
@@ -658,7 +659,7 @@ Section Ticketlock.
     tau_map_auth TM -∗ ticket_tau i cd -∗ tau_map_interp lk c ow TM -∗
     tau_interp lk c ow i cd ∗ ticket_tau i cd ∗ tau_map_auth TM ∗ (tau_interp lk c ow i cd -∗ tau_map_interp lk c ow TM).
   Proof using.
-    clear fl_degs_wl0 d__w ODl ODd LEl. 
+    clear fl_degs_wl0 d__w ODl ODd LEl.
     iIntros "TM T TMI".
     iDestruct (tau_map_ticket with "[$] [$]") as "#TK".
     rewrite {1}/tau_map_interp. rewrite {3}(map_split TM i).
@@ -669,8 +670,8 @@ Section Ticketlock.
     simpl. rewrite big_sepM_singleton.
     iDestruct (tau_interp_Proper_impl' with "TK TKI") as "TKI". iFrame.
     iIntros "TKI".
-    rewrite internal_eq_sym. 
-    iDestruct (tau_interp_Proper_impl' with "TK TKI") as "TKI". 
+    rewrite internal_eq_sym.
+    iDestruct (tau_interp_Proper_impl' with "TK TKI") as "TKI".
     iDestruct (big_sepM_insert_delete with "[CLOS TKI]") as "TMI".
     { repeat iFrame. }
     rewrite insert_id; [| done]. iFrame.
@@ -696,7 +697,7 @@ Section Ticketlock.
     iIntros "TMI TAU".
     rewrite /tau_map_interp. rewrite big_opM_insert.
     2: { apply not_elem_of_dom. rewrite DOM. intros ?%elem_of_set_seq. lia. }
-    iFrame. iRight. iLeft. by iFrame. 
+    iFrame. iRight. iLeft. by iFrame.
   Qed.
 
   Lemma tokens_alloc `{TicketlockG Σ} (N: nat):
@@ -710,10 +711,10 @@ Section Ticketlock.
     1: eapply gset_disj_alloc_empty_local_update.
     2: { reflexivity. }
     apply disjoint_singleton_l. by (intros ?%elem_of_set_seq; lia).
-  Qed. 
+  Qed.
 
   Definition get_ticket: val :=
-    λ: "lk", FAA (Snd "lk") #1.    
+    λ: "lk", FAA (Snd "lk") #1.
 
   Definition wait: val :=
     rec: "wait" "lk" "t" :=
@@ -730,7 +731,7 @@ Section Ticketlock.
   .
 
   Definition tl_release: val :=
-      λ: "lk", FAA (Fst "lk") #1 
+      λ: "lk", FAA (Fst "lk") #1
   .
 
   Definition tl_is_lock `{TicketlockG Σ} lk c := inv tl_ns (tl_inv_inner lk c).
@@ -742,22 +743,22 @@ Section Ticketlock.
     iApply BMU_intro;
     iDestruct (cp_mul_take with "CPS") as "[CPS CP]";
     iSplitR "CP";
-    [| do 2 iExists _; iFrame; iPureIntro; done].   
+    [| do 2 iExists _; iFrame; iPureIntro; done].
   
   Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS _ EM hGS (↑ nroot)}.
   
   Ltac MU_by_BMU :=
     iApply OBLS_AMU; [by rewrite nclose_nroot| ];
-    iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH". 
+    iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH".
   
   Ltac MU_by_burn_cp := MU_by_BMU; BMU_burn_cp.
   
-  Ltac pure_step_hl := 
+  Ltac pure_step_hl :=
     iApply sswp_MU_wp; [done| ];
     iApply sswp_pure_step; [done| ]; simpl;
     iNext.
   
-  Ltac pure_step := pure_step_hl; MU_by_burn_cp.   
+  Ltac pure_step := pure_step_hl; MU_by_burn_cp.
   Ltac pure_step_cases := pure_step || (iApply wp_value; []) || wp_bind (RecV _ _ _ _)%V.
   Ltac pure_steps := repeat (pure_step_cases; []).
 
@@ -872,7 +873,7 @@ Section Ticketlock.
     
     iDestruct (ow_exact_lb with "[$]") as "[EXACT LB]".
     remember_goal.
-    iMod (tokens_alloc with "[$]") as "[TOKS TOK]". 
+    iMod (tokens_alloc with "[$]") as "[TOKS TOK]".
     iMod (ticket_tau_alloc with "[$]") as "[TM TK_TAU]".
     { rewrite DOM__TM. intros [_ IN]%elem_of_set_seq. simpl in IN.
       by apply Nat.lt_irrefl in IN. }
@@ -880,22 +881,22 @@ Section Ticketlock.
     
     destruct (Nat.eq_0_gt_0_cases d) as [-> | QUEUE].
     2: { BMU_burn_cp.
-         rewrite (proj2 (Nat.eqb_neq _ _)); [| lia]. simpl. 
+         rewrite (proj2 (Nat.eqb_neq _ _)); [| lia]. simpl.
          iModIntro.
          pure_steps.
          do 2 iExists _. iFrame. rewrite Nat.sub_add'.
          rewrite cp_mul_take. iDestruct "CPSh" as "[CPSh CPh]".
          iFrame.
-         iApply fupd_frame_all.         
-         iSplitL "RR0". 
+         iApply fupd_frame_all.
+         iSplitL "RR0".
          { iModIntro. iSplit; [done| ]. iSplit; [iPureIntro; lia| ].
-           iExists _. iFrame. } 
+           iExists _. iFrame. }
          iDestruct "TAU" as "[_ [_ AB]]".
          iMod ("AB" with "[ST]") as "TAU"; [by iFrame| ].
          iDestruct (TMI_extend_queue with "[$] [TAU OB]") as "TAUS"; eauto.
          { lia. }
          { rewrite /TAU_stored.
-           Unshelve. 2: repeat eapply pair.           
+           Unshelve. 2: repeat eapply pair.
            simpl. iFrame "OB TAU".
            by iApply sgns_level_gt'_empty. }
          iMod ("CLOS" with "[HELD TK' OW EXACT TOKS TAUS TM]") as "_"; [| done].
@@ -904,7 +905,7 @@ Section Ticketlock.
          (* Set Printing Coercions. *)
          (* Set Printing All. *)
 
-         rewrite (proj2 (Nat.eqb_neq _ _)); [| lia]. 
+         rewrite (proj2 (Nat.eqb_neq _ _)); [| lia].
          replace (((ow + d)%nat + 1)%Z) with (Z.of_nat $ S (ow + d)) by lia.
          iFrame. iPureIntro. split; [done| ]. split; [lia| ].
          rewrite dom_insert_L DOM__TM.
@@ -912,18 +913,18 @@ Section Ticketlock.
 
     rewrite (proj2 (Nat.eqb_eq _ _)); [| done]. simpl.
     iApply (BMU_lower _ (c + (1 + c))); [lia| ].
-    iApply BMU_split. 
+    iApply BMU_split.
     rewrite /tl_LK. destruct st as [[]]. iDestruct "ST" as (??) "(-> & OW' & HELD')".
     rewrite !Nat.add_0_r. rewrite Nat.add_0_r in DOM__TM.
     iDestruct "TAU" as "[_ [COMM _]]".
-    iDestruct (held_agree with "[$] [$]") as "<-". 
+    iDestruct (held_agree with "[$] [$]") as "<-".
     rewrite /tl_LK.
     iSpecialize ("COMM" with "[OB]").
     { by iFrame. }
 
     iApply (BMU_wand with "[-COMM]"); [| done].
     iIntros "COMM".
-    BMU_burn_cp. iModIntro. iApply wp_value. 
+    BMU_burn_cp. iModIntro. iApply wp_value.
     do 2 iExists _. iFrame. iApply fupd_frame_all.
     iSplitL "CPSh RR0".
     { rewrite Nat.sub_diag. iModIntro.
@@ -937,7 +938,7 @@ Section Ticketlock.
     iDestruct (TMI_extend_acquire _ _ _ _ (_, Φ, _) with "[$] [$]") as "TMI"; eauto.
     iApply "CLOS". iNext. rewrite /tl_inv_inner.
     rewrite -(Nat.add_1_r ow).
-    replace (Z.of_nat ow + 1)%Z with (Z.of_nat (ow + 1)) by lia. 
+    replace (Z.of_nat ow + 1)%Z with (Z.of_nat (ow + 1)) by lia.
     do 5 iExists _. iFrame.
     rewrite (proj2 (Nat.eqb_neq _ _)); [| lia]. iFrame.
     iPureIntro. split; [done| ]. split; [lia| ].
@@ -948,7 +949,7 @@ Section Ticketlock.
 
   Lemma wait_spec (lk: val) c o' (t: nat) τ π Ob Φ RR
     (LIM_STEPS': fl_B TLPre c <= LIM_STEPS):
-    tl_is_lock lk c ∗ exc_lb 20 (oGS := oGS) ∗ wait_res o' t τ π Ob Φ RR ⊢ WP (wait lk #t) @ τ {{ Φ }}.
+    tl_is_lock lk c ∗ exc_lb 20 (oGS := oGS) ∗ wait_res o' t τ π Ob Φ RR ⊢ WP (wait lk #t) @ τ {{ v, Φ v ∗ th_phase_eq τ π (oGS := oGS) }}.
   Proof using fl_degs_wl0 OBLS_AMU.
     clear ODl ODd LEl.
     iLöb as "IH" forall (o').
@@ -958,7 +959,7 @@ Section Ticketlock.
 
     wp_bind (Fst _)%E.
     (* TODO: make a lemma? and remove duplicates *)
-    iApply wp_atomic. 
+    iApply wp_atomic.
     iMod (fupd_mask_subseteq _) as "CLOS'"; [| iInv "INV" as "inv" "CLOS"]; [set_solver| ].
     iModIntro. rewrite {1}/tl_inv_inner.
     iDestruct "inv" as (l__ow l__tk ???) "[>%EQ inv]". subst lk.
@@ -976,7 +977,7 @@ Section Ticketlock.
     iApply sswp_MU_wp_fupd; [done| ]. iModIntro.
     iApply (wp_load with "[OW]"); [done| ]. iIntros "!> OW".
     
-    iDestruct (ticket_token_bound with "[$] [$]") as %LTttk. 
+    iDestruct (ticket_token_bound with "[$] [$]") as %LTttk.
     destruct (decide (ow = t)) as [-> | QUEUE].
     { rewrite (proj2 (Nat.eqb_neq _ _)); [| lia].
       iDestruct (tau_map_ticket_interp with "[$] [$] [$]") as "(TAUtk & TAU & TM & TMI_CLOS)".
@@ -993,23 +994,23 @@ Section Ticketlock.
       iModIntro.
 
       wp_bind (Rec _ _ _)%V. pure_steps.
-      wp_bind (_ = _)%E. 
-      iApply sswp_MU_wp; [done| ]. 
-      iApply sswp_pure_step. 
+      wp_bind (_ = _)%E.
+      iApply sswp_MU_wp; [done| ].
+      iApply sswp_pure_step.
       { simpl. tauto. }
       iNext. MU_by_burn_cp. rewrite bool_decide_eq_true_2; [| tauto].
       pure_steps.
-      done. }
+      iFrame. }
 
     iDestruct (tau_map_ticket_interp with "[$] [$] [$]") as "(TAUtk & TAU & TM & TMI_CLOS)".
     rewrite {1}/tau_interp.
-    apply Nat.le_lteq in LEot as [LTot | EQ]. 
+    apply Nat.le_lteq in LEot as [LTot | EQ].
     2: { subst tk. iDestruct "TAUtk" as "[[? %] | [[? %] | [? %]]]".
-         all: try lia. 
+         all: try lia.
          by iDestruct (ticket_token_excl with "[$] [$]") as %?. }
 
     iDestruct "TAUtk" as "[[TAUs %] | [[? %] | [? %]]]".
-    all: try lia. 
+    all: try lia.
     2: { by iDestruct (ticket_token_excl with "[$] [$]") as %?. }
     rewrite (proj2 (Nat.eqb_neq _ _)); [| lia].
     rewrite /TAU_stored. iDestruct "TAUs" as "(OB & SLT & TAUs)".
@@ -1030,7 +1031,7 @@ Section Ticketlock.
       { rewrite /sgns_level_ge'. set_solver. }
       iSplit; [| done].
       iDestruct "RR" as (r) "[RR RR']". iExists _. iFrame.
-      iDestruct "RR'" as "[-> | ?]"; [| by iFrame]. 
+      iDestruct "RR'" as "[-> | ?]"; [| by iFrame].
       apply Nat.le_sum in LBow as [d ->]. rewrite Nat.sub_add'.
       destruct d.
       - rewrite Nat.add_0_r. by iLeft.
@@ -1038,7 +1039,7 @@ Section Ticketlock.
     iModIntro.
     iApply (BMU_lower _ (c + (3 + c))); [lia| ].
     iApply BMU_split. iApply (BMU_wand with "[-WAIT] [$]").
-    iIntros "(RR & CP & PH & OB & CLOS')". 
+    iIntros "(RR & CP & PH & OB & CLOS')".
     iSpecialize ("CLOS'" with "[OW' HELD']").
     { iFrame. iSplit; [| done]. iNext. do 2 iExists _. iFrame. eauto. }
     iApply OU_BMU.
@@ -1048,7 +1049,7 @@ Section Ticketlock.
          apply fl_degs_wl0. }
     iIntros "[CPS' PH]".
     iDestruct (cp_mul_split with "[CPS CPS']") as "CPS"; [iFrame| ]. simpl.
-    iApply BMU_intro. iMod "CLOS'" as "TAUs". iModIntro. 
+    iApply BMU_intro. iMod "CLOS'" as "TAUs". iModIntro.
     rewrite cp_mul_take. iDestruct "CPS" as "[CPS CP]".
     iSplitR "CP".
     2: { do 2 iExists _. iFrame. done. }
@@ -1063,15 +1064,15 @@ Section Ticketlock.
       iPureIntro. repeat split; eauto. lia. }
     iModIntro.
     wp_bind (Rec _ _ _)%V. pure_steps.
-    wp_bind (_ = _)%E. 
-    iApply sswp_MU_wp; [done| ]. 
-    iApply sswp_pure_step. 
+    wp_bind (_ = _)%E.
+    iApply sswp_MU_wp; [done| ].
+    iApply sswp_pure_step.
     { simpl. tauto. }
     iNext. MU_by_burn_cp. rewrite bool_decide_eq_false_2.
-    2: { intros [=EQ%Nat2Z.inj']. lia. } 
+    2: { intros [=EQ%Nat2Z.inj']. lia. }
     do 2 pure_step_cases.
 
-    iApply ("IH" $! ow). 
+    iApply ("IH" $! ow).
     iFrame "#∗". iSplit; [iPureIntro; lia| ]. iSplitL "RR".
     { iExists _. iFrame. by iLeft. }
     replace 21 with (10 + 11) by lia. rewrite cp_mul_split.
@@ -1113,12 +1114,12 @@ Section Ticketlock.
 
     rewrite !lookup_delete_ne; [| lia].
     destruct (TM !! (ow + 1)) as [[[[[[]]]]]| ] eqn:OW'.
-    2: { simpl. rewrite bool_decide_eq_false_2; [| by apply not_elem_of_dom]. 
+    2: { simpl. rewrite bool_decide_eq_false_2; [| by apply not_elem_of_dom].
          iApply BMU_intro. iFrame. set_solver. }
     simpl. rewrite bool_decide_eq_true_2; [| by apply elem_of_dom].
     rewrite !big_sepM_singleton.
     rewrite {1}/tau_interp. iDestruct "OW'" as "[[TAU %] | [[? %] | [? %]]]"; try lia.
-    rewrite /TAU_stored. iDestruct "TAU" as "(OB' & #SLT' & TAUs')". simpl. 
+    rewrite /TAU_stored. iDestruct "TAU" as "(OB' & #SLT' & TAUs')". simpl.
     rewrite /tl_TAU /TAU_FL. rewrite TAU_elim. simpl.
     rewrite /TAU_acc.
     
@@ -1126,13 +1127,13 @@ Section Ticketlock.
     iMod "TAUs'" as ([[lk_ r] b]) "[PRE [_ [COMM _]]]". iModIntro.
 
     rewrite /acquire_at_pre. simpl.
-    remember_goal. 
+    remember_goal.
     iDestruct "PRE" as "[>(%&%&%EQ&LOW'&HELD') ->]".
     iApply "GOAL". iClear "GOAL".
-    subst lk. inversion_clear EQ. 
+    subst lk. inversion_clear EQ.
     iDestruct (held_agree with "[$] [$]") as %<-.
     iDestruct (mapsto_agree with "LOW LOW'") as %EQ.
-    inversion EQ as [EQ'']. assert (r = ow + 1) as -> by lia. clear EQ'' EQ. 
+    inversion EQ as [EQ'']. assert (r = ow + 1) as -> by lia. clear EQ'' EQ.
     iSpecialize ("COMM" with "[$OB' //]").
     iApply (BMU_wand with "[-COMM] [$]"). iIntros "CLOS'".
     iMod (held_update _ _ true with "[$] [$]") as "[HELD HELD']".
@@ -1161,7 +1162,7 @@ Section Ticketlock.
     iIntros "[#INV #EB]". rewrite /TLAT_FL /TLAT.
     iIntros (Φ π Ob RR) "%LIM_STEPS' PRE TAU".
     rewrite /TLAT_pre. simpl. iDestruct "PRE" as "(RR0 & OB & _ & PH & CP)".
-    rewrite /tl_release. 
+    rewrite /tl_release.
 
     pure_step_hl. MU_by_BMU.
     iApply (BMU_lower _ 2).
@@ -1209,7 +1210,7 @@ Section Ticketlock.
     simpl. rewrite -Nat.add_assoc. iApply BMU_split.
     iApply (BMU_wand with "[-TAU] [$]"). iIntros "CLOS'". rewrite -Nat.add_assoc.
     iSpecialize ("CLOS'" $! (_, (ow + 1), false)).
-    remember_goal. 
+    remember_goal.
     iMod (held_update _ _ false with "[$] [$]") as "[HELD HELD']".
     iMod (ow_exact_increase _ (ow + 1) with "[$]") as "[EXACT OW_LB]"; [lia| ].
     iApply "GOAL". iClear "GOAL".
@@ -1224,9 +1225,9 @@ Section Ticketlock.
     iApply BMU_proper.
     1, 2: reflexivity.
     { apply bi.sep_comm. }
-    iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
+    iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
     iApply (BMU_frame_l with "[CP]").
-    { do 2 iExists _. by iFrame. } 
+    { do 2 iExists _. by iFrame. }
     iApply (BMU_mask_comm with "[-CLOS'] [$]"); [set_solver| ].
     iIntros "Φ". simpl.
 
@@ -1245,7 +1246,7 @@ Section Ticketlock.
       - apply Nat.eqb_eq in OW'. apply bool_decide_eq_false. lia.
       - apply Nat.eqb_neq in OW'. apply bool_decide_eq_true. lia. }
 
-    by iFrame.
+    iModIntro. by iApply "Φ".
   Qed.
 
   (* TODO: mention exc_lb in the proof OR implement its increase *)
@@ -1287,7 +1288,8 @@ Section Ticketlock.
     replace 19 with (10 + 9) at 4 by lia. iDestruct (cp_mul_split with "CPS") as "[CPS1 CPS]".
 
     Set Printing Coercions.
-    assert (NonExpansive Φ) as NE_Φ by apply _.
+    set (post :=  (fun x => bi_wand (th_phase_eq τ π (oGS := oGS)) (Φ x)): ofe_car valO → ofe_car (iPropO Σ)).
+    assert (NonExpansive post) as NE_Φ by apply _.
     assert (NonExpansive RR) as NE_RR.
     { (* TODO: why it's not inferred automatically? *)
       simpl in *.
@@ -1300,12 +1302,12 @@ Section Ticketlock.
     iApply (wp_wand with "[TAU OB PH CPe RR0 CPS1]").
     { iApply (get_ticket_spec with "[$] [TAU] [OB PH CPe RR0] [$]").
       { done. }
-      { simpl. rewrite /TAU_FL. simpl. 
+      { simpl. rewrite /TAU_FL. simpl.
         iApply (TAU_Proper with "[$]").
         all: try reflexivity.
-        Unshelve. 4: econstructor; apply NE_RR. 3: econstructor; apply NE_Φ.
-        1, 2: done. }
-      rewrite /TLAT_pre. iFrame. iApply sgns_level_gt'_empty. }    
+        Unshelve. 4: by econstructor; apply NE_RR. 3: by econstructor; apply NE_Φ.
+        all: done. }
+      rewrite /TLAT_pre. iFrame. iApply sgns_level_gt'_empty. }
     simpl. iIntros (?) "(%&%&->&WR)".
     rewrite /wait_res. rewrite !bi.sep_assoc. iDestruct "WR" as "[WR_ PH]".
 
@@ -1316,7 +1318,7 @@ Section Ticketlock.
       rewrite -!bi.sep_assoc. iDestruct "WR_" as "(?&?&?&?&?&?&?)".
       iFrame "#∗". }
 
-    simpl. intuition. 
+    simpl. iIntros (?) "[POST PH]". by iApply "POST". 
   Qed.
   
-End Ticketlock. 
+End Ticketlock.
