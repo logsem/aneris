@@ -904,14 +904,14 @@ Section MotivatingClient.
           obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
           sgn s__f l__f None (oGS := oGS) ∗
           ep s__f π (fl_d__h FLP) (oGS := oGS) ∗
-          cp π (fl_d__h FLP) (oGS := oGS) ∗
+          cp_mul π (fl_d__h FLP) 2 (oGS := oGS) ∗
           c ↦ #false ∗
           cp_mul π d0 10 (oGS := oGS)
       }}}
         right_thread_iter lk #flag #c @ τ
       {{{ v, RET v; obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
                     cp_mul π d0 20 (oGS := oGS) ∗
-                    ∃ v, c ↦ #v ∗ (⌜ v = true ⌝ ∗ flag_set ∨ ⌜ v = false ⌝ ∗ cp π (fl_d__h FLP) (oGS := oGS))
+                    ∃ v, c ↦ #v ∗ (⌜ v = true ⌝ ∗ flag_set ∨ ⌜ v = false ⌝ ∗ cp_mul π (fl_d__h FLP) 2 (oGS := oGS))
                      }}}.
     Proof using.
       iIntros (Φ).
@@ -920,6 +920,7 @@ Section MotivatingClient.
       rewrite /right_thread_iter.
 
       (* pure_steps. *)
+      (* wp_bind (fl_acquire _ _)%E.  *)
 
     Admitted. 
 
@@ -930,7 +931,7 @@ Section MotivatingClient.
           obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
           sgn s__f l__f None (oGS := oGS) ∗
           ep s__f π (fl_d__h FLP) (oGS := oGS) ∗
-          cp π (fl_d__h FLP) (oGS := oGS) ∗
+          cp_mul π (fl_d__h FLP) 2 (oGS := oGS) ∗
           c ↦ #false ∗
           cp_mul π d0 20 (oGS := oGS)
       }}}
@@ -941,7 +942,7 @@ Section MotivatingClient.
       iIntros (Φ).
       iLöb as "IH".
       pose proof (fl_is_lock_pers FL lk c__cl (FLG := FLG)) as PERS. (* TODO: why Existing Instance doesn't work? *)
-      iIntros "(#LOCK & #INV & OB & PH & #SGNf & #EPf & CPh & C & CPS) POST".
+      iIntros "(#LOCK & #INV & OB & PH & #SGNf & #EPf & CPSh & C & CPS) POST".
       rewrite /right_thread_rep.
 
       do 1 pure_step_cases.
@@ -1031,9 +1032,9 @@ Section MotivatingClient.
       split_cps "CPS" 10. simpl.
       iApply (right_thread_rep_spec with "[-POST]").
       2: { iNext. iIntros (?) "(?&?&?&?)". iApply "POST". iFrame. }
-      split_cps "CPSh" 1. rewrite -cp_mul_1. 
       iFrame "#∗".
-      iDestruct (cp_mul_split with "[CPS CPS']") as "CPS"; [by iFrame| ].
+      split_cps "CPSh" 2. iFrame.
+      iDestruct (cp_mul_split with "[CPS CPS']") as "CPS"; [by iFrame| ]. 
       split_cps "CPS" 20. iFrame.  
     Qed.
 
