@@ -528,7 +528,7 @@ Section MotivatingClient.
       iFrame. iPureIntro. repeat split; try done.
     Qed.
 
-    Hypothesis (DEG_LH: deg_lt (fl_d__l FLP) (fl_d__h FLP)).
+    (* Hypothesis (DEG_LH: deg_lt (fl_d__l FLP) (fl_d__h FLP)). *)
 
     Lemma BMU_create_wait_owner τ π r m smap i
       (DOM: i ∈ dom smap)
@@ -536,7 +536,7 @@ Section MotivatingClient.
       th_phase_eq τ π (oGS := oGS) ∗ cp π (fl_d__h FLP) (oGS := oGS) ∗ smap_repr_cl r m smap ⊢
       BMU ∅ 1 (th_phase_eq τ π (oGS := oGS) ∗ RR__L π (Some i) ∗
                 smap_repr_cl r m smap) (oGS := oGS).
-    Proof using LVL_ORDo L__FL DEG_LH ODd ODl LEl.
+    Proof using LVL_ORDo L__FL ODd ODl LEl.
       iIntros "(PH & CP & [SR %SR_DOM])".
       rewrite /RR__L.
       
@@ -545,7 +545,7 @@ Section MotivatingClient.
       2: { iApply (smap_create_ep (λ _, l__o) with "[$] [$] [$]").
            { reflexivity. }
            { done. }
-           apply DEG_LH. }
+           apply fl_degs_lh. }
 
       iIntros "X". iMod "X" as "(%s&?&?&?&?)". iApply BMU_intro.
       iFrame. iSplit; [| done]. iExists _. iFrame "#∗".
