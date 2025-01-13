@@ -18,6 +18,313 @@ Ltac remember_goal :=
   end.
 
 
+Section TotalTriples.
+  Context `{OfeDiscrete DegO} `{OfeDiscrete LevelO}.
+  Context `{LEl: @LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}. 
+  
+  Let Degree := ofe_car DegO.
+  Let Level := ofe_car LevelO.
+
+  Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}.
+  Let OP := LocaleOP (Locale := locale heap_lang).
+  Existing Instance OP.
+  Let OM := ObligationsModel.
+  
+  Context {Σ: gFunctors}.
+  Context {invs_inΣ: invGS_gen HasNoLc Σ}.
+
+  Let OAM := ObligationsAM. 
+  Let ASEM := ObligationsASEM.
+  Context {oGS: @asem_GS _ _ ASEM Σ}.
+
+  Let Locale := locale heap_lang. 
+
+  Section AtomicTriples. 
+    Context
+      {ST: Type}
+      {RO: Type}
+      (τ: Locale)(* TODO: should it be fixed? *)
+      (P: ST -> iProp Σ) (Q: ST -> ST -> iProp Σ) (* second ST is the previous state *)
+      (L: gset Level) (* TODO: only finite sets? *)
+      (round: ST -> RO) (* TODO: can we get away with ST only? *)
+      (TGT: ST -> Prop) (* `{forall x, Decision (TGT x)} *)
+      (d__h d__l d__m: Degree)
+      (c: nat) (B: nat -> nat)
+      (ε__m: coPset)
+    .
+
+    Section AtomicUpdates.
+      Context
+        (ε: coPset)
+        (π: Phase)
+        (q0: Qp)
+        (Φ: ST -> ST -> iProp Σ)
+        (O: gset SignalId)
+        (RR: option RO -> iProp Σ)
+      .
+
+      Definition TAU_acc (V: iProp Σ): iProp Σ :=
+        |={ε, ∅}=> ∃ x, P x ∗ (
+              let abort := P x ={∅, ε}=∗ V in
+              let PH q := th_phase_frag τ π q (oGS := oGS) in
+              (let r := round x in
+               ∀ O' q', obls τ O' (oGS := oGS) ∗ sgns_level_ge' O' L (oGS := oGS) ∗ 
+                        PH q' ∗ ⌜ Qp.le q' q0 ⌝ ∗
+                      (∃ r__p, RR r__p ∗ (⌜ r__p = Some r ⌝ ∨ cp π d__h (oGS := oGS))) ∗
+                      ⌜ ¬ TGT x ⌝ -∗
+                      BMU ∅ c (oGS := oGS) (
+                        RR (Some r) ∗ cp π d__l (oGS := oGS) ∗ PH q' ∗
+                        obls τ O' (oGS := oGS) ∗
+                        abort
+                      )
+              ) ∧
+              (∀ q',
+               (* (∃ r__p, RR r__p) ∗ *)
+               ⌜ TGT x ⌝ ∗ obls τ O (oGS := oGS)
+                 ∗ PH q' ∗ ⌜ Qp.le q' q0 ⌝
+                 -∗
+               BMU ∅ c (oGS := oGS) (
+                 ∀ y, Q y x ={∅, ε}=∗ from_option PH ⌜ True ⌝ (Qp.sub q0 q') -∗ Φ y x)) ∧
+              abort
+      ).
+
+      Definition TAU_pre (V : () → iProp Σ) (_ : ()) : iProp Σ :=
+        TAU_acc (V ()).
+
+      Lemma TAU_acc_mono V1 V2:
+        (V1 -∗ V2) -∗ TAU_acc V1 -∗ TAU_acc V2.
+      Proof using.
+        iIntros "V12 T1". rewrite /TAU_acc.
+        iMod "T1" as (?) "[P T1]". iModIntro. iExists _. iFrame "P".
+        iSplit; [| iSplit].
+        - iIntros (??) "X". iDestruct "T1" as "[T1 _]".
+          iSpecialize ("T1" with "[$]").
+          iApply (BMU_wand with "[-T1]"); [| done].
+          iIntros "(?&?&?&?&AB)". iFrame.
+          iIntros "?". iMod ("AB" with "[$]"). by iApply "V12".
+        - iDestruct "T1" as "[_ [T1 _]]". done.
+        - iDestruct "T1" as "[_ [_ AB]]".
+          iIntros "?". iMod ("AB" with "[$]"). by iApply "V12".
+      Qed.
+
+      Global Instance TAU_pre_mono : BiMonoPred TAU_pre.
+      Proof.
+        constructor.
+        - iIntros (P1 P2 ??) "#HP12". iIntros ([]) "AU".
+          rewrite /TAU_pre.
+          iApply (TAU_acc_mono with "[] [$]"). done. 
+        - intros ??. solve_proper.
+      Qed.
+
+      Local Definition TAU_def :=
+        bi_greatest_fixpoint TAU_pre ().
+
+      (* TODO: seal *)
+      Definition TAU := TAU_def.
+      
+      Lemma TAU_elim:
+        TAU ⊣⊢ TAU_acc TAU.
+      Proof using.
+        rewrite /TAU /TAU_def /=. apply: greatest_fixpoint_unfold.
+      Qed.
+
+      Lemma TAU_intro U V:
+        Absorbing U → Persistent U →
+        (U ∧ V ⊢ TAU_acc V) → U ∧ V ⊢ TAU.
+      Proof.
+        rewrite /TAU /TAU_def /=.
+        iIntros (?? HAU) "[#HP HQ]".
+        iApply (greatest_fixpoint_coiter _ (λ _, V)); last done.
+        iIntros "!>" ([]) "HQ".
+        iApply HAU. iSplit; by iFrame.
+      Qed.
+
+    End AtomicUpdates.
+
+    Context `{EM: ExecutionModel heap_lang M}. 
+    Context `{hGS: @heapGS Σ _ EM}.
+    Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
+
+    Definition TLAT_pre (RR: option RO -> iProp Σ) π q (O: gset SignalId): iProp Σ :=
+      RR None ∗ obls τ O (oGS := oGS) ∗ sgns_level_gt' O L (oGS := oGS) ∗
+      th_phase_frag τ π q (oGS := oGS) ∗ cp π d__m (oGS := oGS).
+    
+    Definition TLAT e s
+      (POST: ST -> ST -> option (iProp Σ))
+      (get_ret: ST -> ST -> val)
+      : iProp Σ :=
+      ∀ Φ q π O (RR: option RO -> iProp Σ),
+        ⌜ B c <= LIM_STEPS ⌝ -∗ TLAT_pre RR π q O -∗
+        TAU (⊤ ∖ ε__m) π q (fun y x => POST y x -∗? Φ (get_ret y x)) O RR -∗
+        WP e @ s; τ; ⊤ {{ v, Φ v }}.
+
+  End AtomicTriples.
+
+  (* TODO: move *)
+  Instance sgns_level_ge'_Proper:
+    Proper (equiv ==> equiv ==> equiv) (sgns_level_ge' (oGS := oGS)).
+  Proof using. solve_proper. Qed.
+
+  Global Instance TAU_acc_Proper {ST RO: Type}:
+    Proper
+      (eq ==> (eq ==> equiv) ==> (eq ==> eq ==> equiv) ==> equiv ==> 
+       (eq ==> eq) ==> (eq ==> iff) ==> eq ==> eq ==> eq ==> equiv ==> 
+       eq ==> eq ==> (eq ==> eq ==> equiv ) ==> equiv ==> (eq ==> equiv) ==> equiv ==>
+       equiv) (TAU_acc (ST := ST) (RO := RO)).
+  Proof using.
+    (* TODO: simplify *)
+    red. repeat intro. subst. 
+    rewrite /TAU_acc.
+    apply leibniz_equiv_iff in H4, H10, H14. subst.
+    iApply fupd_proper. 
+    iApply bi.exist_proper. iIntros (?).
+    iApply bi.sep_proper; [by eauto| ].
+    iApply bi.and_proper.
+    { do 2 (iApply bi.forall_proper; iIntros (?)).
+      iApply bi.wand_proper.
+      { repeat iApply bi.sep_proper; try done. 
+        2: { iApply bi.pure_proper. apply not_iff_compat. eauto. }
+        iApply bi.exist_proper. iIntros (?).
+        iApply bi.sep_proper; eauto.
+        iApply bi.or_proper; eauto.
+        iApply bi.pure_proper. split; intros ->; subst; f_equal; [| symmetry]; eauto. }
+      rewrite -(H5 a); [| done]. rewrite -(H2 a); [| done]. rewrite H16.
+      rewrite -(H15 _); reflexivity. }
+    rewrite -(H2 a); [| done].
+    iApply bi.and_proper.
+    2: { solve_proper. }
+    iApply bi.forall_proper; iIntros (?).
+    rewrite -(H6 a); [| done].
+    (* rewrite H16. *)
+    setoid_rewrite <- (H3 _ _ _ _); try reflexivity.
+    setoid_rewrite <- (H13 _ _ _ _); reflexivity.
+  Qed.
+
+  Global Instance TAU_Proper {ST RO: Type}:
+    Proper
+      (eq ==> (eq ==> equiv) ==> (eq ==> eq ==> equiv) ==> equiv ==> 
+       (eq ==> eq) ==> (eq ==> iff) ==> eq ==> eq ==> eq ==> equiv ==> 
+       eq ==> eq ==> (eq ==> eq ==> equiv ) ==> equiv ==> (eq ==> equiv) ==> equiv)
+      (TAU (ST := ST) (RO := RO)).
+  Proof using.
+    rewrite /TAU /TAU_def.
+    red. repeat intro. subst.
+    eapply greatest_fixpoint_proper; [| done].
+    repeat intro. rewrite /TAU_pre. iApply TAU_acc_Proper; eauto.
+  Qed.
+
+End TotalTriples.
+
+
+(* TODO: move to another file *)
+Section FairLockSpec.
+
+  Definition FL_st: Type := val * nat * bool.
+
+  Definition fl_round: FL_st -> nat := fun '(_, r, _) => r. 
+
+  Context `{OfeDiscrete DegO} `{OfeDiscrete LevelO}.
+  Context `{@LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}. 
+  
+  Let Degree := ofe_car DegO.
+  Let Level := ofe_car LevelO.
+
+  Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}.
+  Let OP := LocaleOP (Locale := locale heap_lang).
+  Existing Instance OP.
+  Let OM := ObligationsModel.
+  
+  Record FairLockPre := {
+    fl_c__cr: nat; fl_B: nat -> nat;
+    fl_GS :> gFunctors -> Set;
+    fl_LK `{FLG: fl_GS Σ} {HEAP: gen_heapGS loc val Σ}: FL_st -> iProp Σ;
+    fl_d__h: Degree;
+    fl_d__l: Degree;
+    fl_d__m: Degree;
+    fl_degs_lh: deg_lt fl_d__l fl_d__h;
+    fl_degs_hm: deg_lt fl_d__h fl_d__m;
+    fl_ι: namespace;
+    fl_acq_lvls: gset Level;                                     
+  }.
+
+
+  Context {Σ: gFunctors}.
+  (* Context {invs_inΣ: invGS_gen HasNoLc Σ}. *)
+  
+  Let OAM := ObligationsAM. 
+  Let ASEM := ObligationsASEM.
+  Context {oGS: @asem_GS _ _ ASEM Σ}.
+  
+  Context `{EM: ExecutionModel heap_lang M}.
+  Context `{hGS: @heapGS Σ _ EM}.
+  Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
+  
+  Context {FLP: FairLockPre}.
+  
+  Definition TAU_FL τ P Q L TGT c π q
+    (* (Φ: val -> iProp Σ) *)
+    Φ
+    O (RR: option nat -> iProp Σ): iProp Σ := 
+    TAU τ P Q L fl_round TGT (fl_d__h FLP) (fl_d__l FLP)
+      c
+      (⊤ ∖ ↑(fl_ι FLP))
+      π q
+      (* (fun _ _ => Φ #()) *)
+      Φ
+      O RR
+      (oGS := oGS). 
+  
+  Definition TLAT_FL τ P Q L TGT get_ret c e : iProp Σ := 
+    TLAT τ P Q L          
+      fl_round TGT
+      (fl_d__h FLP) (fl_d__l FLP) (fl_d__m FLP)
+      c (fl_B FLP)
+      (↑ (fl_ι FLP)) e NotStuck
+      (fun _ _ => None)
+      (* (fun _ _ => #()) *)
+      get_ret
+      (oGS := oGS).
+  
+  Definition acquire_at_pre {FLG: fl_GS FLP Σ} (lk: val) (x: FL_st): iProp Σ :=
+    ▷ fl_LK FLP x (FLG := FLG) ∗ ⌜ x.1.1 = lk ⌝. 
+  Definition acquire_at_post {FLG: fl_GS FLP Σ} (lk: val) (y x: FL_st): iProp Σ :=
+    fl_LK FLP y (FLG := FLG) ∗ ⌜ y.1 = x.1 /\ x.2 = false /\ y.2 = true⌝.
+  Definition release_at_pre {FLG: fl_GS FLP Σ} (lk: val) (x: FL_st): iProp Σ :=
+    ▷ fl_LK FLP x (FLG := FLG) ∗ ⌜ x.2 = true /\ x.1.1 = lk⌝. 
+  Definition release_at_post {FLG: fl_GS FLP Σ} (lk: val) (y x: FL_st): iProp Σ :=
+    fl_LK FLP y (FLG := FLG) ∗ ⌜ y.1.2 = (x.1.2 + 1)%nat /\ y.2 = false /\ y.1.1 = x.1.1 ⌝.
+  
+  Record FairLock := {    
+    fl_create: val; fl_acquire: val; fl_release: val;
+    fl_is_lock `{FLG: fl_GS FLP Σ} {HEAP: gen_heapGS loc val Σ}: val -> nat -> iProp Σ;
+    fl_is_lock_pers {FLG: fl_GS FLP Σ} lk c :> Persistent (fl_is_lock lk c (FLG := FLG));
+
+    fl_create_spec: ⊢ ⌜ fl_c__cr FLP <= LIM_STEPS ⌝ -∗ ∀ τ c,
+      {{{ ⌜ True ⌝ }}} fl_create #() @ τ {{{ lk, RET lk;
+         ∃ FLG: fl_GS FLP Σ, fl_LK FLP (lk, 0, false) (FLG := FLG) ∗ fl_is_lock lk c (FLG := FLG) }}};
+
+    fl_acquire_spec {FLG: fl_GS FLP Σ} (lk: val) c τ: (fl_is_lock (FLG := FLG)) lk c ⊢
+        TLAT_FL τ 
+        (acquire_at_pre lk (FLG := FLG))
+        (acquire_at_post lk (FLG := FLG))
+        (fl_acq_lvls FLP)
+        (fun '(_, _, b) => b = false)
+        (fun _ _ => #())
+        c (fl_acquire lk);
+                                     
+    fl_release_spec {FLG: fl_GS FLP Σ} (lk: val) c τ: (fl_is_lock (FLG := FLG)) lk c ⊢
+        TLAT_FL τ
+        (release_at_pre lk (FLG := FLG))
+        (release_at_post lk (FLG := FLG))
+        ∅
+        (fun _ => True%type)
+        (fun _ '(_, r, _) => #r)
+        c (fl_release lk);
+  }.
+  
+End FairLockSpec.
+
+
 (* TODO: move *)
 Section OneShot.
   Context {V: ofe}.
@@ -180,12 +487,12 @@ Section MotivatingClient.
     Context (l__fl: Level).
     Hypothesis (L__FL: l__fl ∈ fl_acq_lvls FLP).
 
-    Lemma BMU_wait_owner τ π O r m smap π__e i
+    Lemma BMU_wait_owner τ π q O r m smap π__e i
       (PH_EXP: phase_le π__e π)
       (WAIT: r <= i):
       obls τ O (oGS := oGS) ∗ sgns_level_ge' O (fl_acq_lvls FLP) (oGS := oGS)∗
-      th_phase_eq τ π (oGS := oGS) ∗ RR__L π__e (Some i) ∗ smap_repr_cl r m smap ⊢
-      BMU ∅ 1 (cp π (fl_d__l FLP) (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
+      th_phase_frag τ π q (oGS := oGS) ∗ RR__L π__e (Some i) ∗ smap_repr_cl r m smap ⊢
+      BMU ∅ 1 (cp π (fl_d__l FLP) (oGS := oGS) ∗ th_phase_frag τ π q (oGS := oGS) ∗
           obls τ O (oGS := oGS) ∗ smap_repr_cl r m smap
       ) (oGS := oGS).
     Proof using LVL_ORDo L__FL ODl LEl.
@@ -212,11 +519,11 @@ Section MotivatingClient.
 
     (* Hypothesis (DEG_LH: deg_lt (fl_d__l FLP) (fl_d__h FLP)). *)
 
-    Lemma BMU_create_wait_owner τ π r m smap i
+    Lemma BMU_create_wait_owner τ π q r m smap i
       (DOM: i ∈ dom smap)
       :
-      th_phase_eq τ π (oGS := oGS) ∗ cp π (fl_d__h FLP) (oGS := oGS) ∗ smap_repr_cl r m smap ⊢
-      BMU ∅ 1 (th_phase_eq τ π (oGS := oGS) ∗ RR__L π (Some i) ∗
+      th_phase_frag τ π q (oGS := oGS) ∗ cp π (fl_d__h FLP) (oGS := oGS) ∗ smap_repr_cl r m smap ⊢
+      BMU ∅ 1 (th_phase_frag τ π q (oGS := oGS) ∗ RR__L π (Some i) ∗
                 smap_repr_cl r m smap) (oGS := oGS).
     Proof using LVL_ORDo L__FL ODd ODl LEl.
       iIntros "(PH & CP & [SR %SR_DOM])".
@@ -259,6 +566,28 @@ Section MotivatingClient.
       iIntros "HA HB". iCombine "HB HA" as "H".
       rewrite -!own_op. iApply own_update; [| by iFrame].
       apply excl_auth_update.
+    Qed.
+
+    (* TODO: move, remove duplicates *)
+    Lemma th_phase_frag_combine τ π q p:
+      th_phase_frag τ π q (oGS := oGS) ∗ th_phase_frag τ π p (oGS := oGS) ⊣⊢ th_phase_frag τ π (Qp.add q p) (oGS := oGS). 
+    Proof using.
+      rewrite /th_phase_frag. by rewrite ghost_map.ghost_map_elem_fractional.
+    Qed.
+
+    (* TODO: move *)
+    Lemma th_phase_frag_combine' τ π q p
+      (LE: Qp.le p q)
+      :
+      th_phase_frag τ π q (oGS := oGS) ⊣⊢ th_phase_frag τ π p (oGS := oGS) ∗ from_option (fun d => th_phase_frag τ π d (oGS := oGS)) ⌜ True ⌝ (Qp.sub q p). 
+    Proof using.
+      destruct (q - p)%Qp eqn:D. 
+      - simpl. rewrite th_phase_frag_combine.
+        by apply Qp.sub_Some in D as ->.
+      - simpl. apply Qp.sub_None in D.
+        assert (p = q) as ->.
+        { eapply @partial_order_anti_symm; eauto. apply _. }
+        by rewrite bi.sep_True'.
     Qed.
 
     Lemma acquire_left τ (lk: val) flag s__f π:
@@ -316,7 +645,7 @@ Section MotivatingClient.
            2: { by iFrame "#∗". }
            iNext. rewrite /client_inv_inner. do 4 iExists _. iFrame. }
 
-      { iIntros (O') "(OB & #LVLS' & PH & (%r' & #RR' & CASES) & %BB)".
+      { iIntros (O' q') "(OB & #LVLS' & PH & %Q' & (%r' & #RR' & CASES) & %BB)".
         apply not_false_is_true in BB as ->.
         (* TODO: don't unfold BMU *)
         remember_goal.
@@ -324,7 +653,7 @@ Section MotivatingClient.
         iMod "LOCK_OW". iMod "SR".
         iApply "GOAL". iClear "GOAL".
 
-        iAssert (BMU ∅ 1 (RR__L π (Some r) ∗ th_phase_eq τ π (oGS := oGS) ∗
+        iAssert (BMU ∅ 1 (RR__L π (Some r) ∗ th_phase_frag τ π q' (oGS := oGS) ∗
                            smap_repr_cl r (r + 1) smap))%I with "[CASES PH SR]" as "EXP".
         { iDestruct "CASES" as "[-> | RR]".
           { iApply BMU_intro. iFrame "#∗". }
@@ -345,7 +674,7 @@ Section MotivatingClient.
         iNext. rewrite /client_inv_inner. do 4 iExists _. iFrame.
         iLeft. iSplit; [done| ]. iExists _. iFrame "#∗". done. }
 
-      { iIntros "(-> & OB & PH)".
+      { iIntros "%q' (-> & OB & PH & %Q')".
         remember_goal.
         iDestruct "ST" as "[[>% ?] | X]"; [done| ].
         iDestruct "X" as "(_& >LOCKED & >[%f P])".
@@ -375,11 +704,14 @@ Section MotivatingClient.
           iLeft. iSplit; [done| ].
           rewrite lookup_insert. eauto. }
         
-        iModIntro. iIntros "POST !>". iApply "POST".
+        iModIntro. iIntros "PH_CLOS POST !>".
+        iApply "POST".
         rewrite {1}/P__lock. iDestruct "P" as "[F [[-> ?] | [-> SET]]]".
         2: { by iDestruct (os_pending_excl with "[$] [$]") as %?. }
-        iExists _. iFrame. iSplit; [| set_solver].
-        iLeft. iFrame. done. }
+        iExists _. iFrame. iSplitL "PH PH_CLOS".
+        2: { iSplitL; [| set_solver]. iLeft. by iFrame. }
+        iDestruct (th_phase_frag_combine' with "[$PH $PH_CLOS]") as "foo".
+        all: done. }
     Qed.
 
 
@@ -442,8 +774,8 @@ Section MotivatingClient.
            iNext. rewrite /client_inv_inner. do 4 iExists _. iFrame.
            iSplit; [| done].
            iLeft. iSplit; [done| ]. eauto. }
-      { iIntros (?) "(?&?&?&?&%)". done. }
-      { iIntros "(_ & OB & PH)".
+      { iIntros (??) "(?&?&?&?&?&%)". done. }
+      { iIntros "% (_ & OB & PH & %Q')".
         iApply OU_BMU.
         iApply (OU_wand with "[-OB SR]").
         2: { iApply (smap_set_sig (λ _, l__o) with "[$] [$] [$]").
@@ -472,7 +804,10 @@ Section MotivatingClient.
         iMod (os_shoot _ () with "[$]") as "#SET".
         iMod "CLOS'" as "_".
         iMod ("CLOS" with "[-OB PH]") as "_".
-        2: { iModIntro. iIntros "POST". iApply "POST". by iFrame. }
+        2: { iModIntro. iIntros "PH_CLOS POST". iApply "POST".
+             iFrame. iModIntro.
+             iDestruct (th_phase_frag_combine' with "[$PH $PH_CLOS]") as "foo".
+             all: done. }
         iNext. rewrite /client_inv_inner. do 4 iExists _. iFrame.
         iSplitR "SR".
         2: { rewrite Nat.add_0_r -Nat.add_1_r. iFrame. done. }
@@ -632,7 +967,7 @@ Section MotivatingClient.
            2: { by iFrame "#∗". }
            iNext. rewrite /client_inv_inner. do 4 iExists _. iFrame. }
 
-      { iIntros (O') "(OB & #LVLS' & PH & (%r' & #RR' & CASES) & %BB)".
+      { iIntros (O' q') "(OB & #LVLS' & PH & %Q' & (%r' & #RR' & CASES) & %BB)".
         apply not_false_is_true in BB as ->.
         (* TODO: don't unfold BMU *)
         remember_goal.
@@ -640,7 +975,7 @@ Section MotivatingClient.
         iMod "LOCK_OW". iMod "SR".
         iApply "GOAL". iClear "GOAL".
 
-        iAssert (BMU ∅ 1 (RR__L π (Some r) ∗ th_phase_eq τ π (oGS := oGS) ∗
+        iAssert (BMU ∅ 1 (RR__L π (Some r) ∗ th_phase_frag τ π q' (oGS := oGS) ∗
                            smap_repr_cl r (r + 1) smap))%I with "[CASES PH SR]" as "EXP".
         { iDestruct "CASES" as "[-> | RR]".
           { iApply BMU_intro. iFrame "#∗". }
@@ -661,7 +996,7 @@ Section MotivatingClient.
         iNext. rewrite /client_inv_inner. do 4 iExists _. iFrame.
         iLeft. iSplit; [done| ]. iExists _. iFrame "#∗". done. }
 
-      { iIntros "(-> & OB & PH)".
+      { iIntros "%q' (-> & OB & PH & %Q')".
         remember_goal.
         iDestruct "ST" as "[[>% ?] | X]"; [done| ].
         iDestruct "X" as "(_& >LOCKED & >[%f P])".
@@ -691,9 +1026,11 @@ Section MotivatingClient.
           iLeft. iSplit; [done| ].
           rewrite lookup_insert. eauto. }
         
-        iModIntro. iIntros "POST !>". iApply "POST".
+        iModIntro. iIntros "PH_CLOS POST !>". iApply "POST".
         rewrite union_empty_l_L.
-        do 2 iExists _. iFrame. }
+        do 2 iExists _. iFrame.
+        iDestruct (th_phase_frag_combine' with "[$PH $PH_CLOS]") as "foo".
+        all: done. }
     Qed.
 
     (* TODO: move *)
@@ -838,8 +1175,8 @@ Section MotivatingClient.
            iNext. rewrite /client_inv_inner. do 4 iExists _. iFrame.
            iSplit; [| done].
            iLeft. iSplit; [done| ]. eauto. }
-      { iIntros (?) "(?&?&?&?&%)". done. }
-      { iIntros "(_ & OB & PH)".
+      { iIntros (??) "(?&?&?&?&?&%)". done. }
+      { iIntros "%q' (_ & OB & PH & %Q')".
         iApply OU_BMU.
         iApply (OU_wand with "[-OB SR]").
         2: { iApply (smap_set_sig (λ _, l__o) with "[$] [$] [$]").
@@ -855,7 +1192,7 @@ Section MotivatingClient.
         iIntros "[SR OB]".
         rewrite difference_diag_L.
 
-        iAssert (BMU ∅ 3 ((⌜f = true⌝ ∗ flag_set ∨ ⌜f = false⌝ ∗ cp_mul π (fl_d__m FLP) 3 (oGS := oGS)) ∗ P__lock flag s__f f ∗ obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS)) (oGS := oGS))%I with "[P OB PH]" as "FIN".
+        iAssert (BMU ∅ 3 ((⌜f = true⌝ ∗ flag_set ∨ ⌜f = false⌝ ∗ cp_mul π (fl_d__m FLP) 3 (oGS := oGS)) ∗ P__lock flag s__f f ∗ obls τ ∅ (oGS := oGS) ∗ th_phase_frag τ π q' (oGS := oGS)) (oGS := oGS))%I with "[P OB PH]" as "FIN".
         { rewrite /P__lock. destruct f.
           { iDestruct "P" as "[? [[% ?] | [_ #SET]]]"; [done| ].
             iApply BMU_intro. iFrame.
@@ -877,7 +1214,9 @@ Section MotivatingClient.
         iMod (lock_owner_update _ _ None with "[$] [$]") as "[UNL' UNL]".
         iMod "CLOS'" as "_".
         iMod ("CLOS" with "[-OB PH FIN]") as "_".
-        2: { iModIntro. iIntros "POST". iModIntro. iApply "POST". iFrame. }
+        2: { iModIntro. iIntros "PH_CLOS POST". iModIntro. iApply "POST". iFrame.
+             iDestruct (th_phase_frag_combine' with "[$PH $PH_CLOS]") as "foo".
+             all: done. }
         iNext. rewrite /client_inv_inner. do 4 iExists _. iFrame.
         iSplitR "SR".
         2: { rewrite Nat.add_0_r -Nat.add_1_r. iFrame. done. }

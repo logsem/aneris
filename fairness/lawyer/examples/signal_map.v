@@ -148,16 +148,16 @@ Section SignalMap.
   Qed. 
 
   (* TODO: use bupd in definition of OU *)
-  Lemma smap_create_ep i B smap π π__cp τ d__h d__l
+  Lemma smap_create_ep i B smap π q π__cp τ d__h d__l
     (PH_LE: phase_le π__cp π)
     (LT: i ∈ dom smap)
     (DEG_LT: deg_lt d__l d__h):
     ⊢ smap_repr B smap -∗ 
       cp π__cp d__h (oGS := oGS) -∗
-      th_phase_eq τ π (oGS := oGS) -∗
+      th_phase_frag τ π q (oGS := oGS) -∗
       OU (|==> ∃ s, ith_sig i s ∗
                     ep s π__cp d__l (oGS := oGS) ∗ smap_repr B smap ∗
-                    th_phase_eq τ π (oGS := oGS)) (oGS := oGS).
+                    th_phase_frag τ π q (oGS := oGS)) (oGS := oGS).
   Proof using DISCR__d DISCR__l LEQUIV__l.
     iIntros "SR CP PH".
     rewrite /smap_repr. iDestruct "SR" as "(AUTH & SIGS)".
@@ -248,13 +248,13 @@ Section SignalMap.
       rewrite FRESH_UNSET. iFrame.
     Qed.
       
-    Lemma ith_sig_expect i sw τ π π__e smap R d B
+    Lemma ith_sig_expect i sw τ π q π__e smap R d B
       (PH_EXP: phase_le π__e π)
       (UNSETi: B i = false):
-      ⊢ ep sw π__e d (oGS := oGS) -∗ th_phase_eq τ π (oGS := oGS) -∗
+      ⊢ ep sw π__e d (oGS := oGS) -∗ th_phase_frag τ π q (oGS := oGS) -∗
          smap_repr B smap -∗ ith_sig i sw -∗
          obls τ R (oGS := oGS) -∗ sgns_level_gt R (L i) (oGS := oGS) -∗ 
-         OU (cp π d (oGS := oGS) ∗ smap_repr B smap ∗ th_phase_eq τ π (oGS := oGS) ∗ obls τ R (oGS := oGS)) (oGS := oGS).
+         OU (cp π d (oGS := oGS) ∗ smap_repr B smap ∗ th_phase_frag τ π q (oGS := oGS) ∗ obls τ R (oGS := oGS)) (oGS := oGS).
     Proof using LEQUIV__l DISCR__l.
       iIntros "#EP PH SR #SW OBLS #OBLS_LT". 
       iDestruct (ith_sig_in with "[$] [$]") as "%ITH".
