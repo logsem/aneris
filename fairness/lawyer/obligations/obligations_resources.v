@@ -1,6 +1,6 @@
 From iris.proofmode Require Import tactics.
-From iris.base_logic Require Import own. 
-From iris.algebra Require Import auth gmap gset excl gmultiset big_op mono_nat.
+From iris.base_logic Require Import own ghost_map.
+From iris.algebra Require Import auth gmap gset excl gmultiset big_op mono_nat gmap_view.
 From trillium.fairness Require Import (* fairness *) locales_helpers utils.
 From trillium.fairness.lawyer.obligations Require Import obligations_model. 
 From stdpp Require Import namespaces. 
@@ -26,14 +26,26 @@ Section ObligationsRepr.
  
   Let epO := prodO (prodO natO phO) DegO.
 
+  (* used to avoid applying leibnizO directly to list nat.
+     See comment in ofe.v *)
+  Record phase_wrapped := PhWr { ph_wr_car: Phase }.
+  Definition wrap_phase := PhWr.
+  Definition unwrap_phase (p: phase_wrapped) := match p with | PhWr π => π end.
+  Lemma phase_wrap_unwrap π: unwrap_phase (wrap_phase π) = π.
+  Proof using. done. Qed. 
+  Lemma phase_unwrap_wrap p: wrap_phase (unwrap_phase p) = p.
+  Proof using. by destruct p. Qed.
+
   Class ObligationsPreGS Σ := {
       obls_pre_cps :> inG Σ (authUR (gmultisetUR cpO));
       obls_pre_sigs :> inG Σ (authUR (gmapUR SignalId sstR));
       obls_pre_obls :> inG Σ (authUR (gmapUR Locale (exclR (gsetUR natO))));
       obls_pre_eps :> inG Σ (authUR (gsetUR epO)); (* allowing duplication of eps *)
-      obls_pre_phs :> inG Σ (authUR (gmapUR Locale (exclR phO)));
+      (* obls_pre_phs :> inG Σ (authUR (gmapUR Locale (exclR phO))); *)
+      obls_pre_phs :> ghost_mapG Σ Locale phase_wrapped;
       obls_pre_lb :> inG Σ mono_natUR;
   }.
+  
   Class ObligationsGS Σ := {
       obls_pre :> ObligationsPreGS Σ;
       obls_cps: gname;
@@ -42,7 +54,7 @@ Section ObligationsRepr.
       obls_eps: gname;
       obls_phs: gname;
       obls_exc_lb: gname;
-  }.  
+  }.
 
   Definition sig_map_repr smap: gmapUR SignalId sstR :=
     (fun '(l, b) => (to_agree l, Excl' b)) <$> smap. 
@@ -50,10 +62,12 @@ Section ObligationsRepr.
   Definition obls_map_repr (omap: gmap Locale (gset SignalId)):
     gmapUR Locale (exclR (gsetUR natO)) :=
     Excl <$> omap.
-
-  Definition phases_repr (pmap: gmap Locale Phase):
-    gmapUR Locale (exclR phO) :=
-    fmap Excl pmap (FMap := gmap_fmap).
+ 
+  (* Definition phases_repr_auth (pmap: gmap Locale Phase): *)
+  (*   (* gmapUR Locale (exclR phO) := *) *)
+  (*   (* fmap Excl pmap (FMap := gmap_fmap). *) *)
+  (*   gmap_viewR Locale (leibnizO phase_wrapped) := *)
+  (*   gmap_view_auth (DfracOwn 1) (wrap_phase <$> pmap) (V:=leibnizO phase_wrapped). *)
   
   Definition eps_repr (eps: gset ExpectPermission): gsetUR epO :=
     eps.
@@ -65,22 +79,23 @@ Section ObligationsRepr.
     own obls_sigs (● (sig_map_repr $ ps_sigs ps)) ∗
     own obls_obls (● (obls_map_repr $ ps_obls ps)) ∗
     own obls_eps (● (eps_repr $ ps_eps ps)) ∗
-    own obls_phs (● (phases_repr $ ps_phases ps)) ∗
+    ghost_map_auth obls_phs 1%Qp (wrap_phase <$> ps_phases ps) ∗
     own obls_exc_lb (●MN (ps_exc_bound ps))
-  . 
+  .
   
   Definition obls_Σ: gFunctors := #[
       GFunctor (authUR (gmultisetUR cpO));
       GFunctor (authUR (gmapUR SignalId sstR));
       GFunctor (authUR (gmapUR Locale (exclR (gsetR natO))));
       GFunctor (authUR (gsetUR epO));
-      GFunctor (authUR (gmapUR Locale (exclR phO)));
+      (* GFunctor (authUR (gmapUR Locale (exclR phO))); *)
+      ghost_mapΣ Locale phase_wrapped;
       GFunctor (mono_natUR)
    ].
 
   Global Instance obls_Σ_pre:
     ∀ Σ, subG obls_Σ Σ → ObligationsPreGS Σ.
-  Proof using. solve_inG. Qed.           
+  Proof using. solve_inG. Qed.
 
   Section Resources.
     Context `{oGS: ObligationsGS Σ}. 
@@ -118,10 +133,11 @@ Section ObligationsRepr.
     Definition exc_lb (n: nat) :=
       own obls_exc_lb (mono_nat_lb n).
 
-    (* Definition th_phase_ge ζ π: iProp Σ := *)
-    (*   ∃ π__max, own obls_phs (◯ (phases_repr {[ ζ := π__max]})) ∗ ⌜ phase_le π π__max⌝. *)
+    Definition th_phase_frag ζ π (q: Qp): iProp Σ :=
+      ghost_map_elem obls_phs ζ (DfracOwn q) (wrap_phase π).
+
     Definition th_phase_eq ζ π: iProp Σ :=
-      own obls_phs (◯ (phases_repr {[ ζ := π]})). 
+      th_phase_frag ζ π 1%Qp.
 
     Lemma obls_proper ζ R1 R2 (EQUIV: R1 ≡ R2):
       ⊢ obls ζ R1 ∗-∗ obls ζ R2.
@@ -229,46 +245,22 @@ Section ObligationsRepr.
       rewrite agree_idemp. done.
     Qed.
 
-    Lemma th_phase_msi_eq_strong δ ζ π:
-      ⊢ obls_msi δ -∗ th_phase_eq ζ π -∗        
-        obls_msi δ ∗ own obls_phs (◯ phases_repr {[ζ := π]}) ∗ ⌜ ps_phases δ !! ζ = Some π ⌝. 
+    Instance wrap_phase_inj: Inj eq eq wrap_phase.
     Proof using.
-      rewrite /obls_msi. iIntros "(?&?&?&?&PHASES&?) PH".
-      iRevert "PHASES PH". iFrame. iIntros "PHASES PH".  
-      rewrite /th_phase_eq. 
-      iDestruct (own_valid with "[PHASES PH]") as "#V".
-      { iApply own_op. iApply bi.sep_comm. iFrame. }
-      iDestruct "V" as %V. 
-      iFrame. iPureIntro. 
-      apply auth_both_valid_discrete in V as [SUB V].
-      rewrite /phases_repr in SUB. rewrite map_fmap_singleton in SUB. 
-      apply @singleton_included_l in SUB. destruct SUB as (π'&PH'&LE').
-      destruct π' as [π'| ].
-      2: { specialize (V ζ). rewrite PH' in V. done. }
-      apply Excl_included in LE'.
-      rewrite -LE' in PH'.
-
-      apply leibniz_equiv_iff in PH'.
-      rewrite lookup_fmap_Some in PH'. by destruct PH' as (?&[=->]&?).
+      intros ?? EQ. apply (@f_equal _ _ unwrap_phase) in EQ.
+      by rewrite !phase_wrap_unwrap in EQ.
     Qed.
 
-    (* Lemma th_phase_msi_ge δ ζ π: *)
-    (*   ⊢ obls_msi δ -∗ th_phase_ge ζ π -∗         *)
-    (*     ⌜ exists π__max, ps_phases δ !! ζ = Some π__max /\ phase_le π π__max ⌝.  *)
-    (* Proof using. *)
-    (*   iIntros "? ?".  *)
-    (*   iDestruct (th_phase_msi_ge_strong with "[$] [$]") as "[? L]". *)
-    (*   iDestruct "L" as (?) "[? %F]". *)
-    (*   iPureIntro. eauto.  *)
-    (* Qed. *)
-
-    (* Global Instance th_phase_ge_Proper: *)
-    (*   Proper (eq ==> (flip phase_le) ==> bi_entails) th_phase_ge. *)
-    (* Proof using. *)
-    (*   red. intros ??-> ???. *)
-    (*   rewrite /th_phase_ge. iIntros "(% & ? & %)". *)
-    (*   iExists _. iFrame. iPureIntro. etrans; eauto. *)
-    (* Qed. *)
+    Lemma th_phase_msi_frag δ ζ π q:
+      ⊢ obls_msi δ -∗ th_phase_frag ζ π q -∗ ⌜ ps_phases δ !! ζ = Some π ⌝. 
+    Proof using.
+      clear H1 H0 H. 
+      rewrite /obls_msi. iIntros "(?&?&?&?&PHASES&?) PH".
+      iRevert "PHASES PH". iFrame. iIntros "PHASES PH".
+      rewrite /th_phase_frag.
+      iDestruct (ghost_map_lookup with "[$] [$]") as %V.
+      apply lookup_fmap_Some in V as (?&?&?). set_solver.
+    Qed.
 
     Lemma exc_lb_msi_bound δ n:
       ⊢ obls_msi δ -∗ exc_lb n -∗ ⌜ n <= ps_exc_bound δ ⌝.
@@ -440,15 +432,15 @@ Section ObligationsRepr.
       by apply exclusive_local_update.
     Qed.
 
-    Lemma exchange_cp_upd ζ π π__cp d d' b k
+    Lemma exchange_cp_upd ζ π q π__cp d d' b k
       (LE: k <= b)
       (PH_LE: phase_le π__cp π)
       (DEG: deg_lt d' d):
-      ⊢ cp π__cp d -∗ th_phase_eq ζ π -∗ exc_lb b -∗ OU (cp_mul π__cp d' k ∗ th_phase_eq ζ π).
+      ⊢ cp π__cp d -∗ th_phase_frag ζ π q -∗ exc_lb b -∗ OU (cp_mul π__cp d' k ∗ th_phase_frag ζ π q).
     Proof using.
       rewrite /OU /OU'. iIntros "CP PH #LB %δ MSI".
       iDestruct (exc_lb_msi_bound with "[$] [$]") as %LB.
-      iDestruct (th_phase_msi_eq_strong with "[$] [$]") as "(MSI & PH & %)". 
+      iDestruct (th_phase_msi_frag with "[$] [$]") as "%".
       iDestruct (cp_msi_dom with "[$] [$]") as %CP. 
       rewrite {1}/obls_msi. iDestruct "MSI" as "(CPS&?&?&?&?&?)".
       destruct δ. simpl in *.
@@ -474,19 +466,19 @@ Section ObligationsRepr.
       eapply local_update_proper.
       1: reflexivity.
       2: eapply gmultiset_local_update_alloc.
-      by rewrite gmultiset_disj_union_left_id. 
+      by rewrite gmultiset_disj_union_left_id.
     Qed.
 
     (* TODO: ? use duplicable "signal exists" resource *)
-    Lemma create_ep_upd ζ π π__cp d d' sid l ov (DEG: deg_lt d' d)
+    Lemma create_ep_upd ζ π q π__cp d d' sid l ov (DEG: deg_lt d' d)
       (PH_LE: phase_le π__cp π)
       :
-      ⊢ cp π__cp d -∗ sgn sid l ov -∗ th_phase_eq ζ π -∗ 
-        OU (ep sid π__cp d' ∗ sgn sid l ov ∗ th_phase_eq ζ π).
+      ⊢ cp π__cp d -∗ sgn sid l ov -∗ th_phase_frag ζ π q -∗ 
+        OU (ep sid π__cp d' ∗ sgn sid l ov ∗ th_phase_frag ζ π q).
     Proof using H1 H0.
       rewrite /OU /OU'. iIntros "CP SIG PH %δ MSI".
       iDestruct (sigs_msi_in with "[$] [$]") as %[v Sζ].
-      iDestruct (th_phase_msi_eq_strong with "[$] [$]") as "(MSI & PH & %)".
+      iDestruct (th_phase_msi_frag with "[$] [$]") as "%".
       iDestruct (cp_msi_dom with "[$] [$]") as %CP. 
       rewrite {1}/obls_msi. iDestruct "MSI" as "(CPS&SIGS&?&EPS&?&?)".
       destruct δ. simpl in *.
@@ -525,26 +517,26 @@ Section ObligationsRepr.
       rewrite gmultiset_difference_diag. set_solver.
     Qed.
       
-    Lemma th_phase_msi_align δ ζ π:
-      ⊢ obls_msi δ -∗ th_phase_eq ζ π -∗
-        obls_msi δ ∗ th_phase_eq ζ (default π (ps_phases δ !! ζ)). 
+    Lemma th_phase_msi_align δ ζ π q:
+      ⊢ obls_msi δ -∗ th_phase_frag ζ π q -∗
+        obls_msi δ ∗ th_phase_frag ζ (default π (ps_phases δ !! ζ)) q. 
     Proof using.
       iIntros "? ?". 
-      iDestruct (th_phase_msi_eq_strong with "[$] [$]") as "(? & ? & ->)".
-      iFrame. 
+      iDestruct (th_phase_msi_frag with "[$] [$]") as "->".
+      iFrame.
     Qed.
 
-    Lemma expect_sig_upd ζ sid π π__e d l R
+    Lemma expect_sig_upd ζ sid π q π__e d l R
       (PH_EXP: phase_le π__e π)
       :
       ⊢ ep sid π__e d -∗ sgn sid l (Some false) -∗ obls ζ R -∗
-        sgns_level_gt R l -∗ th_phase_eq ζ π -∗
-        OU (cp π d ∗ sgn sid l (Some false) ∗ obls ζ R ∗ th_phase_eq ζ π).
+        sgns_level_gt R l -∗ th_phase_frag ζ π q -∗
+        OU (cp π d ∗ sgn sid l (Some false) ∗ obls ζ R ∗ th_phase_frag ζ π q).
     Proof using H1 H0.
       rewrite /OU /OU'. iIntros "#EP SIG OBLS #SIGS_LT PH %δ MSI".
       iDestruct (sigs_msi_exact with "[$] [$]") as %Sζ.
       (* iDestruct (th_phase_msi_ge with "[$] [$]") as %(? & PH__ζ & LE__πx). *)
-      iDestruct (th_phase_msi_eq_strong with "[$] [$]") as "(MSI & PH & %PH)".
+      iDestruct (th_phase_msi_frag with "[$] [$]") as "%PH".
       iDestruct (th_phase_msi_align with "[$] [$]") as "[MSI PH]".
       rewrite PH. simpl.
       iDestruct (ep_msi_in with "[$] [$]") as %EP. 
@@ -605,28 +597,28 @@ Section ObligationsRepr.
       done. 
     Qed.
 
-    Lemma burn_cp_upd_burn ζ π__cp π deg
+    Lemma burn_cp_upd_burn ζ π__cp π q deg
       (LE: phase_le π__cp π):
-      ⊢ cp π__cp deg -∗ th_phase_eq ζ π -∗ 
-        OU' (fun δ1 δ2 => burns_cp δ1 ζ δ2 π__cp deg) (th_phase_eq ζ π).
+      ⊢ cp π__cp deg -∗ th_phase_frag ζ π q -∗ 
+        OU' (fun δ1 δ2 => burns_cp δ1 ζ δ2 π__cp deg) (th_phase_frag ζ π q).
     Proof using.
       rewrite /OU'. iIntros "CP PH % MSI".
       (* iDestruct (th_phase_msi_ge with "[$] [$]") as %(? & ? & ?).  *)
-      iDestruct (th_phase_msi_eq_strong with "[$] [$]") as "(MSI & PH & %PH)".
+      iDestruct (th_phase_msi_frag with "[$] [$]") as "%PH".
       iMod (burn_cp_upd_impl with "[$] [$]") as "R"; eauto.
       iDestruct "R" as "(%&?&?)". iModIntro. iExists _. iFrame.
     Qed.
 
-    Lemma burn_cp_upd ζ π__cp π deg
+    Lemma burn_cp_upd ζ π__cp π q deg
       (LE: phase_le π__cp π):
-      ⊢ cp π__cp deg -∗ th_phase_eq ζ π -∗ OU (th_phase_eq ζ π). 
+      ⊢ cp π__cp deg -∗ th_phase_frag ζ π q -∗ OU (th_phase_frag ζ π q).
     Proof using.
       iIntros "??".
       iPoseProof (burn_cp_upd_burn with "[$] [$]") as "OU'"; [done| ].
       rewrite /OU /OU'. iIntros "% MSI".
       iMod ("OU'" with "[$]") as "(%&?&%&?)". iModIntro.
       iExists _. iFrame. iPureIntro.
-      red. eexists. left. eauto. 
+      red. eexists. left. eauto.
     Qed.
 
     Lemma cp_mul_take ph deg n:
@@ -674,7 +666,7 @@ Section ObligationsRepr.
       clear H1 H0 H.
       iIntros "MSI PH OB".
       (* iDestruct (th_phase_msi_ge_strong with "[$] [$]") as "(MSI & %π0 & (PH & %PH & %PLE))". *)
-      iDestruct (th_phase_msi_eq_strong with "[$] [$]") as "(MSI & PH & %PH)".
+      iDestruct (th_phase_msi_frag with "[$] [$]") as "%PH".
       iDestruct (obls_msi_exact with "[$] [$]") as %OBLS. 
       rewrite {1}/obls_msi. iDestruct "MSI" as "(?&?&OBLS&?&PHASES&?)".
       destruct δ. simpl in *. iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _). 
@@ -694,7 +686,7 @@ Section ObligationsRepr.
            simpl. reflexivity. }
 
       rewrite !OBLS. simpl.  
-      rewrite -(bi.sep_assoc _ _ (obls _ _)). rewrite bi.sep_comm.
+      rewrite -(bi.sep_assoc _ _ (obls _ _)). rewrite -(bi.sep_comm (obls _ _ ∗ obls _ _)%I).
       rewrite -!bi.sep_assoc.
       do 2 rewrite bi.sep_assoc. 
       rewrite -bupd_sep. 
@@ -718,35 +710,13 @@ Section ObligationsRepr.
         rewrite fmap_insert. apply singleton_local_update_any.
         intros. replace (R0 ∖ (R0 ∩ R')) with (R0 ∖ R') by set_solver. 
         apply exclusive_local_update. done.
-      - rewrite /th_phase_eq.
-        (* rewrite !bi.sep_exist_l; iExists _. *)
-        (* rewrite !bi.sep_assoc. iSplitL.  *)
-        (* 2: { iPureIntro. reflexivity. } *)
-        (* rewrite bi.sep_comm. *)
-        (* rewrite !bi.sep_exist_l; iExists _. *)
-        (* rewrite !bi.sep_assoc. iSplitL. *)
-        (* 2: { iPureIntro. reflexivity. } *)
-        (* rewrite -bi.sep_assoc bi.sep_comm. *)
-        rewrite -!own_op. iApply own_update; [| by iFrame].
-        etrans.
-        2: {
-             rewrite (cmra_comm (◯ _) _). 
-             rewrite cmra_assoc.
-             apply cmra_update_op; [| reflexivity].
-             (* rewrite cmra_comm.  *)
-             apply auth_update_alloc.
-             rewrite /phases_repr !fmap_insert. 
-             rewrite fmap_empty insert_empty.
-             apply alloc_singleton_local_update; [| done].
-             apply not_elem_of_dom. rewrite dom_insert_L dom_fmap.
-             rewrite not_elem_of_union not_elem_of_singleton. split.
-             - intros ->. destruct FRESH. by apply elem_of_dom.
-             - done. }
-        apply auth_update.
-        rewrite /phases_repr !fmap_insert. 
-        rewrite fmap_empty insert_empty.
-        apply singleton_local_update_any.
-        intros. eapply exclusive_local_update. done.
+      - iDestruct "PHASES" as "[AUTH PH]".
+        iMod (ghost_map_update with "[$] [$]") as "[AUTH PH]". iFrame "PH".
+        iMod (ghost_map_insert with "[$]") as "[AUTH PH]".
+        2: { iFrame. by rewrite !fmap_insert. }
+        rewrite lookup_insert_ne.
+        2: { intros <-. destruct FRESH. by apply elem_of_dom. }
+        rewrite lookup_fmap. by rewrite not_elem_of_dom_1.  
     Qed.
 
   End Resources.

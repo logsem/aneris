@@ -1,5 +1,6 @@
 From iris.proofmode Require Import tactics.
 From stdpp Require Import namespaces.
+From iris.base_logic Require Import ghost_map.
 From iris.algebra Require Import auth gmap gset excl gmultiset big_op mono_nat.
 From trillium.fairness Require Import fairness locales_helpers execution_model.
 From trillium.fairness.lawyer.obligations Require Import obligations_model obls_utils obligations_resources multiset_utils obligations_wf.
@@ -66,7 +67,8 @@ Section ObligationsEM.
     own obls_sigs (◯ (sig_map_repr $ ps_sigs δ)) ∗
     own obls_obls (◯ (obls_map_repr $ ps_obls δ)) ∗
     own obls_eps (◯ (eps_repr $ ps_eps δ)) ∗
-    own obls_phs (◯ (phases_repr $ ps_phases δ)) ∗
+    (* own obls_phs (◯ (phases_repr $ ps_phases δ)) ∗ *)
+    ([∗ map] τ↦π ∈ ps_phases δ, th_phase_eq τ π) ∗
     own obls_exc_lb (◯MN (ps_exc_bound δ))
   .
 
@@ -98,20 +100,18 @@ Section ObligationsEM.
       by destruct lookup. }
     iMod (own_alloc (● (eps_repr $ ps_eps δ) ⋅ ◯ _)) as (?) "[EPSa EPSf]". 
     { by apply auth_both_valid_2. }
-    iMod (own_alloc (● (phases_repr $ ps_phases δ) ⋅ ◯ _)) as (?) "[PHa PHf]". 
-    { apply auth_both_valid_2; [| reflexivity].
-      rewrite /phases_repr. intros τ. destruct lookup eqn:L; [| done].
-      rewrite lookup_fmap_Some in L. destruct L as (? & <- & L). done. }
+
+    iMod (ghost_map_alloc (wrap_phase <$> ps_phases δ)) as (?) "[PHa PHf]".
     iMod (own_alloc (●MN (ps_exc_bound δ) ⋅ mono_nat_lb _)) as (?) "[LBa LBf]".
     { apply mono_nat_both_valid. reflexivity. }
     iModIntro. iExists {| obls_pre := PRE; |}.
-    iFrame.
+    rewrite big_sepM_fmap. iFrame.
 
     iPureIntro. 
     red in INIT. destruct INIT as (?&?&?&?).
     red. rewrite /threads_own_obls /dom_phases_obls.
     erewrite om_wf_dpo; eauto. set_solver.
-  Qed.    
+  Qed.
   
   Definition ObligationsEM: ExecutionModel Λ OM :=
     {| 

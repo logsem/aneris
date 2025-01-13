@@ -146,7 +146,7 @@ Section ProgramLogic.
       destruct FORK as (LOCS' & FRESH).
 
       (* iDestruct (th_phase_msi_ge with "[$] [$]") as %(π__max & PH & LE0). *)
-      iDestruct (th_phase_msi_eq_strong with "[$] [$]") as "(MSI & PH & %PH)".
+      iDestruct (th_phase_msi_frag with "[$] [$]") as "%PH".
       
       iMod (burn_cp_upd_impl with "[$] [$]") as "X".
       { eexists. split; eauto. }
@@ -270,11 +270,11 @@ Section ProgramLogic.
       iIntros "CLOS". iFrame. iExists _. iFrame.
     Qed.
 
-    Lemma BMU_AMU E ζ b (P : iProp Σ) π
+    Lemma BMU_AMU E ζ b (P : iProp Σ) π q
       (BOUND: b <= LIM_STEPS)
       :
-      ⊢ (th_phase_eq ζ π (oGS := oGS) -∗ BMU E b ((P) ∗ ∃ ph deg, cp ph deg (oGS := oGS) ∗ ⌜ phase_le ph π ⌝)) -∗
-        th_phase_eq ζ π (oGS := oGS) -∗
+      ⊢ (th_phase_frag ζ π q (oGS := oGS) -∗ BMU E b ((P) ∗ ∃ ph deg, cp ph deg (oGS := oGS) ∗ ⌜ phase_le ph π ⌝)) -∗
+        th_phase_frag ζ π q (oGS := oGS) -∗
         AMU E ζ obls_act P (aeGS := oGS).
     Proof using.
       rewrite /AMU /AMU_impl /BMU. iIntros "BMU PH" (c c' δ) "TI'".
@@ -284,7 +284,7 @@ Section ProgramLogic.
 
       (* iDestruct (th_phase_msi_ge with "[MSI] [$]") as %(π__max & PH & LE0). *)
       iDestruct "MSI" as "(MSI&%OBLS&%DPO)".
-      iDestruct (th_phase_msi_eq_strong with "[$] [$]") as "(MSI & PH & %PH)".
+      iDestruct (th_phase_msi_frag with "[$] [$]") as "%PH".
       (* { rewrite /AM_st_interp_interim. *)
       (*   simpl. iDestruct "TI'" as "((?&?&?)&?&?)". iFrame. } *)
       iSpecialize ("BMU" with "[$]").
@@ -324,7 +324,7 @@ Section ProgramLogic.
       rewrite /AMU__f /AMU_impl /BMU. iIntros "BMU PH" (c c' δ) "TI'".
       iDestruct "TI'" as "(MSI&%STEP&%FORK)". iFrame. 
       iDestruct "MSI" as "(MSI&%OBLS&%DPO)".
-      iDestruct (th_phase_msi_eq_strong with "[$] [$]") as "(MSI & PH & %PH)".
+      iDestruct (th_phase_msi_frag with "[$] [$]") as "%PH".
       iSpecialize ("BMU" with "[$]").
       iSpecialize ("BMU" $! c c' δ ζ 0 (Some ζ') with "[MSI]").
       { rewrite /OAM_st_interp_interim_step /AM_st_interp_interim.
@@ -550,6 +550,6 @@ Section TestProg.
       iApply NO_OBLS_POST. 
       iApply (obls_proper with "[$]").
       set_solver.
-  Qed. 
+  Qed.
 
 End TestProg.
