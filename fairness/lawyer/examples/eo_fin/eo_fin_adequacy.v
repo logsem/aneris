@@ -339,13 +339,12 @@ Section EOFinAdequacy.
       rewrite locales_of_cfg_simpl. simpl.
       rewrite union_empty_r_L. simpl. 
       iDestruct "INIT" as "(CPS & SIGS & OB & EPS & PH & EB)".
-      rewrite /cps_repr /sig_map_repr /eps_repr /phases_repr /obls_map_repr. 
-      rewrite map_fmap_singleton fmap_empty.
+      rewrite /cps_repr /sig_map_repr /eps_repr /obls_map_repr.
+      rewrite big_sepM_singleton. 
+      rewrite fmap_empty.
       rewrite !gset_to_gmap_singleton. 
       rewrite map_fmap_singleton.      
       iFrame.
-      rewrite !bi.sep_assoc. iSplitR "PH". 
-      2: { rewrite /th_phase_eq /phases_repr. rewrite map_fmap_singleton. iFrame. }
       rewrite mset_map_disj_union.
       rewrite auth_frag_op.
       iDestruct (own_op with "CPS") as "[CPS2 CPS0]".
