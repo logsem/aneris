@@ -6,8 +6,8 @@ From trillium.program_logic Require Export weakestpre adequacy ectx_lifting.
 From trillium.fairness Require Import utils.
 From trillium.fairness.lawyer.examples Require Import signal_map obls_tactics.
 From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_am obligations_em obligations_logic.
-From trillium.fairness.lawyer Require Import sub_action_em.
-From trillium.fairness.lawyer Require Import program_logic.
+From trillium.fairness.lawyer Require Import sub_action_em program_logic.
+From trillium.fairness.lawyer.examples.ticketlock Require Import obls_atomic fair_lock.
 From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From iris.base_logic.lib Require Import invariants.
 
