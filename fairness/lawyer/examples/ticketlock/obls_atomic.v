@@ -11,6 +11,313 @@ From trillium.fairness.lawyer Require Import sub_action_em.
 From trillium.fairness.lawyer Require Import program_logic.
 
 
+Section TotalTriples.
+  Context `{OfeDiscrete DegO} `{OfeDiscrete LevelO}.
+  Context `{LEl: @LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}. 
+  
+  Let Degree := ofe_car DegO.
+  Let Level := ofe_car LevelO.
+
+  Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}.
+  Let OP := LocaleOP (Locale := locale heap_lang).
+  Existing Instance OP.
+  Let OM := ObligationsModel.
+  
+  Context {Σ: gFunctors}.
+  Context {invs_inΣ: invGS_gen HasNoLc Σ}.
+
+  Let OAM := ObligationsAM. 
+  Let ASEM := ObligationsASEM.
+  Context {oGS: @asem_GS _ _ ASEM Σ}.
+
+  Let Locale := locale heap_lang. 
+
+  Section AtomicTriples. 
+    Context
+      {ST: Type}
+      {RO: Type}
+      (τ: Locale)(* TODO: should it be fixed? *)
+      (P: ST -> iProp Σ) (Q: ST -> ST -> iProp Σ) (* second ST is the previous state *)
+      (L: gset Level) (* TODO: only finite sets? *)
+      (round: ST -> RO) (* TODO: can we get away with ST only? *)
+      (TGT: ST -> Prop) (* `{forall x, Decision (TGT x)} *)
+      (d__h d__l d__m: Degree)
+      (c: nat) (B: nat -> nat)
+      (ε__m: coPset)
+    .
+
+    Section AtomicUpdates.
+      Context
+        (ε: coPset)
+        (π: Phase)
+        (q0: Qp)
+        (Φ: ST -> ST -> iProp Σ)
+        (O: gset SignalId)
+        (RR: option RO -> iProp Σ)
+      .
+
+      Definition TAU_acc (V: iProp Σ): iProp Σ :=
+        |={ε, ∅}=> ∃ x, P x ∗ (
+              let abort := P x ={∅, ε}=∗ V in
+              let PH q := th_phase_frag τ π q (oGS := oGS) in
+              (let r := round x in
+               ∀ O' q', obls τ O' (oGS := oGS) ∗ sgns_level_ge' O' L (oGS := oGS) ∗ 
+                        PH q' ∗ ⌜ Qp.le q' q0 ⌝ ∗
+                      (∃ r__p, RR r__p ∗ (⌜ r__p = Some r ⌝ ∨ cp π d__h (oGS := oGS))) ∗
+                      ⌜ ¬ TGT x ⌝ -∗
+                      BMU ∅ c (oGS := oGS) (
+                        RR (Some r) ∗ cp π d__l (oGS := oGS) ∗ PH q' ∗
+                        obls τ O' (oGS := oGS) ∗
+                        abort
+                      )
+              ) ∧
+              (∀ q',
+               (* (∃ r__p, RR r__p) ∗ *)
+               ⌜ TGT x ⌝ ∗ obls τ O (oGS := oGS)
+                 ∗ PH q' ∗ ⌜ Qp.le q' q0 ⌝
+                 -∗
+               BMU ∅ c (oGS := oGS) (
+                 ∀ y, Q y x ={∅, ε}=∗ from_option PH ⌜ True ⌝ (Qp.sub q0 q') -∗ Φ y x)) ∧
+              abort
+      ).
+
+      Definition TAU_pre (V : () → iProp Σ) (_ : ()) : iProp Σ :=
+        TAU_acc (V ()).
+
+      Lemma TAU_acc_mono V1 V2:
+        (V1 -∗ V2) -∗ TAU_acc V1 -∗ TAU_acc V2.
+      Proof using.
+        iIntros "V12 T1". rewrite /TAU_acc.
+        iMod "T1" as (?) "[P T1]". iModIntro. iExists _. iFrame "P".
+        iSplit; [| iSplit].
+        - iIntros (??) "X". iDestruct "T1" as "[T1 _]".
+          iSpecialize ("T1" with "[$]").
+          iApply (BMU_wand with "[-T1]"); [| done].
+          iIntros "(?&?&?&?&AB)". iFrame.
+          iIntros "?". iMod ("AB" with "[$]"). by iApply "V12".
+        - iDestruct "T1" as "[_ [T1 _]]". done.
+        - iDestruct "T1" as "[_ [_ AB]]".
+          iIntros "?". iMod ("AB" with "[$]"). by iApply "V12".
+      Qed.
+
+      Global Instance TAU_pre_mono : BiMonoPred TAU_pre.
+      Proof.
+        constructor.
+        - iIntros (P1 P2 ??) "#HP12". iIntros ([]) "AU".
+          rewrite /TAU_pre.
+          iApply (TAU_acc_mono with "[] [$]"). done. 
+        - intros ??. solve_proper.
+      Qed.
+
+      Local Definition TAU_def :=
+        bi_greatest_fixpoint TAU_pre ().
+
+      (* TODO: seal *)
+      Definition TAU := TAU_def.
+      
+      Lemma TAU_elim:
+        TAU ⊣⊢ TAU_acc TAU.
+      Proof using.
+        rewrite /TAU /TAU_def /=. apply: greatest_fixpoint_unfold.
+      Qed.
+
+      Lemma TAU_intro U V:
+        Absorbing U → Persistent U →
+        (U ∧ V ⊢ TAU_acc V) → U ∧ V ⊢ TAU.
+      Proof.
+        rewrite /TAU /TAU_def /=.
+        iIntros (?? HAU) "[#HP HQ]".
+        iApply (greatest_fixpoint_coiter _ (λ _, V)); last done.
+        iIntros "!>" ([]) "HQ".
+        iApply HAU. iSplit; by iFrame.
+      Qed.
+
+    End AtomicUpdates.
+
+    Context `{EM: ExecutionModel heap_lang M}. 
+    Context `{hGS: @heapGS Σ _ EM}.
+    Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
+
+    Definition TLAT_pre (RR: option RO -> iProp Σ) π q (O: gset SignalId): iProp Σ :=
+      RR None ∗ obls τ O (oGS := oGS) ∗ sgns_level_gt' O L (oGS := oGS) ∗
+      th_phase_frag τ π q (oGS := oGS) ∗ cp π d__m (oGS := oGS).
+    
+    Definition TLAT e s
+      (POST: ST -> ST -> option (iProp Σ))
+      (get_ret: ST -> ST -> val)
+      : iProp Σ :=
+      ∀ Φ q π O (RR: option RO -> iProp Σ),
+        ⌜ B c <= LIM_STEPS ⌝ -∗ TLAT_pre RR π q O -∗
+        TAU (⊤ ∖ ε__m) π q (fun y x => POST y x -∗? Φ (get_ret y x)) O RR -∗
+        WP e @ s; τ; ⊤ {{ v, Φ v }}.
+
+  End AtomicTriples.
+
+  Global Instance TAU_acc_Proper {ST RO: Type}:
+    Proper
+      (eq ==> (eq ==> equiv) ==> (eq ==> eq ==> equiv) ==> equiv ==> 
+       (eq ==> eq) ==> (eq ==> iff) ==> eq ==> eq ==> eq ==> equiv ==> 
+       eq ==> eq ==> (eq ==> eq ==> equiv ) ==> equiv ==> (eq ==> equiv) ==> equiv ==>
+       equiv) (TAU_acc (ST := ST) (RO := RO)).
+  Proof using.
+    (* TODO: simplify *)
+    red. repeat intro. subst. 
+    rewrite /TAU_acc.
+    apply leibniz_equiv_iff in H4, H10, H14. subst.
+    iApply fupd_proper. 
+    iApply bi.exist_proper. iIntros (?).
+    iApply bi.sep_proper; [by eauto| ].
+    iApply bi.and_proper.
+    { do 2 (iApply bi.forall_proper; iIntros (?)).
+      iApply bi.wand_proper.
+      { repeat iApply bi.sep_proper; try done. 
+        2: { iApply bi.pure_proper. apply not_iff_compat. eauto. }
+        iApply bi.exist_proper. iIntros (?).
+        iApply bi.sep_proper; eauto.
+        iApply bi.or_proper; eauto.
+        iApply bi.pure_proper. split; intros ->; subst; f_equal; [| symmetry]; eauto. }
+      rewrite -(H5 a); [| done]. rewrite -(H2 a); [| done]. rewrite H16.
+      rewrite -(H15 _); reflexivity. }
+    rewrite -(H2 a); [| done].
+    iApply bi.and_proper.
+    2: { solve_proper. }
+    iApply bi.forall_proper; iIntros (?).
+    rewrite -(H6 a); [| done].
+    (* rewrite H16. *)
+    setoid_rewrite <- (H3 _ _ _ _); try reflexivity.
+    setoid_rewrite <- (H13 _ _ _ _); reflexivity.
+  Qed.
+
+  Global Instance TAU_Proper {ST RO: Type}:
+    Proper
+      (eq ==> (eq ==> equiv) ==> (eq ==> eq ==> equiv) ==> equiv ==> 
+       (eq ==> eq) ==> (eq ==> iff) ==> eq ==> eq ==> eq ==> equiv ==> 
+       eq ==> eq ==> (eq ==> eq ==> equiv ) ==> equiv ==> (eq ==> equiv) ==> equiv)
+      (TAU (ST := ST) (RO := RO)).
+  Proof using.
+    rewrite /TAU /TAU_def.
+    red. repeat intro. subst.
+    eapply greatest_fixpoint_proper; [| done].
+    repeat intro. rewrite /TAU_pre. iApply TAU_acc_Proper; eauto.
+  Qed.
+
+End TotalTriples.
+
+
+(* TODO: move to another file *)
+Section FairLockSpec.
+
+  Definition FL_st: Type := val * nat * bool.
+
+  Definition fl_round: FL_st -> nat := fun '(_, r, _) => r. 
+
+  Context `{OfeDiscrete DegO} `{OfeDiscrete LevelO}.
+  Context `{@LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}. 
+  
+  Let Degree := ofe_car DegO.
+  Let Level := ofe_car LevelO.
+
+  Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}.
+  Let OP := LocaleOP (Locale := locale heap_lang).
+  Existing Instance OP.
+  Let OM := ObligationsModel.
+  
+  Record FairLockPre := {
+    fl_c__cr: nat; fl_B: nat -> nat;
+    fl_GS :> gFunctors -> Set;
+    fl_LK `{FLG: fl_GS Σ} {HEAP: gen_heapGS loc val Σ}: FL_st -> iProp Σ;
+    fl_d__h: Degree;
+    fl_d__l: Degree;
+    fl_d__m: Degree;
+    fl_degs_lh: deg_lt fl_d__l fl_d__h;
+    fl_degs_hm: deg_lt fl_d__h fl_d__m;
+    fl_ι: namespace;
+    fl_acq_lvls: gset Level;                                     
+  }.
+
+
+  Context {Σ: gFunctors}.
+  (* Context {invs_inΣ: invGS_gen HasNoLc Σ}. *)
+  
+  Let OAM := ObligationsAM. 
+  Let ASEM := ObligationsASEM.
+  Context {oGS: @asem_GS _ _ ASEM Σ}.
+  
+  Context `{EM: ExecutionModel heap_lang M}.
+  Context `{hGS: @heapGS Σ _ EM}.
+  Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
+  
+  Context {FLP: FairLockPre}.
+  
+  Definition TAU_FL τ P Q L TGT c π q
+    (* (Φ: val -> iProp Σ) *)
+    Φ
+    O (RR: option nat -> iProp Σ): iProp Σ := 
+    TAU τ P Q L fl_round TGT (fl_d__h FLP) (fl_d__l FLP)
+      c
+      (⊤ ∖ ↑(fl_ι FLP))
+      π q
+      (* (fun _ _ => Φ #()) *)
+      Φ
+      O RR
+      (oGS := oGS). 
+  
+  Definition TLAT_FL τ P Q L TGT (POST: FL_st -> FL_st -> option (iProp Σ))
+    get_ret c e : iProp Σ := 
+    TLAT τ P Q L          
+      fl_round TGT
+      (fl_d__h FLP) (fl_d__l FLP) (fl_d__m FLP)
+      c (fl_B FLP)
+      (↑ (fl_ι FLP)) e NotStuck
+      POST
+      get_ret
+      (oGS := oGS).
+  
+  Definition acquire_at_pre {FLG: fl_GS FLP Σ} (lk: val) (x: FL_st): iProp Σ :=
+    ▷ fl_LK FLP x (FLG := FLG) ∗ ⌜ x.1.1 = lk ⌝. 
+  Definition acquire_at_post {FLG: fl_GS FLP Σ} (lk: val) (y x: FL_st): iProp Σ :=
+    fl_LK FLP y (FLG := FLG) ∗ ⌜ y.1 = x.1 /\ x.2 = false /\ y.2 = true⌝.
+  Definition release_at_pre {FLG: fl_GS FLP Σ} (lk: val) (x: FL_st): iProp Σ :=
+    ▷ fl_LK FLP x (FLG := FLG) ∗ ⌜ x.2 = true /\ x.1.1 = lk⌝. 
+  Definition release_at_post {FLG: fl_GS FLP Σ} (lk: val) (y x: FL_st): iProp Σ :=
+    fl_LK FLP y (FLG := FLG) ∗ ⌜ y.1.2 = (x.1.2 + 1)%nat /\ y.2 = false /\ y.1.1 = x.1.1 ⌝.
+  
+  Record FairLock := {    
+    fl_create: val; fl_acquire: val; fl_release: val;
+
+    fl_is_lock `{FLG: fl_GS FLP Σ} {HEAP: gen_heapGS loc val Σ}: val -> nat -> iProp Σ;
+    fl_is_lock_pers {FLG: fl_GS FLP Σ} lk c :> Persistent (fl_is_lock lk c (FLG := FLG));
+
+    fl_release_token: iProp Σ;
+
+    fl_create_spec: ⊢ ⌜ fl_c__cr FLP <= LIM_STEPS ⌝ -∗ ∀ τ c,
+      {{{ ⌜ True ⌝ }}} fl_create #() @ τ {{{ lk, RET lk;
+         ∃ FLG: fl_GS FLP Σ, fl_LK FLP (lk, 0, false) (FLG := FLG) ∗ fl_is_lock lk c (FLG := FLG) }}};
+
+    fl_acquire_spec {FLG: fl_GS FLP Σ} (lk: val) c τ: (fl_is_lock (FLG := FLG)) lk c ⊢
+        TLAT_FL τ 
+        (acquire_at_pre lk (FLG := FLG))
+        (acquire_at_post lk (FLG := FLG))
+        (fl_acq_lvls FLP)
+        (fun '(_, _, b) => b = false)
+        (fun _ _ => Some fl_release_token)
+        (fun _ _ => #())
+        c (fl_acquire lk);
+                                     
+    fl_release_spec {FLG: fl_GS FLP Σ} (lk: val) c τ: (fl_is_lock (FLG := FLG)) lk c ∗ fl_release_token ⊢
+        TLAT_FL τ
+        (release_at_pre lk (FLG := FLG))
+        (release_at_post lk (FLG := FLG))
+        ∅
+        (fun _ => True%type)
+        (fun _ _ => None)
+        (fun _ '(_, r, _) => #r)
+        c (fl_release lk);
+  }.
+  
+End FairLockSpec.
+
+
 Section Ticketlock.
   Context `{ODd: OfeDiscrete DegO} `{ODl: OfeDiscrete LevelO}.
   Context `{LEl: @LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}.
@@ -327,7 +634,7 @@ Section Ticketlock.
   
   Definition tl_inv_inner `{TicketlockG Σ} (tl: val) (c: nat): iProp Σ :=
     ∃ (l__ow l__tk: loc) (ow tk: nat) TM,
-      ⌜ tl = (#l__ow, #l__tk)%V ⌝ ∗ ⌜ ow <= tk ⌝ ∗
+      ⌜ tl = (#l__ow, #l__tk)%V ⌝ ∗ ⌜ ow <= tk ⌝ ∗ exc_lb (tk - ow + 2) (oGS := oGS) ∗
       l__ow ↦{/ 2} #ow ∗ l__tk ↦ #tk ∗ ow_exact ow ∗ held_auth (negb (ow =? tk)) ∗
       tokens_auth tk ∗
       ⌜ dom TM = set_seq 0 tk ⌝ ∗ tau_map_auth TM ∗ tau_map_interp tl c ow TM ∗
@@ -466,11 +773,6 @@ Section Ticketlock.
     ∗ th_phase_frag τ π (q / 2) (oGS := oGS)
   .
 
-  (* TODO: requires dynamic eb updates *)
-  Lemma TODO_increase_eb n m:
-    exc_lb n (oGS := oGS) ⊢ exc_lb m (oGS := oGS).
-  Proof using. Admitted.
-
   (* TODO: move, remove duplicates *)
   Ltac remember_goal :=
   match goal with | |- envs_entails _ ?P =>
@@ -534,14 +836,14 @@ Section Ticketlock.
 
     iApply wp_atomic.
     iInv "INV" as "inv" "CLOS". rewrite {1}/tl_inv_inner.
-    iDestruct "inv" as (?? ow tk TM) "(>%EQ_ & >%LEot & >OW & >TK & >EXACT & >HELD & >TOKS & >%DOM__TM & TM & TAUS & RTOK)".
+    iDestruct "inv" as (?? ow tk TM) "(>%EQ_ & >%LEot & #EBd & >OW & >TK & >EXACT & >HELD & >TOKS & >%DOM__TM & TM & TAUS & RTOK)".
     inversion EQ_. subst l__ow0 l__tk0. clear EQ_.
     rewrite /TAU_FL. rewrite TAU_elim. iMod "TAU" as (st) "[[ST %ST__lk] TAU]".
     iModIntro.
     iApply sswp_MU_wp_fupd; [done| ]. iModIntro.
     iApply (wp_faa with "TK").
     iIntros "!> TK'". iNext. MU_by_BMU.
-    simpl. rewrite Nat.add_comm. iApply OU_BMU.
+    simpl. rewrite (Nat.add_comm _ 3). iApply OU_BMU.
     (* iDestruct (cp_mul_take with "CPSw") as "[CPSw CPw]". *)
     apply Nat.le_sum in LEot as [d ->].
     iApply (OU_wand with "[-CPe PH]").
@@ -549,16 +851,20 @@ Section Ticketlock.
          { apply (Nat.le_refl (S (S d))). }
          { done. }
          { apply fl_degs_he. }
-         (* TODO: requires dynamic eb updates *)
-         by iApply TODO_increase_eb. }
+         rewrite Nat.sub_add'. by rewrite Nat.add_comm. }
     iIntros "[CPSh PH]".
     iDestruct (cp_mul_take with "CPSh") as "[CPSh CPh]".
+
     iApply OU_BMU. iApply (OU_wand with "[-CPh PH]").
-    2: { iApply (exchange_cp_upd with "[$] [$] [$]").
+    2: { iApply (exchange_cp_upd with "[$] [$] EB").
          { Unshelve. 3: exact 10. lia. shelve. }
          { done. }
          etrans; [apply fl_degs_wl0 | apply fl_degs_lh0]. }
     iIntros "[CPS' PH]".
+
+    iApply OU_BMU. iApply (OU_wand with "[-PH]").
+    2: { iApply (increase_eb_upd with "EBd [$]"). }
+    iClear "EBd". iIntros "[#EBd' PH]".
     
     iDestruct (ow_exact_lb with "[$]") as "[EXACT LB]".
     remember_goal.
@@ -600,13 +906,14 @@ Section Ticketlock.
          replace (((ow + d)%nat + 1)%Z) with (Z.of_nat $ S (ow + d)) by lia.
          iFrame. rewrite !bi.sep_assoc. iSplit.
          2: { iIntros "%". lia. }
+         replace ((S (ow + d) - ow + 2)) with (S (d + 2)) by lia. iFrame "#∗".
          iPureIntro. split.
          { split; [done| lia]. }
          rewrite dom_insert_L DOM__TM.
          by rewrite set_seq_S_end_union_L. }
 
     rewrite (proj2 (Nat.eqb_eq _ _)); [| done]. simpl.
-    iApply (BMU_lower _ (c + (1 + c))); [lia| ].
+    iApply (BMU_lower _ (c + (0 + c))); [lia| ].
     iApply BMU_split.
     rewrite /tl_LK. destruct st as [[]]. iDestruct "ST" as (??) "(-> & OW' & HELD')".
     rewrite !Nat.add_0_r. rewrite Nat.add_0_r in DOM__TM.
@@ -643,12 +950,18 @@ Section Ticketlock.
     rewrite (proj2 (Nat.eqb_neq _ _)); [| lia]. iFrame.
     iFrame. rewrite !bi.sep_assoc. iSplit.
     2: { iIntros "%". lia. }
+    rewrite Nat.sub_diag Nat.sub_add'. iFrame "#∗".
     iPureIntro. split.
     { split; [done| lia]. }
     rewrite dom_insert_L DOM__TM.
     rewrite set_seq_add_L. simpl.
     set_solver.
   Qed.
+
+  (* TODO: move, remove duplicates *)
+  Ltac split_cps cps_res n :=
+    let fmt := constr:(("[" ++ cps_res ++ "' " ++ cps_res ++ "]")%string) in
+    iDestruct (cp_mul_split' _ _ n with cps_res) as fmt; [lia| ].
 
   Lemma wait_spec (lk: val) c o' (t: nat) τ π q Ob Φ RR
     (LIM_STEPS': fl_B TLPre c <= LIM_STEPS):
@@ -675,7 +988,7 @@ Section Ticketlock.
     wp_bind (! _)%E.
     iApply wp_atomic.
     iInv "INV" as "inv" "CLOS". rewrite {1}/tl_inv_inner.
-    iDestruct "inv" as (?? ow tk TM) "(>%EQ_ & >%LEot & >OW & >Ltk & >EXACT & >HELD & >TOKS & >%DOM__TM & TM & TAUS & RTOK)".
+    iDestruct "inv" as (?? ow tk TM) "(>%EQ_ & >%LEot & #EBd & >OW & >Ltk & >EXACT & >HELD & >TOKS & >%DOM__TM & TM & TAUS & RTOK)".
     inversion EQ_. subst l__ow0 l__tk0. clear EQ_.
     iModIntro.
     iApply sswp_MU_wp_fupd; [done| ]. iModIntro.
@@ -693,7 +1006,7 @@ Section Ticketlock.
       { rewrite /tau_interp. iRight. iLeft. iSplit; [| done]. iFrame. }
       MU_by_burn_cp. iModIntro. pure_steps.
       iMod ("CLOS" with "[TMI_CLOS OW TOKS HELD EXACT Ltk TM]") as "_".
-      { rewrite /tl_inv_inner. iNext. do 5 iExists _. iFrame.
+      { rewrite /tl_inv_inner. iNext. do 5 iExists _. iFrame "#∗".
         rewrite (proj2 (Nat.eqb_neq _ _)); [| lia].
         rewrite !bi.sep_assoc. iSplitL; [by iFrame| ].
         iIntros "%". lia. }
@@ -751,14 +1064,15 @@ Section Ticketlock.
     { iFrame. iSplit; [| done]. iNext. do 2 iExists _. iFrame. eauto. }
     iApply OU_BMU.
     iApply (OU_wand with "[-CP PH]").
-    2: { iApply (exchange_cp_upd with "[$] [$] [$]").
+    2: { iApply (exchange_cp_upd with "[$] [$] EXC").
          1, 2: reflexivity.
          apply fl_degs_wl0. }
     iIntros "[CPS' PH]".
     iDestruct (cp_mul_split with "[CPS CPS']") as "CPS"; [iFrame| ]. simpl.
     iApply BMU_intro. iMod "CLOS'" as "TAUs". iModIntro.
-    rewrite cp_mul_take. iDestruct "CPS" as "[CPS CP]".
-    iSplitR "CP".
+    (* rewrite cp_mul_take. iDestruct "CPS" as "[CPS CP]". *)
+    split_cps "CPS" 1. rewrite -cp_mul_1. 
+    iSplitR "CPS'".
     2: { do 2 iExists _. iFrame. done. }
     iModIntro. pure_steps.
     iSpecialize ("TMI_CLOS" with "[TAUs SLT OB PH']").
@@ -767,7 +1081,7 @@ Section Ticketlock.
     iClear "OW_LB". iDestruct (ow_exact_lb with "[$]") as "[EXACT OW_LB]".
     iMod ("CLOS" with "[TMI_CLOS OW TOKS HELD EXACT Ltk TM]") as "_".
     { rewrite /tl_inv_inner. iNext. do 5 iExists _. iFrame.
-      rewrite (proj2 (Nat.eqb_neq _ _)); [| lia]. iFrame.
+      rewrite (proj2 (Nat.eqb_neq _ _)); [| lia]. iFrame "#∗".
       rewrite !bi.sep_assoc. iSplit.
       { iPureIntro. repeat split; eauto. lia. }
       iIntros "->". lia. }
@@ -875,6 +1189,15 @@ Section Ticketlock.
     iSplit; [| done]. iLeft. iFrame.
   Qed.
 
+  (* TODO: move *)
+  Lemma exc_lb_le n m
+    (LE: n <= m):
+    exc_lb m (oGS := oGS) ⊢ exc_lb n (oGS := oGS).
+  Proof using.
+    rewrite /exc_lb. erewrite mono_nat_lb_op_le_l; eauto.
+    rewrite own_op. by iIntros "[??]". 
+  Qed.
+
   (* TODO: mention exc_lb in the proof OR implement its increase *)
   Lemma tl_release_spec (lk: val) c τ:
     tl_is_lock lk c ∗ exc_lb 20 (oGS := oGS) ∗ rel_tok ⊢
@@ -919,7 +1242,7 @@ Section Ticketlock.
 
     iApply wp_atomic.
     iInv "INV" as "inv" "CLOS". rewrite {1}/tl_inv_inner.
-    iDestruct "inv" as (?? ow tk TM) "(>%EQ_ & >%LEot & >OW & >Ltk & >EXACT & >HELD & >TOKS & >%DOM__TM & TM & TAUS & _)".
+    iDestruct "inv" as (?? ow tk TM) "(>%EQ_ & >%LEot & >#EBD & >OW & >Ltk & >EXACT & >HELD & >TOKS & >%DOM__TM & TM & TAUS & _)".
     inversion EQ_. subst l__ow0 l__tk0. clear EQ_.
     iModIntro.
     iApply sswp_MU_wp_fupd; [done| ].
@@ -970,10 +1293,13 @@ Section Ticketlock.
     rewrite Qp.sub_diag. simpl. iSpecialize ("Φ" with "[//]"). 
     iApply BMU_intro. pure_steps.
     iMod ("CLOS" with "[-Φ RR0 CPS OW_LB]") as "_".
-    { iNext. rewrite /tl_inv_inner. do 5 iExists _. iFrame.
+    { iNext. rewrite /tl_inv_inner. do 5 iExists _.
+      iRevert "EBD". iFrame. iIntros "#EBd".
       iSplit; [done| ]. iSplit; [iPureIntro; lia| ].
       erewrite bool_decide_ext with (Q := ow + 1 ≠ tk). 
       2: { rewrite DOM__TM elem_of_set_seq. simpl. lia. }
+      iSplitR.
+      { iApply (exc_lb_le with "EBd"). lia. }
       rewrite bi.sep_assoc. iSplitR "RTOK".
       2: { iApply bi.impl_proper; [..| done | by iFrame].
            rewrite bool_decide_eq_false. iPureIntro. tauto. }
@@ -1058,7 +1384,7 @@ Section Ticketlock.
       rewrite -!bi.sep_assoc. iDestruct "WR_" as "(?&?&?&?&?&?&?)".
       iFrame "#∗". }
 
-    subst post. simpl. iIntros (?) "[POST ?]". by iApply "POST". 
+    subst post. simpl. iIntros (?) "[POST ?]". by iApply "POST".
   Qed.
   
 End Ticketlock.
