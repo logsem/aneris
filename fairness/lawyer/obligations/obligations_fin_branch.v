@@ -137,6 +137,14 @@ Section FiniteBranching.
     rewrite LOC_PHASE. reflexivity. 
   Qed.
 
+  Lemma increases_eb_next_states δ:
+    list_approx (fun δ' => exists τ, increases_eb δ τ δ').
+  Proof using.
+    exists [update_eb (ps_exc_bound δ + 1) δ]. 
+    intros ? (? & STEP). apply elem_of_list_singleton. 
+    by inversion STEP. 
+  Qed.
+
   Lemma forks_locale_next_states δ τ':
     list_approx (fun δ' => exists τ obls', forks_locale δ τ δ' τ' obls'). 
   Proof using.
@@ -156,7 +164,8 @@ Section FiniteBranching.
       apply elem_of_elements. apply powerset_spec. set_solver. }
     by apply elem_of_map_to_list. 
   Qed.
-    
+
+  (* TODO: move *)
   Lemma ex_and_comm' {T: Type} (A: Prop) (B: T -> Prop):
     (exists t, B t /\ A) <-> (exists t, B t) /\ A.
   Proof. 
@@ -177,11 +186,12 @@ Section FiniteBranching.
             flat_map (fun ℓ => proj1_sig (creates_signal_next_states δ ℓ)) (@enum _ _ FINlvl) ++
             proj1_sig (sets_signal_next_states δ) ++
             flat_map (fun d' => proj1_sig (creates_ep_next_states δ d')) (@enum _ _ FINdeg) ++
-            proj1_sig (expects_ep_next_states δ)
+            proj1_sig (expects_ep_next_states δ) ++
+            proj1_sig (increases_eb_next_states δ)
         ).
       intros ? (?& STEP).
       rewrite !elem_of_app. 
-      destruct STEP as [T|[T|[T|[T|[T|T]]]]]. 
+      destruct STEP as [T|[T|[T|[T|[T|[T|T]]]]]]. 
       - destruct T as (?&?&T). left.
         destruct (burns_cp_next_states δ); eauto. 
       - destruct T as (?&?&?&?&T). do 1 right. left.
@@ -203,9 +213,11 @@ Section FiniteBranching.
         { eapply elem_of_enum. Unshelve. eauto. }
         destruct creates_ep_next_states; eauto.
         eapply e; eauto. 
-      - destruct T as (?&?&?&T). do 5 right.
+      - destruct T as (?&?&?&T). do 5 right. left.
         destruct expects_ep_next_states; eauto.
-        eapply e; eauto. 
+        eapply e; eauto.
+      - repeat right.
+        destruct increases_eb_next_states; eauto.
     Qed.
 
     Lemma progress_step_approx δ:

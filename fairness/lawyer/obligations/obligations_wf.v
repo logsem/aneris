@@ -190,20 +190,10 @@ Section Wf.
     intros. eapply pres_by_valid_trace_strong with (T := fun _ => True); eauto.
   Qed. 
 
-  Ltac inv_loc_step STEP :=
-    destruct STEP as [T|[T|[T|[T|[T|T]]]]];
-    [destruct T as (?&?&T) |
-     destruct T as (?&?&?&?&T) |
-     destruct T as (?&T) |
-     destruct T as (?&T) |
-     destruct T as (?&?&?&?&T) |
-     destruct T as (?&?&?&T) ];
-    inversion T; subst. 
-
   Lemma loc_step_dpo_pres: preserved_by_loc_step_ex dom_phases_obls.
   Proof using.
     do 2 red. intros δ1 δ2 PHASES_CORR [τ STEP].
-    inv_loc_step STEP; destruct δ1; try done; simpl in *. 
+    inv_loc_step STEP; destruct δ1; try done; simpl in *.
     - subst new_obls0. red. subst new_ps. simpl. set_solver. 
     - subst new_obls0. simpl. red. set_solver. 
   Qed.

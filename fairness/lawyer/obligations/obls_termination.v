@@ -361,24 +361,20 @@ Section Termination.
       clear dependent δ1. 
       red in STEP.
       inv_loc_step STEP; destruct δ'; simpl in *; subst.
-      + by rewrite SIG2 in SIG'.
-      + by rewrite SIG2 in SIG'.
+      all: try by rewrite SIG2 in SIG'.
       + subst new_sigs0. rewrite lookup_insert_ne in SIG2.
         { by rewrite SIG2 in SIG'. }
         intros ->. subst new_obls0.
         destruct NO2. rewrite lookup_insert. simpl. set_solver.
       + subst new_sigs0. rewrite lookup_insert_ne in SIG2.
         { by rewrite SIG2 in SIG'. }       
-        intros ->. by rewrite SIG' in SIG.
-      + by rewrite SIG2 in SIG'.
-      + by rewrite SIG2 in SIG'. }
+        intros ->. by rewrite SIG' in SIG. }
     clear LE'. 
 
     eapply IHn; eauto.
     destruct (ps_obls δ' !! τ) eqn:OBLS'; [| done]. simpl. intros IN'.
-    inv_loc_step STEP; destruct δ'; simpl in *; subst. 
-    + by rewrite OBLS' in NO2. 
-    + by rewrite OBLS' in NO2.
+    inv_loc_step STEP; destruct δ'; simpl in *; subst.
+    all: try by rewrite OBLS' in NO2. 
     + subst new_sigs0 new_obls0.
       destruct NO2. subst cur_loc_obls0. rewrite OBLS' lookup_insert. set_solver.
     + subst new_sigs0 new_obls0.
@@ -387,8 +383,6 @@ Section Termination.
       { rewrite lookup_insert in SIG2. done. }
       rewrite lookup_insert_ne in SIG2; [| done].
       destruct NO2. rewrite OBLS'. simpl. rewrite lookup_insert. simpl. set_solver.
-    + rewrite OBLS' in NO2. done.
-    + rewrite OBLS' in NO2. done. 
   Qed.
 
   (* (* TODO: rephrase in terms of preserved_by? *) *)

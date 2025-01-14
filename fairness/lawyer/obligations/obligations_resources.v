@@ -275,6 +275,12 @@ Section ObligationsRepr.
       by apply mono_nat_both_valid in V.
     Qed.
 
+    Lemma exc_lb_max n m:
+      exc_lb n ∗ exc_lb m ⊣⊢ exc_lb (max n m). 
+    Proof using.
+      rewrite /exc_lb. rewrite -own_op. by rewrite mono_nat_lb_op.
+    Qed.
+
     Lemma obls_sgn_lt_locale_obls δ ζ R lm:
       ⊢ obls_msi δ -∗ obls ζ R -∗ sgns_level_gt R lm -∗
         ⌜ lt_locale_obls lm ζ δ ⌝.
@@ -675,7 +681,7 @@ Section ObligationsRepr.
       rewrite bi.sep_comm -bi.sep_assoc.
       iSplitR.
       { iPureIntro. exists ζ. 
-        red. do 5 right. do 3 eexists. 
+        red. do 5 right. left. do 3 eexists. 
         erewrite (f_equal (expects_ep _ _)).
         { econstructor.
           { apply PH. }
@@ -760,6 +766,52 @@ Section ObligationsRepr.
       iMod ("OU'" with "[$]") as "(%&?&%&?)". iModIntro.
       iExists _. iFrame. iPureIntro.
       red. eexists. left. eauto.
+    Qed.
+
+    (* actually the locale doesn't matter here, but we need to provide some according to the definition of loc_step_ex.
+       In fact, the only place where it matters is last burning fuel step and fork.
+       TODO: remove locale parameter from the cases of loc_step_ex, rename it *)
+    Lemma increase_eb_upd τ n π q:
+      ⊢ exc_lb n -∗ th_phase_frag τ π q -∗ OU (exc_lb (S n) ∗ th_phase_frag τ π q).
+    Proof using.
+      clear H1 H0 H. 
+      rewrite /OU /OU'. iIntros "EB PH %δ MSI".
+      iDestruct (exc_lb_msi_bound with "[$] [$]") as %LB. iClear "EB".
+      iDestruct (th_phase_msi_frag with "[$] [$]") as "%".
+      rewrite {1}/obls_msi. iDestruct "MSI" as "(?&?&?&?&?&EE)".
+      destruct δ. simpl. iFrame. simpl in *.
+      iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _). 
+      iRevert "EE". iFrame. iIntros "EE". simpl.
+      
+      rewrite bi.sep_comm -bi.sep_assoc.  
+      iSplitR.
+      { iPureIntro. exists τ. 
+        red. repeat right.
+        erewrite (f_equal (increases_eb _ _)).
+        { econstructor; eauto. simpl. eapply elem_of_dom; eauto. }
+        simpl. reflexivity. }
+
+      rewrite -own_op cmra_comm. 
+      iApply (own_update with "[$]").
+      etrans. 
+      { eapply mono_nat_update. apply PeanoNat.Nat.le_succ_diag_r. }
+      rewrite Nat.add_1_r. apply cmra_update_included.
+      rewrite {2}mono_nat_auth_lb_op. apply cmra_mono_l.
+      apply mono_nat_lb_mono. lia.
+    Qed.
+
+    Lemma increase_eb_upd_rep τ n π q k:
+      ⊢ exc_lb n -∗ th_phase_frag τ π q -∗ OU_rep k (exc_lb (n + k) ∗ th_phase_frag τ π q).
+    Proof using.
+      clear H1 H0 H.
+      iIntros "EB PH".
+      iInduction k as [| k] "IH" forall (n); simpl.
+      { iFrame "#∗". by rewrite Nat.add_0_r. }      
+      iApply (OU_wand with "[]").
+      2: { iApply (increase_eb_upd with "[$] [$]"). }
+      iIntros "[EB PH]". iApply (OU_rep_wand with "[]").
+      2: { iApply ("IH" with "[$] [$]"). }
+      rewrite Nat.add_succ_comm. set_solver.
     Qed.
 
     (* TODO: ? refactor these proofs about fork step *)

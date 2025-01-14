@@ -15,14 +15,15 @@ Section PhaseFuel.
     (exists π δ δ' n, exchanges_cp δ1 τ δ2 π δ δ' n) \/
     (exists l, creates_signal δ1 τ δ2 l) \/
     (exists s, sets_signal δ1 τ δ2 s) \/
-    (exists s π δ δ', creates_ep δ1 τ δ2 s π δ δ').
+    (exists s π δ δ', creates_ep δ1 τ δ2 s π δ δ') \/
+    (increases_eb δ1 τ δ2).
 
   Lemma loc_step_split δ1 τ δ2:
     loc_step δ1 τ δ2 <->
       (loc_step_no_exp_all δ1 τ δ2 \/ (exists sid π d, expects_ep δ1 τ δ2 sid π d)).
   Proof using.
     rewrite /loc_step_no_exp_all. split.
-    - intros [T|[T|[T|[T|[T|T]]]]]; tauto.
+    - intros [T|[T|[T|[T|[T|[T|T]]]]]]; tauto.
     - intros [[T|[T|[T|[T|T]]]] | ?]; red; tauto.
   Qed.
     
@@ -190,7 +191,7 @@ Section PhaseFuel.
     ms_le deg_le (PF' (S k) δ2) (PF' k δ1).
   Proof using.
     clear -STEP OM.
-    destruct STEP as [T|[T|[T|[T|T]]]]. 
+    destruct STEP as [T|[T|[T|[T|[T|T]]]]]. 
     - destruct T as (?&?&T). inversion T; subst. 
       destruct δ1. simpl in *.
       apply ms_le_disj_union; [apply _| ..].
@@ -208,7 +209,11 @@ Section PhaseFuel.
       apply ms_le_disj_union; [apply _| ..].
       + apply ms_le_sub. apply mset_map_sub. mss. 
       + apply ms_le_exp_mono; [lia | reflexivity].
-    - destruct T as (?&?&?&?&T). eapply create_ep_ms_le; eauto. 
+    - destruct T as (?&?&?&?&T). eapply create_ep_ms_le; eauto.
+    - inversion T; subst. destruct δ1. simpl.
+      apply ms_le_disj_union; [apply _| ..].
+      + apply ms_le_sub. apply mset_map_sub. mss. 
+      + apply ms_le_exp_mono; [lia | reflexivity]. 
   Qed.
   
   Definition expect_ms_le δ1 τ δ2 k :=

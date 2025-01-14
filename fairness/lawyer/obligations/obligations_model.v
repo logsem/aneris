@@ -59,6 +59,8 @@ Section Model.
     Build_ProgressState a b c eps e f.
   Definition update_phases phases '(Build_ProgressState a b c d _ f) :=
     Build_ProgressState a b c d phases f.
+  Definition update_eb eb '(Build_ProgressState a b c d e _) :=
+    Build_ProgressState a b c d e eb.
 
   Definition lt_locale_obls l θ ps: Prop :=
     let obls: gset SignalId := default ∅ (ps_obls ps !! θ) in
@@ -142,8 +144,14 @@ Section Model.
     let new_cps := ps_cps ps ⊎ {[+ (π__max, δ) +]} in
     expects_ep ps θ (update_cps new_cps ps) s π δ.
 
-  Definition ext_phase (π: Phase) (d: nat) := d :: π. 
-  Definition fork_left (π: Phase): Phase := ext_phase π 0. 
+  (* TODO: get rid of mandatory locale parameter in these lemmas *)
+  Inductive increases_eb: PS -> Locale -> PS -> Prop :=
+  | ieb_step ps θ
+      (DOM: θ ∈ dom $ ps_phases ps):
+    increases_eb ps θ (update_eb (ps_exc_bound ps + 1) ps).
+
+  Definition ext_phase (π: Phase) (d: nat) := d :: π.
+  Definition fork_left (π: Phase): Phase := ext_phase π 0.
   Definition fork_right (π: Phase): Phase := ext_phase π 1.
 
   Inductive forks_locale: PS -> Locale -> PS -> Locale -> gset SignalId -> Prop :=
@@ -164,7 +172,8 @@ Section Model.
     (exists l, creates_signal ps1 θ ps2 l) \/
     (exists s, sets_signal ps1 θ ps2 s) \/
     (exists s π δ δ', creates_ep ps1 θ ps2 s π δ δ') \/
-    (exists s π δ, expects_ep ps1 θ ps2 s π δ).
+    (exists s π δ, expects_ep ps1 θ ps2 s π δ) ∨
+    (increases_eb ps1 θ ps2). 
 
   Definition loc_step_ex := fun ps1 ps2 => exists θ, loc_step ps1 θ ps2.
   Definition fork_step_of θ := fun ps1 ps2 => exists τ' R, forks_locale ps1 θ ps2 τ' R.
@@ -246,11 +255,12 @@ Section Model.
 End Model.
 
 Ltac inv_loc_step STEP :=
-    destruct STEP as [T|[T|[T|[T|[T|T]]]]];
+    destruct STEP as [T|[T|[T|[T|[T|[T|T]]]]]];
     [destruct T as (?&?&T) |
      destruct T as (?&?&?&?&T) |
      destruct T as (?&T) |
      destruct T as (?&T) |
      destruct T as (?&?&?&?&T) |
-     destruct T as (?&?&?&T) ];
+     destruct T as (?&?&?&T) |
+    ];
     inversion T; subst. 
