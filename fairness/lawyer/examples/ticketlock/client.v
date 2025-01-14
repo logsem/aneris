@@ -17,7 +17,311 @@ Ltac remember_goal :=
     iAssert (P -∗ P)%I as "GOAL"; [iIntros "X"; by iApply "X"| ]
   end.
 
+Section TotalTriples.
+  Context `{OfeDiscrete DegO} `{OfeDiscrete LevelO}.
+  Context `{LEl: @LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}. 
+  
+  Let Degree := ofe_car DegO.
+  Let Level := ofe_car LevelO.
 
+  Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}.
+  Let OP := LocaleOP (Locale := locale heap_lang).
+  Existing Instance OP.
+  Let OM := ObligationsModel.
+  
+  Context {Σ: gFunctors}.
+  Context {invs_inΣ: invGS_gen HasNoLc Σ}.
+
+  Let OAM := ObligationsAM. 
+  Let ASEM := ObligationsASEM.
+  Context {oGS: @asem_GS _ _ ASEM Σ}.
+
+  Let Locale := locale heap_lang. 
+
+  Section AtomicTriples. 
+    Context
+      {ST: Type}
+      {RO: Type}
+      (τ: Locale)(* TODO: should it be fixed? *)
+      (P: ST -> iProp Σ) (Q: ST -> ST -> iProp Σ) (* second ST is the previous state *)
+      (L: gset Level) (* TODO: only finite sets? *)
+      (round: ST -> RO) (* TODO: can we get away with ST only? *)
+      (TGT: ST -> Prop) (* `{forall x, Decision (TGT x)} *)
+      (d__h d__l d__m: Degree)
+      (c: nat) (B: nat -> nat)
+      (ε__m: coPset)
+    .
+
+    Section AtomicUpdates.
+      Context
+        (ε: coPset)
+        (π: Phase)
+        (q0: Qp)
+        (Φ: ST -> ST -> iProp Σ)
+        (O: gset SignalId)
+        (RR: option RO -> iProp Σ)
+      .
+
+      Definition TAU_acc (V: iProp Σ): iProp Σ :=
+        |={ε, ∅}=> ∃ x, P x ∗ (
+              let abort := P x ={∅, ε}=∗ V in
+              let PH q := th_phase_frag τ π q (oGS := oGS) in
+              (let r := round x in
+               ∀ O' q', obls τ O' (oGS := oGS) ∗ sgns_level_ge' O' L (oGS := oGS) ∗ 
+                        PH q' ∗ ⌜ Qp.le q' q0 ⌝ ∗
+                      (∃ r__p, RR r__p ∗ (⌜ r__p = Some r ⌝ ∨ cp π d__h (oGS := oGS))) ∗
+                      ⌜ ¬ TGT x ⌝ -∗
+                      BMU ∅ c (oGS := oGS) (
+                        RR (Some r) ∗ cp π d__l (oGS := oGS) ∗ PH q' ∗
+                        obls τ O' (oGS := oGS) ∗
+                        abort
+                      )
+              ) ∧
+              (∀ q',
+               (* (∃ r__p, RR r__p) ∗ *)
+               ⌜ TGT x ⌝ ∗ obls τ O (oGS := oGS)
+                 ∗ PH q' ∗ ⌜ Qp.le q' q0 ⌝
+                 -∗
+               BMU ∅ c (oGS := oGS) (
+                 ∀ y, Q y x ={∅, ε}=∗ from_option PH ⌜ True ⌝ (Qp.sub q0 q') -∗ Φ y x)) ∧
+              abort
+      ).
+
+      Definition TAU_pre (V : () → iProp Σ) (_ : ()) : iProp Σ :=
+        TAU_acc (V ()).
+
+      Lemma TAU_acc_mono V1 V2:
+        (V1 -∗ V2) -∗ TAU_acc V1 -∗ TAU_acc V2.
+      Proof using.
+        iIntros "V12 T1". rewrite /TAU_acc.
+        iMod "T1" as (?) "[P T1]". iModIntro. iExists _. iFrame "P".
+        iSplit; [| iSplit].
+        - iIntros (??) "X". iDestruct "T1" as "[T1 _]".
+          iSpecialize ("T1" with "[$]").
+          iApply (BMU_wand with "[-T1]"); [| done].
+          iIntros "(?&?&?&?&AB)". iFrame.
+          iIntros "?". iMod ("AB" with "[$]"). by iApply "V12".
+        - iDestruct "T1" as "[_ [T1 _]]". done.
+        - iDestruct "T1" as "[_ [_ AB]]".
+          iIntros "?". iMod ("AB" with "[$]"). by iApply "V12".
+      Qed.
+
+      Global Instance TAU_pre_mono : BiMonoPred TAU_pre.
+      Proof.
+        constructor.
+        - iIntros (P1 P2 ??) "#HP12". iIntros ([]) "AU".
+          rewrite /TAU_pre.
+          iApply (TAU_acc_mono with "[] [$]"). done. 
+        - intros ??. solve_proper.
+      Qed.
+
+      Local Definition TAU_def :=
+        bi_greatest_fixpoint TAU_pre ().
+
+      (* TODO: seal *)
+      Definition TAU := TAU_def.
+      
+      Lemma TAU_elim:
+        TAU ⊣⊢ TAU_acc TAU.
+      Proof using.
+        rewrite /TAU /TAU_def /=. apply: greatest_fixpoint_unfold.
+      Qed.
+
+      Lemma TAU_intro U V:
+        Absorbing U → Persistent U →
+        (U ∧ V ⊢ TAU_acc V) → U ∧ V ⊢ TAU.
+      Proof.
+        rewrite /TAU /TAU_def /=.
+        iIntros (?? HAU) "[#HP HQ]".
+        iApply (greatest_fixpoint_coiter _ (λ _, V)); last done.
+        iIntros "!>" ([]) "HQ".
+        iApply HAU. iSplit; by iFrame.
+      Qed.
+
+    End AtomicUpdates.
+
+    Context `{EM: ExecutionModel heap_lang M}. 
+    Context `{hGS: @heapGS Σ _ EM}.
+    Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
+
+    Definition TLAT_pre (RR: option RO -> iProp Σ) π q (O: gset SignalId): iProp Σ :=
+      RR None ∗ obls τ O (oGS := oGS) ∗ sgns_level_gt' O L (oGS := oGS) ∗
+      th_phase_frag τ π q (oGS := oGS) ∗ cp π d__m (oGS := oGS).
+    
+    Definition TLAT e s
+      (POST: ST -> ST -> option (iProp Σ))
+      (get_ret: ST -> ST -> val)
+      : iProp Σ :=
+      ∀ Φ q π O (RR: option RO -> iProp Σ),
+        ⌜ B c <= LIM_STEPS ⌝ -∗ TLAT_pre RR π q O -∗
+        TAU (⊤ ∖ ε__m) π q (fun y x => POST y x -∗? Φ (get_ret y x)) O RR -∗
+        WP e @ s; τ; ⊤ {{ v, Φ v }}.
+
+  End AtomicTriples.
+
+  Global Instance TAU_acc_Proper {ST RO: Type}:
+    Proper
+      (eq ==> (eq ==> equiv) ==> (eq ==> eq ==> equiv) ==> equiv ==> 
+       (eq ==> eq) ==> (eq ==> iff) ==> eq ==> eq ==> eq ==> equiv ==> 
+       eq ==> eq ==> (eq ==> eq ==> equiv ) ==> equiv ==> (eq ==> equiv) ==> equiv ==>
+       equiv) (TAU_acc (ST := ST) (RO := RO)).
+  Proof using.
+    (* TODO: simplify *)
+    red. repeat intro. subst. 
+    rewrite /TAU_acc.
+    apply leibniz_equiv_iff in H4, H10, H14. subst.
+    iApply fupd_proper. 
+    iApply bi.exist_proper. iIntros (?).
+    iApply bi.sep_proper; [by eauto| ].
+    iApply bi.and_proper.
+    { do 2 (iApply bi.forall_proper; iIntros (?)).
+      iApply bi.wand_proper.
+      { repeat iApply bi.sep_proper; try done. 
+        2: { iApply bi.pure_proper. apply not_iff_compat. eauto. }
+        iApply bi.exist_proper. iIntros (?).
+        iApply bi.sep_proper; eauto.
+        iApply bi.or_proper; eauto.
+        iApply bi.pure_proper. split; intros ->; subst; f_equal; [| symmetry]; eauto. }
+      rewrite -(H5 a); [| done]. rewrite -(H2 a); [| done]. rewrite H16.
+      rewrite -(H15 _); reflexivity. }
+    rewrite -(H2 a); [| done].
+    iApply bi.and_proper.
+    2: { solve_proper. }
+    iApply bi.forall_proper; iIntros (?).
+    rewrite -(H6 a); [| done].
+    (* rewrite H16. *)
+    setoid_rewrite <- (H3 _ _ _ _); try reflexivity.
+    setoid_rewrite <- (H13 _ _ _ _); reflexivity.
+  Qed.
+
+  Global Instance TAU_Proper {ST RO: Type}:
+    Proper
+      (eq ==> (eq ==> equiv) ==> (eq ==> eq ==> equiv) ==> equiv ==> 
+       (eq ==> eq) ==> (eq ==> iff) ==> eq ==> eq ==> eq ==> equiv ==> 
+       eq ==> eq ==> (eq ==> eq ==> equiv ) ==> equiv ==> (eq ==> equiv) ==> equiv)
+      (TAU (ST := ST) (RO := RO)).
+  Proof using.
+    rewrite /TAU /TAU_def.
+    red. repeat intro. subst.
+    eapply greatest_fixpoint_proper; [| done].
+    repeat intro. rewrite /TAU_pre. iApply TAU_acc_Proper; eauto.
+  Qed.
+
+End TotalTriples.
+
+
+(* TODO: move to another file *)
+Section FairLockSpec.
+
+  Definition FL_st: Type := val * nat * bool.
+
+  Definition fl_round: FL_st -> nat := fun '(_, r, _) => r. 
+
+  Context `{OfeDiscrete DegO} `{OfeDiscrete LevelO}.
+  Context `{@LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}. 
+  
+  Let Degree := ofe_car DegO.
+  Let Level := ofe_car LevelO.
+
+  Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}.
+  Let OP := LocaleOP (Locale := locale heap_lang).
+  Existing Instance OP.
+  Let OM := ObligationsModel.
+  
+  Record FairLockPre := {
+    fl_c__cr: nat; fl_B: nat -> nat;
+    fl_GS :> gFunctors -> Set;
+    fl_LK `{FLG: fl_GS Σ} {HEAP: gen_heapGS loc val Σ}: FL_st -> iProp Σ;
+    fl_d__h: Degree;
+    fl_d__l: Degree;
+    fl_d__m: Degree;
+    fl_degs_lh: deg_lt fl_d__l fl_d__h;
+    fl_degs_hm: deg_lt fl_d__h fl_d__m;
+    fl_ι: namespace;
+    fl_acq_lvls: gset Level;                                     
+  }.
+
+
+  Context {Σ: gFunctors}.
+  (* Context {invs_inΣ: invGS_gen HasNoLc Σ}. *)
+  
+  Let OAM := ObligationsAM. 
+  Let ASEM := ObligationsASEM.
+  Context {oGS: @asem_GS _ _ ASEM Σ}.
+  
+  Context `{EM: ExecutionModel heap_lang M}.
+  Context `{hGS: @heapGS Σ _ EM}.
+  Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
+  
+  Context {FLP: FairLockPre}.
+  
+  Definition TAU_FL τ P Q L TGT c π q
+    (* (Φ: val -> iProp Σ) *)
+    Φ
+    O (RR: option nat -> iProp Σ): iProp Σ := 
+    TAU τ P Q L fl_round TGT (fl_d__h FLP) (fl_d__l FLP)
+      c
+      (⊤ ∖ ↑(fl_ι FLP))
+      π q
+      (* (fun _ _ => Φ #()) *)
+      Φ
+      O RR
+      (oGS := oGS). 
+  
+  Definition TLAT_FL τ P Q L TGT (POST: FL_st -> FL_st -> option (iProp Σ))
+    get_ret c e : iProp Σ := 
+    TLAT τ P Q L          
+      fl_round TGT
+      (fl_d__h FLP) (fl_d__l FLP) (fl_d__m FLP)
+      c (fl_B FLP)
+      (↑ (fl_ι FLP)) e NotStuck
+      POST
+      get_ret
+      (oGS := oGS).
+  
+  Definition acquire_at_pre {FLG: fl_GS FLP Σ} (lk: val) (x: FL_st): iProp Σ :=
+    ▷ fl_LK FLP x (FLG := FLG) ∗ ⌜ x.1.1 = lk ⌝. 
+  Definition acquire_at_post {FLG: fl_GS FLP Σ} (lk: val) (y x: FL_st): iProp Σ :=
+    fl_LK FLP y (FLG := FLG) ∗ ⌜ y.1 = x.1 /\ x.2 = false /\ y.2 = true⌝.
+  Definition release_at_pre {FLG: fl_GS FLP Σ} (lk: val) (x: FL_st): iProp Σ :=
+    ▷ fl_LK FLP x (FLG := FLG) ∗ ⌜ x.2 = true /\ x.1.1 = lk⌝. 
+  Definition release_at_post {FLG: fl_GS FLP Σ} (lk: val) (y x: FL_st): iProp Σ :=
+    fl_LK FLP y (FLG := FLG) ∗ ⌜ y.1.2 = (x.1.2 + 1)%nat /\ y.2 = false /\ y.1.1 = x.1.1 ⌝.
+  
+  Record FairLock := {    
+    fl_create: val; fl_acquire: val; fl_release: val;
+
+    fl_is_lock `{FLG: fl_GS FLP Σ} {HEAP: gen_heapGS loc val Σ}: val -> nat -> iProp Σ;
+    fl_is_lock_pers {FLG: fl_GS FLP Σ} lk c :> Persistent (fl_is_lock lk c (FLG := FLG));
+
+    fl_release_token: iProp Σ;
+
+    fl_create_spec: ⊢ ⌜ fl_c__cr FLP <= LIM_STEPS ⌝ -∗ ∀ τ c,
+      {{{ ⌜ True ⌝ }}} fl_create #() @ τ {{{ lk, RET lk;
+         ∃ FLG: fl_GS FLP Σ, fl_LK FLP (lk, 0, false) (FLG := FLG) ∗ fl_is_lock lk c (FLG := FLG) }}};
+
+    fl_acquire_spec {FLG: fl_GS FLP Σ} (lk: val) c τ: (fl_is_lock (FLG := FLG)) lk c ⊢
+        TLAT_FL τ 
+        (acquire_at_pre lk (FLG := FLG))
+        (acquire_at_post lk (FLG := FLG))
+        (fl_acq_lvls FLP)
+        (fun '(_, _, b) => b = false)
+        (fun _ _ => Some fl_release_token)
+        (fun _ _ => #())
+        c (fl_acquire lk);
+                                     
+    fl_release_spec {FLG: fl_GS FLP Σ} (lk: val) c τ: (fl_is_lock (FLG := FLG)) lk c ∗ fl_release_token ⊢
+        TLAT_FL τ
+        (release_at_pre lk (FLG := FLG))
+        (release_at_post lk (FLG := FLG))
+        ∅
+        (fun _ => True%type)
+        (fun _ _ => None)
+        (fun _ '(_, r, _) => #r)
+        c (fl_release lk);
+  }.
+  
+End FairLockSpec.
 
 
 (* TODO: move *)
@@ -273,7 +577,7 @@ Section MotivatingClient.
       {{{ v, RET v; ∃ s__o, obls τ {[ s__f; s__o ]} (oGS := oGS) ∗ flag_unset ∗
                           th_phase_eq τ π (oGS := oGS) ∗
                           P__lock flag s__f false ∗ lock_owner_frag (Some s__o) ∗
-                          ⌜ s__o ≠ s__f ⌝
+                          ⌜ s__o ≠ s__f ⌝ ∗ fl_release_token FL
       }}}.
     Proof using All.
       iIntros (Φ).
@@ -377,7 +681,7 @@ Section MotivatingClient.
           iLeft. iSplit; [done| ].
           rewrite lookup_insert. eauto. }
         
-        iModIntro. iIntros "PH_CLOS POST !>".
+        iModIntro. iIntros "PH_CLOS RT POST !>".
         iApply "POST".
         rewrite {1}/P__lock. iDestruct "P" as "[F [[-> ?] | [-> SET]]]".
         2: { by iDestruct (os_pending_excl with "[$] [$]") as %?. }
@@ -395,14 +699,13 @@ Section MotivatingClient.
           th_phase_eq τ π (oGS := oGS) ∗ cp π (fl_d__m FLP) (oGS := oGS) ∗
           (* P__lock flag s__f false ∗ *)
           flag ↦ #true ∗ sgn s__f l__f (Some false) (oGS := oGS) ∗
-          
-          lock_owner_frag (Some s__o) }}}
+          lock_owner_frag (Some s__o) ∗ fl_release_token FL }}}
         (fl_release FL) lk @ τ
       {{{ v, RET v; obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) }}}.
     Proof using All.
       iIntros (Φ).
       pose proof (fl_is_lock_pers FL lk c__cl (FLG := FLG)) as PERS. (* TODO: why Existing Instance doesn't work? *)
-      iIntros "(#LOCK & #INV & UNSET & OB & PH & CPm & FLAG & SGNf & LOCKED) POST".
+      iIntros "(#LOCK & #INV & UNSET & OB & PH & CPm & FLAG & SGNf & LOCKED & RT) POST".
 
       iApply (wp_step_fupd _ _ ⊤ _ _ with "[POST]").
       { done. }
@@ -533,7 +836,7 @@ Section MotivatingClient.
       iDestruct (cp_mul_take with "CPSm") as "[CPSm CPm]".
       iApply (acquire_left with "[-CPSm CPS POST]").
       { iFrame "#∗". }
-      iNext. iIntros (v) "(% & OB & UNSET & PH & P & LOCKED & %)".
+      iNext. iIntros (v) "(% & OB & UNSET & PH & P & LOCKED & % & RT)".
       rewrite /P__lock. iDestruct "P" as "[FLAG [[_ SGNf]| [% ?]]]".
       2: done.
 
@@ -583,12 +886,11 @@ Section MotivatingClient.
       {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗
           obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
           cp π (fl_d__m FLP) (oGS := oGS)
-          (* ∗ sgn s__f l__f None (oGS := oGS) *)
       }}}
         (fl_acquire FL) lk @ τ
       {{{ v, RET v; ∃ s__o f, obls τ {[ s__o ]} (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
-                          P__lock flag s__f f ∗ lock_owner_frag (Some s__o)
-                          (* ∗ ⌜ s__o ≠ s__f ⌝ *) (* TODO: is it needed? *)
+                          P__lock flag s__f f ∗ lock_owner_frag (Some s__o) ∗
+                          fl_release_token FL
       }}}.
     Proof using All.
       iIntros (Φ).
@@ -690,29 +992,27 @@ Section MotivatingClient.
           iLeft. iSplit; [done| ].
           rewrite lookup_insert. eauto. }
         
-        iModIntro. iIntros "PH_CLOS POST !>". iApply "POST".
+        iModIntro. iIntros "PH_CLOS RT POST !>". iApply "POST".
         rewrite union_empty_l_L.
         do 2 iExists _. iFrame.
         iDestruct (th_phase_frag_combine' with "[$PH $PH_CLOS]") as "foo".
         all: done. }
     Qed.
     
-    Lemma release_right (lk: val) τ s__o flag s__f π f
-      (* (SIGS_NEQ: s__o ≠ s__f) *)
-      :
+    Lemma release_right (lk: val) τ s__o flag s__f π f:
       {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗
           ep s__f π (fl_d__m FLP) (oGS := oGS) ∗
           obls τ {[ s__o ]} (oGS := oGS) ∗
           th_phase_eq τ π (oGS := oGS) ∗ cp π (fl_d__m FLP) (oGS := oGS) ∗
           P__lock flag s__f f ∗          
-          lock_owner_frag (Some s__o) }}}
+          lock_owner_frag (Some s__o) ∗ fl_release_token FL }}}
         (fl_release FL) lk @ τ
       {{{ v, RET v; obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗ 
                          (⌜ f = true ⌝ ∗ flag_set ∨ ⌜ f = false ⌝ ∗ cp_mul π (fl_d__m FLP) 3 (oGS := oGS)) }}}.
     Proof using All.
       iIntros (Φ).
       pose proof (fl_is_lock_pers FL lk c__cl (FLG := FLG)) as PERS. (* TODO: why Existing Instance doesn't work? *)
-      iIntros "(#LOCK & #INV & #EPf & OB & PH & CPm & P & LOCKED) POST".
+      iIntros "(#LOCK & #INV & #EPf & OB & PH & CPm & P & LOCKED & RT) POST".
 
       iApply (wp_step_fupd _ _ ⊤ _ _ with "[POST]").
       { done. }
@@ -781,7 +1081,7 @@ Section MotivatingClient.
             rewrite bi.or_comm. iSplitL ""; iRight; by iFrame "#∗". }
           iDestruct "P" as "[FLAG [[_ UNSET] | [% ?]]]"; [| done].
           iApply OU_BMU_rep. iApply (OU_rep_wand with "[FLAG]").
-          2: { iApply (expect_sig_upd_rep with "[$] [$] [$] [] [$]").
+          2: { iApply (expect_sig_upd_rep with "EPf [$] [$] [] [$]").
                { done. }
                (* TODO: make a lemma*)
                rewrite /sgns_level_gt'.
@@ -833,7 +1133,7 @@ Section MotivatingClient.
       iApply (acquire_right with "[PH OB CPSm]").
       { by iFrame "#∗". }
 
-      iNext. iIntros (v) "(%s__o & %f & OB & PH & P & LOCKED)".
+      iNext. iIntros (v) "(%s__o & %f & OB & PH & P & LOCKED & RT)".
       wp_bind (Rec _ _ _)%E. pure_steps.
       wp_bind (! _)%E. rewrite /P__lock. iDestruct "P" as "[FLAG P]".
       iApply sswp_MU_wp; [done| ]. iApply (wp_load with "[$]"). iIntros "!> FLAG".
@@ -843,7 +1143,7 @@ Section MotivatingClient.
       iIntros "!> C". MU_by_burn_cp. pure_steps.
       wp_bind (Rec _ _ _)%E. pure_steps.
       
-      iApply (release_right with "[OB PH P LOCKED FLAG CPSm']").
+      iApply (release_right with "[OB PH P LOCKED FLAG CPSm' RT]").
       { iFrame "#∗". }
 
       iNext. iIntros (?) "(OB & PH & FIN)".
