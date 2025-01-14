@@ -186,6 +186,14 @@ Section TraceLookup.
     eapply state_lookup_dom; eauto. destruct len; eauto. simpl in *. lia. 
   Qed.  
     
+  Lemma label_lookup_prev (tr : trace St L) i (DOM: is_Some (tr L!! i)):
+    ∀ j (LE: j ≤ i), is_Some (tr L!! j).
+  Proof using.
+    intros. pose proof (trace_has_len tr) as [len ?].
+    eapply label_lookup_dom in DOM; eauto.
+    eapply label_lookup_dom; eauto. destruct len; eauto. simpl in *. lia.
+  Qed. 
+
   Lemma label_lookup_states (tr: trace St L):
     forall i, is_Some (tr L!! i) <-> is_Some (tr S!! i) /\ is_Some (tr S!! (i + 1)). 
   Proof using. 

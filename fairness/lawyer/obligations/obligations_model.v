@@ -1,6 +1,6 @@
 Require Import Relation_Operators.
 From trillium.fairness Require Import fairness.
-From trillium.fairness.lawyer.obligations Require Import obls_utils.
+From trillium.fairness Require Import utils.
 
 
 Class ObligationsParams (Degree Level Locale: Type) (LIM_STEPS: nat) := {

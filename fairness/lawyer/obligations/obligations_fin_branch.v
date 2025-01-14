@@ -208,18 +208,6 @@ Section FiniteBranching.
         eapply e; eauto. 
     Qed.
 
-    (* TODO: move *)
-    Instance nsteps_impl {A: Type}:
-      Proper ((eq ==> eq ==> impl) ==> eq ==> (eq ==> eq ==> impl)) (@relations.nsteps A).
-    Proof using.
-      red. intros ?????????????. subst. red in H3.
-      generalize dependent y2. induction y0.
-      { intros ?. by rewrite !nsteps_0. }
-      intros ?. rewrite -!rel_compose_nsteps_next.
-      intros (?&STEPS&STEP). apply IHy0 in STEPS.
-      eexists. split; eauto. eapply H3; eauto.
-    Qed. 
-
     Lemma progress_step_approx δ:
       list_approx (fun δ' => exists τ, progress_step δ τ δ'). 
     Proof using FINlvl FINdeg.

@@ -185,21 +185,15 @@ Section SignalMap.
     iExists _. iFrame. done.
   Qed.
 
-  (* TODO: move, find existing? *)
   Lemma lookup_delete_ne' `{Countable K} {V: Type} (k: K) (m: gmap K V)
     (NOk: k ∉ dom m):
     delete k m = m.
   Proof using.
-    apply map_eq. intros.
-    destruct (decide (i = k)) as [-> | ?].
-    - rewrite lookup_delete. symmetry.
-      by apply not_elem_of_dom.
-    - by apply lookup_delete_ne.
-  Qed.                          
+    apply delete_notin. by apply not_elem_of_dom.
+  Qed.
 
   Lemma smap_sgns_extend (B B': nat -> bool)
     (smap: gmap nat SignalId) (s : SignalId) (m : nat) (* lm *)
-    (* (DOM: dom smap = set_seq 0 m) *)
     (FRESH: m ∉ dom smap)
     (PRES: forall i, i ∈ dom smap -> B' i = B i)
     :

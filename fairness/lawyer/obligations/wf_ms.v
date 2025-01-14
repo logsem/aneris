@@ -169,52 +169,6 @@ From iris.proofmode Require Import tactics.
 Require Import Coq.Program.Wf.
 From trillium.fairness Require Import utils.
 
-(* TODO: move *)
-Global Instance clos_trans_1n_proper_impl {A: Type} (R: relation A)
-  (E: relation A)
-  {REFL_E: Reflexive E}
-  (PR: Proper (E ==> E ==> impl) R):
-  Proper (E ==> E ==> impl) (clos_trans_1n _ R).
-Proof using.
-  red. intros x1 x2 Ex y1 y2 Ey. intros TR.
-  generalize dependent x2. generalize dependent y2.
-  induction TR.
-  + intros. econstructor. eapply PR; [..| apply H]; done.
-  + intros y2 Ez x2 Ex.
-    rename x into x1.
-    rename y2 into z2. rename z into z1.
-    rename y into y1.
-    eapply PR in H; eauto.     
-    specialize (IHTR _ Ez).
-    specialize (IHTR _ ltac:(reflexivity)).
-    eapply t1n_trans; eauto.
-Qed.
-
-
-  
-(* TODO: move *)
-Global Instance clos_trans_1n_proper_iff {A: Type} (R: relation A)
-  (E: relation A)
-  {SYM_E: Symmetric E}
-  {REFL_E: Reflexive E}
-  (PR: Proper (E ==> E ==> iff) R):
-  Proper (E ==> E ==> iff) (clos_trans_1n _ R).
-Proof using.
-  red.
-  assert (Proper (E ==> E ==> impl) R).
-  { intros ???????. symmetry in H, H0. 
-    eapply PR; eauto. }
-  intros x1 x2 Ex y1 y2 Ey. split; intros. 
-  - eapply clos_trans_1n_proper_impl; eauto. 
-  - symmetry in Ex, Ey. eapply clos_trans_1n_proper_impl; eauto.
-Qed. 
-
-Lemma clos_trans_tn1_t1n_iff {A : Type} (R : relation A) (x y : A):
-  clos_trans_n1 A R x y ↔ clos_trans_1n A R x y.
-Proof using.
-  by rewrite -Operators_Properties.clos_trans_t1n_iff Operators_Properties.clos_trans_tn1_iff.
-Qed. 
-
 Section GmultisetLtWf.
   Context `{ED: EqDecision A}. 
   Context {CNT: Countable A}. 

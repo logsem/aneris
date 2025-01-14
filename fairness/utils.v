@@ -1,8 +1,8 @@
 From iris.algebra Require Import gmap gset.
 From iris.proofmode Require Import tactics.
 From trillium.prelude Require Import quantifiers finitary.
-From trillium.fairness Require Export utils_coPset utils_logic utils_maps utils_sets.
-(* From stdpp Require Import finitary. *)
+From trillium.fairness Require Export utils_coPset utils_logic utils_maps utils_sets utils_relations utils_multisets.
+
 
 (* TODO: move these lemmas to appropriate places *)
 

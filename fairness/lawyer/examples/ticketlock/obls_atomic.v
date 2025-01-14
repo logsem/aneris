@@ -224,21 +224,6 @@ Section Ticketlock.
            
   Let tl_TAU := TAU_FL (FLP := TLPre) (oGS := oGS).
 
-  (* TODO: move *)
-  Lemma th_phase_frag_combine τ π q p:
-    th_phase_frag τ π q (oGS := oGS) ∗ th_phase_frag τ π p (oGS := oGS) ⊣⊢ th_phase_frag τ π (Qp.add q p) (oGS := oGS). 
-  Proof using.
-    rewrite /th_phase_frag. by rewrite ghost_map.ghost_map_elem_fractional.
-  Qed.
-
-  (* TODO: move *)
-  Lemma th_phase_eq_halve τ π:
-    th_phase_eq τ π (oGS := oGS) ⊣⊢ th_phase_frag τ π ((/ 2)%Qp) (oGS := oGS) ∗ th_phase_frag τ π ((/ 2)%Qp) (oGS := oGS).
-  Proof using.
-    rewrite /th_phase_eq /th_phase_frag.
-    rewrite th_phase_frag_combine. by rewrite Qp.inv_half_half.
-  Qed.
-
   Definition TAU_stored `{TLG: TicketlockG Σ} (lk: val) (c: nat) (cd: tau_codom Σ): iProp Σ :=
     let '(τ, π, q, Ob, L, Φ, RR) := cd in
     obls τ Ob (oGS := oGS) ∗ sgns_level_gt' Ob L (oGS := oGS) ∗
@@ -489,14 +474,6 @@ Section Ticketlock.
   match goal with | |- envs_entails _ ?P =>
     iAssert (P -∗ P)%I as "GOAL"; [iIntros "X"; by iApply "X"| ]
   end.
-
-  (* TODO: move *)
-  Lemma th_phase_frag_halve τ π q:
-    th_phase_frag τ π q (oGS := oGS) ⊣⊢ th_phase_frag τ π ((q /2)%Qp) (oGS := oGS) ∗ th_phase_frag τ π (q /2) (oGS := oGS).
-  Proof using.
-    rewrite /th_phase_frag.
-    rewrite th_phase_frag_combine. by rewrite Qp.div_2.
-  Qed.
 
   (* TODO: mention exc_lb in the proof OR implement its increase *)
   Lemma get_ticket_spec s (lk: val) c (τ: locale heap_lang) π q

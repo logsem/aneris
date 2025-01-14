@@ -377,6 +377,14 @@ Section ProgramLogic.
       - iPureIntro. lia. 
     Qed.
 
+    Lemma OU_BMU_rep E P b:
+       ⊢ OU_rep b P (oGS := oGS) -∗ BMU E b P.
+    Proof using.
+      iIntros "OUs". iInduction b as [| b] "IH"; simpl.
+      { iMod "OUs". by iApply BMU_intro. }
+      iApply OU_BMU. iApply (OU_wand with "[-OUs] [$]"). done.
+    Qed.
+
     (* an example usage of OU *)
     Lemma BMU_step_create_signal E ζ P b l R:
        ⊢ (∀ sid, sgn sid l (Some false) (oGS := oGS) -∗ obls ζ (R ∪ {[ sid ]}) (oGS := oGS) -∗ BMU E b P) -∗ obls ζ R (oGS := oGS) -∗ BMU E (S b) P.

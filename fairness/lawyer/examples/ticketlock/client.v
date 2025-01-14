@@ -160,11 +160,6 @@ Section TotalTriples.
 
   End AtomicTriples.
 
-  (* TODO: move *)
-  Instance sgns_level_ge'_Proper:
-    Proper (equiv ==> equiv ==> equiv) (sgns_level_ge' (oGS := oGS)).
-  Proof using. solve_proper. Qed.
-
   Global Instance TAU_acc_Proper {ST RO: Type}:
     Proper
       (eq ==> (eq ==> equiv) ==> (eq ==> eq ==> equiv) ==> equiv ==> 
@@ -568,28 +563,6 @@ Section MotivatingClient.
       apply excl_auth_update.
     Qed.
 
-    (* TODO: move, remove duplicates *)
-    Lemma th_phase_frag_combine τ π q p:
-      th_phase_frag τ π q (oGS := oGS) ∗ th_phase_frag τ π p (oGS := oGS) ⊣⊢ th_phase_frag τ π (Qp.add q p) (oGS := oGS). 
-    Proof using.
-      rewrite /th_phase_frag. by rewrite ghost_map.ghost_map_elem_fractional.
-    Qed.
-
-    (* TODO: move *)
-    Lemma th_phase_frag_combine' τ π q p
-      (LE: Qp.le p q)
-      :
-      th_phase_frag τ π q (oGS := oGS) ⊣⊢ th_phase_frag τ π p (oGS := oGS) ∗ from_option (fun d => th_phase_frag τ π d (oGS := oGS)) ⌜ True ⌝ (Qp.sub q p). 
-    Proof using.
-      destruct (q - p)%Qp eqn:D. 
-      - simpl. rewrite th_phase_frag_combine.
-        by apply Qp.sub_Some in D as ->.
-      - simpl. apply Qp.sub_None in D.
-        assert (p = q) as ->.
-        { eapply @partial_order_anti_symm; eauto. apply _. }
-        by rewrite bi.sep_True'.
-    Qed.
-
     Lemma acquire_left τ (lk: val) flag s__f π:
       {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗ flag_unset ∗
           obls τ {[ s__f ]} (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
@@ -902,15 +875,6 @@ Section MotivatingClient.
     Hypothesis (LS_LB: 2 <= LIM_STEPS). 
 
     (* TODO: move *)
-    Lemma cp_mul_split' (ph : listO natO) (deg : DegO) (m n : nat)
-      (LE: m <= n):
-      cp_mul ph deg n (oGS := oGS) ⊣⊢ cp_mul ph deg m (oGS := oGS) ∗ cp_mul ph deg (n - m) (oGS := oGS).
-    Proof using.
-      apply Nat.le_sum in LE as [? ->]. rewrite Nat.sub_add'.
-      apply cp_mul_split.
-    Qed.
-
-    (* TODO: move *)
     Ltac split_cps cps_res n :=
       let fmt := constr:(("[" ++ cps_res ++ "' " ++ cps_res ++ "]")%string) in
       iDestruct (cp_mul_split' _ _ n with cps_res) as fmt; [lia| ].
@@ -1032,89 +996,7 @@ Section MotivatingClient.
         iDestruct (th_phase_frag_combine' with "[$PH $PH_CLOS]") as "foo".
         all: done. }
     Qed.
-
-    (* TODO: move *)
-    Fixpoint OU_rep n P: iProp Σ :=
-      match n with
-      | 0 => |==> P
-      | S n => OU (OU_rep n P) (oGS := oGS)
-      end. 
-
-    (* TODO: move *)
-    Lemma OU_bupd P:
-      (OU (|==> P) (oGS := oGS)) -∗ OU P (oGS := oGS).
-    Proof using.
-      rewrite /OU. iIntros "OU" (?) "?".
-      iMod ("OU" with "[$]") as (?) "(?&?& P)". iMod "P".
-      iModIntro. iExists _. iFrame.
-    Qed.
-
-    (* TODO: move *)
-    Lemma OU_rep_frame_l n P Q:
-      (P ∗ OU_rep n Q) -∗ OU_rep n (P ∗ Q).
-    Proof using.
-      iIntros "[P OUs]". iInduction n as [| n] "IH".
-      { simpl. iFrame. done. }
-      simpl. iApply (OU_wand with "[-OUs] [$]").
-      by iApply "IH".
-    Qed.
-
-    (* TODO: move *)
-    Lemma OU_rep_wand n P Q:
-      (P -∗ Q) -∗ OU_rep n P -∗ OU_rep n Q.
-    Proof using.
-      iIntros "PQ OUs". iInduction n as [| n] "IH"; simpl.
-      { iMod "OUs". by iApply "PQ". }
-      iApply (OU_wand with "[-OUs] [$]").
-      iIntros "OUs". by iApply ("IH" with "[$]").
-    Qed.
-
-    (* TODO: move *)
-    Lemma OU_proper' (P Q: iProp Σ):
-      (P ∗-∗ Q) -∗ OU P (oGS := oGS) ∗-∗ OU Q (oGS := oGS). 
-    Proof.
-      iIntros "EQUIV". rewrite /OU.
-      iSplit; iIntros "OU % MSI"; iMod ("OU" with "[$]") as "(%&?&?&?)"; iModIntro; iExists _; iFrame; by iApply "EQUIV".
-    Qed.
-
-    (* TODO: move *)
-    Global Instance OU_rep_proper n:
-      Proper (equiv ==> equiv) (OU_rep n).
-    Proof.
-      clear -OM OAM.
-      intros ???. iInduction n as [| n] "%IH".
-      { simpl. rewrite H. set_solver. }
-      simpl. by iApply OU_proper'.
-    Qed.
     
-    (* TODO: move *)
-    Lemma expect_sig_upd_rep ζ sid π q π__e d l R n
-      (PH_EXP: phase_le π__e π):
-      ⊢ ep sid π__e d (oGS := oGS) -∗ sgn sid l (Some false) (oGS := oGS) -∗
-        obls ζ R (oGS := oGS) -∗
-        sgns_level_gt R l (oGS := oGS) -∗ th_phase_frag ζ π q (oGS := oGS) -∗
-        OU_rep n (cp_mul π d n (oGS := oGS) ∗ sgn sid l (Some false) (oGS := oGS) ∗
-                  obls ζ R (oGS := oGS) ∗ th_phase_frag ζ π q (oGS := oGS)).
-    Proof using ODl LEl.
-      iIntros "#EP ?? #GT ?".
-      iInduction n as [| n] "IH".
-      { iFrame. iApply cp_mul_0. }
-      simpl. iApply (OU_wand with "[]").
-      2: { iApply (expect_sig_upd with "EP [$] [$] [$] [$]"). done. }
-      iIntros "(CP & ?&?&?)".
-      rewrite cp_mul_take. rewrite (bi.sep_comm _ (cp _ _)). rewrite -bi.sep_assoc.
-      iApply OU_rep_frame_l. iFrame. iApply ("IH" with "[$] [$] [$]").
-    Qed.
-
-    (* TODO: move *)
-    Lemma OU_BMU_rep E P b:
-       ⊢ OU_rep b P -∗ BMU E b P (oGS := oGS).
-    Proof using.
-      iIntros "OUs". iInduction b as [| b] "IH"; simpl.
-      { iMod "OUs". by iApply BMU_intro. }
-      iApply OU_BMU. iApply (OU_wand with "[-OUs] [$]"). done.
-    Qed.    
-
     Lemma release_right (lk: val) τ s__o flag s__f π f
       (* (SIGS_NEQ: s__o ≠ s__f) *)
       :
@@ -1222,13 +1104,6 @@ Section MotivatingClient.
         2: { rewrite Nat.add_0_r -Nat.add_1_r. iFrame. done. }
         iRight. iSplit; [done| ]. iFrame.
         by iExists _. }
-    Qed.
-
-    (* TODO: move *)
-    Lemma cp_mul_1 π d:
-      cp π d (oGS := oGS) ⊣⊢ cp_mul π d 1 (oGS := oGS).
-    Proof using.
-      rewrite /cp_mul. rewrite gmultiset_scalar_mul_1. done.
     Qed.
 
     Lemma right_thread_iter_spec (lk: val) τ π flag s__f (c: loc):

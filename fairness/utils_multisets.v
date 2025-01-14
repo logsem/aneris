@@ -557,7 +557,6 @@ Section MultisetOrder.
     red. intros ?. rewrite multiplicity_difference. lia.
   Qed.
 
-
   Lemma ms_le_disj_union X1 Y1 X2 Y2
     (LE1: ms_le X1 Y1) (LE2: ms_le X2 Y2):
     ms_le (X1 ⊎ X2) (Y1 ⊎ Y2).

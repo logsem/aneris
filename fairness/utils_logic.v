@@ -1,6 +1,6 @@
 Require Import ClassicalFacts.
-From stdpp Require Import base.
 Require Import Lia.
+From stdpp Require Import base option.
 
 (* TODO: find existing? *)
 Section LogicHelpers.
@@ -112,6 +112,21 @@ Proof.
     apply n0. lia.
 Qed. 
 
+Lemma min_prop_dec (P: nat -> Prop) (DEC: forall n, Decision (P n)):
+  ClassicalFacts.Minimization_Property P.
+Proof using.
+  red. intros ? Pn.
+  edestruct (min_prop_dec_impl _ _ _ Pn). eauto.  
+Qed.
+
+Global Instance Minimal_proper: 
+  Proper (pointwise_relation nat iff ==> eq ==> iff) ClassicalFacts.Minimal.
+Proof using.
+  red. red. intros. red. intros. subst. red in H. 
+  split; intros [P MIN].
+  all: split; [| intros; apply MIN]; apply H; auto.
+Qed. 
+
 Definition Minimal_pos (P: BinNums.positive → Prop) (n : BinNums.positive) :=
   P n ∧ (∀ k, P k → BinPos.Pos.le n k). 
 
@@ -147,3 +162,14 @@ Proof.
     apply List.Exists_exists. eexists. split; eauto.
 Qed. 
 
+(* useful for rewriting in equivalences *)
+Lemma is_Some_Some_True {A: Type} (a: A):
+  is_Some (Some a) <-> True.
+Proof. done. Qed. 
+
+(* useful for rewriting in equivalences *)
+Lemma is_Some_None_False {A: Type}:
+  is_Some (None: option A) <-> False.
+Proof.
+  split; [| done]. by intros []. 
+Qed. 

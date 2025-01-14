@@ -148,6 +148,10 @@ Section ObligationsRepr.
     Proof using.
       rewrite /sgns_level_gt'. by rewrite big_sepS_empty.
     Qed.
+    
+    Instance sgns_level_ge'_Proper:
+      Proper (equiv ==> equiv ==> equiv) (sgns_level_ge').
+    Proof using. solve_proper. Qed.
 
     Lemma cp_msi_dom δ ph deg:
       ⊢ obls_msi δ -∗ cp ph deg -∗
@@ -229,7 +233,7 @@ Section ObligationsRepr.
     Qed.
 
     Instance sgn_ex_pers sid l: Persistent (sgn sid l None).
-    Proof. apply _. Qed.  
+    Proof using. apply _. Qed.
 
     Lemma sgn_get_ex sid l ov:
       ⊢ sgn sid l ov -∗ sgn sid l ov ∗ sgn sid l None. 
@@ -303,7 +307,79 @@ Section ObligationsRepr.
       iDestruct (own_valid with "[$]") as %V. iPureIntro.
       apply auth_both_valid_discrete in V as [SUB V].
       by apply gset_included, singleton_subseteq_l in SUB.
+    Qed.
+
+    Lemma th_phase_frag_combine τ π q p:
+      th_phase_frag τ π q ∗ th_phase_frag τ π p ⊣⊢ th_phase_frag τ π (Qp.add q p). 
+    Proof using.
+      rewrite /th_phase_frag. by rewrite ghost_map.ghost_map_elem_fractional.
+    Qed.
+
+    Lemma th_phase_frag_combine' τ π q p
+      (LE: Qp.le p q):
+      th_phase_frag τ π q ⊣⊢ th_phase_frag τ π p ∗ from_option (fun d => th_phase_frag τ π d) ⌜ True ⌝ (Qp.sub q p). 
+    Proof using.
+      destruct (q - p)%Qp eqn:D. 
+      - simpl. rewrite th_phase_frag_combine.
+        by apply Qp.sub_Some in D as ->.
+      - simpl. apply Qp.sub_None in D.
+        assert (p = q) as ->.
+        { eapply @partial_order_anti_symm; eauto. apply _. }
+        by rewrite bi.sep_True'.
+    Qed.
+
+    Lemma th_phase_frag_halve τ π q:
+      th_phase_frag τ π q ⊣⊢ th_phase_frag τ π (q /2) ∗ th_phase_frag τ π (q /2).
+    Proof using.
+      rewrite /th_phase_frag.
+      rewrite th_phase_frag_combine. by rewrite Qp.div_2.
+    Qed.
+
+    Lemma cp_mul_take ph deg n:
+      cp_mul ph deg (S n) ⊣⊢ cp_mul ph deg n ∗ cp ph deg.
+    Proof using. 
+      rewrite /cp_mul. rewrite -own_op -auth_frag_op. 
+      iApply own_proper. f_equiv.
+      rewrite gmultiset_op.
+      by rewrite gmultiset_scalar_mul_S_r. 
+    Qed.
+
+    Lemma cp_mul_split ph deg m n:
+      cp_mul ph deg (m + n) ⊣⊢ cp_mul ph deg m ∗ cp_mul ph deg n.
+    Proof using.
+      clear H H0 H1. 
+      (* TODO: find existing lemmas? *)
+      induction n.
+      { rewrite Nat.add_0_r. rewrite /cp_mul.
+        rewrite gmultiset_scalar_mul_0.
+        rewrite -own_op -auth_frag_op.
+        rewrite gmultiset_op.
+        rewrite gmultiset_disj_union_right_id. done. }
+      rewrite Nat.add_succ_r. rewrite !cp_mul_take.
+      rewrite IHn. iFrame. rewrite bi.sep_assoc. iFrame. set_solver.
     Qed. 
+ 
+    (* TODO: move *)
+    Lemma cp_mul_split' (ph : listO natO) (deg : DegO) (m n : nat)
+      (LE: m <= n):
+      cp_mul ph deg n ⊣⊢ cp_mul ph deg m ∗ cp_mul ph deg (n - m).
+    Proof using.
+      apply Nat.le_sum in LE as [? ->]. rewrite Nat.sub_add'.
+      apply cp_mul_split.
+    Qed.
+
+    Lemma cp_mul_0 π d:
+      ⊢ |==> cp_mul π d 0.
+    Proof using.
+      rewrite /cp_mul. rewrite gmultiset_scalar_mul_0.
+      iApply own_unit.
+    Qed.
+
+    Lemma cp_mul_1 π d:
+      cp π d ⊣⊢ cp_mul π d 1.
+    Proof using.
+      rewrite /cp_mul. rewrite gmultiset_scalar_mul_1. done.
+    Qed.
 
     Let OU' (R: ProgressState -> ProgressState -> Prop) P: iProp Σ :=
       ∀ δ, obls_msi δ ==∗ ∃ δ', obls_msi δ' ∗ ⌜ R δ δ'⌝ ∗ P. 
@@ -332,6 +408,54 @@ Section ObligationsRepr.
     Proof using.
       intros ?? [PQ QP]%bi.equiv_entails.
       iSplit; iApply OU_entails; [iApply PQ | iApply QP].  
+    Qed.
+
+    Fixpoint OU_rep n P: iProp Σ :=
+      match n with
+      | 0 => |==> P
+      | S n => OU (OU_rep n P)
+      end. 
+
+    Lemma OU_bupd P:
+      (OU (|==> P)) -∗ OU P.
+    Proof using.
+      rewrite /OU. iIntros "OU" (?) "?".
+      iMod ("OU" with "[$]") as (?) "(?&?& P)". iMod "P".
+      iModIntro. iExists _. iFrame.
+    Qed.
+
+    Lemma OU_rep_frame_l n P Q:
+      (P ∗ OU_rep n Q) -∗ OU_rep n (P ∗ Q).
+    Proof using.
+      iIntros "[P OUs]". iInduction n as [| n] "IH".
+      { simpl. iFrame. done. }
+      simpl. iApply (OU_wand with "[-OUs] [$]").
+      by iApply "IH".
+    Qed.
+
+    Lemma OU_rep_wand n P Q:
+      (P -∗ Q) -∗ OU_rep n P -∗ OU_rep n Q.
+    Proof using.
+      iIntros "PQ OUs". iInduction n as [| n] "IH"; simpl.
+      { iMod "OUs". by iApply "PQ". }
+      iApply (OU_wand with "[-OUs] [$]").
+      iIntros "OUs". by iApply ("IH" with "[$]").
+    Qed.
+
+    Lemma OU_proper' (P Q: iProp Σ):
+      (P ∗-∗ Q) -∗ OU P ∗-∗ OU Q.
+    Proof using.
+      iIntros "EQUIV". rewrite /OU.
+      iSplit; iIntros "OU % MSI"; iMod ("OU" with "[$]") as "(%&?&?&?)"; iModIntro; iExists _; iFrame; by iApply "EQUIV".
+    Qed.
+
+    Global Instance OU_rep_proper n:
+      Proper (equiv ==> equiv) (OU_rep n).
+    Proof using.
+      clear H1 H0 H.
+      intros ???. iInduction n as [| n] "%IH".
+      { simpl. rewrite H. set_solver. }
+      simpl. by iApply OU_proper'.
     Qed.
 
     Lemma OU_create_sig ζ R l:
@@ -573,6 +697,23 @@ Section ObligationsRepr.
       f_equiv. rewrite gmultiset_disj_union_left_id. set_solver.
     Qed.
 
+    Lemma expect_sig_upd_rep ζ sid π q π__e d l R n
+      (PH_EXP: phase_le π__e π):
+      ⊢ ep sid π__e d -∗ sgn sid l (Some false) -∗ obls ζ R -∗
+        sgns_level_gt R l -∗ th_phase_frag ζ π q -∗
+        OU_rep n (cp_mul π d n ∗ sgn sid l (Some false) ∗
+                  obls ζ R ∗ th_phase_frag ζ π q).
+    Proof using H0 H1.
+      iIntros "#EP ?? #GT ?".
+      iInduction n as [| n] "IH".
+      { iFrame. iApply cp_mul_0. }
+      simpl. iApply (OU_wand with "[]").
+      2: { iApply (expect_sig_upd with "EP [$] [$] [$] [$]"). done. }
+      iIntros "(CP & ?&?&?)".
+      rewrite cp_mul_take. rewrite (bi.sep_comm _ (cp _ _)). rewrite -bi.sep_assoc.
+      iApply OU_rep_frame_l. iFrame. iApply ("IH" with "[$] [$] [$]").
+    Qed.
+
     (* TODO: ? refactor these proofs about burn_cp *)
     Lemma burn_cp_upd_impl δ ζ π deg
       (PH_MAX: exists π__max, ps_phases δ !! ζ = Some π__max /\ phase_le π π__max)
@@ -619,37 +760,6 @@ Section ObligationsRepr.
       iMod ("OU'" with "[$]") as "(%&?&%&?)". iModIntro.
       iExists _. iFrame. iPureIntro.
       red. eexists. left. eauto.
-    Qed.
-
-    Lemma cp_mul_take ph deg n:
-      cp_mul ph deg (S n) ⊣⊢ cp_mul ph deg n ∗ cp ph deg.
-    Proof using. 
-      rewrite /cp_mul. rewrite -own_op -auth_frag_op. 
-      iApply own_proper. f_equiv.
-      rewrite gmultiset_op.
-      by rewrite gmultiset_scalar_mul_S_r. 
-    Qed.
-
-    (* TODO: find existing lemmas? *)
-    Lemma cp_mul_split ph deg m n:
-      cp_mul ph deg (m + n) ⊣⊢ cp_mul ph deg m ∗ cp_mul ph deg n.
-    Proof using.
-      clear H H0 H1. 
-      induction n.
-      { rewrite Nat.add_0_r. rewrite /cp_mul.
-        rewrite gmultiset_scalar_mul_0.
-        rewrite -own_op -auth_frag_op.
-        rewrite gmultiset_op.
-        rewrite gmultiset_disj_union_right_id. done. }
-      rewrite Nat.add_succ_r. rewrite !cp_mul_take.
-      rewrite IHn. iFrame. rewrite bi.sep_assoc. iFrame. set_solver.
-    Qed. 
- 
-    Lemma cp_mul_0 π d:
-      ⊢ |==> cp_mul π d 0.
-    Proof using.
-      rewrite /cp_mul. rewrite gmultiset_scalar_mul_0.
-      iApply own_unit.
     Qed.
 
     (* TODO: ? refactor these proofs about fork step *)

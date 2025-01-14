@@ -3,7 +3,7 @@ Require Import Relation_Operators.
 From iris.proofmode Require Import tactics.
 From iris.algebra Require Import gset gmultiset.
 From trillium.fairness Require Import locales_helpers inftraces fairness trace_len my_omega.
-From trillium.fairness.lawyer.obligations Require Import obligations_model multiset_utils obls_utils wf_utils obls_pf wf_ms obligations_wf.
+From trillium.fairness.lawyer.obligations Require Import obligations_model multiset_utils wf_utils obls_pf wf_ms obligations_wf.
 From stdpp Require Import relations.
 
 
@@ -808,7 +808,7 @@ Section Termination.
     clear dependent mf. rename δk' into δ''.
     
     generalize dependent mb. induction k.
-    { intros ? ->%obls_utils.nsteps_0.
+    { intros ? ->%nsteps_0.
       rewrite Nat.add_0_r. reflexivity. }
     intros mb (δ' & STEPS & STEP)%nsteps_inv_r SIG_LE'' SF.
 
@@ -1647,7 +1647,7 @@ Section Termination.
     clear dependent BSTEP FSTEP. 
     
     generalize dependent mb. induction k.
-    { intros ? ->%obls_utils.nsteps_0.
+    { intros ? ->%nsteps_0.
       rewrite Nat.add_0_r. reflexivity. }
     intros δ'' (δ' & STEPS & [τ STEP])%nsteps_inv_r SIG_LE'''.
     specialize (IHk ltac:(lia) _ STEPS). specialize_full IHk.
@@ -1743,42 +1743,8 @@ Section TerminationFull.
     intros sid.
     destruct (Classical_Prop.classic (exists c, sig_is_set_at tr sid c)) as [[c USED] | UNUSED].
     2: { exists 0. red. intros. left. split; auto. }
-
-    exists c. red. right. eexists. split; eauto.  
-    
-    (* destruct (Classical_Prop.classic (exists s, c <= s /\ sig_val_at tr sid s = true)) as [[s SET] | UNSET]. *)
-    (* - exists s. red. intros ? EV_SET LEsi. *)
-    (*   unfold sig_val_at in *. *)
-    (*   destruct (tr S!! c) eqn:CTH; [| done]. simpl in USED. *)
-    (*   destruct (ps_sigs m !! sid) as [[??]| ] eqn:SIGm; [| done]. simpl in USED. subst. *)
-      
-    (*   destruct (tr S!! i) eqn:ITH; [| done]. simpl. *)
-      
-    (*   destruct SET as [LE SET].  *)
-    (*   forward eapply state_lookup_prev; [eauto | apply LEsi| ]. intros [? STH].  *)
-    (*   rewrite STH in SET. simpl in SET.  *)
-      
-    (*   forward eapply pres_by_valid_trace with (i := c) (j := s); eauto. *)
-    (*   { intros. apply (loc_step_sig_st_le_pres _ sid (Some (l, false))). } *)
-    (*   { intros. apply fork_step_sig_st_le_pres. } *)
-    (*   { rewrite CTH. simpl. by rewrite SIGm. } *)
-    (*   rewrite STH. simpl. *)
-    (*   destruct (ps_sigs x !! sid) as [[??]| ] eqn:SIGs; [| done]. *)
-    (*   simpl in SET. subst. intros [<- ?].  *)
-
-    (*   forward eapply pres_by_valid_trace with (i := s) (j := i); eauto. *)
-    (*   { intros. apply (loc_step_sig_st_le_pres _ sid (Some (l, true))). } *)
-    (*   { intros. apply fork_step_sig_st_le_pres. } *)
-    (*   { rewrite STH. simpl. by rewrite SIGs. } *)
-    (*   rewrite ITH. simpl. destruct (ps_sigs  m0 !! sid) as [[??]| ]; [| done]. *)
-    (*   simpl. intros [??]. destruct b; done.  *)
-    (* - exists c. red. intros i SET ?. *)
-    (*   destruct UNSET. red in SET. specialize (SET i). *)
-    (*   rewrite /never_set_after in SET. *)
-    (*   apply not_forall_exists_not in SET as [c' SET]. *)
-    (*   apply Classical_Prop.imply_to_and in SET as [LEic SET]. *)
-    (*   exists c'. split; [lia| ]. by apply not_false_is_true. *)
-  Qed. 
+    exists c. red. right. eexists. split; eauto.      
+  Qed.
 
   Theorem obls_fair_trace_terminate
     (TR_WF: ∀ i δ, tr S!! i = Some δ → om_st_wf δ)
