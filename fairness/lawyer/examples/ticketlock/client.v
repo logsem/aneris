@@ -4,12 +4,12 @@ From iris.proofmode Require Import tactics.
 From iris.bi.lib Require Import fixpoint.
 From trillium.program_logic Require Export weakestpre adequacy ectx_lifting.
 From trillium.fairness Require Import utils.
+From trillium.fairness.lawyer.examples Require Import signal_map obls_tactics.
 From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_am obligations_em obligations_logic.
 From trillium.fairness.lawyer Require Import sub_action_em.
 From trillium.fairness.lawyer Require Import program_logic.
 From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From iris.base_logic.lib Require Import invariants.
-From trillium.fairness.lawyer.examples Require Import signal_map.
 
 
 Ltac remember_goal :=
@@ -484,29 +484,7 @@ Section MotivatingClient.
         iExists _. iFrame. iRight. iSplit; [done| ]. iFrame "#∗". }
     Qed.
 
-    (* TODO: move, remove duplicates *)
-    Ltac BMU_burn_cp :=
-      iApply BMU_intro;
-      iDestruct (cp_mul_take with "CPS") as "[CPS CP]";
-      iSplitR "CP";
-      [| do 2 iExists _; iFrame; iPureIntro; done].
-    
     Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS _ EM hGS (↑ nroot)}.
-    
-    Ltac MU_by_BMU :=
-      iApply OBLS_AMU; [by rewrite nclose_nroot| ];
-      iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH".
-    
-    Ltac MU_by_burn_cp := MU_by_BMU; BMU_burn_cp.
-    
-    Ltac pure_step_hl :=
-      iApply sswp_MU_wp; [done| ];
-      iApply sswp_pure_step; [done| ]; simpl;
-      iNext.
-    
-    Ltac pure_step := pure_step_hl; MU_by_burn_cp.
-    Ltac pure_step_cases := pure_step || (iApply wp_value; []) || wp_bind (RecV _ _ _ _)%V.
-    Ltac pure_steps := repeat (pure_step_cases; []).
 
     Theorem left_thread_spec (lk: val) τ flag s__f π:
       {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗ flag_unset ∗
@@ -569,11 +547,6 @@ Section MotivatingClient.
     .
 
     Hypothesis (LS_LB: 2 <= LIM_STEPS). 
-
-    (* TODO: move *)
-    Ltac split_cps cps_res n :=
-      let fmt := constr:(("[" ++ cps_res ++ "' " ++ cps_res ++ "]")%string) in
-      iDestruct (cp_mul_split' _ _ n with cps_res) as fmt; [lia| ].
 
     Lemma acquire_right τ (lk: val) flag s__f π:
       {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗

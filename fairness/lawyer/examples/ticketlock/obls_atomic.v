@@ -6,6 +6,7 @@ From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From iris.base_logic.lib Require Import invariants.
 From trillium.program_logic Require Export weakestpre adequacy ectx_lifting.
 From trillium.fairness Require Import utils.
+From trillium.fairness.lawyer.examples Require Import obls_tactics.
 From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_am obligations_em obligations_logic.
 From trillium.fairness.lawyer Require Import sub_action_em.
 From trillium.fairness.lawyer Require Import program_logic.
@@ -727,35 +728,8 @@ Section Ticketlock.
 
   Context {TLG: TicketlockG Σ}.
   
-  (* TODO: move, remove duplicates *)
-  Ltac BMU_burn_cp :=
-    iApply BMU_intro;
-    iDestruct (cp_mul_take with "CPS") as "[CPS CP]";
-    iSplitR "CP";
-    [| do 2 iExists _; iFrame; iPureIntro; done].
-  
   Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS _ EM hGS (↑ nroot)}.
   
-  Ltac MU_by_BMU :=
-    iApply OBLS_AMU; [by rewrite nclose_nroot| ];
-    iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH".
-  
-  Ltac MU_by_burn_cp := MU_by_BMU; BMU_burn_cp.
-  
-  Ltac pure_step_hl :=
-    iApply sswp_MU_wp; [done| ];
-    iApply sswp_pure_step; [done| ]; simpl;
-    iNext.
-  
-  Ltac pure_step := pure_step_hl; MU_by_burn_cp.
-  Ltac pure_step_cases := pure_step || (iApply wp_value; []) || wp_bind (RecV _ _ _ _)%V.
-  Ltac pure_steps := repeat (pure_step_cases; []).
-
-  (* Definition mk_tcd (τ: Tid) (π: Phase) (R: gset SignalId) *)
-  (*                   (Φ: ofe_mor val (iProp Σ)) (RR: ofe_mor (option nat) (iProp Σ)): *)
-  (*   tau_codom Σ := *)
-  (*   (τ, π, R, Φ, RR).  *)
-
   (* TODO: find existing *)
   Lemma fupd_frame_all E1 E2 P:
     ((|==> P) ∗ |={E1, E2}=> emp: iProp Σ) ⊢ |={E1, E2}=> P.
@@ -804,20 +778,6 @@ Section Ticketlock.
     rewrite /TLAT_pre. simpl. iDestruct "PRE" as "(RR0 & OB & _ & PH & CPe)".
     rewrite /get_ticket.
 
-    (* pure_step_hl. MU_by_BMU. *)
-    (* iApply (BMU_lower _ 2). *)
-    (* { simpl. lia. } *)
-    (* iApply OU_BMU. iApply (OU_wand with "[-CP PH]"). *)
-    (* 2: { (* TODO: can we remove phase restriction for exchange? *) *)
-    (*      iApply (exchange_cp_upd with "[$] [$] [$]"). *)
-    (*      1, 2: reflexivity. *)
-    (*      apply fl_degs_hm. } *)
-    (* iIntros "[CPSh PH]". iDestruct (cp_mul_take with "CPSh") as "[CPSh CPh]".  *)
-    (* iApply OU_BMU. iApply (OU_wand with "[-CPw PH]"). *)
-    (* 2: { iApply (exchange_cp_upd with "[$] [$] [$]"). *)
-    (*      1, 2: reflexivity. *)
-    (*      trans d__h0; eauto. } *)
-    (* iIntros "[CPS PH]". BMU_burn_cp. *)
     pure_steps.
 
     (* TODO: ??? worked fine when get_ticket was inlined into tl_acquire *)
@@ -941,8 +901,6 @@ Section Ticketlock.
     iSpecialize ("RTOK" with "[//]"). 
     iDestruct (TMI_extend_acquire _ _ _ _ (((((((_), _), _), _), _), _), _) with "[$] [$] [$]") as "TMI"; eauto.
 
-    (* iDestruct (TMI_extend_acquire _ _ _ _ (((((τ, π), (q /2)%Qp), ∅), Φ), RR) with "[$] [$]") as "TMI"; eauto. *)
-
     iApply "CLOS". iNext. rewrite /tl_inv_inner.
     rewrite -(Nat.add_1_r ow).
     replace (Z.of_nat ow + 1)%Z with (Z.of_nat (ow + 1)) by lia.
@@ -957,11 +915,6 @@ Section Ticketlock.
     rewrite set_seq_add_L. simpl.
     set_solver.
   Qed.
-
-  (* TODO: move, remove duplicates *)
-  Ltac split_cps cps_res n :=
-    let fmt := constr:(("[" ++ cps_res ++ "' " ++ cps_res ++ "]")%string) in
-    iDestruct (cp_mul_split' _ _ n with cps_res) as fmt; [lia| ].
 
   Lemma wait_spec (lk: val) c o' (t: nat) τ π q Ob Φ RR
     (LIM_STEPS': fl_B TLPre c <= LIM_STEPS):
