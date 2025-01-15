@@ -22,8 +22,9 @@ Section FairLockSpec.
   
   Record FairLockPre := {
     fl_c__cr: nat; fl_B: nat -> nat;
+    fl_GpreS :> gFunctors -> Set;
     fl_GS :> gFunctors -> Set;
-    fl_LK `{FLG: fl_GS Σ} {HEAP: gen_heapGS loc val Σ}: FL_st -> iProp Σ;
+    fl_LK {Σ: gFunctors} {FLG: fl_GS Σ} {HEAP: gen_heapGS loc val Σ}: FL_st -> iProp Σ;
     fl_d__h: Degree;
     fl_d__l: Degree;
     fl_d__m: Degree;
@@ -85,7 +86,7 @@ Section FairLockSpec.
 
     fl_release_token: iProp Σ;
 
-    fl_create_spec: ⊢ ⌜ fl_c__cr FLP <= LIM_STEPS ⌝ -∗ ∀ τ c,
+    fl_create_spec {FLG_PRE: fl_GpreS FLP Σ}: ⊢ ⌜ fl_c__cr FLP <= LIM_STEPS ⌝ -∗ ∀ τ c,
       {{{ ⌜ True ⌝ }}} fl_create #() @ τ {{{ lk, RET lk;
          ∃ FLG: fl_GS FLP Σ, fl_LK FLP (lk, 0, false) (FLG := FLG) ∗ fl_is_lock lk c (FLG := FLG) }}};
 
