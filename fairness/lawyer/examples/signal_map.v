@@ -215,15 +215,15 @@ Section SignalMap.
   Qed. 
 
   (* TODO: use bupd in definition of OU *)
-  Lemma smap_create_ep i B smap π q π__cp τ d__h d__l
-    (PH_LE: phase_le π__cp π)
+  Lemma smap_create_ep i B smap π q τ d__h d__l
+    (* (PH_LE: phase_le π__cp π) *)
     (LT: i ∈ dom smap)
     (DEG_LT: deg_lt d__l d__h):
     ⊢ smap_repr B smap -∗ 
-      cp π__cp d__h (oGS := oGS) -∗
+      cp π d__h (oGS := oGS) -∗
       th_phase_frag τ π q (oGS := oGS) -∗
       OU (|==> ∃ s, ith_sig i s ∗
-                    ep s π__cp d__l (oGS := oGS) ∗ smap_repr B smap ∗
+                    ep s π d__l (oGS := oGS) ∗ smap_repr B smap ∗
                     th_phase_frag τ π q (oGS := oGS)) (oGS := oGS).
   Proof using DISCR__d DISCR__l LEQUIV__l.
     iIntros "SR CP PH".
@@ -237,7 +237,6 @@ Section SignalMap.
     iDestruct "SIGS" as "[SIG SIGS]". setoid_rewrite big_sepM_singleton.
     rewrite {1}/ex_ith_sig. 
     iDestruct (create_ep_upd with "CP [$] [PH]") as "OU".
-    { eauto. }
     { done. }
     { done. }
     iMod (own_update with "AUTH") as "X". 
@@ -309,10 +308,9 @@ Section SignalMap.
       rewrite FRESH_UNSET. iFrame.
     Qed.
       
-    Lemma ith_sig_expect i sw τ π q π__e smap R d B
-      (PH_EXP: phase_le π__e π)
+    Lemma ith_sig_expect i sw τ π q smap R d B
       (UNSETi: B i = false):
-      ⊢ ep sw π__e d (oGS := oGS) -∗ th_phase_frag τ π q (oGS := oGS) -∗
+      ⊢ ep sw π d (oGS := oGS) -∗ th_phase_frag τ π q (oGS := oGS) -∗
          smap_repr B smap -∗ ith_sig i sw -∗
          obls τ R (oGS := oGS) -∗ sgns_level_gt R (L i) (oGS := oGS) -∗ 
          OU (cp π d (oGS := oGS) ∗ smap_repr B smap ∗ th_phase_frag τ π q (oGS := oGS) ∗ obls τ R (oGS := oGS)) (oGS := oGS).
@@ -321,7 +319,7 @@ Section SignalMap.
       iDestruct (ith_sig_in with "[$] [$]") as "%ITH".
       iDestruct (smap_repr_split with "SW [$]") as "[SGw SR]".
       rewrite {1}/ex_ith_sig. rewrite UNSETi. 
-      iDestruct (expect_sig_upd with "EP [$] [$] [$] [$]") as "OU"; [done| ..].
+      iDestruct (expect_sig_upd with "EP [$] [$] [$] [$]") as "OU".
       iApply (OU_wand with "[-OU]"); [| done].
       iIntros "(CP1 & SIGW & OBLS & PH)".
       iFrame. iApply "SR". rewrite /ex_ith_sig. by rewrite UNSETi.

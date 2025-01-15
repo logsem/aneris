@@ -100,14 +100,17 @@ Section ObligationsRepr.
   Section Resources.
     Context `{oGS: ObligationsGS Σ}. 
 
-    Definition cp (ph: Phase) (deg: Degree): iProp Σ :=
-      own obls_cps (◯ (cps_repr ({[+ ((ph, deg)) +]}))). 
+    (* Without phase weakening, the phase of initial cps would mismatch thread's phase after it performs a fork.
+       It'd lead to having "phase_le .." hypotheses to allow burning initial cps.
+       These hypotheses would have to be propagated in all specs. *)
+    Definition cp (ph_ub: Phase) (deg: Degree): iProp Σ :=
+      ∃ ph, own obls_cps (◯ (cps_repr ({[+ ((ph, deg)) +]}))) ∗ ⌜ phase_le ph ph_ub ⌝.
 
-    Definition cp_mul ph deg n: iProp Σ :=
-      own obls_cps (◯ (n *: {[+ (ph, deg) +]})). 
+    Definition cp_mul (ph_ub: Phase) deg n: iProp Σ :=
+      [∗] replicate n (cp ph_ub deg). 
 
-    Definition cps (m: gmultiset (@CallPermission Degree)) : iProp Σ :=
-      own obls_cps (◯ (cps_repr m)). 
+    (* Definition cps (m: gmultiset (@CallPermission Degree)) : iProp Σ := *)
+    (*   own obls_cps (◯ (cps_repr m)).  *)
 
     Definition sgn (sid: SignalId) (l: Level) (ob: option bool): iProp Σ :=
       own obls_sigs (◯ ({[ sid := (to_agree l, mbind (Some ∘ Excl) ob ) ]})).
@@ -127,8 +130,8 @@ Section ObligationsRepr.
     Definition sgns_level_gt' (R: gset SignalId) (L: gset Level): iProp Σ := 
       [∗ set] l ∈ L, sgns_level_gt R l.
 
-    Definition ep (sid: SignalId) π d: iProp Σ :=
-    own obls_eps (◯ {[ (sid, π, d) ]}). 
+    Definition ep (sid: SignalId) (π__ub: Phase) d: iProp Σ :=
+      ∃ π, own obls_eps (◯ {[ (sid, π, d) ]}) ∗ ⌜ phase_le π π__ub ⌝.
     
     Definition exc_lb (n: nat) :=
       own obls_exc_lb (mono_nat_lb n).
@@ -153,16 +156,20 @@ Section ObligationsRepr.
       Proper (equiv ==> equiv ==> equiv) (sgns_level_ge').
     Proof using. solve_proper. Qed.
 
-    Lemma cp_msi_dom δ ph deg:
+    Lemma cp_msi_unfold δ ph deg:
       ⊢ obls_msi δ -∗ cp ph deg -∗
-        ⌜ (ph, deg) ∈ ps_cps δ ⌝.
+        obls_msi δ ∗ ∃ π0, own obls_cps (◯ ({[+ ((π0, deg)) +]})) ∗ ⌜ (π0, deg) ∈ ps_cps δ /\ phase_le π0 ph⌝.
     Proof using.
       clear H H0 H1.
-      rewrite /obls_msi. iIntros "(CPS&_) CP". 
+      rewrite /obls_msi. iIntros "(CPS&?) CP".
+      iDestruct "CP" as "(%π & CP & %PH_LE)". 
       iCombine "CPS CP" as "CPS". 
-      iDestruct (own_valid with "[$]") as %V. iPureIntro.
-      apply auth_both_valid_discrete, proj1 in V.
-      apply gmultiset_singleton_subseteq_l.
+      iDestruct (own_valid with "[$]") as %V.
+      iDestruct "CPS" as "[??]". iFrame. 
+      iExists _. iFrame. iPureIntro. split; [| done]. 
+      apply auth_both_valid_discrete, proj1 in V. 
+      rewrite /cps_repr in V. simpl in V.
+      apply gmultiset_singleton_subseteq_l. 
       by apply gmultiset_included.
     Qed.
 
@@ -304,14 +311,16 @@ Section ObligationsRepr.
       done.
     Qed. 
 
-    Lemma ep_msi_in δ sid π d:
-      ⊢ obls_msi δ -∗ ep sid π d -∗
-        ⌜ ((sid, π, d): (@ExpectPermission _)) ∈ (ps_eps δ) ⌝. 
+    Lemma ep_msi_in δ sid π__ub d:
+      ⊢ obls_msi δ -∗ ep sid π__ub d -∗
+        ∃ π, ⌜ ((sid, π, d): (@ExpectPermission _)) ∈ (ps_eps δ) /\ phase_le π π__ub⌝. 
     Proof using. 
-      rewrite /obls_msi. iIntros "(_&_&_&EPS&_) EP". 
+      rewrite /obls_msi. iIntros "(_&_&_&EPS&_) EP".
+      iDestruct "EP" as "(%π & EP & %PH_LE)". 
       iCombine "EPS EP" as "EPS". 
       iDestruct (own_valid with "[$]") as %V. iPureIntro.
       apply auth_both_valid_discrete in V as [SUB V].
+      eexists. split; [| done].
       by apply gset_included, singleton_subseteq_l in SUB.
     Qed.
 
@@ -341,29 +350,39 @@ Section ObligationsRepr.
       rewrite th_phase_frag_combine. by rewrite Qp.div_2.
     Qed.
 
+    Lemma cp_weaken π1 π2 deg
+      (PH_LE: phase_le π1 π2):
+      cp π1 deg -∗ cp π2 deg.
+    Proof using.
+      rewrite /cp. iIntros "(%&?&%)".
+      iExists _. iFrame. iPureIntro. etrans; eauto.
+    Qed.
+      
+    Lemma cp_mul_weaken π1 π2 deg n
+      (PH_LE: phase_le π1 π2):
+      cp_mul π1 deg n -∗ cp_mul π2 deg n.
+    Proof using.
+      clear H1 H0 H.
+      iIntros "CPS".
+      rewrite /cp_mul. iInduction n as [| n] "IH".
+      { set_solver. }
+      simpl. iDestruct "CPS" as "[CP CPS]". iSplitL "CP".
+      { by iApply cp_weaken. }
+      by iApply "IH". 
+    Qed.
+
     Lemma cp_mul_take ph deg n:
       cp_mul ph deg (S n) ⊣⊢ cp_mul ph deg n ∗ cp ph deg.
-    Proof using. 
-      rewrite /cp_mul. rewrite -own_op -auth_frag_op. 
-      iApply own_proper. f_equiv.
-      rewrite gmultiset_op.
-      by rewrite gmultiset_scalar_mul_S_r. 
+    Proof using.
+      rewrite /cp_mul. simpl. by rewrite bi.sep_comm. 
     Qed.
 
     Lemma cp_mul_split ph deg m n:
       cp_mul ph deg (m + n) ⊣⊢ cp_mul ph deg m ∗ cp_mul ph deg n.
     Proof using.
-      clear H H0 H1. 
-      (* TODO: find existing lemmas? *)
-      induction n.
-      { rewrite Nat.add_0_r. rewrite /cp_mul.
-        rewrite gmultiset_scalar_mul_0.
-        rewrite -own_op -auth_frag_op.
-        rewrite gmultiset_op.
-        rewrite gmultiset_disj_union_right_id. done. }
-      rewrite Nat.add_succ_r. rewrite !cp_mul_take.
-      rewrite IHn. iFrame. rewrite bi.sep_assoc. iFrame. set_solver.
-    Qed. 
+      rewrite /cp_mul. rewrite replicate_add.
+      by rewrite big_sepL_app. 
+    Qed.
  
     (* TODO: move *)
     Lemma cp_mul_split' (ph : listO natO) (deg : DegO) (m n : nat)
@@ -377,14 +396,15 @@ Section ObligationsRepr.
     Lemma cp_mul_0 π d:
       ⊢ |==> cp_mul π d 0.
     Proof using.
-      rewrite /cp_mul. rewrite gmultiset_scalar_mul_0.
-      iApply own_unit.
+      clear H H0 H1. 
+      rewrite /cp_mul. simpl. set_solver. 
     Qed.
 
     Lemma cp_mul_1 π d:
       cp π d ⊣⊢ cp_mul π d 1.
     Proof using.
-      rewrite /cp_mul. rewrite gmultiset_scalar_mul_1. done.
+      rewrite /cp_mul. simpl.
+      by rewrite bi.sep_emp.
     Qed.
 
     Let OU' (R: ProgressState -> ProgressState -> Prop) P: iProp Σ :=
@@ -562,54 +582,66 @@ Section ObligationsRepr.
       by apply exclusive_local_update.
     Qed.
 
-    Lemma exchange_cp_upd ζ π q π__cp d d' b k
+    Lemma exchange_cp_upd ζ π q d d' b k
       (LE: k <= b)
-      (PH_LE: phase_le π__cp π)
       (DEG: deg_lt d' d):
-      ⊢ cp π__cp d -∗ th_phase_frag ζ π q -∗ exc_lb b -∗ OU (cp_mul π__cp d' k ∗ th_phase_frag ζ π q).
+      ⊢ cp π d -∗ th_phase_frag ζ π q -∗ exc_lb b -∗ OU (cp_mul π d' k ∗ th_phase_frag ζ π q).
     Proof using.
+      clear H1 H0 H.
       rewrite /OU /OU'. iIntros "CP PH #LB %δ MSI".
       iDestruct (exc_lb_msi_bound with "[$] [$]") as %LB.
       iDestruct (th_phase_msi_frag with "[$] [$]") as "%".
-      iDestruct (cp_msi_dom with "[$] [$]") as %CP. 
+      (* iDestruct "CP" as "(%π0 & CP & %PH_LE)".  *)
+      iDestruct (cp_msi_unfold with "[$] [$]") as "(MSI & %π0 & CP & [%IN %PH_LE])".
       rewrite {1}/obls_msi. iDestruct "MSI" as "(CPS&?&?&?&?&?)".
       destruct δ. simpl in *.
       iCombine "CPS CP" as "CPS".
       iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _). 
-      iRevert "CPS". iFrame. simpl. iIntros "CPS".
+      iRevert "CPS". iFrame. simpl. iIntros "[CPS CP]".
 
-      rewrite bi.sep_comm -!bi.sep_assoc.  
+      rewrite bi.sep_comm -!bi.sep_assoc.
       iSplitR.
       { iPureIntro. exists ζ. 
-        red. right. left. exists π__cp, d, d', k. 
+        red. right. left. exists π0, d, d', k. 
         erewrite (f_equal (exchanges_cp _ _)).
         { econstructor; eauto.
           simpl. lia. }
         simpl. reflexivity. }
 
-      rewrite /cps_repr. rewrite bi.sep_comm. rewrite /cp_mul /cp. rewrite -own_op.
-      iApply own_update; [| by iFrame].
-      apply auth_update.
+      rewrite /cps_repr. rewrite bi.sep_comm.
+      rewrite /cp_mul /cp. iCombine "CPS CP" as "CPS".
+      iMod (own_update with "[$]") as "foo".
+      { apply auth_update.
       etrans.
       { eapply gmultiset_local_update_dealloc. reflexivity. }
       rewrite gmultiset_difference_diag.
       eapply local_update_proper.
       1: reflexivity.
       2: eapply gmultiset_local_update_alloc.
-      by rewrite gmultiset_disj_union_left_id.
+      by rewrite gmultiset_disj_union_left_id. }
+
+      iModIntro. iDestruct "foo" as "[AUTH FRAG]". iFrame.
+
+      iInduction k as [| k] "IH".
+      { set_solver. }
+      simpl. rewrite gmultiset_scalar_mul_S_r.
+      rewrite -gmultiset_op. rewrite auth_frag_op.
+      iDestruct "FRAG" as "[CPS CP]".
+      iSplitL "CP".
+      { iExists _. by iFrame. }
+      iApply ("IH" with "[] [$]"). iPureIntro. lia. 
     Qed.
 
     (* TODO: ? use duplicable "signal exists" resource *)
-    Lemma create_ep_upd ζ π q π__cp d d' sid l ov (DEG: deg_lt d' d)
-      (PH_LE: phase_le π__cp π)
+    Lemma create_ep_upd ζ π q d d' sid l ov (DEG: deg_lt d' d)
       :
-      ⊢ cp π__cp d -∗ sgn sid l ov -∗ th_phase_frag ζ π q -∗ 
-        OU (ep sid π__cp d' ∗ sgn sid l ov ∗ th_phase_frag ζ π q).
+      ⊢ cp π d -∗ sgn sid l ov -∗ th_phase_frag ζ π q -∗ 
+        OU (ep sid π d' ∗ sgn sid l ov ∗ th_phase_frag ζ π q).
     Proof using H1 H0.
       rewrite /OU /OU'. iIntros "CP SIG PH %δ MSI".
       iDestruct (sigs_msi_in with "[$] [$]") as %[v Sζ].
       iDestruct (th_phase_msi_frag with "[$] [$]") as "%".
-      iDestruct (cp_msi_dom with "[$] [$]") as %CP. 
+      iDestruct (cp_msi_unfold with "[$] [$]") as "(MSI & %π0 & CP & [%IN %PH_LE])".
       rewrite {1}/obls_msi. iDestruct "MSI" as "(CPS&SIGS&?&EPS&?&?)".
       destruct δ. simpl in *.
       iCombine "CPS CP" as "CPS".
@@ -619,7 +651,7 @@ Section ObligationsRepr.
       rewrite bi.sep_comm -!bi.sep_assoc.
       iSplitR.
       { iPureIntro. exists ζ. 
-        red. do 4 right. left. exists sid, π__cp. do 2 eexists. 
+        red. do 4 right. left. exists sid, π0. do 2 eexists. 
         erewrite (f_equal (creates_ep _ _)).
         { econstructor; eauto.
           - simpl. by apply elem_of_dom. }
@@ -636,7 +668,8 @@ Section ObligationsRepr.
       2: { iDestruct "EPS" as "[A F]".
            iSplitL "A".
            { iApply "A". }           
-           iModIntro. iApply own_mono; [| by iFrame].
+           iModIntro. iExists _. iSplit; [| done].
+           iApply own_mono; [| by iFrame].
            apply auth_frag_mono. apply gset_included. apply union_subseteq_r. }
       
       iApply own_update; [| by iFrame].
@@ -656,10 +689,9 @@ Section ObligationsRepr.
       iFrame.
     Qed.
 
-    Lemma expect_sig_upd ζ sid π q π__e d l R
-      (PH_EXP: phase_le π__e π)
+    Lemma expect_sig_upd ζ sid π q d l R
       :
-      ⊢ ep sid π__e d -∗ sgn sid l (Some false) -∗ obls ζ R -∗
+      ⊢ ep sid π d -∗ sgn sid l (Some false) -∗ obls ζ R -∗
         sgns_level_gt R l -∗ th_phase_frag ζ π q -∗
         OU (cp π d ∗ sgn sid l (Some false) ∗ obls ζ R ∗ th_phase_frag ζ π q).
     Proof using H1 H0.
@@ -669,8 +701,8 @@ Section ObligationsRepr.
       iDestruct (th_phase_msi_frag with "[$] [$]") as "%PH".
       iDestruct (th_phase_msi_align with "[$] [$]") as "[MSI PH]".
       rewrite PH. simpl.
-      iDestruct (ep_msi_in with "[$] [$]") as %EP. 
-      iDestruct (obls_sgn_lt_locale_obls with "[$] [$] [$]") as %LT. 
+      iDestruct (ep_msi_in with "[$] [$]") as %(π__e & IN & PH_LE).
+      iDestruct (obls_sgn_lt_locale_obls with "[$] [$] [$]") as %LT.
 
       rewrite {1}/obls_msi. iDestruct "MSI" as "(CPS&?&?&?&?&?)".
       destruct δ. simpl in *.
@@ -685,7 +717,7 @@ Section ObligationsRepr.
         erewrite (f_equal (expects_ep _ _)).
         { econstructor.
           { apply PH. }
-          { eauto. (* etrans; [apply PH_EXP | apply LE__πx].  *)}
+          { apply PH_LE. }
           all: eauto. }
         done. }
 
@@ -694,7 +726,9 @@ Section ObligationsRepr.
       (* iSplitL "CPS".  *)
       (* 2: { iFrame. iPureIntro. split; try done. *)
       (*      etrans; eauto. }  *)
-      rewrite -own_op. 
+      iApply bi.sep_exist_l. iExists π.
+      rewrite bi.sep_assoc. rewrite -own_op.
+      iApply bupd_frame_r. iSplit; [| done].
       iApply own_update; [| by iFrame].
       apply auth_update_alloc.
       eapply local_update_proper.
@@ -703,9 +737,8 @@ Section ObligationsRepr.
       f_equiv. rewrite gmultiset_disj_union_left_id. set_solver.
     Qed.
 
-    Lemma expect_sig_upd_rep ζ sid π q π__e d l R n
-      (PH_EXP: phase_le π__e π):
-      ⊢ ep sid π__e d -∗ sgn sid l (Some false) -∗ obls ζ R -∗
+    Lemma expect_sig_upd_rep ζ sid π q d l R n:
+      ⊢ ep sid π d -∗ sgn sid l (Some false) -∗ obls ζ R -∗
         sgns_level_gt R l -∗ th_phase_frag ζ π q -∗
         OU_rep n (cp_mul π d n ∗ sgn sid l (Some false) ∗
                   obls ζ R ∗ th_phase_frag ζ π q).
@@ -714,7 +747,7 @@ Section ObligationsRepr.
       iInduction n as [| n] "IH".
       { iFrame. iApply cp_mul_0. }
       simpl. iApply (OU_wand with "[]").
-      2: { iApply (expect_sig_upd with "EP [$] [$] [$] [$]"). done. }
+      2: { iApply (expect_sig_upd with "EP [$] [$] [$] [$]"). }
       iIntros "(CP & ?&?&?)".
       rewrite cp_mul_take. rewrite (bi.sep_comm _ (cp _ _)). rewrite -bi.sep_assoc.
       iApply OU_rep_frame_l. iFrame. iApply ("IH" with "[$] [$] [$]").
@@ -724,10 +757,11 @@ Section ObligationsRepr.
     Lemma burn_cp_upd_impl δ ζ π deg
       (PH_MAX: exists π__max, ps_phases δ !! ζ = Some π__max /\ phase_le π π__max)
       :
-      ⊢ obls_msi δ -∗ cp π deg ==∗ ∃ δ', obls_msi δ' ∗ ⌜ burns_cp δ ζ δ' π deg⌝.
+      ⊢ obls_msi δ -∗ cp π deg ==∗ ∃ δ', obls_msi δ' ∗ ⌜ ∃ π__b, burns_cp δ ζ δ' π__b deg⌝.
     Proof using.
       iIntros "MSI CP".
-      iDestruct (cp_msi_dom with "[$] [$]") as "%IN". 
+      (* iDestruct (cp_msi_dom with "[$] [$]") as "%IN".  *)
+      iDestruct (cp_msi_unfold with "[$] [$]") as "(MSI & %π0 & CP & [%IN %PH_LE])".
       rewrite {1}/obls_msi. iDestruct "MSI" as "(CPS&?&?&?&?&?)".
       destruct δ. simpl in *. iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _). 
       simpl. iRevert "CPS". iFrame. iIntros "CPS". simpl.
@@ -738,32 +772,32 @@ Section ObligationsRepr.
         1, 3: reflexivity.
         f_equiv. by rewrite gmultiset_difference_diag. }
       iModIntro. iFrame. iPureIntro.
-      destruct PH_MAX as (?&?&?). 
+      destruct PH_MAX as (?&?&?).
+      exists π0. 
       erewrite (f_equal (burns_cp _ _)).
-      { econstructor; eauto. }
+      { econstructor; eauto. etrans; eauto. }
       done. 
     Qed.
 
-    Lemma burn_cp_upd_burn ζ π__cp π q deg
-      (LE: phase_le π__cp π):
-      ⊢ cp π__cp deg -∗ th_phase_frag ζ π q -∗ 
-        OU' (fun δ1 δ2 => burns_cp δ1 ζ δ2 π__cp deg) (th_phase_frag ζ π q).
+    Lemma burn_cp_upd_burn ζ π q deg:
+      ⊢ cp π deg -∗ th_phase_frag ζ π q -∗ 
+        OU' (fun δ1 δ2 => exists π__b, burns_cp δ1 ζ δ2 π__b deg) (th_phase_frag ζ π q).
     Proof using.
       rewrite /OU'. iIntros "CP PH % MSI".
       (* iDestruct (th_phase_msi_ge with "[$] [$]") as %(? & ? & ?).  *)
       iDestruct (th_phase_msi_frag with "[$] [$]") as "%PH".
       iMod (burn_cp_upd_impl with "[$] [$]") as "R"; eauto.
+      { eexists. split; eauto. done. }
       iDestruct "R" as "(%&?&?)". iModIntro. iExists _. iFrame.
     Qed.
 
-    Lemma burn_cp_upd ζ π__cp π q deg
-      (LE: phase_le π__cp π):
-      ⊢ cp π__cp deg -∗ th_phase_frag ζ π q -∗ OU (th_phase_frag ζ π q).
+    Lemma burn_cp_upd ζ π q deg:
+      ⊢ cp π deg -∗ th_phase_frag ζ π q -∗ OU (th_phase_frag ζ π q).
     Proof using.
       iIntros "??".
-      iPoseProof (burn_cp_upd_burn with "[$] [$]") as "OU'"; [done| ].
+      iPoseProof (burn_cp_upd_burn with "[$] [$]") as "OU'".
       rewrite /OU /OU'. iIntros "% MSI".
-      iMod ("OU'" with "[$]") as "(%&?&%&?)". iModIntro.
+      iMod ("OU'" with "[$]") as "(%&?&[% %]&?)". iModIntro.
       iExists _. iFrame. iPureIntro.
       red. eexists. left. eauto.
     Qed.

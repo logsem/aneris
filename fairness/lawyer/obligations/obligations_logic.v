@@ -87,7 +87,8 @@ Section ProgramLogic.
       rewrite /OAM_st_interp_interim_step.
 
       iDestruct "TI''" as (δ__k) "(MSI&%TRANSS&%TH_OWN&%DPO&%OBLS&%STEP&%NOFORK)".
-      iDestruct (cp_msi_dom with "[$] [$]") as %CP.
+      (* iDestruct (cp_msi_dom with "[$] [$]") as %CP. *)
+      
       destruct LE as (π__max & PH & LE0).
       
       iMod (burn_cp_upd_impl with "[$] [$]") as "X".
@@ -108,14 +109,17 @@ Section ProgramLogic.
              - apply empty_difference_subseteq_L in NOFORK. set_solver. 
              - eapply locale_step_sub; eauto. }
         red. eexists. split; [eauto| ].
-        eexists. split; eauto. }
+        eexists. split; eauto.
+        eapply ex2_comm; eauto. }
       
       iPureIntro. split; [split| ]; auto.
       - eapply pres_by_loc_step_implies_progress; eauto.
         { apply loc_step_dpo_pres. }
         do 2 (eexists; split; eauto).
+        eapply ex2_comm; eauto. 
       - simpl. red. eexists. split; eauto.
         + eexists. split; eauto. eexists. split; eauto.
+          eapply ex2_comm; eauto.
         + by right.
     Qed.
 
@@ -139,7 +143,7 @@ Section ProgramLogic.
       rewrite /OAM_st_interp_interim_step.
       
       iDestruct "TI''" as (δ__k) "(MSI&%TRANSS&%TH_OWN&%DPO&%OBLS&%STEP&%FORK)".
-      iDestruct (cp_msi_dom with "[$] [$]") as %CP.
+      (* iDestruct (cp_msi_dom with "[$] [$]") as %CP. *)
       
       apply gset_pick_Some in FORK. 
       eapply locale_step_fresh_exact in FORK; eauto.  
@@ -151,6 +155,7 @@ Section ProgramLogic.
       iMod (burn_cp_upd_impl with "[$] [$]") as "X".
       { eexists. split; eauto. }
       iDestruct "X" as "(%δ' & MSI & %BURNS)".
+      pattern deg in BURNS. apply ex_intro, ex2_comm in BURNS. 
 
       assert (dom_obls_eq (dom (ps_obls δ)) δ') as OBLS'.
       { eapply pres_by_loc_step_implies_progress.
@@ -459,7 +464,6 @@ Section TestProg.
     iApply OU_BMU.
     iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
     iDestruct (exchange_cp_upd with "[$] [$] [$]") as "OU"; eauto.
-    { done. }
     iApply (OU_wand with "[-OU]"); [| done].
     iIntros "[CPS' PH]". 
     iApply BMU_intro.
@@ -523,7 +527,7 @@ Section TestProg.
       iApply OU_BMU.
       iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
       iApply (OU_wand with "[-CP PH]"). 
-      2: { iApply (burn_cp_upd with "CP [$]"). done. }
+      2: { iApply (burn_cp_upd with "CP [$]"). }
       iIntros "PH".
       
       iApply BMU_intro. iFrame "PH OBLS".

@@ -196,11 +196,10 @@ Section MotivatingClient.
       | Some r => ∃ s, ith_sig r s ∗ ep s π (fl_d__l FLP) (oGS := oGS)
       end.
 
-    Lemma BMU_wait_owner τ π q O r m smap π__e i
-      (PH_EXP: phase_le π__e π)
+    Lemma BMU_wait_owner τ π q O r m smap i
       (WAIT: r <= i):
       obls τ O (oGS := oGS) ∗ sgns_level_ge' O (fl_acq_lvls FLP) (oGS := oGS)∗
-      th_phase_frag τ π q (oGS := oGS) ∗ RR__L π__e (Some i) ∗ smap_repr_cl r m smap ⊢
+      th_phase_frag τ π q (oGS := oGS) ∗ RR__L π (Some i) ∗ smap_repr_cl r m smap ⊢
       BMU ∅ 1 (cp π (fl_d__l FLP) (oGS := oGS) ∗ th_phase_frag τ π q (oGS := oGS) ∗
           obls τ O (oGS := oGS) ∗ smap_repr_cl r m smap
       ) (oGS := oGS).
@@ -214,7 +213,6 @@ Section MotivatingClient.
       iApply (OU_wand with "[]").
       2: { rewrite /smap_repr_cl.
            iApply (ith_sig_expect (λ _, l__o) with "[$] [$] [$] [$] [$] []").
-           { done. }
            { simpl. apply Nat.ltb_nlt. lia. }
            rewrite /sgns_level_ge' /sgns_level_gt /sgns_level_ge.
            iDestruct (big_sepS_forall with "LVLS") as "LVLS'".
@@ -240,7 +238,6 @@ Section MotivatingClient.
       iApply OU_BMU.
       iApply (OU_wand with "[]").
       2: { iApply (smap_create_ep (λ _, l__o) with "[$] [$] [$]").
-           { reflexivity. }
            { done. }
            apply fl_degs_lh. }
 
@@ -718,7 +715,6 @@ Section MotivatingClient.
           iDestruct "P" as "[FLAG [[_ UNSET] | [% ?]]]"; [| done].
           iApply OU_BMU_rep. iApply (OU_rep_wand with "[FLAG]").
           2: { iApply (expect_sig_upd_rep with "EPf [$] [$] [] [$]").
-               { done. }
                (* TODO: make a lemma*)
                rewrite /sgns_level_gt'.
                iApply big_sepS_forall. iIntros (??). set_solver. }
@@ -834,10 +830,11 @@ Section MotivatingClient.
         MU_by_BMU. iApply OU_BMU.
         iApply (OU_wand with "[-PH CPh']").
         2: { rewrite -cp_mul_1. iApply (exchange_cp_upd with "[$] [$] [$]").
-             1, 2: reflexivity.
+             1: reflexivity.
              apply LT0m. }
         iIntros "[CPSm PH]". BMU_burn_cp. 
         iApply ("IH" with "[-POST]"); [| done]. iFrame "#∗".
+        rewrite cp_mul_1 -cp_mul_split. iFrame. 
     Qed.
 
     Theorem right_thread_spec (lk: val) τ π (flag: loc) s__f:
@@ -869,12 +866,11 @@ Section MotivatingClient.
       split_cps "CPSm" 1. rewrite -!cp_mul_1.
       iApply (OU_wand with "[-CPSm PH]").
       2: { iApply (@create_ep_upd with "[$] [$] [$]").
-           { apply LThm. } (* TODO: rename that hypothesis *)
-           reflexivity. }
+           apply LThm. } (* TODO: rename that hypothesis *)
       iIntros "(EPf & _ & PH)". iApply OU_BMU.
       iApply (OU_wand with "[-CPSm' PH]").
       2: { iApply (exchange_cp_upd with "[$] [$] [$]").
-           1, 2: reflexivity.
+           1: reflexivity.
            apply LThm. }
       iIntros "[CPSh PH]".
       
@@ -891,8 +887,8 @@ Section MotivatingClient.
       2: { iNext. iIntros (?) "(?&?&?&?)". iApply "POST". iFrame. }
       iFrame "#∗".
       split_cps "CPSh" 2. iFrame.
-      iDestruct (cp_mul_split with "[CPS CPS']") as "CPS"; [by iFrame| ]. 
-      split_cps "CPS" 30. iFrame.
+      rewrite cp_mul_1. rewrite -!cp_mul_split. 
+      split_cps "CPS'" 6. iFrame.
     Qed.
 
   End AfterInit.
@@ -922,19 +918,19 @@ Section MotivatingClient.
         cp_mul π d__r 4 (oGS := oGS) }}}
       client_prog #() @ τ
     {{{ v, RET v; obls τ ∅ (oGS := oGS) }}}.
-  Proof using.
+  Proof using All.
     iIntros (Φ) "(#EB & OB & PH & CPSr) POST". rewrite /client_prog.
     pure_step_hl. 
     MU_by_BMU. iApply OU_BMU.
     split_cps "CPSr" 1. rewrite -cp_mul_1. iApply (OU_wand with "[-CPSr' PH]").
     2: { iApply (exchange_cp_upd with "[$] [$] [$]").
-         1, 2: reflexivity.
+         1: reflexivity.
          etrans; [apply LT0m | apply LThm]. }
     iIntros "[CPS PH]".    
     split_cps "CPSr" 1. rewrite -cp_mul_1.
     iApply OU_BMU. iApply (OU_wand with "[-CPSr' PH]").
     2: { iApply (exchange_cp_upd with "[$] [$] [$]").
-         1, 2: reflexivity.
+         1: reflexivity.
          apply LThm. }
     iIntros "[CPSm PH]".
     iApply OU_BMU. iApply (OU_wand with "[-OB]").
@@ -993,7 +989,8 @@ Section MotivatingClient.
       2: { iIntros "!> % [OB PH]". by iApply NO_OBS_POST. }
       iFrame "#∗". iSplitL "OB2".
       { iApply obls_proper; [| done]. symmetry. apply intersection_idemp. }
-      replace π2 with π by admit. iFrame. }
+      apply strict_include in PH_LT2.
+      iSplitL "CPSm'"; (iApply cp_mul_weaken; [| by iFrame]); done. }
 
     iRename "PH1" into "PH". rewrite difference_diag_L.
     (* Unset Printing Notations. *)
@@ -1017,11 +1014,11 @@ Section MotivatingClient.
     iApply (right_thread_spec with "[-PH1]").
     2: { iIntros "!> % [OB PH]". by iApply NO_OBS_POST. }
     rewrite intersection_idemp_L. iFrame "#∗".
-    replace π12 with π by admit. iFrame.
-    iApply (exc_lb_le with "[$]"). lia.
-
-  Admitted. 
-
+    iSplit. 
+    { iApply (exc_lb_le with "[$]"). lia. }
+    apply strict_include in PH_LT12.
+    iSplitL "CPSr"; (iApply cp_mul_weaken; [| by iFrame]); etrans; eauto.
+  Qed.
     
 End MotivatingClient.
 
