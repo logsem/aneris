@@ -30,10 +30,10 @@ Section FairLockSpec.
     fl_d__m: Degree;
     fl_degs_lh: deg_lt fl_d__l fl_d__h;
     fl_degs_hm: deg_lt fl_d__h fl_d__m;
-    fl_ι: namespace;
     fl_acq_lvls: gset Level;                                     
   }.
 
+  Definition fl_ι: namespace := nroot .@ "fair_lock".
 
   Context {Σ: gFunctors}.
   
@@ -52,7 +52,7 @@ Section FairLockSpec.
     O (RR: option nat -> iProp Σ): iProp Σ := 
     TAU τ P Q L fl_round TGT (fl_d__h FLP) (fl_d__l FLP)
       c
-      (⊤ ∖ ↑(fl_ι FLP))
+      (⊤ ∖ ↑fl_ι)
       π q
       Φ
       O RR
@@ -64,7 +64,7 @@ Section FairLockSpec.
       fl_round TGT
       (fl_d__h FLP) (fl_d__l FLP) (fl_d__m FLP)
       c (fl_B FLP)
-      (↑ (fl_ι FLP)) e NotStuck
+      (↑ fl_ι) e NotStuck
       POST
       get_ret
       (oGS := oGS).

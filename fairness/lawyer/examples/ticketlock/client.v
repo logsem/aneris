@@ -100,7 +100,16 @@ Section MotivatingClient.
     (* in case fl_lvls is empty *)
     (LVL_ORDof: lvl_lt l__o l__f).
 
+  (* need to assume at least one FL level *)
+  (* TODO: can we change either TAU or levels order? *)
+  Context (l__fl: Level).
+  Hypothesis (L__FL: l__fl ∈ fl_acq_lvls FLP).
   Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS _ EM hGS (↑ nroot)}.
+
+  Definition client_ns := nroot .@ "client".
+
+  Lemma INVS_DISJ: fl_ι ## client_ns.
+  Proof using. solve_ndisj. Qed. 
 
   Definition left_thread: val :=
     λ: "lk" "flag",
@@ -144,7 +153,8 @@ Section MotivatingClient.
   Definition c__cl: nat := 4.
   Hypothesis (FL_STEPS: fl_B FLP c__cl ≤ LIM_STEPS).
   (* TODO: make tactics more specific wrt. the lower bound on LIM_STEPS *)
-  Hypothesis (LS_LB: 2 <= LIM_STEPS).
+  Hypothesis (LS_LB: 3 <= LIM_STEPS).
+
 
   Section AfterInit.
     Context {CL: ClientG Σ}.
@@ -176,24 +186,15 @@ Section MotivatingClient.
          ∨
          ⌜ b = false ⌝ ∗ lock_owner_frag None ∗ ∃ f, P__lock flag s__f f) ∗
         smap_repr_cl r (r + (if b then 1 else 0)) smap.
-
-    Definition client_ns := nroot .@ "client".
     
     Definition client_inv lk flag sf: iProp Σ :=
       inv client_ns (client_inv_inner lk flag sf).
-
-    Hypothesis (INVS_DISJ: fl_ι FLP ## client_ns).
 
     Definition RR__L π (r': option nat): iProp Σ :=
       match r' with
       | None => ⌜ True ⌝
       | Some r => ∃ s, ith_sig r s ∗ ep s π (fl_d__l FLP) (oGS := oGS)
       end.
-
-    (* need to assume at least one FL level *)
-    (* TODO: can we change either TAU or levels order? *)
-    Context (l__fl: Level).
-    Hypothesis (L__FL: l__fl ∈ fl_acq_lvls FLP).
 
     Lemma BMU_wait_owner τ π q O r m smap π__e i
       (PH_EXP: phase_le π__e π)
@@ -902,8 +903,6 @@ Section MotivatingClient.
     iSplitR "CP";
     [| do 2 iExists _; iFrame; iPureIntro; done].
 
-  (* TODO: remove another one *)
-  Hypothesis (LS_LB': 3 <= LIM_STEPS).
 
   Context {OBLS_AMU__f: forall τ, @AMU_lift_MU__f _ _ _ τ oGS _ EM _ ⊤}.
   Context {NO_OBS_POST: ∀ τ v, obls τ ∅ (oGS := oGS) -∗ fork_post τ v}. 
@@ -991,8 +990,6 @@ Section MotivatingClient.
 
     iSplitL "CPS' CPSm' OB2 PH2 UNSET".
     { iApply (left_thread_spec with "[-]").
-      { admit. }
-      { admit. }
       2: { iIntros "!> % [OB PH]". by iApply NO_OBS_POST. }
       iFrame "#∗". iSplitL "OB2".
       { iApply obls_proper; [| done]. symmetry. apply intersection_idemp. }
@@ -1018,7 +1015,6 @@ Section MotivatingClient.
          symmetry. apply difference_diag. }
 
     iApply (right_thread_spec with "[-PH1]").
-    1, 2: admit.
     2: { iIntros "!> % [OB PH]". by iApply NO_OBS_POST. }
     rewrite intersection_idemp_L. iFrame "#∗".
     replace π12 with π by admit. iFrame.
