@@ -12,6 +12,7 @@ From trillium.fairness.lawyer Require Import program_logic.
 
 Ltac BMU_burn_cp :=
   iApply BMU_intro;
+  (* TODO: make a separate tactic *)
   iDestruct (cp_mul_take with "CPS") as "[CPS CP]";
   iSplitR "CP";
   [| do 2 iExists _; iFrame; iPureIntro; done].

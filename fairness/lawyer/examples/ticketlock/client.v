@@ -100,6 +100,51 @@ Section MotivatingClient.
     (* in case fl_lvls is empty *)
     (LVL_ORDof: lvl_lt l__o l__f).
 
+  Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS _ EM hGS (↑ nroot)}.
+
+  Definition left_thread: val :=
+    λ: "lk" "flag",
+      (fl_acquire FL) "lk" ;;
+      "flag" <- #true ;;
+      (fl_release FL) "lk"
+    .
+
+    Definition right_thread_iter: val :=
+      λ: "lk" "flag" "c",
+        (fl_acquire FL) "lk" ;;
+        "c" <- !"flag" ;;
+        (fl_release FL) "lk"
+    .
+
+    Definition right_thread_rep: val :=
+      rec: "right" "lk" "flag" "c" :=
+        right_thread_iter "lk" "flag" "c" ;;
+        if: (!"c" = #true) then #() else "right" "lk" "flag" "c"
+    .
+
+    Definition right_thread: val :=
+      λ: "lk" "flag",
+        let: "c" := ref #false in
+        right_thread_rep "lk" "flag" "c"
+    .
+
+  Definition client_prog: val :=
+    λ: <>,
+      let: "lk" := fl_create FL #() in
+      let: "flag" := ref #false in
+      (Fork (left_thread "lk" "flag") ;;
+       Fork (right_thread "lk" "flag")).
+
+  (* TODO: move, remove duplicate *)
+  Context (d0 d__r: Degree).
+  Hypothesis (LThm: deg_lt (fl_d__m FLP) d__r). 
+  Hypothesis (LT0m: deg_lt d0 (fl_d__m FLP)).
+
+  Hypothesis (CR_LIM: fl_c__cr FLP ≤ LIM_STEPS).
+  Definition c__cl: nat := 4.
+  Hypothesis (FL_STEPS: fl_B FLP c__cl ≤ LIM_STEPS).
+  (* TODO: make tactics more specific wrt. the lower bound on LIM_STEPS *)
+  Hypothesis (LS_LB: 2 <= LIM_STEPS).
 
   Section AfterInit.
     Context {CL: ClientG Σ}.
@@ -137,20 +182,6 @@ Section MotivatingClient.
     Definition client_inv lk flag sf: iProp Σ :=
       inv client_ns (client_inv_inner lk flag sf).
 
-    Definition left_thread: val :=
-      λ: "lk" "flag",
-          (fl_acquire FL) "lk" ;;
-           "flag" <- #true ;;
-           (fl_release FL) "lk"
-    .
-
-    Definition c__cl: nat := 4.
-
-    Context (d0 d__r: Degree).
-    Hypothesis (LThm: deg_lt (fl_d__m FLP) d__r). 
-    Hypothesis (LT0m: deg_lt d0 (fl_d__m FLP)). 
-
-    Hypothesis (FL_STEPS: fl_B FLP c__cl ≤ LIM_STEPS).
     Hypothesis (INVS_DISJ: fl_ι FLP ## client_ns).
 
     Definition RR__L π (r': option nat): iProp Σ :=
@@ -173,6 +204,7 @@ Section MotivatingClient.
           obls τ O (oGS := oGS) ∗ smap_repr_cl r m smap
       ) (oGS := oGS).
     Proof using LVL_ORDo L__FL ODl LEl.
+      clear LS_LB CR_LIM.
       clear FL_STEPS.
       
       iIntros "(OBLS & #LVLS & PH & #RR & [SR %SR_DOM])".
@@ -530,9 +562,9 @@ Section MotivatingClient.
       iFrame.
     Qed.      
 
-    Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS _ EM hGS (↑ nroot)}.
-
-    Theorem left_thread_spec (lk: val) τ flag s__f π:
+    Theorem left_thread_spec (lk: val) τ flag s__f π
+      (* π__cp (PH_LE: phase_le π__cp π) *)
+      :
       {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗ flag_unset ∗
           obls τ {[ s__f ]} (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
           cp_mul π (fl_d__m FLP) 2 (oGS := oGS) ∗
@@ -573,27 +605,6 @@ Section MotivatingClient.
       { iFrame "#∗". }
       iNext. done.
     Qed.
-
-    Definition right_thread_iter: val :=
-      λ: "lk" "flag" "c",
-          (fl_acquire FL) "lk" ;;
-           "c" <- !"flag" ;;
-           (fl_release FL) "lk"
-    .
-
-    Definition right_thread_rep: val :=
-      rec: "right" "lk" "flag" "c" :=
-          right_thread_iter "lk" "flag" "c" ;;
-          if: (!"c" = #true) then #() else "right" "lk" "flag" "c"
-    .
-
-    Definition right_thread: val :=
-      λ: "lk" "flag",
-          let: "c" := ref #false in
-          right_thread_rep "lk" "flag" "c"
-    .
-
-    Hypothesis (LS_LB: 2 <= LIM_STEPS). 
 
     Lemma acquire_right τ (lk: val) flag s__f π:
       {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗
@@ -884,6 +895,137 @@ Section MotivatingClient.
     Qed.
 
   End AfterInit.
+
+  (* TODO: move *)
+  Ltac burn_cp_after_BMU :=
+    iDestruct (cp_mul_take with "CPS") as "[CPS CP]";
+    iSplitR "CP";
+    [| do 2 iExists _; iFrame; iPureIntro; done].
+
+  (* TODO: remove another one *)
+  Hypothesis (LS_LB': 3 <= LIM_STEPS).
+
+  Context {OBLS_AMU__f: forall τ, @AMU_lift_MU__f _ _ _ τ oGS _ EM _ ⊤}.
+  Context {NO_OBS_POST: ∀ τ v, obls τ ∅ (oGS := oGS) -∗ fork_post τ v}. 
+
+  (* TODO: move, remove duplicates *)
+  Lemma exc_lb_le n m
+    (LE: n <= m):
+    exc_lb m (oGS := oGS) ⊢ exc_lb n (oGS := oGS).
+  Proof using.
+    rewrite /exc_lb. erewrite mono_nat_lb_op_le_l; eauto.
+    rewrite own_op. by iIntros "[??]". 
+  Qed.
+
+  Theorem client_spec `{ClientPreG Σ, fl_GpreS FLP Σ} τ π:
+    {{{ exc_lb 70 (oGS := oGS) ∗
+        obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
+        cp_mul π d__r 4 (oGS := oGS) }}}
+      client_prog #() @ τ
+    {{{ v, RET v; obls τ ∅ (oGS := oGS) }}}.
+  Proof using.
+    iIntros (Φ) "(#EB & OB & PH & CPSr) POST". rewrite /client_prog.
+    pure_step_hl. 
+    MU_by_BMU. iApply OU_BMU.
+    split_cps "CPSr" 1. rewrite -cp_mul_1. iApply (OU_wand with "[-CPSr' PH]").
+    2: { iApply (exchange_cp_upd with "[$] [$] [$]").
+         1, 2: reflexivity.
+         etrans; [apply LT0m | apply LThm]. }
+    iIntros "[CPS PH]".    
+    split_cps "CPSr" 1. rewrite -cp_mul_1.
+    iApply OU_BMU. iApply (OU_wand with "[-CPSr' PH]").
+    2: { iApply (exchange_cp_upd with "[$] [$] [$]").
+         1, 2: reflexivity.
+         apply LThm. }
+    iIntros "[CPSm PH]".
+    iApply OU_BMU. iApply (OU_wand with "[-OB]").
+    2: { iApply (OU_create_sig _ _ l__f with "OB"). }
+    iIntros "(%s__f & SGNf & OB & _)". rewrite union_empty_l_L.
+    iDestruct (sgn_get_ex with "[$]") as "[SGNf #SGNf']".
+    BMU_burn_cp.
+
+    wp_bind (fl_create FL _)%E.
+    unshelve iApply (fl_create_spec FL with "[//] [$]").
+    { eauto. }
+    { exact c__cl. }
+    iIntros "!> %lk (%FLG & LK & LOCK)".
+    pose proof (fl_is_lock_pers FL lk c__cl (FLG := FLG)) as PERS. (* TODO: why Existing Instance doesn't work? *)
+    iDestruct "LOCK" as "#LOCK".
+
+    wp_bind (Rec _ _ _)%E. pure_steps.
+    wp_bind (ref _)%E. iApply sswp_MU_wp_fupd; [done| ]. iModIntro. 
+    iApply wp_alloc. iIntros "!> %flag FLAG _".
+    iNext. MU_by_BMU.
+    
+    iMod (own_alloc (● Excl' None ⋅ ◯ _: excl_authUR (optionUR SignalId))) as (?) "[OW_A OW_F]".
+    { apply auth_both_valid_2; [| reflexivity]. done. }
+    iMod (own_alloc (@Pending unitO)) as (?) "UNSET"; [done| ].
+    iPoseProof (init_smap_repr (fun _ => l__o) _ _ (flip Nat.ltb 0) ∅ with "OB") as "SR".
+    rewrite size_empty. simpl. iApply (BMU_weaken ∅ _ 0 with "[-SR] [$]"); [lia| done| ..].
+    iIntros "(%smap & %SMG & SR & %DOM__SM & OB)". burn_cp_after_BMU.
+    apply dom_empty_inv_L in DOM__SM as ->. rewrite map_img_empty_L union_empty_r_L.
+
+    set (CG := {| cl_γ__ow := γ; cl_γ__os := γ0 |}).
+    iMod (inv_alloc client_ns _ (client_inv_inner lk flag s__f) with "[LK FLAG OW_A OW_F SR SGNf]") as "#INV".
+    { iNext. rewrite /client_inv_inner.
+      do 4 iExists _. iFrame.
+      iSplit.
+      2: { simpl. iPureIntro. set_solver. }
+      iRight. iSplit; [done| ].
+      iFrame. iExists _. iFrame. iLeft. by iFrame. }
+    iModIntro.
+
+    pure_steps. wp_bind (Rec _ _ _)%E. pure_steps.
+
+    wp_bind (Fork _)%E. 
+    split_cps "CPS" 20. split_cps "CPSm" 2.
+    iApply sswp_MUf_wp. iIntros "%τ' !>".
+    iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
+    iApply (MU__f_wand with "[-CP PH OB]").
+    2: { iApply OBLS_AMU__f; [done| ].
+         iApply (BMU_AMU__f with "[-PH] [$]"); [reflexivity| ..].
+         iIntros "?". iApply BMU_intro. iFrame.
+         iSplitR; [iAccu| ]. 
+         do 2 iExists _. by iFrame. }
+    iIntros "(_ & (%π1 & %π2 & PH1 & OB1 & PH2 & OB2 & [%PH_LT1 %PH_LT2]))".
+
+    iSplitL "CPS' CPSm' OB2 PH2 UNSET".
+    { iApply (left_thread_spec with "[-]").
+      { admit. }
+      { admit. }
+      2: { iIntros "!> % [OB PH]". by iApply NO_OBS_POST. }
+      iFrame "#∗". iSplitL "OB2".
+      { iApply obls_proper; [| done]. symmetry. apply intersection_idemp. }
+      replace π2 with π by admit. iFrame. }
+
+    iRename "PH1" into "PH". rewrite difference_diag_L.
+    (* Unset Printing Notations. *)
+    apply strict_include in PH_LT1. 
+    wp_bind (Rec _ _ _)%E. pure_steps.
+
+    iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
+    iApply sswp_MUf_wp. iIntros "%τ2 !>". 
+    iApply (MU__f_wand with "[-CP PH OB1]").
+    2: { iApply OBLS_AMU__f; [done| ].
+         iApply (BMU_AMU__f with "[-PH] [$]"); [reflexivity| ..].
+         iIntros "?". iApply BMU_intro. iFrame.
+         iSplitR; [iAccu| ]. 
+         do 2 iExists _. by iFrame. }
+    iIntros "(_ & (%π11 & %π12 & PH1 & OB1 & PH2 & OB2 & [%PH_LT11 %PH_LT12]))".
+
+    iSplitR "POST OB1".
+    2: { iApply "POST". iApply obls_proper; [| done].
+         symmetry. apply difference_diag. }
+
+    iApply (right_thread_spec with "[-PH1]").
+    1, 2: admit.
+    2: { iIntros "!> % [OB PH]". by iApply NO_OBS_POST. }
+    rewrite intersection_idemp_L. iFrame "#∗".
+    replace π12 with π by admit. iFrame.
+    iApply (exc_lb_le with "[$]"). lia.
+
+  Admitted. 
+
     
 End MotivatingClient.
 
