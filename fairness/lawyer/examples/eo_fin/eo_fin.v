@@ -571,6 +571,7 @@ Section EoFin.
     Qed.
 
     (* TODO: parametrize smap_repr_eo with the lower bound *)
+    (* TODO: try to use init_smap_repr for initialization *)
     Lemma alloc_inv l (* (i: nat) *) τ
       (* (i := 0) *)
       :

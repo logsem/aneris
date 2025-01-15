@@ -15,7 +15,6 @@ Section SignalMap.
       sm_γ__smap: gname;
   }.
 
-  Context `{SigMapG Σ}.
 
   Context `{DISCR__d: OfeDiscrete DegO} `{DISCR__l: OfeDiscrete LevelO}.
   Context {LEQUIV__l: @LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}.   
@@ -25,19 +24,87 @@ Section SignalMap.
   Let EO_OP := LocaleOP (Locale := locale heap_lang). 
   Existing Instance EO_OP. 
 
-  Context {oGS: ObligationsGS Σ}.
+  Context {Σ: gFunctors} {oGS: ObligationsGS Σ}.
 
   Context (L: nat -> Level). 
 
   Definition ex_ith_sig B (i: nat) (s: SignalId): iProp Σ :=
     sgn s (L i) (Some $ B i) (oGS := oGS). 
   
-  Definition smap_repr B (smap: gmap nat SignalId): iProp Σ :=
+  Definition smap_repr `{SigMapG Σ} B (smap: gmap nat SignalId): iProp Σ :=
     own sm_γ__smap (● (to_agree <$> smap: gmapUR nat (agreeR SignalId))) ∗
     ([∗ map] i ↦ s ∈ smap, ex_ith_sig B i s).
 
-  Definition ith_sig (i: nat) (s: SignalId): iProp Σ :=
+  Definition ith_sig `{SigMapG Σ} (i: nat) (s: SignalId): iProp Σ :=
     own sm_γ__smap (◯ {[ i := to_agree s ]}).
+
+  (* TODO: move, remove duplicates *)
+  Lemma map_nat_agree_valid {A: ofe} (m: gmap nat A):
+    ✓ ((to_agree <$> m): gmapUR nat (agreeR A)).
+  Proof using.
+    red. intros k.
+    destruct lookup eqn:LL; [| done].
+    apply lookup_fmap_Some in LL. 
+    destruct LL as (a&<-&?). 
+    done.
+  Qed.
+
+  Lemma init_smap_repr `{SigMapPreG Σ, invGS_gen HasNoLc Σ} τ R B (D: gset nat):
+    obls τ R -∗ BMU ∅ (2 * size D) (∃ smap (SMG: SigMapG Σ), 
+          smap_repr B smap ∗ ⌜ dom smap = D ⌝ ∗ obls τ (R ∪ map_img (filter (fun '(i, _) => B i = false) smap))) (oGS := oGS).
+  Proof using LEQUIV__l DISCR__l .
+    clear DISCR__d.
+    iIntros "OB".
+    iAssert (BMU ∅ (2 * size D) (∃ smap, ⌜ dom smap = D ⌝ ∗ obls τ (R ∪ map_img (filter (fun '(i, _) => B i = false) smap)) ∗ [∗ map] i ↦ s ∈ smap, ex_ith_sig B i s))%I with "[OB]" as "SIGS".
+    { iInduction D as [| i D FRESH] "IH" using set_ind_L forall (R). 
+      { iApply BMU_intro. iExists ∅.
+        rewrite big_opM_empty. iSplit; [iPureIntro; set_solver| ].
+        rewrite map_img_empty_L union_empty_r_L. set_solver. }
+      rewrite size_union; [| set_solver].
+      rewrite Nat.mul_add_distr_l. rewrite size_singleton. simpl. 
+      iApply OU_BMU. iApply (OU_wand with "[-OB]").
+      2: { iApply (OU_create_sig _ _ (L i) with "OB"). }
+      iIntros "(%sid & SIG & OB & %FRESH_SID)".
+      iAssert (BMU ∅ 1 (sgn sid (L i) (Some $ B i) ∗ obls τ (R ∪ if B i then ∅ else {[sid]})))%I with "[-]" as "SET".
+      { destruct (B i).
+        2: { iApply BMU_intro. iFrame. }
+        iApply OU_BMU. iApply (OU_wand with "[]").
+        2: { iApply (OU_set_sig (oGS := oGS) with "[$] [$]"). set_solver. }
+        iIntros "[SIG OB]". iApply BMU_intro. iFrame.
+        iApply obls_proper; [| by iFrame].
+        set_solver. }
+      iApply (BMU_split _ _ 1). iApply (BMU_wand with "[-SET] [$]").
+      iIntros "[SIG OB]".
+
+      rewrite Nat.add_0_r.
+      iSpecialize ("IH" with "[$]").
+      iApply (BMU_wand with "[-IH] [$]").
+      iIntros "(%smap & %DOM & OB & SIGS)". 
+      iExists (<[ i := sid ]> smap).
+      iSplit.
+      { iPureIntro. set_solver. }
+      iSplitL "OB".
+      { iApply obls_proper; [| by iFrame].
+        rewrite -union_assoc. eapply sets.union_proper; [done| ].
+        destruct (B i) eqn:Bi.
+        - rewrite map_filter_insert_not; [| by rewrite Bi].
+          set_solver.
+        - rewrite map_filter_insert_True; [| done].
+          rewrite map_img_insert_L. rewrite delete_notin; [done| ].
+          apply map_filter_lookup_None_2. left.
+          apply not_elem_of_dom. congruence. }
+      rewrite big_opM_insert; [| apply not_elem_of_dom; congruence].
+      iFrame. }
+
+    rewrite {2}(plus_n_O (2 * _)). iApply BMU_split.
+    iApply (BMU_wand with "[] [$]"). iIntros "(%smap & %DOM & OB & SIGS)".
+    iMod (own_alloc (● ((to_agree <$> smap): gmapUR nat (agreeR SignalId)) ⋅ ◯ _)) as (γ) "[A F]".
+    { apply auth_both_valid_2; [| reflexivity]. apply map_nat_agree_valid. }
+    iApply BMU_intro.
+    iExists _, {| sm_γ__smap := γ |}. by iFrame.
+  Qed.
+
+  Context {SM_G: SigMapG Σ}.
 
   Lemma ith_sig_in i s B (smap: gmap nat SignalId):
     ⊢ ith_sig i s -∗ smap_repr B smap -∗ ⌜ smap !! i = Some s ⌝.
