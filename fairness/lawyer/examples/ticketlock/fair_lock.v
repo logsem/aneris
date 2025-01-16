@@ -1,6 +1,7 @@
 From trillium.fairness.lawyer.examples Require Import obls_atomic.
 From trillium.fairness.lawyer.obligations Require Import obligations_model  obligations_am obligations_em obligations_logic.
 From trillium.fairness.lawyer Require Import sub_action_em program_logic.
+From trillium.fairness.lawyer.obligations Require Import obligations_resources.
 
 
 Section FairLockSpec.
@@ -84,11 +85,12 @@ Section FairLockSpec.
     fl_is_lock `{FLG: fl_GS FLP Σ} {HEAP: gen_heapGS loc val Σ}: val -> nat -> iProp Σ;
     fl_is_lock_pers {FLG: fl_GS FLP Σ} lk c :> Persistent (fl_is_lock lk c (FLG := FLG));
 
-    fl_release_token: iProp Σ;
+    fl_release_token `{FLG: fl_GS FLP Σ}: iProp Σ;
 
-    fl_create_spec {FLG_PRE: fl_GpreS FLP Σ}: ⊢ ⌜ fl_c__cr FLP <= LIM_STEPS ⌝ -∗ ∀ τ c,
-      {{{ ⌜ True ⌝ }}} fl_create #() @ τ {{{ lk, RET lk;
-         ∃ FLG: fl_GS FLP Σ, fl_LK FLP (lk, 0, false) (FLG := FLG) ∗ fl_is_lock lk c (FLG := FLG) }}};
+    fl_create_spec {FLG_PRE: fl_GpreS FLP Σ}: ⊢ ⌜ fl_c__cr FLP <= LIM_STEPS ⌝ -∗ ∀ τ π c,
+        {{{ cp π (fl_d__m FLP) (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) }}}
+            fl_create #() @ τ
+        {{{ lk, RET lk; ∃ FLG: fl_GS FLP Σ, fl_LK _ (lk, 0, false) (FLG := FLG) ∗ fl_is_lock lk c (FLG := FLG) ∗ th_phase_eq τ π (oGS := oGS) }}};
 
     fl_acquire_spec {FLG: fl_GS FLP Σ} (lk: val) c τ: (fl_is_lock (FLG := FLG)) lk c ⊢
         TLAT_FL τ 
@@ -96,11 +98,11 @@ Section FairLockSpec.
         (acquire_at_post lk (FLG := FLG))
         (fl_acq_lvls FLP)
         (fun '(_, _, b) => b = false)
-        (fun _ _ => Some fl_release_token)
+        (fun _ _ => Some $ fl_release_token (FLG := FLG))
         (fun _ _ => #())
         c (fl_acquire lk);
                                      
-    fl_release_spec {FLG: fl_GS FLP Σ} (lk: val) c τ: (fl_is_lock (FLG := FLG)) lk c ∗ fl_release_token ⊢
+    fl_release_spec {FLG: fl_GS FLP Σ} (lk: val) c τ: (fl_is_lock (FLG := FLG)) lk c ∗ fl_release_token (FLG := FLG) ⊢
         TLAT_FL τ
         (release_at_pre lk (FLG := FLG))
         (release_at_post lk (FLG := FLG))

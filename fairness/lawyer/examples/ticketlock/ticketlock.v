@@ -2,14 +2,14 @@ From iris.base_logic Require Export gen_heap.
 From iris.proofmode Require Import tactics coq_tactics.
 From iris.proofmode Require Import tactics.
 From iris.bi.lib Require Import fixpoint.
+From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
+From iris.base_logic.lib Require Import invariants.
 From trillium.program_logic Require Export weakestpre adequacy ectx_lifting.
 From trillium.fairness Require Import utils.
 From trillium.fairness.lawyer.examples Require Import obls_tactics.
 From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_am obligations_em obligations_logic.
 From trillium.fairness.lawyer Require Import sub_action_em program_logic.
 From trillium.fairness.lawyer.examples.ticketlock Require Import obls_atomic fair_lock.
-From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
-From iris.base_logic.lib Require Import invariants.
 
 
 Section Ticketlock.
@@ -196,10 +196,12 @@ Section Ticketlock.
     (fl_degs_he: deg_lt d__h0 d__e)
     (fl_degs_em: deg_lt d__e d__m0)
   .
+
+  Definition tl_exc := 20.
   
-  Program Definition TLPre: FairLockPre := {|
-    fl_c__cr := 2;
-    fl_B := fun c => 2 * c + 3;
+  Program Definition TLPre: FairLockPre := {|    
+    fl_c__cr := 2 + tl_exc;
+    fl_B := fun c => 2 * c + 3 + tl_exc;
     fl_GpreS := TicketlockPreG;
     fl_GS := TicketlockG;
     fl_LK := fun Σ FLG HEAP => tl_LK;
@@ -383,24 +385,21 @@ Section Ticketlock.
 
   Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS _ EM hGS (↑ nroot)}.
 
-  (* TODO: move *)
-  Lemma exc_lb_le n m
-    (LE: n <= m):
-    exc_lb m (oGS := oGS) ⊢ exc_lb n (oGS := oGS).
-  Proof using.
-    rewrite /exc_lb. erewrite mono_nat_lb_op_le_l; eauto.
-    rewrite own_op. by iIntros "[??]". 
-  Qed.
-
   Lemma tl_newlock_spec `{TicketlockPreG Σ} τ π c
     (BOUND: fl_c__cr TLPre <= LIM_STEPS):
-      {{{ exc_lb 20 (oGS := oGS) ∗ cp π d__m0 (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) }}}
+      {{{ cp π d__m0 (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) }}}
         tl_newlock #() @ τ
       {{{ lk, RET lk; ∃ TLG: TicketlockG Σ, tl_LK (lk, 0, false) ∗ tl_is_lock lk c ∗ th_phase_eq τ π (oGS := oGS) }}}.
-  Proof using OBLS_AMU .
+  Proof using OBLS_AMU.
     clear fl_degs_wl0 d__w ODl ODd LEl.
-    iIntros (Φ) "(#EB & CP & PH) POST". rewrite /tl_newlock.
+    iIntros (Φ) "(CP & PH) POST". rewrite /tl_newlock.
     pure_step_hl. MU_by_BMU.
+    simpl. do 2 rewrite -Nat.add_1_r. rewrite -Nat.add_assoc. iApply BMU_split.
+    iApply OU_BMU_rep.
+    iApply (OU_rep_wand with "[-PH]").
+    2: { iApply (increase_eb_upd_rep0 with "[$]"). }
+    iIntros "[#EB PH]".    
+    
     iApply OU_BMU. iApply (OU_wand with "[-CP PH]").
     2: { (* TODO: can we remove phase restriction for exchange? *)
          iApply (exchange_cp_upd with "[$] [$] [$]").
@@ -414,10 +413,9 @@ Section Ticketlock.
     wp_bind (ref _)%E. iApply sswp_MU_wp; [done| ].
     iApply wp_alloc. iIntros "!> %l__tk TK _". MU_by_burn_cp. pure_steps.
     
-    iApply fupd_wp.
     iMod (own_alloc (● ∅ ⋅ ◯ _: authUR (gmapUR nat (exclR $ tau_codomO Σ)))) as (γ__tm) "[TM_AUTH TM_FRAG]".
     { apply auth_both_valid_2; [| reflexivity]. done. }
-    iMod (own_alloc (● (GSet ∅) ⋅ _: authUR (gset_disjUR natO))) as (γ__toks) "[TOKS_AUTH TOKS_FRAG]". 
+    iMod (@own_alloc _ _ _ (● (GSet ∅) ⋅ _: authUR (gset_disjUR natO))) as (γ__toks) "[TOKS_AUTH TOKS_FRAG]".
     { apply auth_both_valid_2; [| reflexivity]. done. }
     iMod (own_alloc (● Excl' false ⋅ ◯ _: (excl_authUR boolO))) as (γ__h) "[HELD_AUTH HELD_FRAG]".
     { apply auth_both_valid_2; [| reflexivity]. done. }
@@ -428,10 +426,11 @@ Section Ticketlock.
     rewrite -{1}Qp.inv_half_half. iDestruct "OW" as "[OW OW']".
 
     eset (TLG := Build_TicketlockG _ _ γ__tm γ__toks γ__h γ__lb γ__rt).
+    iApply fupd_wp.
     iMod (inv_alloc fl_ι _ (tl_inv_inner _ c) with "[-POST OW' HELD_FRAG CPS PH]") as "#INV".
     { rewrite /tl_inv_inner. iNext. do 5 iExists _. iFrame.
       do 2 (iSplit; [done| ]). iSplit.
-      { simpl. iApply exc_lb_le; [| done]. lia. }
+      { simpl. iApply exc_lb_le; [| done]. unfold tl_exc. lia. }
       rewrite Nat.eqb_refl. iFrame.
       iSplit.
       { iPureIntro. apply dom_empty_L. }
@@ -445,6 +444,8 @@ Section Ticketlock.
     iApply "POST". iExists _. iFrame "#∗".
     do 2 iExists _. iFrame. done.
   Qed.
+
+  Set Ltac Profiling.
 
   Section AfterInit.
         
@@ -473,7 +474,7 @@ Section Ticketlock.
     iAssert (P -∗ P)%I as "GOAL"; [iIntros "X"; by iApply "X"| ]
   end.
 
-  (* TODO: move *)
+  (* TODO: why it works only in specific cases? *)
   Opaque cp_mul. 
 
   (* TODO: mention exc_lb in the proof OR implement its increase *)
@@ -526,7 +527,9 @@ Section Ticketlock.
     iApply sswp_MU_wp_fupd; [done| ]. iModIntro.
     iApply (wp_faa with "TK").
     iIntros "!> TK'". iNext. MU_by_BMU.
-    simpl. rewrite (Nat.add_comm _ 3). iApply OU_BMU.
+    simpl.
+    iApply BMU_lower; [apply PeanoNat.Nat.le_add_r| ].
+    rewrite (Nat.add_comm _ 3). iApply OU_BMU.
     (* iDestruct (cp_mul_take with "CPSw") as "[CPSw CPw]". *)
     apply Nat.le_sum in LEot as [d ->].
     iApply (OU_wand with "[-CPe PH]").
@@ -746,7 +749,7 @@ Section Ticketlock.
     iDestruct (cp_mul_split with "[CPS CPS']") as "CPS"; [iFrame| ]. simpl.
     iApply BMU_intro. iMod "CLOS'" as "TAUs". iModIntro.
     (* rewrite cp_mul_take. iDestruct "CPS" as "[CPS CP]". *)
-    split_cps "CPS" 1. rewrite -cp_mul_1. 
+    split_cps "CPS" 1. rewrite -cp_mul_1.
     iSplitR "CPS'".
     2: { do 2 iExists _. iFrame. done. }
     iModIntro. pure_steps.
@@ -864,9 +867,35 @@ Section Ticketlock.
     iSplit; [| done]. iLeft. iFrame.
   Qed.
 
+  (* TODO: move, remove duplicates *)
+  Hypothesis (LS_LB: S tl_exc ≤ LIM_STEPS). 
+
+  (* TODO: move, use in other lemmas *)
+  Lemma first_BMU τ π q d0 d n E
+    (DEG_LT: deg_lt d d0)
+    (LIM: S n <= LIM_STEPS):
+    th_phase_frag τ π q (oGS := oGS) -∗ cp π d0 (oGS := oGS) -∗
+    BMU E (S n) (cp_mul π d n (oGS := oGS) ∗ exc_lb n (oGS := oGS) ∗ th_phase_frag τ π q (oGS := oGS)) (oGS := oGS).
+  Proof using.
+    iIntros "PH CP".
+    do 2 rewrite -Nat.add_1_r. simpl. iApply BMU_split.
+    iApply OU_BMU_rep.
+    iApply (OU_rep_wand with "[-PH]").
+    2: { iApply (increase_eb_upd_rep0 with "[$]"). }
+    iIntros "[#EB PH]".    
+    
+    iApply OU_BMU. iApply (OU_wand with "[-CP PH]").
+    2: { (* TODO: can we remove phase restriction for exchange? *)
+         iApply (exchange_cp_upd with "[$] [$] [$]").
+         { reflexivity. }
+         eauto. }
+    iIntros "[CPS PH]".
+    iApply BMU_intro. iFrame "#∗".
+  Qed.
+
   (* TODO: mention exc_lb in the proof OR implement its increase *)
   Lemma tl_release_spec (lk: val) c τ:
-    tl_is_lock lk c ∗ exc_lb 20 (oGS := oGS) ∗ rel_tok ⊢
+    tl_is_lock lk c ∗ rel_tok ⊢
         TLAT_FL τ
         (release_at_pre lk (FLP := TLPre) (FLG := TLG))
         (release_at_post lk (FLP := TLPre) (FLG := TLG))
@@ -878,22 +907,30 @@ Section Ticketlock.
          (tl_release lk)
         (oGS := oGS)
         (FLP := TLPre).
-  Proof using fl_degs_wl0 OBLS_AMU.
+  Proof using fl_degs_wl0 OBLS_AMU LS_LB.
     clear ODl ODd LEl.
-    iIntros "(#INV & #EB & RT)". rewrite /TLAT_FL /TLAT.
+    iIntros "(#INV & RT)". rewrite /TLAT_FL /TLAT.
     iIntros (Φ q π Ob RR) "%LIM_STEPS' PRE TAU".
     rewrite /TLAT_pre. simpl. iDestruct "PRE" as "(RR0 & OB & _ & PH & CP)".
     rewrite /tl_release.
 
-    pure_step_hl. MU_by_BMU.
-    iApply (BMU_lower _ 2).
-    { simpl. lia. }
-    iApply OU_BMU. iApply (OU_wand with "[-CP PH]").
-    2: { (* TODO: can we remove phase restriction for exchange? *)
-         iApply (exchange_cp_upd with "[$] [$] [$]").
-         { reflexivity. }
-         trans d__e; [trans d__h0| ]; [trans d__l0|..]; eauto. }
-    iIntros "[CPS PH]". BMU_burn_cp.
+    pure_step_hl. MU_by_BMU.    
+    iApply (BMU_lower _ 20).
+    { simpl. rewrite /tl_exc. lia. }
+    iApply (BMU_wand with "[-CP PH]").
+    2: { iApply (first_BMU with "[$] [$]"); [| eauto].
+         { trans d__e; [trans d__h0| ]; [trans d__l0|..]; eauto. }
+         simpl. etrans; [| apply LIM_STEPS'].
+         simpl. rewrite /tl_exc. lia. }
+    iIntros "(CPS & #EB & PH)".
+    burn_cp_after_BMU. 
+    
+    (* iApply OU_BMU. iApply (OU_wand with "[-CP PH]"). *)
+    (* 2: { (* TODO: can we remove phase restriction for exchange? *) *)
+    (*      iApply (exchange_cp_upd with "[$] [$] [$]"). *)
+    (*      { reflexivity. } *)
+    (*      trans d__e; [trans d__h0| ]; [trans d__l0|..]; eauto. } *)
+    (* iIntros "[CPS PH]". BMU_burn_cp. *)
 
     assert (FAA (Fst lk) #1 = fill_item (FaaLCtx #(LitInt 1)) (Fst lk)) as CTX by done.
     iApply (wp_bind [(FaaLCtx #1)] NotStuck ⊤ τ (Fst lk) (Λ := heap_lang)). simpl.
@@ -928,7 +965,8 @@ Section Ticketlock.
     iDestruct "TAU" as "[_ [TAU _]]".
     iNext. MU_by_BMU.
     iSpecialize ("TAU" with "[$OB $PH]").
-    { done. }    
+    { done. }
+    simpl. iApply BMU_lower; [apply PeanoNat.Nat.le_add_r| ].
     simpl. rewrite -Nat.add_assoc. iApply BMU_split.
     iApply (BMU_wand with "[-TAU] [$]"). iIntros "CLOS'". rewrite -Nat.add_assoc.
     iSpecialize ("CLOS'" $! (_, (ow + 1), false)).
@@ -978,10 +1016,9 @@ Section Ticketlock.
     iModIntro. by iApply "Φ".
   Qed.
 
-
   (* TODO: mention exc_lb in the proof OR implement its increase *)
   Lemma tl_acquire_spec (lk: val) c τ:
-    tl_is_lock lk c ∗ exc_lb 20 (oGS := oGS) ⊢
+    tl_is_lock lk c ⊢
         TLAT_FL τ
         (acquire_at_pre lk (FLP := TLPre) (FLG := TLG))
         (acquire_at_post lk (FLP := TLPre) (FLG := TLG))
@@ -992,21 +1029,22 @@ Section Ticketlock.
         c (tl_acquire lk)
         (oGS := oGS)
         (FLP := TLPre).
-  Proof using fl_degs_wl0 d__w OBLS_AMU.
+  Proof using fl_degs_wl0 d__w OBLS_AMU LS_LB.
     clear ODl ODd LEl. 
-    iIntros "[#INV #EB]". rewrite /TLAT_FL /TLAT.
+    iIntros "#INV". rewrite /TLAT_FL /TLAT.
     iIntros (Φ q π Ob RR) "%LIM_STEPS' PRE TAU".
     rewrite /TLAT_pre. simpl. iDestruct "PRE" as "(RR0 & OB & _ & PH & CP)".
 
     rewrite /tl_acquire. pure_step_hl. MU_by_BMU.
-    iApply (BMU_lower _ 3).
-    { simpl. lia. }
-    iApply OU_BMU. iApply (OU_wand with "[-CP PH]").
-    2: { (* TODO: can we remove phase restriction for exchange? *)
-         iApply (exchange_cp_upd with "[$] [$] [$]").
-         { reflexivity. }
+    simpl. iApply (BMU_lower _ (S tl_exc + (c + c + 2))); [lia| ].
+    iApply BMU_split. iApply (BMU_wand with "[-CP PH]").
+    2: { iApply (first_BMU with "[$] [$]"); [| eauto].
          apply fl_degs_em. }
-    iIntros "[CPSe PH]". iDestruct (cp_mul_take with "CPSe") as "[CPSe CPe]".
+    iIntros "(CPSe & #EB & PH)".
+    
+    iApply (BMU_lower _ 2).
+    { simpl. lia. }
+    iDestruct (cp_mul_take with "CPSe") as "[CPSe CPe]".
     iApply OU_BMU. iApply (OU_wand with "[-CPe PH]").
     2: { iApply (exchange_cp_upd with "[$] [$] [$]").
          { reflexivity. }
@@ -1017,10 +1055,10 @@ Section Ticketlock.
          { reflexivity. }
          do 2 (etrans; eauto). }
     iIntros "[CPS PH]". BMU_burn_cp.
-    replace 19 with (10 + 9) at 4 by lia. iDestruct (cp_mul_split with "CPS") as "[CPS1 CPS]".
+    replace 19 with (10 + 9) at 3 by lia.
+    iDestruct (cp_mul_split with "CPS") as "[CPS1 CPS]".
 
     Set Printing Coercions.
-    (* set (post :=  (fun x => bi_wand (th_phase_frag τ π (q /2) (oGS := oGS)) (Φ x)): ofe_car valO → ofe_car (iPropO Σ)). *)
     set (post := (fun x => bi_wand rel_tok (Φ x)) : ofe_car valO → ofe_car (iPropO Σ)). 
     assert (NonExpansive post) as NE_Φ by apply _.
     assert (NonExpansive RR) as NE_RR.
@@ -1059,6 +1097,30 @@ Section Ticketlock.
 
   End AfterInit.
 
-  
-  
+  Show Ltac Profile.
+
+  (* TODO: move, remove duplicates *)
+  Hypothesis (LS_LB: S tl_exc ≤ LIM_STEPS). 
+
+  Program Definition TL_FL: FairLock (oGS := oGS) (FLP := TLPre) := {|
+    fl_is_lock FLG hGS := @tl_is_lock FLG;
+    fl_create := tl_newlock; fl_acquire := tl_acquire; fl_release := tl_release;
+    fl_release_token FLG := @rel_tok _ FLG;
+  |}.
+  Next Obligation.
+    iIntros "%%%%% % !> (CP & PH) POST".
+    unshelve iApply (tl_newlock_spec with "[-POST] [$]").
+    { eauto. }
+    { done. }
+    iFrame.
+  Qed.
+  Next Obligation.
+    iIntros "%%%% #LOCK".
+    iApply (tl_acquire_spec with "[$]"). done.
+  Qed.
+  Next Obligation.
+    iIntros "%%%% (#LOCK & RT)".
+    iApply (tl_release_spec with "[$]"). done.
+  Qed.     
+    
 End Ticketlock.
