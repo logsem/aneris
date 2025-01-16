@@ -386,7 +386,13 @@ Section ProgramLogic.
        ⊢ OU_rep b P (oGS := oGS) -∗ BMU E b P.
     Proof using.
       iIntros "OUs". iInduction b as [| b] "IH"; simpl.
-      { iMod "OUs". by iApply BMU_intro. }
+      { rewrite /BMU.
+        rewrite /BMU /OAM_st_interp_interim_step.
+        iIntros (c c' δ τ n f) "TI'".
+        iDestruct "TI'" as "(%δ_ & MSI & %TRANS1 & %TH_OWN & %DPO & %OBLS_EQ & %STEP & %FF)".
+        iMod ("OUs" with "[$]") as "(% & ? & -> & ?)".
+        iModIntro. iExists n. iFrame. iSplit; [| by rewrite Nat.sub_diag].        
+        iExists _. iFrame. eauto. }
       iApply OU_BMU. iApply (OU_wand with "[-OUs] [$]"). done.
     Qed.
 

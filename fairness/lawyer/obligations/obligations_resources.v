@@ -288,6 +288,13 @@ Section ObligationsRepr.
       rewrite /exc_lb. rewrite -own_op. by rewrite mono_nat_lb_op.
     Qed.
 
+    Lemma exc_lb_le n m (LE: n <= m):
+      exc_lb m ⊢ exc_lb n.
+    Proof using.
+      rewrite /exc_lb. erewrite mono_nat_lb_op_le_l; eauto.
+      rewrite own_op. by iIntros "[??]". 
+    Qed.
+
     Lemma obls_sgn_lt_locale_obls δ ζ R lm:
       ⊢ obls_msi δ -∗ obls ζ R -∗ sgns_level_gt R lm -∗
         ⌜ lt_locale_obls lm ζ δ ⌝.
@@ -412,14 +419,18 @@ Section ObligationsRepr.
 
     Definition OU := OU' (loc_step_ex).
 
-    Lemma OU_wand P Q:
-      (P -∗ Q) -∗ OU P -∗ OU Q.
+    Lemma OU'_wand rel P Q:
+      (P -∗ Q) -∗ OU' rel P -∗ OU' rel Q.
     Proof using.
       iIntros "PQ OU".
-      rewrite /OU /OU'. iIntros "**".
+      rewrite /OU'. iIntros "**".
       iSpecialize ("OU" with "[$]"). iMod "OU" as "(%&?&?&?)". iModIntro.
       iExists _. iFrame. by iApply "PQ".
     Qed.
+        
+    Lemma OU_wand P Q:
+      (P -∗ Q) -∗ OU P -∗ OU Q.
+    Proof using. by apply OU'_wand. Qed.
         
     Global Instance OU_entails:
       Proper (bi_entails ==> bi_entails) OU.
@@ -438,9 +449,9 @@ Section ObligationsRepr.
 
     Fixpoint OU_rep n P: iProp Σ :=
       match n with
-      | 0 => |==> P
+      | 0 => OU' eq P (* access obls_msi even on trivial case *)
       | S n => OU (OU_rep n P)
-      end. 
+      end.
 
     Lemma OU_bupd P:
       (OU (|==> P)) -∗ OU P.
@@ -454,7 +465,8 @@ Section ObligationsRepr.
       (P ∗ OU_rep n Q) -∗ OU_rep n (P ∗ Q).
     Proof using.
       iIntros "[P OUs]". iInduction n as [| n] "IH".
-      { simpl. iFrame. done. }
+      { simpl. iFrame. iIntros "% ?".
+        iMod ("OUs" with "[$]") as "(%&?&?&?)". iExists _. by iFrame. }
       simpl. iApply (OU_wand with "[-OUs] [$]").
       by iApply "IH".
     Qed.
@@ -463,13 +475,13 @@ Section ObligationsRepr.
       (P -∗ Q) -∗ OU_rep n P -∗ OU_rep n Q.
     Proof using.
       iIntros "PQ OUs". iInduction n as [| n] "IH"; simpl.
-      { iMod "OUs". by iApply "PQ". }
+      { by iApply (OU'_wand with "[$]"). }
       iApply (OU_wand with "[-OUs] [$]").
       iIntros "OUs". by iApply ("IH" with "[$]").
     Qed.
 
-    Lemma OU_proper' (P Q: iProp Σ):
-      (P ∗-∗ Q) -∗ OU P ∗-∗ OU Q.
+    Lemma OU'_proper' (P Q: iProp Σ) rel:
+      (P ∗-∗ Q) -∗ OU' rel P ∗-∗ OU' rel Q.
     Proof using.
       iIntros "EQUIV". rewrite /OU.
       iSplit; iIntros "OU % MSI"; iMod ("OU" with "[$]") as "(%&?&?&?)"; iModIntro; iExists _; iFrame; by iApply "EQUIV".
@@ -480,8 +492,8 @@ Section ObligationsRepr.
     Proof using.
       clear H1 H0 H.
       intros ???. iInduction n as [| n] "%IH".
-      { simpl. rewrite H. set_solver. }
-      simpl. by iApply OU_proper'.
+      { simpl. iSplit; iApply OU'_wand; set_solver. } 
+      simpl. by iApply OU'_proper'.
     Qed.
 
     Lemma OU_create_sig ζ R l:
@@ -745,7 +757,9 @@ Section ObligationsRepr.
     Proof using H0 H1.
       iIntros "#EP ?? #GT ?".
       iInduction n as [| n] "IH".
-      { iFrame. iApply cp_mul_0. }
+      { iFrame. iIntros "% ?".
+        iExists _. iFrame. iApply bupd_frame_l. 
+        iSplit; [done| ]. iApply cp_mul_0. }
       simpl. iApply (OU_wand with "[]").
       2: { iApply (expect_sig_upd with "EP [$] [$] [$] [$]"). }
       iIntros "(CP & ?&?&?)".
@@ -833,6 +847,24 @@ Section ObligationsRepr.
       rewrite {2}mono_nat_auth_lb_op. apply cmra_mono_l.
       apply mono_nat_lb_mono. lia.
     Qed.
+    
+    Lemma OU'_mod P rel R:
+      (∀ δ, obls_msi δ -∗ obls_msi δ ∗ R) -∗ (R -∗ OU' rel P) -∗ OU' rel P.
+    Proof using.
+      iIntros "GET OU". rewrite /OU'.
+      iIntros "% MSI". iDestruct ("GET" with "[$]") as "[MSI R]".
+      iApply ("OU" with "[$] [$]").
+    Qed.
+
+    Lemma OU_rep_mod P n R:
+      (∀ δ, obls_msi δ -∗ obls_msi δ ∗ R) -∗ (R -∗ OU_rep n P) -∗ OU_rep n P.
+    Proof using.
+      iIntros "GET OU".
+      iInduction n as [| n] "IH".
+      { iApply (OU'_mod with "[$] [$]"). }
+      simpl.
+      iApply (OU'_mod with "[$] [$]").
+    Qed.
 
     Lemma increase_eb_upd_rep τ n π q k:
       ⊢ exc_lb n -∗ th_phase_frag τ π q -∗ OU_rep k (exc_lb (n + k) ∗ th_phase_frag τ π q).
@@ -840,12 +872,25 @@ Section ObligationsRepr.
       clear H1 H0 H.
       iIntros "EB PH".
       iInduction k as [| k] "IH" forall (n); simpl.
-      { iFrame "#∗". by rewrite Nat.add_0_r. }      
+      { iFrame "#∗". rewrite Nat.add_0_r.
+        iIntros. iExists _. by iFrame. }      
       iApply (OU_wand with "[]").
       2: { iApply (increase_eb_upd with "[$] [$]"). }
       iIntros "[EB PH]". iApply (OU_rep_wand with "[]").
       2: { iApply ("IH" with "[$] [$]"). }
       rewrite Nat.add_succ_comm. set_solver.
+    Qed.
+
+    Lemma increase_eb_upd_rep0 τ π q k:
+      ⊢ th_phase_frag τ π q -∗ OU_rep k (exc_lb k ∗ th_phase_frag τ π q).
+    Proof using.
+      clear H1 H0 H.
+      iIntros "PH".
+      iApply (OU_rep_mod _ _ (exc_lb 0)).
+      2: { iIntros. rewrite -{2}(Nat.add_0_l k). iApply (increase_eb_upd_rep with "[$] [$]"). }
+      iIntros "% (?&?&?&?&?&EX)".
+      rewrite mono_nat_auth_lb_op. iDestruct "EX" as "[??]". iFrame.
+      iApply (exc_lb_le with "[$]"). lia.
     Qed.
 
     (* TODO: ? refactor these proofs about fork step *)

@@ -893,24 +893,8 @@ Section MotivatingClient.
 
   End AfterInit.
 
-  (* TODO: move *)
-  Ltac burn_cp_after_BMU :=
-    iDestruct (cp_mul_take with "CPS") as "[CPS CP]";
-    iSplitR "CP";
-    [| do 2 iExists _; iFrame; iPureIntro; done].
-
-
   Context {OBLS_AMU__f: forall τ, @AMU_lift_MU__f _ _ _ τ oGS _ EM _ ⊤}.
   Context {NO_OBS_POST: ∀ τ v, obls τ ∅ (oGS := oGS) -∗ fork_post τ v}. 
-
-  (* TODO: move, remove duplicates *)
-  Lemma exc_lb_le n m
-    (LE: n <= m):
-    exc_lb m (oGS := oGS) ⊢ exc_lb n (oGS := oGS).
-  Proof using.
-    rewrite /exc_lb. erewrite mono_nat_lb_op_le_l; eauto.
-    rewrite own_op. by iIntros "[??]". 
-  Qed.
 
   Theorem client_spec `{ClientPreG Σ, fl_GpreS FLP Σ} τ π:
     {{{ exc_lb 70 (oGS := oGS) ∗

@@ -10,12 +10,14 @@ From trillium.fairness.lawyer.obligations Require Import obligations_model oblig
 From trillium.fairness.lawyer Require Import sub_action_em.
 From trillium.fairness.lawyer Require Import program_logic.
 
-Ltac BMU_burn_cp :=
-  iApply BMU_intro;
-  (* TODO: make a separate tactic *)
+Ltac burn_cp_after_BMU :=
   iDestruct (cp_mul_take with "CPS") as "[CPS CP]";
   iSplitR "CP";
   [| do 2 iExists _; iFrame; iPureIntro; done].
+
+Ltac BMU_burn_cp :=
+  iApply BMU_intro;
+  burn_cp_after_BMU.
 
 Ltac MU_by_BMU :=
   match goal with
