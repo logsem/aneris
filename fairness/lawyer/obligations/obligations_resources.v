@@ -106,11 +106,13 @@ Section ObligationsRepr.
     Definition cp (ph_ub: Phase) (deg: Degree): iProp Σ :=
       ∃ ph, own obls_cps (◯ (cps_repr ({[+ ((ph, deg)) +]}))) ∗ ⌜ phase_le ph ph_ub ⌝.
 
-    Definition cp_mul (ph_ub: Phase) deg n: iProp Σ :=
-      [∗] replicate n (cp ph_ub deg). 
-
-    (* Definition cps (m: gmultiset (@CallPermission Degree)) : iProp Σ := *)
-    (*   own obls_cps (◯ (cps_repr m)).  *)
+    (* sealing this definition to avoid annoying unfolds (see Mattermost message) *)
+    (* TODO: find a better solution? *)
+    Local Definition cp_mul_def (ph_ub: Phase) deg n: iProp Σ :=
+      [∗] replicate n (cp ph_ub deg).
+    Local Definition cp_mul_aux : seal cp_mul_def. by eexists. Qed.
+    Definition cp_mul := unseal cp_mul_aux. 
+    Local Definition cp_mul_unseal : cp_mul = cp_mul_def := seal_eq cp_mul_aux.
 
     Definition sgn (sid: SignalId) (l: Level) (ob: option bool): iProp Σ :=
       own obls_sigs (◯ ({[ sid := (to_agree l, mbind (Some ∘ Excl) ob ) ]})).
@@ -371,7 +373,8 @@ Section ObligationsRepr.
     Proof using.
       clear H1 H0 H.
       iIntros "CPS".
-      rewrite /cp_mul. iInduction n as [| n] "IH".
+      rewrite cp_mul_unseal. 
+      iInduction n as [| n] "IH".
       { set_solver. }
       simpl. iDestruct "CPS" as "[CP CPS]". iSplitL "CP".
       { by iApply cp_weaken. }
@@ -381,13 +384,15 @@ Section ObligationsRepr.
     Lemma cp_mul_take ph deg n:
       cp_mul ph deg (S n) ⊣⊢ cp_mul ph deg n ∗ cp ph deg.
     Proof using.
+      rewrite cp_mul_unseal. 
       rewrite /cp_mul. simpl. by rewrite bi.sep_comm. 
     Qed.
 
     Lemma cp_mul_split ph deg m n:
       cp_mul ph deg (m + n) ⊣⊢ cp_mul ph deg m ∗ cp_mul ph deg n.
     Proof using.
-      rewrite /cp_mul. rewrite replicate_add.
+      rewrite cp_mul_unseal.
+      rewrite /cp_mul_def. rewrite replicate_add.
       by rewrite big_sepL_app. 
     Qed.
  
@@ -403,14 +408,16 @@ Section ObligationsRepr.
     Lemma cp_mul_0 π d:
       ⊢ |==> cp_mul π d 0.
     Proof using.
-      clear H H0 H1. 
-      rewrite /cp_mul. simpl. set_solver. 
+      clear H H0 H1.
+      rewrite cp_mul_unseal. 
+      rewrite /cp_mul_def. simpl. set_solver. 
     Qed.
 
     Lemma cp_mul_1 π d:
       cp π d ⊣⊢ cp_mul π d 1.
     Proof using.
-      rewrite /cp_mul. simpl.
+      rewrite cp_mul_unseal. 
+      rewrite /cp_mul_def. simpl.
       by rewrite bi.sep_emp.
     Qed.
 
@@ -621,7 +628,8 @@ Section ObligationsRepr.
         simpl. reflexivity. }
 
       rewrite /cps_repr. rewrite bi.sep_comm.
-      rewrite /cp_mul /cp. iCombine "CPS CP" as "CPS".
+      rewrite cp_mul_unseal. 
+      rewrite /cp_mul_def /cp. iCombine "CPS CP" as "CPS".
       iMod (own_update with "[$]") as "foo".
       { apply auth_update.
       etrans.
