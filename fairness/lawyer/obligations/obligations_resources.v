@@ -367,18 +367,16 @@ Section ObligationsRepr.
       iExists _. iFrame. iPureIntro. etrans; eauto.
     Qed.
       
-    Lemma cp_mul_weaken π1 π2 deg n
-      (PH_LE: phase_le π1 π2):
-      cp_mul π1 deg n -∗ cp_mul π2 deg n.
+    Lemma cp_mul_alt π d n:
+      cp_mul π d n ⊣⊢ ([∗ mset] '(π, d) ∈ (n *: {[+ (π, d) +]}), cp π d).
     Proof using.
       clear H1 H0 H.
-      iIntros "CPS".
-      rewrite cp_mul_unseal. 
+      rewrite cp_mul_unseal. rewrite /cp_mul_def.
       iInduction n as [| n] "IH".
       { set_solver. }
-      simpl. iDestruct "CPS" as "[CP CPS]". iSplitL "CP".
-      { by iApply cp_weaken. }
-      by iApply "IH". 
+      simpl. rewrite gmultiset_scalar_mul_S_l big_sepMS_disj_union.
+      rewrite big_sepMS_singleton.
+      iSplit; iIntros "[??]"; iFrame; by iApply "IH".
     Qed.
 
     Lemma cp_mul_take ph deg n:
@@ -396,13 +394,43 @@ Section ObligationsRepr.
       by rewrite big_sepL_app. 
     Qed.
  
-    (* TODO: move *)
     Lemma cp_mul_split' (ph : listO natO) (deg : DegO) (m n : nat)
       (LE: m <= n):
       cp_mul ph deg n ⊣⊢ cp_mul ph deg m ∗ cp_mul ph deg (n - m).
     Proof using.
       apply Nat.le_sum in LE as [? ->]. rewrite Nat.sub_add'.
       apply cp_mul_split.
+    Qed.
+
+    Lemma cp_mul_weaken π1 π2 deg n1 n2
+      (PH_LE: phase_le π1 π2)
+      (LE: n2 <= n1):
+      cp_mul π1 deg n1 -∗ cp_mul π2 deg n2.
+    Proof using.
+      clear H1 H0 H.
+      iIntros "CPS".
+      apply Nat.le_sum in LE as [? ->].
+      iDestruct (cp_mul_split with "CPS") as "[CPS _]".
+      rewrite cp_mul_unseal.
+      iInduction n2 as [| n] "IH".
+      { set_solver. }
+      simpl. iDestruct "CPS" as "[CP CPS]". iSplitL "CP".
+      { by iApply cp_weaken. }
+      by iApply "IH".
+    Qed.
+
+    Lemma cps_mset (M: gmultiset CallPermission):
+      own obls_cps (◯ M) -∗ ([∗ mset] '(π, d) ∈ M, cp π d).
+    Proof using.
+      clear H1 H0 H. 
+      iIntros "CPS".
+      iInduction M as [| cp M] "IH" using gmultiset_ind.
+      { set_solver. }
+      rewrite big_sepMS_disj_union.
+      rewrite -gmultiset_op. iDestruct "CPS" as "[CP CPS]". iSplitL "CP".
+      - rewrite big_opMS_singleton. destruct cp.
+        iExists _. by iFrame.
+      - by iApply "IH".
     Qed.
 
     Lemma cp_mul_0 π d:

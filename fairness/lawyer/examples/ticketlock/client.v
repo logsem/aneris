@@ -834,7 +834,6 @@ Section MotivatingClient.
              apply LT0m. }
         iIntros "[CPSm PH]". BMU_burn_cp. 
         iApply ("IH" with "[-POST]"); [| done]. iFrame "#∗".
-        rewrite cp_mul_1 -cp_mul_split. iFrame. 
     Qed.
 
     Theorem right_thread_spec (lk: val) τ π (flag: loc) s__f:
@@ -887,8 +886,8 @@ Section MotivatingClient.
       2: { iNext. iIntros (?) "(?&?&?&?)". iApply "POST". iFrame. }
       iFrame "#∗".
       split_cps "CPSh" 2. iFrame.
-      rewrite cp_mul_1. rewrite -!cp_mul_split. 
-      split_cps "CPS'" 6. iFrame.
+      iDestruct (cp_mul_split with "[$CPS' $CPS]") as "?".
+      iApply cp_mul_weaken; [reflexivity| | by iFrame]. lia. 
     Qed.
 
   End AfterInit.
@@ -975,7 +974,7 @@ Section MotivatingClient.
       iFrame "#∗". iSplitL "OB2".
       { iApply obls_proper; [| done]. symmetry. apply intersection_idemp. }
       apply strict_include in PH_LT2.
-      iSplitL "CPSm'"; (iApply cp_mul_weaken; [| by iFrame]); done. }
+      iSplitL "CPSm'"; (iApply cp_mul_weaken; [| reflexivity| by iFrame]); done. }
 
     iRename "PH1" into "PH". rewrite difference_diag_L.
     (* Unset Printing Notations. *)
@@ -1002,7 +1001,7 @@ Section MotivatingClient.
     iSplit. 
     { iApply (exc_lb_le with "[$]"). lia. }
     apply strict_include in PH_LT12.
-    iSplitL "CPSr"; (iApply cp_mul_weaken; [| by iFrame]); etrans; eauto.
+    iSplitL "CPSr"; (iApply cp_mul_weaken; [| reflexivity| by iFrame]); etrans; eauto.
   Qed.
     
 End MotivatingClient.

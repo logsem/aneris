@@ -774,11 +774,11 @@ Section EoFin.
           rewrite bi.sep_assoc. iSplitR "OB2".
           2: { rewrite (proj2 (PeanoNat.Nat.ltb_lt _ _)); [ | lia].
                iExists _. by iFrame. }
-          iSplitL "CPS2"; (iApply cp_mul_weaken; [| by iFrame]); apply LT2. }
+          iSplitL "CPS2"; (iApply cp_mul_weaken; [| reflexivity| by iFrame]); apply LT2. }
 
         iRename "PH1" into "PH".
         apply strict_include in LT1.
-        iDestruct (cp_mul_weaken with "CPS") as "CPS"; [apply LT1| ].
+        iDestruct (cp_mul_weaken with "CPS") as "CPS"; [apply LT1| reflexivity| ].
         wp_bind (Rec _ _ _)%E. pure_steps.
 
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
@@ -803,7 +803,7 @@ Section EoFin.
         
         apply strict_include in LT4. iRename "PH3" into "PH".
         wp_bind (_ + _)%E. rewrite Nat2Z.inj_0.
-        iDestruct (cp_mul_weaken with "CPS") as "CPS"; [apply LT4| ].
+        iDestruct (cp_mul_weaken with "CPS") as "CPS"; [apply LT4| reflexivity| ].
         do 2 pure_step_cases.
         replace (0 + 1)%Z with 1%Z; [| done].
         replace 1%Z with (Z.of_nat 1%nat); [| done].
@@ -816,7 +816,7 @@ Section EoFin.
         rewrite bi.sep_assoc. iSplitR "OB2".
         2: { rewrite (proj2 (PeanoNat.Nat.ltb_lt _ _)); [ | lia].
              iExists _. by iFrame. }
-        iSplitL "CPS2"; (iApply cp_mul_weaken; [| by iFrame]).
+        iSplitL "CPS2"; (iApply cp_mul_weaken; [| reflexivity| by iFrame]).
         all: etrans; eauto.
         Unshelve. exact #(). 
       - simpl in SIGS_LEN. 
@@ -850,11 +850,11 @@ Section EoFin.
           rewrite bi.sep_assoc. iSplitR "OB2".
           2: { rewrite (proj2 (PeanoNat.Nat.ltb_lt _ _)); [ | lia].
                iExists _. by iFrame. }
-          iSplitL "CPS2"; (iApply cp_mul_weaken; [| by iFrame]).
+          iSplitL "CPS2"; (iApply cp_mul_weaken; [| reflexivity| by iFrame]).
           all: apply LT2. }
 
         apply strict_include in LT1. iRename "PH1" into "PH".
-        iDestruct (cp_mul_weaken with "CPS") as "CPS"; [apply LT1| ].        
+        iDestruct (cp_mul_weaken with "CPS") as "CPS"; [apply LT1| reflexivity| ].
         wp_bind (Rec _ _ _)%V. pure_step.
         iApply wp_value. pure_step.
 
@@ -880,7 +880,7 @@ Section EoFin.
         
         apply strict_include in LT4. iRename "PH3" into "PH".
         wp_bind (_ + _)%E. rewrite Nat2Z.inj_0.
-        iDestruct (cp_mul_weaken with "CPS") as "CPS"; [apply LT4| ].
+        iDestruct (cp_mul_weaken with "CPS") as "CPS"; [apply LT4| reflexivity| ].
         do 2 pure_step_cases.
         replace (0 + 1)%Z with 1%Z; [| done].
         replace 1%Z with (Z.of_nat 1%nat); [| done].         
@@ -892,7 +892,7 @@ Section EoFin.
         rewrite {1 3}B1. simpl.
         rewrite (proj2 (PeanoNat.Nat.ltb_ge _ _)); [| lia].
         iFrame "PH #∗".
-        iSplitL "CPS2"; (iApply cp_mul_weaken; [| by iFrame]).
+        iSplitL "CPS2"; (iApply cp_mul_weaken; [| reflexivity| by iFrame]).
         all: etrans; eauto. 
         Unshelve. exact #().
       - simpl in SIGS_LEN. 
@@ -923,10 +923,10 @@ Section EoFin.
           2: { iNext. iIntros (v) "OB". by iApply NO_OBS_POST. }
           rewrite (proj2 (PeanoNat.Nat.ltb_ge _ _)); [| lia].
           rewrite Nat.sub_0_r. iFrame "PH3 #∗".
-          iSplitL "CPS2"; (iApply cp_mul_weaken; [| by iFrame]); apply LT2. }
+          iSplitL "CPS2"; (iApply cp_mul_weaken; [| reflexivity| by iFrame]); apply LT2. }
 
         apply strict_include in LT1. iRename "PH1" into "PH".
-        iDestruct (cp_mul_weaken with "CPS") as "CPS"; [apply LT1| ].
+        iDestruct (cp_mul_weaken with "CPS") as "CPS"; [apply LT1| reflexivity| ].
         wp_bind (Rec _ _ _)%V. pure_step.
         iApply wp_value. pure_step.
 
@@ -952,7 +952,7 @@ Section EoFin.
         
         apply strict_include in LT4. iRename "PH3" into "PH".
         wp_bind (_ + _)%E. rewrite Nat2Z.inj_0.
-        iDestruct (cp_mul_weaken with "CPS") as "CPS"; [apply LT4| ].
+        iDestruct (cp_mul_weaken with "CPS") as "CPS"; [apply LT4| reflexivity| ].
         do 2 pure_step_cases.
         replace (0 + 1)%Z with 1%Z; [| done].
         replace 1%Z with (Z.of_nat 1%nat); [| done].         
@@ -964,7 +964,7 @@ Section EoFin.
         rewrite (proj2 (PeanoNat.Nat.ltb_ge _ _)); [| lia].
         rewrite {1 3}B0. simpl.  
         iFrame "PH #∗".
-        iSplitL "CPS2'"; (iApply cp_mul_weaken; [| by iFrame]).
+        iSplitL "CPS2'"; (iApply cp_mul_weaken; [| reflexivity| by iFrame]).
         all: etrans; eauto.
         Unshelve. exact #().
     Qed.

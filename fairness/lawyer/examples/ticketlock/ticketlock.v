@@ -445,7 +445,7 @@ Section Ticketlock.
     do 2 iExists _. iFrame. done.
   Qed.
 
-  Set Ltac Profiling.
+  (* Set Ltac Profiling. *)
 
   Section AfterInit.
         
@@ -1097,7 +1097,7 @@ Section Ticketlock.
 
   End AfterInit.
 
-  Show Ltac Profile.
+  (* Show Ltac Profile. *)
 
   (* TODO: move, remove duplicates *)
   Hypothesis (LS_LB: S tl_exc ≤ LIM_STEPS). 

@@ -63,13 +63,12 @@ Section ObligationsEM.
 
   Definition obls_init_resource `{!ObligationsGS Σ}
     (δ: mstate OM) (_: unit): iProp Σ :=
-    own obls_cps (◯ (cps_repr $ ps_cps δ)) ∗
+    ([∗ mset] '(π, d) ∈ (ps_cps δ), cp π d) ∗    
     own obls_sigs (◯ (sig_map_repr $ ps_sigs δ)) ∗
     own obls_obls (◯ (obls_map_repr $ ps_obls δ)) ∗
     own obls_eps (◯ (eps_repr $ ps_eps δ)) ∗
-    (* own obls_phs (◯ (phases_repr $ ps_phases δ)) ∗ *)
     ([∗ map] τ↦π ∈ ps_phases δ, th_phase_eq τ π) ∗
-    own obls_exc_lb (◯MN (ps_exc_bound δ))
+    exc_lb (ps_exc_bound δ)
   .
 
   Definition obls_is_init_st (σ: cfg Λ) (δ: mstate OM) :=
@@ -106,6 +105,9 @@ Section ObligationsEM.
     { apply mono_nat_both_valid. reflexivity. }
     iModIntro. iExists {| obls_pre := PRE; |}.
     rewrite big_sepM_fmap. iFrame.
+
+    rewrite /cps_repr. iSplitL.
+    { by iApply cps_mset. } 
 
     iPureIntro. 
     red in INIT. destruct INIT as (?&?&?&?).

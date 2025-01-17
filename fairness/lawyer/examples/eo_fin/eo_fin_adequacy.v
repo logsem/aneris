@@ -30,48 +30,6 @@ Section EOFinAdequacy.
   Global Instance subG_eofinΣ {Σ}: subG eofinΣ Σ → EoFinPreG Σ.
   Proof. solve_inG. Qed.
 
-  Definition obls_init_resource' `{!ObligationsGS Σ}
-    (δ: mstate OM) (_: unit): iProp Σ :=
-    ([∗ mset] '(π, d) ∈ (ps_cps δ), cp π d) ∗    
-    own obls_sigs (◯ (sig_map_repr $ ps_sigs δ)) ∗
-    own obls_obls (◯ (obls_map_repr $ ps_obls δ)) ∗
-    own obls_eps (◯ (eps_repr $ ps_eps δ)) ∗
-    ([∗ map] τ↦π ∈ ps_phases δ, th_phase_eq τ π) ∗
-    exc_lb (ps_exc_bound δ)
-  .
-  Lemma obls_init_resource'_WIP `{!ObligationsGS Σ} δ p:
-    obls_init_resource δ p = obls_init_resource' δ p.
-  Proof using. Admitted.
-
-  (* TODO: move *)
-  Lemma cp_mul_alt `{oGS: !ObligationsGS Σ} π d n:
-    cp_mul π d n (oGS := oGS) ⊣⊢ ([∗ mset] '(π, d) ∈ (n *: {[+ (π, d) +]}), cp π d (oGS := oGS)).
-  Proof using.
-    rewrite obligations_resources.cp_mul_unseal. rewrite /obligations_resources.cp_mul_def.
-    iInduction n as [| n] "IH".
-    { set_solver. }
-    simpl. rewrite gmultiset_scalar_mul_S_l big_sepMS_disj_union.
-    rewrite big_sepMS_singleton.
-    iSplit; iIntros "[??]"; iFrame; by iApply "IH".
-  Qed.
-
-  (* TODO: move, replace original *)
-    Lemma cp_mul_weaken `{oGS: ObligationsGS Σ} π1 π2 deg n1 n2
-      (PH_LE: phase_le π1 π2)
-      (LE: n2 <= n1):
-      cp_mul π1 deg n1 (oGS := oGS) -∗ cp_mul π2 deg n2 (oGS := oGS).
-    Proof using.
-      iIntros "CPS".
-      apply Nat.le_sum in LE as [? ->].
-      iDestruct (cp_mul_split with "CPS") as "[CPS _]".
-      rewrite obligations_resources.cp_mul_unseal.
-      iInduction n2 as [| n] "IH".
-      { set_solver. }
-      simpl. iDestruct "CPS" as "[CP CPS]". iSplitL "CP".
-      { by iApply cp_weaken. }
-      by iApply "IH".
-    Qed.
-
   Lemma eofin_terminates_impl
     (extr : heap_lang_extrace)
     (START: trfirst extr = ([start #(0%nat) #B], Build_state ∅ ∅)):
@@ -97,8 +55,7 @@ Section EOFinAdequacy.
       apply AMU_lift_top. }
     
     simpl. rewrite START.
-    rewrite obls_init_resource'_WIP. 
-    rewrite /obls_init_resource' /init_om_state. 
+    rewrite /obls_init_resource /init_om_state. 
       
     rewrite init_phases_helper.
     rewrite locales_of_cfg_simpl. simpl.
@@ -112,9 +69,11 @@ Section EOFinAdequacy.
     iFrame.
     rewrite mset_map_disj_union. rewrite big_sepMS_disj_union.
     rewrite !mset_map_mul !mset_map_singleton.
-    rewrite -!cp_mul_alt. iDestruct "CPS" as "[CPS2 CPS0]".
-    iSplitL "CPS2"; (iApply cp_mul_weaken; [..| by iFrame]; [apply phase_lt_fork | lia]).
-  Qed. 
+
+    rewrite -!(cp_mul_alt (oGS := (@heap_fairnessGS _ _ _ HEAP))).
+    iDestruct "CPS" as "[CPS2 CPS0]". 
+    iSplitL "CPS2"; (iApply cp_mul_weaken; [..| by iFrame]); apply phase_lt_fork || lia. 
+  Qed.
 
 End EOFinAdequacy.
 
