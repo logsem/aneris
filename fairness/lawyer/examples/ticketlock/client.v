@@ -198,7 +198,7 @@ Section MotivatingClient.
 
     Lemma BMU_wait_owner τ π q O r m smap i
       (WAIT: r <= i):
-      obls τ O (oGS := oGS) ∗ sgns_level_ge' O (fl_acq_lvls FLP) (oGS := oGS)∗
+      obls τ O (oGS := oGS) ∗ sgns_levels_ge' O (fl_acq_lvls FLP) (oGS := oGS)∗
       th_phase_frag τ π q (oGS := oGS) ∗ RR__L π (Some i) ∗ smap_repr_cl r m smap ⊢
       BMU ∅ 1 (cp π (fl_d__l FLP) (oGS := oGS) ∗ th_phase_frag τ π q (oGS := oGS) ∗
           obls τ O (oGS := oGS) ∗ smap_repr_cl r m smap
@@ -214,13 +214,16 @@ Section MotivatingClient.
       2: { rewrite /smap_repr_cl.
            iApply (ith_sig_expect (λ _, l__o) with "[$] [$] [$] [$] [$] []").
            { simpl. apply Nat.ltb_nlt. lia. }
-           rewrite /sgns_level_ge' /sgns_level_gt /sgns_level_ge.
-           iDestruct (big_sepS_forall with "LVLS") as "LVLS'".
-           iSpecialize ("LVLS'" $! l__fl with "[//]").
+           rewrite /sgns_levels_ge'.
+           (* iDestruct (big_sepS_forall with "LVLS") as "LVLS'". *)
+           (* iSpecialize ("LVLS'" $! l__fl with "[//]"). *)
            iApply big_sepS_impl; [by iFrame| ].
            iModIntro. iIntros (??) "(%l & ? & %LE)".
            iExists _. iFrame. iPureIntro.
-           eapply strict_transitive_l; [| apply LE]. by apply LVL_ORDo. }
+           apply set_Forall_singleton. 
+           eapply strict_transitive_l; [| apply LE].
+           1: apply LVL_ORDo.
+           all: apply L__FL. }
       iIntros "(?&?&?&?)". iApply BMU_intro.
       iFrame. iPureIntro. repeat split; try done.
     Qed.
@@ -269,13 +272,14 @@ Section MotivatingClient.
       {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗
           obls τ Ob (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
           cp π (fl_d__m FLP) (oGS := oGS) ∗
-          sgns_level_gt' Ob (fl_acq_lvls FLP) (oGS := oGS)
+          sgns_levels_gt' Ob (fl_acq_lvls FLP) (oGS := oGS)
       }}}
         (fl_acquire FL) lk @ τ
       {{{ v, RET v; ∃ s__o (f: bool), obls τ (Ob ∪ {[ s__o ]}) (oGS := oGS) ∗ 
                           th_phase_eq τ π (oGS := oGS) ∗
                           P__lock flag s__f f ∗ lock_owner_frag (Some s__o) ∗
-                          ⌜ s__o ∉ Ob ⌝ ∗ fl_release_token FL (FLG := FLG)
+                          ⌜ s__o ∉ Ob ⌝ ∗ fl_release_token FL (FLG := FLG) ∗
+                          sgn s__o l__o None (oGS := oGS)
       }}}.
     Proof using All.
       iIntros (Φ).
@@ -358,7 +362,7 @@ Section MotivatingClient.
              { simpl. apply Nat.ltb_irrefl. }
              rewrite DOM. intros ?%elem_of_set_seq. lia.
              Unshelve. apply _. }
-        iIntros "X". iMod "X" as "(%s' & SR & #SIGr & OB & %FRESH')".
+        iIntros "X". iMod "X" as "(%s' & SR & #SIGr & OB & %FRESH' & #SGNo)".
         iApply BMU_intro. iFrame.
         iIntros ([[??]?]) "[LK (%X & % & %)]".
         simpl in *. inversion X. subst.
@@ -374,7 +378,7 @@ Section MotivatingClient.
           rewrite lookup_insert. eauto. }
         
         iModIntro. iIntros "PH_CLOS RT POST !>". iApply "POST".
-        do 2 iExists _. iFrame.
+        do 2 iExists _. iFrame "#∗".
         iDestruct (th_phase_frag_combine' with "[$PH $PH_CLOS]") as "foo".
         { done. }
         by iFrame. }
@@ -391,7 +395,8 @@ Section MotivatingClient.
       {{{ v, RET v; ∃ s__o, obls τ {[ s__f; s__o ]} (oGS := oGS) ∗ flag_unset ∗
                           th_phase_eq τ π (oGS := oGS) ∗
                           P__lock flag s__f false ∗ lock_owner_frag (Some s__o) ∗
-                          ⌜ s__o ≠ s__f ⌝ ∗ fl_release_token FL (FLG := FLG)
+                          ⌜ s__o ≠ s__f ⌝ ∗ fl_release_token FL (FLG := FLG) ∗
+                          sgn s__o l__o None (oGS := oGS)                          
       }}}.
     Proof using All.
       iIntros (Φ).
@@ -401,11 +406,8 @@ Section MotivatingClient.
       iApply (acquire_usage with "[-UNSET POST]").
       { iFrame "#∗". 
         (* TODO: make a lemma? *)
-        rewrite /sgns_level_gt'.
-        iApply big_sepS_forall. iIntros (??).
-        rewrite /sgns_level_gt. rewrite big_opS_singleton.
-        iExists _. iFrame "#∗". iPureIntro.
-        by apply LVL_ORDf. }
+        iApply big_opS_singleton. iExists _. iFrame "SF'".
+        iPureIntro. set_solver. }
       
       iNext. iIntros (?) "(%s__o & %f & OB & PH & P & LOCKED & %ADD & RT)".
       rewrite /P__lock. iDestruct "P" as "[FLAG [[-> ?] | [-> ?]]]". 
@@ -419,7 +421,8 @@ Section MotivatingClient.
       (ADD: s__o ∉ Ob)
       :
       {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗
-          obls τ (Ob ∪ {[ s__o ]}) (oGS := oGS) ∗
+          sgns_levels_gt' Ob (fl_acq_lvls FLP) (oGS := oGS) ∗ sgn s__o l__o None (oGS := oGS) ∗
+          obls τ (Ob ∪ {[ s__o ]}) (oGS := oGS) ∗ 
           th_phase_eq τ π (oGS := oGS) ∗ cp π (fl_d__m FLP) (oGS := oGS) ∗
           P__lock flag s__f f ∗ fl_release_token FL (FLG := FLG) ∗ lock_owner_frag (Some s__o) ∗
           (∀ q, ⌜ Qp.le q 1 ⌝ -∗ th_phase_frag τ π q (oGS := oGS) -∗ obls τ Ob (oGS := oGS) -∗
@@ -431,7 +434,7 @@ Section MotivatingClient.
     Proof using All.
       iIntros (Φ).
       pose proof (fl_is_lock_pers FL lk c__cl (FLG := FLG)) as PERS. (* TODO: why Existing Instance doesn't work? *)
-      iIntros "(#LOCK & #INV & OB & PH & CPm & P & RT & LOCKED & FIN_BMU) POST".
+      iIntros "(#LOCK & #INV & #SGT & #SGNo & OB & PH & CPm & P & RT & LOCKED & FIN_BMU) POST".
 
       iApply (wp_step_fupd _ _ ⊤ _ _ with "[POST]").
       { done. }
@@ -443,7 +446,14 @@ Section MotivatingClient.
       { done. }
       { iFrame.
         (* TODO: make a lemma *)
-        rewrite /sgns_level_gt'. set_solver. }
+        rewrite /sgns_levels_gt'.
+
+        rewrite /sgns_levels_rel. rewrite big_sepS_union; [| set_solver].
+        iSplit. 
+        - iApply (big_sepS_impl with "[$]").
+          iModIntro. iIntros (??) "(%l & ? & %LE)".
+          iExists _. iFrame. done.
+        - iApply big_sepS_singleton. iExists _. by iFrame "SGNo". }
 
       iApply (TAU_intro with "[-]").
       4: { iSplit; [| iAccu].
@@ -531,6 +541,7 @@ Section MotivatingClient.
     Lemma release_left (lk: val) τ s__o flag s__f π
       (SIGS_NEQ: s__o ≠ s__f):
       {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗
+          sgn s__o l__o None (oGS := oGS) ∗
           flag_set ∗ obls τ {[ s__f; s__o ]} (oGS := oGS) ∗
           th_phase_eq τ π (oGS := oGS) ∗ cp π (fl_d__m FLP) (oGS := oGS) ∗
           (* P__lock flag s__f false ∗ *)
@@ -541,12 +552,15 @@ Section MotivatingClient.
     Proof using All.
       iIntros (Φ).
       pose proof (fl_is_lock_pers FL lk c__cl (FLG := FLG)) as PERS. (* TODO: why Existing Instance doesn't work? *)
-      iIntros "(#LOCK & #INV & SET & OB & PH & CPm & FLAG & SGNf & LOCKED & RT) POST".
-
+      iIntros "(#LOCK & #INV & #SGNo & SET & OB & PH & CPm & FLAG & SGNf & LOCKED & RT) POST".
+      iDestruct (sgn_get_ex with "[$]") as "[SGNf #SGNf']".
+      
       iApply (release_usage with "[-POST]").
       2: iFrame "#∗".
       3: by iApply "POST".
       { set_solver. }
+      iSplitR.
+      { iApply big_sepS_singleton. iExists _. iFrame "SGNf'". done. }
       iSplitL "SET".
       { iRight. by iFrame. }
       iIntros (?) "%QQ PH OB".
@@ -583,7 +597,7 @@ Section MotivatingClient.
       iDestruct (cp_mul_take with "CPSm") as "[CPSm CPm]".
       iApply (acquire_left with "[-CPSm CPS POST]").
       { iFrame "#∗". }
-      iNext. iIntros (v) "(% & OB & UNSET & PH & P & LOCKED & % & RT)".
+      iNext. iIntros (v) "(% & OB & UNSET & PH & P & LOCKED & % & RT & #SGNo)".
       rewrite /P__lock. iDestruct "P" as "[FLAG [[_ SGNf]| [% ?]]]".
       2: done.
 
@@ -612,7 +626,8 @@ Section MotivatingClient.
         (fl_acquire FL) lk @ τ
       {{{ v, RET v; ∃ s__o f, obls τ {[ s__o ]} (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
                           P__lock flag s__f f ∗ lock_owner_frag (Some s__o) ∗
-                          fl_release_token FL (FLG := FLG)
+                          fl_release_token FL (FLG := FLG) ∗
+                          sgn s__o l__o None (oGS := oGS)
       }}}.
     Proof using All.
       iIntros (Φ).
@@ -620,11 +635,7 @@ Section MotivatingClient.
       iIntros "(#LOCK & #INV & OB & PH & CPm) POST".
 
       iApply (acquire_usage with "[-POST]").
-      { iFrame "#∗". 
-        (* TODO: make a lemma? *)
-        rewrite /sgns_level_gt'.
-        iApply big_sepS_forall. iIntros (??).
-        rewrite /sgns_level_gt. rewrite big_opS_empty. done. } 
+      { iFrame "#∗". iApply empty_sgns_levels_rel. } 
 
       iNext. iIntros (?) "(%s__o & %f & OB & PH & P & LOCKED & %ADD & RT)".
       rewrite union_empty_l_L. iApply "POST". do 2 iExists _.
@@ -634,6 +645,7 @@ Section MotivatingClient.
     (* TODO: maybe generalize release_usage ? *)
     Lemma release_right (lk: val) τ s__o flag s__f π f:
       {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗
+          sgn s__o l__o None (oGS := oGS) ∗
           ep s__f π (fl_d__m FLP) (oGS := oGS) ∗
           obls τ {[ s__o ]} (oGS := oGS) ∗
           th_phase_eq τ π (oGS := oGS) ∗ cp π (fl_d__m FLP) (oGS := oGS) ∗
@@ -645,7 +657,7 @@ Section MotivatingClient.
     Proof using All.
       iIntros (Φ).
       pose proof (fl_is_lock_pers FL lk c__cl (FLG := FLG)) as PERS. (* TODO: why Existing Instance doesn't work? *)
-      iIntros "(#LOCK & #INV & #EPf & OB & PH & CPm & P & LOCKED & RT) POST".
+      iIntros "(#LOCK & #INV & #SGNo & #EPf & OB & PH & CPm & P & LOCKED & RT) POST".
 
       iApply (wp_step_fupd _ _ ⊤ _ _ with "[POST]").
       { done. }
@@ -656,7 +668,8 @@ Section MotivatingClient.
       iApply ("REL" $! _ _ _ _ (RR__L π) with "[] [OB PH CPm]").
       { done. }
       { iFrame.
-        rewrite /sgns_level_gt'. set_solver. }
+        (* TODO: Make a lemma *)
+        iApply big_opS_singleton. iExists _. iFrame "SGNo". done. }
 
       iApply (TAU_intro with "[-]").
       4: { iSplit; [| iAccu].
@@ -715,9 +728,7 @@ Section MotivatingClient.
           iDestruct "P" as "[FLAG [[_ UNSET] | [% ?]]]"; [| done].
           iApply OU_BMU_rep. iApply (OU_rep_wand with "[FLAG]").
           2: { iApply (expect_sig_upd_rep with "EPf [$] [$] [] [$]").
-               (* TODO: make a lemma*)
-               rewrite /sgns_level_gt'.
-               iApply big_sepS_forall. iIntros (??). set_solver. }
+               iApply empty_sgns_levels_rel. }
           iIntros "(CPSm & UNSET & OB & PH)". iFrame.
           rewrite bi.or_comm. iSplitL "CPSm"; iLeft; by iFrame "#∗". }
         
@@ -763,7 +774,7 @@ Section MotivatingClient.
       iApply (acquire_right with "[PH OB CPSm]").
       { by iFrame "#∗". }
 
-      iNext. iIntros (v) "(%s__o & %f & OB & PH & P & LOCKED & RT)".
+      iNext. iIntros (v) "(%s__o & %f & OB & PH & P & LOCKED & RT & #SGNo)".
       wp_bind (Rec _ _ _)%E. pure_steps.
       wp_bind (! _)%E. rewrite /P__lock. iDestruct "P" as "[FLAG P]".
       iApply sswp_MU_wp; [done| ]. iApply (wp_load with "[$]"). iIntros "!> FLAG".

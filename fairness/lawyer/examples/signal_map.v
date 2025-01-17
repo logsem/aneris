@@ -288,7 +288,7 @@ Section SignalMap.
         |==> (∃ s',
              smap_repr B' (<[m := s']> smap) ∗
              ith_sig m s' ∗ obls τ (R ∪ {[s']}) (oGS := oGS) ∗
-             ⌜ s' ∉ R ⌝)) (oGS := oGS).
+             ⌜ s' ∉ R ⌝ ∗ sgn s' (L m) None)) (oGS := oGS).
     Proof using LEQUIV__l DISCR__l DISCR__d.
       iIntros "OBLS SM".
       iApply OU_BMU.
@@ -302,8 +302,9 @@ Section SignalMap.
         2: done.
         apply not_elem_of_dom. by rewrite dom_fmap. }
       iModIntro. iDestruct "SM" as "[SM S']".
+      iDestruct (sgn_get_ex with "[$]") as "[SG #SG0]".
       iExists s'.
-      rewrite -fmap_insert. iFrame. iSplit; [| done].
+      rewrite -fmap_insert. iFrame "#∗". iSplit; [| done].
       iApply (smap_sgns_extend with "[$]"); try done.
       rewrite FRESH_UNSET. iFrame.
     Qed.
