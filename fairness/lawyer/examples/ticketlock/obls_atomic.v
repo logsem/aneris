@@ -54,7 +54,7 @@ Section TotalTriples.
               let abort := P x ={∅, ε}=∗ V in
               let PH q := th_phase_frag τ π q (oGS := oGS) in
               (let r := round x in
-               ∀ O' q', obls τ O' (oGS := oGS) ∗ sgns_level_ge' O' L (oGS := oGS) ∗ 
+               ∀ O' q', obls τ O' (oGS := oGS) ∗ sgns_levels_ge' O' L (oGS := oGS) ∗ 
                         PH q' ∗ ⌜ Qp.le q' q0 ⌝ ∗
                       (∃ r__p, RR r__p ∗ (⌜ r__p = Some r ⌝ ∨ cp π d__h (oGS := oGS))) ∗
                       ⌜ ¬ TGT x ⌝ -∗
@@ -187,7 +187,7 @@ Section TotalTriples.
     Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
 
     Definition TLAT_pre (RR: option RO -> iProp Σ) π q (O: gset SignalId): iProp Σ :=
-      RR None ∗ obls τ O (oGS := oGS) ∗ sgns_level_gt' O L (oGS := oGS) ∗
+      RR None ∗ obls τ O (oGS := oGS) ∗ sgns_levels_gt' O L (oGS := oGS) ∗
       th_phase_frag τ π q (oGS := oGS) ∗ cp π d__m (oGS := oGS).
     
     Definition TLAT e s

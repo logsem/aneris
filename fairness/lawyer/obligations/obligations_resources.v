@@ -120,17 +120,17 @@ Section ObligationsRepr.
     Definition obls τ (R: gset SignalId) :=
       own obls_obls (◯ ({[ τ := Excl R]}: gmapUR Locale (exclR (gsetR natO)))).
     
+    Definition sgns_levels_rel (rel: Level -> Level -> Prop)
+      (R: gset SignalId) (L: gset Level): iProp Σ := 
+      [∗ set] s ∈ R, (∃ l, sgn s l None ∗ ⌜ set_Forall (rel l) L ⌝). 
+
+    Definition sgns_levels_gt' := sgns_levels_rel (flip lvl_lt).
+    Definition sgns_levels_ge' := sgns_levels_rel (flip lvl_le).
+
     Definition sgns_level_gt (R: gset SignalId) lm: iProp Σ :=
-      [∗ set] s ∈ R, (∃ l, sgn s l None ∗ ⌜ lvl_lt lm l ⌝). 
-    
+      sgns_levels_gt' R {[ lm ]}.    
     Definition sgns_level_ge (R: gset SignalId) lm: iProp Σ :=
-      [∗ set] s ∈ R, (∃ l, sgn s l None ∗ ⌜ lvl_le lm l ⌝). 
-
-    Definition sgns_level_ge' (R: gset SignalId) (L: gset Level): iProp Σ := 
-      [∗ set] l ∈ L, sgns_level_ge R l.
-
-    Definition sgns_level_gt' (R: gset SignalId) (L: gset Level): iProp Σ := 
-      [∗ set] l ∈ L, sgns_level_gt R l.
+      sgns_levels_ge' R {[ lm ]}.
 
     Definition ep (sid: SignalId) (π__ub: Phase) d: iProp Σ :=
       ∃ π, own obls_eps (◯ {[ (sid, π, d) ]}) ∗ ⌜ phase_le π π__ub ⌝.
@@ -148,14 +148,21 @@ Section ObligationsRepr.
       ⊢ obls ζ R1 ∗-∗ obls ζ R2.
     Proof using. clear H H0 H1. set_solver. Qed.
     
-    Lemma sgns_level_gt'_empty R:
-      ⊢ sgns_level_gt' R ∅.
+    Lemma empty_sgns_levels_rel rel L:
+      ⊢ sgns_levels_rel rel ∅ L.
     Proof using.
-      rewrite /sgns_level_gt'. by rewrite big_sepS_empty.
+      clear.
+      rewrite /sgns_levels_rel. set_solver.
     Qed.
+
+    (* Lemma sgns_level_gt'_empty R: *)
+    (*   ⊢ sgns_level_gt' R ∅. *)
+    (* Proof using. *)
+    (*   rewrite /sgns_level_gt'. by rewrite big_sepS_empty. *)
+    (* Qed. *)
     
-    Instance sgns_level_ge'_Proper:
-      Proper (equiv ==> equiv ==> equiv) (sgns_level_ge').
+    Global Instance sgns_levels_rel'_Proper rel:
+      Proper (equiv ==> equiv ==> equiv) (sgns_levels_rel rel).
     Proof using. solve_proper. Qed.
 
     Lemma cp_msi_unfold δ ph deg:
@@ -301,6 +308,7 @@ Section ObligationsRepr.
       ⊢ obls_msi δ -∗ obls ζ R -∗ sgns_level_gt R lm -∗
         ⌜ lt_locale_obls lm ζ δ ⌝.
     Proof using H1 H0.
+      clear H. 
       iIntros "MSI OBLS SIGS_LT".
       iDestruct (obls_msi_exact with "[$] [$]") as %Rζ. 
       rewrite /lt_locale_obls. rewrite Rζ. simpl.
@@ -316,8 +324,7 @@ Section ObligationsRepr.
       iDestruct (big_sepS_forall with "SIGS_LT") as "LT".
       iSpecialize ("LT" $! _ IN). iDestruct "LT" as "(%l_ & SIG & %LT)".
       iDestruct (sigs_msi_in with "[$] [$]") as %[? SIG].
-      rewrite SID in SIG. inversion SIG. subst l_ x. 
-      done.
+      set_solver. 
     Qed. 
 
     Lemma ep_msi_in δ sid π__ub d:
