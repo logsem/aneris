@@ -676,21 +676,24 @@ Section Ticketlock.
     iApply (BMU_wand with "[-COMM]"); [| done].
     iIntros "COMM".
     BMU_burn_cp. iModIntro. iApply wp_value.
+    (* do 2 iExists _. iFrame. iApply fupd_frame_all. *)
+
+    iMod (held_update _ _ true with "[$] [$]") as "[HELD HELD']".
+    iMod ("COMM" $! (_, _, _) with "[HELD' OW']") as "Φ".
+    { rewrite /acquire_at_post. simpl. rewrite /tl_LK.
+      iFrame. iSplit; [| done]. do 2 iExists _. iFrame. done. }
+    rewrite -{2}(Qp.div_2 q). rewrite Qp.add_sub. simpl.
+
+    iSpecialize ("RTOK" with "[//]"). 
+    iMod (TMI_extend_acquire _ _ _ _ (((((((_), _), _), _), _), _), _) with "[$] [$] [$]") as (?) "[TMI TK]"; eauto.
+
     do 2 iExists _. iFrame. iApply fupd_frame_all.
     iSplitL "CPSh RR0".
     { rewrite Nat.sub_diag. iModIntro.
       iSplit; [done| ]. iSplit; [done| ]. iApply bi.sep_exist_l.
       iExists _. iFrame. rewrite bi.sep_or_l. iRight.
       by rewrite -cp_mul_take. }
-    iMod (held_update _ _ true with "[$] [$]") as "[HELD HELD']".
-    iMod ("COMM" $! (_, _, _) with "[HELD' OW']") as "Φ".
-    { rewrite /acquire_at_post. simpl. rewrite /tl_LK.
-      iFrame. iSplit; [| done]. do 2 iExists _. iFrame. done. }
-    rewrite -{2}(Qp.div_2 q). rewrite Qp.add_sub. simpl.
     
-    iSpecialize ("RTOK" with "[//]"). 
-    iDestruct (TMI_extend_acquire _ _ _ _ (((((((_), _), _), _), _), _), _) with "[$] [$] [$]") as "TMI"; eauto.
-
     iApply "CLOS". iNext. rewrite /tl_inv_inner.
     rewrite -(Nat.add_1_r ow).
     replace (Z.of_nat ow + 1)%Z with (Z.of_nat (ow + 1)) by lia.
@@ -742,7 +745,7 @@ Section Ticketlock.
     wp_bind (! _)%E.
     iApply wp_atomic.
     iInv "INV" as "inv" "CLOS". rewrite {1}/tl_inv_inner.
-    iDestruct "inv" as (?? ow tk TM) "(>%EQ_ & >%LEot & #EBd & >OW & >Ltk & >EXACT & >HELD & >TOKS & >%DOM__TM & TM & TAUS & RTOK)".
+    iDestruct "inv" as (?? ow tk TM) "(>%EQ_ & >%LEot & #EBd & >OW & >Ltk & >EXACT & >HELD & >TOKS & >%DOM__TM & TAUS & RTOK)".
     inversion EQ_. subst l__ow0 l__tk0. clear EQ_.
     iModIntro.
     iApply sswp_MU_wp_fupd; [done| ]. iModIntro.
@@ -751,7 +754,7 @@ Section Ticketlock.
     iDestruct (ticket_token_bound with "[$] [$]") as %LTttk.
     destruct (decide (ow = t)) as [-> | QUEUE].
     { rewrite (proj2 (Nat.eqb_neq _ _)); [| lia].
-      iDestruct (tau_map_ticket_interp with "[$] [$] [$]") as "(TAUtk & TAU & TM & TMI_CLOS)".
+      iDestruct (tau_map_ticket_interp with "[$] [$]") as (??) "(TAUtk & TK & TMI_CLOS & #EQ1 & #EQ2)".
       rewrite {1}/tau_interp. iDestruct "TAUtk" as "[[? %] | [[TAUtk _] | [? %]]]".
       1, 3: lia.
       simpl. iDestruct "TAUtk" as "[[Φ RTOK'] | TOK']".
@@ -759,7 +762,7 @@ Section Ticketlock.
       iSpecialize ("TMI_CLOS" with "[TOK]").
       { rewrite /tau_interp. iRight. iLeft. iSplit; [| done]. iFrame. }
       MU_by_burn_cp. iModIntro. pure_steps.
-      iMod ("CLOS" with "[TMI_CLOS OW TOKS HELD EXACT Ltk TM]") as "_".
+      iMod ("CLOS" with "[TMI_CLOS OW TOKS HELD EXACT Ltk]") as "_".
       { rewrite /tl_inv_inner. iNext. do 5 iExists _. iFrame "#∗".
         rewrite (proj2 (Nat.eqb_neq _ _)); [| lia].
         rewrite !bi.sep_assoc. iSplitL; [by iFrame| ].
@@ -772,9 +775,10 @@ Section Ticketlock.
       iApply sswp_pure_step.
       { simpl. tauto. }
       iNext. MU_by_burn_cp. rewrite bool_decide_eq_true_2; [| tauto].
-      pure_steps. iFrame. by iApply "Φ". }
+      pure_steps. iFrame.
+      iRewrite ("EQ1" $! #()). by iApply "Φ". }
 
-    iDestruct (tau_map_ticket_interp with "[$] [$] [$]") as "(TAUtk & TAU & TM & TMI_CLOS)".
+    iDestruct (tau_map_ticket_interp with "[$] [$]")  as (??) "(TAUtk & TK & TMI_CLOS & #EQ1 & #EQ2)".
     rewrite {1}/tau_interp.
     apply Nat.le_lteq in LEot as [LTot | EQ].
     2: { subst tk. iDestruct "TAUtk" as "[[? %] | [[? %] | [? %]]]".
@@ -805,6 +809,7 @@ Section Ticketlock.
       { iPureIntro. by apply Qp.div_le. }
       iSplit; [| done].
       iDestruct "RR" as (r) "[RR RR']". iExists _. iFrame.
+      iRewrite ("EQ2" $! r) in "RR". iFrame "RR". 
       iDestruct "RR'" as "[-> | ?]"; [| by iFrame].
       apply Nat.le_sum in LBow as [d ->]. rewrite Nat.sub_add'.
       destruct d.
@@ -833,7 +838,7 @@ Section Ticketlock.
     { rewrite /tau_interp. iLeft. iSplit; [| done].
       rewrite /TAU_stored. by iFrame. }
     iClear "OW_LB". iDestruct (ow_exact_lb with "[$]") as "[EXACT OW_LB]".
-    iMod ("CLOS" with "[TMI_CLOS OW TOKS HELD EXACT Ltk TM]") as "_".
+    iMod ("CLOS" with "[TMI_CLOS OW TOKS HELD EXACT Ltk]") as "_".
     { rewrite /tl_inv_inner. iNext. do 5 iExists _. iFrame.
       rewrite (proj2 (Nat.eqb_neq _ _)); [| lia]. iFrame "#∗".
       rewrite !bi.sep_assoc. iSplit.
@@ -851,7 +856,9 @@ Section Ticketlock.
 
     iApply ("IH" $! ow).
     iFrame "#∗". iSplit; [iPureIntro; lia| ]. iSplitL "RR".
-    { iExists _. iFrame. by iLeft. }
+    { iExists _.
+      iRewrite -("EQ2" $! (Some ow)) in "RR". iFrame "RR".          
+      iFrame. by iLeft. }
     replace 21 with (10 + 11) by lia. rewrite cp_mul_split.
     iDestruct "CPS" as "[??]". iFrame.
   Qed.
@@ -862,7 +869,7 @@ Section Ticketlock.
     iIntros "X". by iDestruct (own_valid with "[$]") as %V.
   Qed.
 
-  Lemma tau_map_interp_update (TM: gmap nat (tau_codom Σ)) (l__ow l__tk: loc) c (ow: nat)
+  Lemma tau_map_interp_update (TM: gmap nat tau_codom_gn) (l__ow l__tk: loc) c (ow: nat)
     (lk := (#l__ow, #l__tk)%V)
     (next := bool_decide (ow + 1 ∈ dom TM)):
     tau_map_interp lk c ow TM -∗ held_auth false -∗
@@ -874,10 +881,10 @@ Section Ticketlock.
     clear fl_degs_wl0 d__w ODl ODd LEl OBLS_AMU.
     iIntros "TMI AUTH LOW RTOK". rewrite /tau_map_interp.
 
-    (* rewrite {1 4}(map_split TM ow). *) rewrite (map_split TM ow).
+    rewrite {2 4}(map_split TM ow).
     rewrite !big_opM_union.
     2, 3: apply map_disjoint_dom; destruct lookup; set_solver.
-    iDestruct "TMI" as "[OW TMI]".
+    iDestruct "TMI" as "(TM & OW & TMI)".
 
     rewrite (map_split (delete _ _ ) (ow + 1)).
     rewrite !big_opM_union.
@@ -888,7 +895,8 @@ Section Ticketlock.
       iIntros "!>" (i cd ITH) "TI".
       apply lookup_delete_Some in ITH as [? [? ITH]%lookup_delete_Some].
       rewrite /tau_interp. destruct cd as [[[[[[]]]]]].
-      iDestruct "TI" as "[[? %] | [[? %] | [? %]]]"; try lia.
+      iDestruct "TI" as (??) "(#SP1 & #SP2 & [[? %] | [[? %] | [? %]]])"; try lia.
+      all: do 2 iExists _; iFrame "SP1 SP2". 
       - iLeft. iFrame. iPureIntro. lia.
       - do 2 iRight. iFrame. iPureIntro. lia. }
     rewrite -bi.sep_assoc bi.sep_comm -bi.sep_assoc.
@@ -899,11 +907,13 @@ Section Ticketlock.
          2: { iSplitR "RTOK"; [| iAccu]. set_solver. }
          simpl. rewrite !big_sepM_singleton.
          rewrite /tau_interp. destruct cd as [[[[[[]]]]]].
-         iDestruct "OW" as "[[? %] | [[OW %] | [? %]]]"; try lia.
+         (* iDestruct "OW" as "[[? %] | [[OW %] | [? %]]]"; try lia. *)
+         iDestruct "OW" as (??) "(#SP1 & #SP2 & [[? %] | [[OW %] | [? %]]])"; try lia.
          iDestruct "OW" as "[CD | TT]".
          { iDestruct "CD" as "[_ RT]".
            by iDestruct (rel_tok_excl with "[$] [$]") as "?". }
-         iFrame. do 2 iRight. iFrame. iPureIntro. lia. }
+         iFrame. do 2 iExists _. iFrame "SP1 SP2".
+         do 2 iRight. iFrame. iPureIntro. lia. }
     iIntros "RTOK".
     rewrite !lookup_delete_ne; [| lia].
     destruct (TM !! (ow + 1)) as [[[[[[[]]]]]]| ] eqn:OW'; simpl; subst next.
@@ -911,8 +921,11 @@ Section Ticketlock.
          iApply BMU_intro. iFrame. set_solver. }
     simpl. rewrite bool_decide_eq_true_2; [| by apply elem_of_dom].
     rewrite !big_sepM_singleton.
-    rewrite {1}/tau_interp. iDestruct "OW'" as "[[TAU %] | [[? %] | [? %]]]"; try lia.
-    rewrite /TAU_stored. iDestruct "TAU" as "(OB' & #SLT' & PH' & TAUs')". simpl.
+    rewrite {1}/tau_interp.
+    (* iDestruct "OW'" as "[[TAU %] | [[? %] | [? %]]]"; try lia. *)
+    iDestruct "OW'" as (??) "(#SP1 & #SP2 & [[TAU %] | [[? %] | [? %]]])"; try lia.
+    rewrite /TAU_stored.
+    simpl. iDestruct "TAU" as "(OB' & #SLT' & PH' & TAUs')". simpl.
     rewrite /tl_TAU /TAU_FL. rewrite TAU_elim. simpl.
     rewrite /TAU_acc.
     
@@ -931,13 +944,14 @@ Section Ticketlock.
     { iPureIntro. split; [done| ]. by apply Qp.div_le. }
     iApply (BMU_wand with "[-COMM] [$]"). iIntros "CLOS'".
     iMod (held_update _ _ true with "[$] [$]") as "[HELD HELD']".
-    iFrame "HELD LOW".
+    iFrame "HELD LOW TM".
     iMod ("CLOS'" $! (_, ow + 1, true) with "[-RTOK]").
     { rewrite /acquire_at_post. simpl. iSplit; [| done].
       rewrite Nat2Z.inj_add. do 2 iExists _. iFrame. eauto. }
     iModIntro. rewrite /tau_interp.
     iSplitL.
     2: { by iIntros "%". }
+    do 2 iExists _. iFrame "SP1 SP2". 
     iRight. iLeft.
     rewrite -{1}(Qp.div_2 q). rewrite Qp.add_sub. simpl.
     iSplit; [| done]. iLeft. iFrame.
@@ -1021,7 +1035,7 @@ Section Ticketlock.
 
     iApply wp_atomic.
     iInv "INV" as "inv" "CLOS". rewrite {1}/tl_inv_inner.
-    iDestruct "inv" as (?? ow tk TM) "(>%EQ_ & >%LEot & >#EBD & >OW & >Ltk & >EXACT & >HELD & >TOKS & >%DOM__TM & TM & TAUS & _)".
+    iDestruct "inv" as (?? ow tk TM) "(>%EQ_ & >%LEot & >#EBD & >OW & >Ltk & >EXACT & >HELD & >TOKS & >%DOM__TM & TAUS & _)".
     inversion EQ_. subst l__ow0 l__tk0. clear EQ_.
     iModIntro.
     iApply sswp_MU_wp_fupd; [done| ].
@@ -1134,16 +1148,18 @@ Section Ticketlock.
     replace 19 with (10 + 9) at 3 by lia.
     iDestruct (cp_mul_split with "CPS") as "[CPS1 CPS]".
 
-    Set Printing Coercions.
-    set (post := (fun x => bi_wand rel_tok (Φ x)) : ofe_car valO → ofe_car (iPropO Σ)). 
-    assert (NonExpansive post) as NE_Φ by apply _.
-    assert (NonExpansive RR) as NE_RR.
-    { (* TODO: why it's not inferred automatically? *)
-      simpl in *.
-      red. intros ????.
-      apply discrete_iff in H.
-      2: by apply _.
-      apply leibniz_equiv_iff in H. by subst. }
+    (* Set Printing Coercions. *)
+    (* set (post := (fun x => bi_wand rel_tok (Φ x)) : ofe_car valO → ofe_car (iPropO Σ)).  *)
+    (* assert (NonExpansive post) as NE_Φ by apply _. *)
+    (* assert (NonExpansive RR) as NE_RR. *)
+    (* { (* TODO: why it's not inferred automatically? *) *)
+    (*   simpl in *. *)
+    (*   red. intros ????. *)
+    (*   apply discrete_iff in H. *)
+    (*   2: by apply _. *)
+    (*   apply leibniz_equiv_iff in H. by subst. } *)
+    set (post := (fun x => bi_wand rel_tok (Φ x))). 
+    
     pure_steps.
     rewrite cp_mul_take. iDestruct "CPSe" as "[CPSe CPe]".
     iApply (wp_wand with "[TAU OB PH CPe RR0 CPS1]").
@@ -1152,8 +1168,7 @@ Section Ticketlock.
       { simpl. rewrite /TAU_FL. simpl.
         iApply (TAU_Proper with "[$]").
         all: try reflexivity.
-        Unshelve. 4: by econstructor; apply NE_RR. 3: by econstructor; apply NE_Φ.
-        all: done. }
+        Unshelve. 2: exact post. done. }
       rewrite /TLAT_pre. iFrame "#∗". }
     simpl. iIntros (?) "(%&%&->&WR)".
     rewrite /wait_res.
