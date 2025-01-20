@@ -444,65 +444,63 @@ Section Ticketlock.
 
   Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS _ EM hGS (↑ nroot)}.
 
-  (* Lemma tl_newlock_spec `{TicketlockPreG Σ} τ π c *)
-  (*   (BOUND: fl_c__cr TLPre <= LIM_STEPS): *)
-  (*     {{{ cp π d__m0 (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) }}} *)
-  (*       tl_newlock #() @ τ *)
-  (*     {{{ lk, RET lk; ∃ TLG: TicketlockG Σ, tl_LK (lk, 0, false) ∗ tl_is_lock lk c ∗ th_phase_eq τ π (oGS := oGS) }}}. *)
-  (* Proof using OBLS_AMU. *)
-  (*   clear fl_degs_wl0 d__w ODl ODd LEl. *)
-  (*   iIntros (Φ) "(CP & PH) POST". rewrite /tl_newlock. *)
-  (*   pure_step_hl. MU_by_BMU. *)
-  (*   simpl. do 2 rewrite -Nat.add_1_r. rewrite -Nat.add_assoc. iApply BMU_split. *)
-  (*   iApply OU_BMU_rep. *)
-  (*   iApply (OU_rep_wand with "[-PH]"). *)
-  (*   2: { iApply (increase_eb_upd_rep0 with "[$]"). } *)
-  (*   iIntros "[#EB PH]".     *)
+  Lemma tl_newlock_spec `{TicketlockPreG Σ} τ π c
+    (BOUND: fl_c__cr TLPre <= LIM_STEPS):
+      {{{ cp π d__m0 (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) }}}
+        tl_newlock #() @ τ
+      {{{ lk, RET lk; ∃ TLG: TicketlockG Σ, tl_LK (lk, 0, false) ∗ tl_is_lock lk c ∗ th_phase_eq τ π (oGS := oGS) }}}.
+  Proof using OBLS_AMU.
+    clear fl_degs_wl0 d__w ODl ODd LEl.
+    iIntros (Φ) "(CP & PH) POST". rewrite /tl_newlock.
+    pure_step_hl. MU_by_BMU.
+    simpl. do 2 rewrite -Nat.add_1_r. rewrite -Nat.add_assoc. iApply BMU_split.
+    iApply OU_BMU_rep.
+    iApply (OU_rep_wand with "[-PH]").
+    2: { iApply (increase_eb_upd_rep0 with "[$]"). }
+    iIntros "[#EB PH]".
     
-  (*   iApply OU_BMU. iApply (OU_wand with "[-CP PH]"). *)
-  (*   2: { (* TODO: can we remove phase restriction for exchange? *) *)
-  (*        iApply (exchange_cp_upd with "[$] [$] [$]"). *)
-  (*        { reflexivity. } *)
-  (*        apply fl_degs_em. } *)
-  (*   iIntros "[CPS PH]". BMU_burn_cp. *)
+    iApply OU_BMU. iApply (OU_wand with "[-CP PH]").
+    2: { (* TODO: can we remove phase restriction for exchange? *)
+         iApply (exchange_cp_upd with "[$] [$] [$]").
+         { reflexivity. }
+         apply fl_degs_em. }
+    iIntros "[CPS PH]". BMU_burn_cp.
 
-  (*   wp_bind (ref _)%E. iApply sswp_MU_wp; [done| ]. *)
-  (*   iApply wp_alloc. iIntros "!> %l__ow OW _". MU_by_burn_cp. *)
-  (*   pure_steps. wp_bind (Rec _ _ _)%E. pure_steps. *)
-  (*   wp_bind (ref _)%E. iApply sswp_MU_wp; [done| ]. *)
-  (*   iApply wp_alloc. iIntros "!> %l__tk TK _". MU_by_burn_cp. pure_steps. *)
+    wp_bind (ref _)%E. iApply sswp_MU_wp; [done| ].
+    iApply wp_alloc. iIntros "!> %l__ow OW _". MU_by_burn_cp.
+    pure_steps. wp_bind (Rec _ _ _)%E. pure_steps.
+    wp_bind (ref _)%E. iApply sswp_MU_wp; [done| ].
+    iApply wp_alloc. iIntros "!> %l__tk TK _". MU_by_burn_cp. pure_steps.
     
-  (*   iMod (own_alloc (● ∅ ⋅ ◯ _: authUR (gmapUR nat (exclR $ tau_codomO Σ)))) as (γ__tm) "[TM_AUTH TM_FRAG]". *)
-  (*   { apply auth_both_valid_2; [| reflexivity]. done. } *)
-  (*   iMod (@own_alloc _ _ _ (● (GSet ∅) ⋅ _: authUR (gset_disjUR natO))) as (γ__toks) "[TOKS_AUTH TOKS_FRAG]". *)
-  (*   { apply auth_both_valid_2; [| reflexivity]. done. } *)
-  (*   iMod (own_alloc (● Excl' false ⋅ ◯ _: (excl_authUR boolO))) as (γ__h) "[HELD_AUTH HELD_FRAG]". *)
-  (*   { apply auth_both_valid_2; [| reflexivity]. done. } *)
-  (*   iMod (own_alloc (●MN 0: mono_natUR)) as (γ__lb) "LB_AUTH". *)
-  (*   { apply mono_nat_auth_valid. } *)
-  (*   iMod (own_alloc (Excl ())) as (γ__rt) "RT". *)
-  (*   { done. } *)
-  (*   rewrite -{1}Qp.inv_half_half. iDestruct "OW" as "[OW OW']". *)
+    iMod (own_alloc (● ∅ ⋅ ◯ _: authUR (gmapUR nat (exclR $ tau_codom_gn)))) as (γ__tm) "[TM_AUTH TM_FRAG]".
+    { apply auth_both_valid_2; [| reflexivity]. done. }
+    iMod (@own_alloc _ _ _ (● (GSet ∅) ⋅ _: authUR (gset_disjUR natO))) as (γ__toks) "[TOKS_AUTH TOKS_FRAG]".
+    { apply auth_both_valid_2; [| reflexivity]. done. }
+    iMod (own_alloc (● Excl' false ⋅ ◯ _: (excl_authUR boolO))) as (γ__h) "[HELD_AUTH HELD_FRAG]".
+    { apply auth_both_valid_2; [| reflexivity]. done. }
+    iMod (own_alloc (●MN 0: mono_natUR)) as (γ__lb) "LB_AUTH".
+    { apply mono_nat_auth_valid. }
+    iMod (own_alloc (Excl ())) as (γ__rt) "RT".
+    { done. }
+    rewrite -{1}Qp.inv_half_half. iDestruct "OW" as "[OW OW']".
 
-  (*   eset (TLG := Build_TicketlockG _ _ γ__tm γ__toks γ__h γ__lb γ__rt). *)
-  (*   iApply fupd_wp. *)
-  (*   iMod (inv_alloc fl_ι _ (tl_inv_inner _ c) with "[-POST OW' HELD_FRAG CPS PH]") as "#INV". *)
-  (*   { rewrite /tl_inv_inner. iNext. do 5 iExists _. iFrame. *)
-  (*     do 2 (iSplit; [done| ]). iSplit. *)
-  (*     { simpl. iApply exc_lb_le; [| done]. unfold tl_exc. lia. } *)
-  (*     rewrite Nat.eqb_refl. iFrame. *)
-  (*     iSplit. *)
-  (*     { iPureIntro. apply dom_empty_L. } *)
-  (*     iSplitL "TM_AUTH". *)
-  (*     { rewrite /tau_map_auth. by rewrite fmap_empty. } *)
-  (*     iSplit; [| done]. *)
-  (*     rewrite /tau_map_interp. set_solver. } *)
+    eset (TLG := Build_TicketlockG _ _ γ__tm γ__toks γ__h γ__lb γ__rt).
+    iApply fupd_wp.
+    iMod (inv_alloc fl_ι _ (tl_inv_inner _ c) with "[-POST OW' HELD_FRAG CPS PH]") as "#INV".
+    { rewrite /tl_inv_inner. iNext. do 5 iExists _. iFrame.
+      do 2 (iSplit; [done| ]). iSplit.
+      { simpl. iApply exc_lb_le; [| done]. unfold tl_exc. lia. }
+      rewrite Nat.eqb_refl. iFrame.
+      iSplit.
+      { iPureIntro. apply dom_empty_L. }
+      iSplit; [| done].
+      rewrite /tau_map_interp. rewrite fmap_empty. iFrame. set_solver. }
 
-  (*   iModIntro. pure_steps. *)
-  (*   wp_bind (Rec _ _ _)%V. pure_steps. *)
-  (*   iApply "POST". iExists _. iFrame "#∗". *)
-  (*   do 2 iExists _. iFrame. done. *)
-  (* Qed. *)
+    iModIntro. pure_steps.
+    wp_bind (Rec _ _ _)%V. pure_steps.
+    iApply "POST". iExists _. iFrame "#∗".
+    do 2 iExists _. iFrame. done.
+  Qed.
 
   (* Set Ltac Profiling. *)
 
