@@ -211,7 +211,7 @@ Section EoFin.
            { simpl. apply Nat.ltb_ge. lia. }
            rewrite DOM. intros ?%elem_of_set_seq. lia. }
 
-      iIntros "UPD". iMod "UPD" as (?) "(SR & SIG & OB & %)".
+      iIntros "UPD". iMod "UPD" as (?) "(SR & SIG & OB & % & #LVL)".
       iModIntro. rewrite Nat.min_r; [| lia]. 
       do 2 iExists _. iFrame. iSplit.
       { rewrite dom_insert_L. iPureIntro.
@@ -401,8 +401,9 @@ Section EoFin.
           iDestruct (ith_sig_sgn with "SN [$]") as "#EX". 
           iDestruct (ith_sig_expect B__eo with "[$] [$] [$] SW [$] []") as "OU".
           { apply Nat.ltb_irrefl. }
-          { rewrite /sgns_level_gt. rewrite big_opS_singleton.
-            iExists _. iFrame "EX". iPureIntro.
+          { rewrite /sgns_level_gt.
+            iApply big_opS_singleton. iExists _. iFrame "EX".
+            iPureIntro. apply set_Forall_singleton. 
             rewrite !B__eo_simpl; try lia. intros.
             apply ith_bn_lt. lia. }
             
@@ -444,8 +445,10 @@ Section EoFin.
           iDestruct (ith_sig_sgn with "SN [$]") as "#EX".
           iDestruct (ith_sig_expect B__eo with "[$] [$] [$] [$] [$] []") as "OU".
           { apply Nat.ltb_irrefl. }
-          { rewrite /sgns_level_gt. rewrite big_opS_singleton.
+          { rewrite /sgns_level_gt.
+            iApply big_opS_singleton. 
             iExists _. iFrame "EX". iPureIntro.
+            apply set_Forall_singleton.
             rewrite !B__eo_simpl; try lia. intros.
             apply ith_bn_lt. lia. }
           iApply OU_BMU.
