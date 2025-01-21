@@ -56,7 +56,7 @@ Section Adequacy.
   (* TODO: make the lower bounds separate definitions in ticketlock module *)
   Definition ClosedLim := max_list [2 + tl_exc; 2 * c__cl + 3 + tl_exc].
 
-  Definition ClosedObligationsPre: ObligationsParamsPre ClosedDegree ClosedLevel ClosedLim.
+  Instance ClosedObligationsPre: ObligationsParamsPre ClosedDegree ClosedLevel ClosedLim.
     esplit; try by apply _.
     all: apply nat_bounded_PO. 
   Defined.
@@ -82,66 +82,88 @@ Section Adequacy.
   Global Instance subG_clientΣ {Σ}: subG ClientΣ Σ → ClientPreG Σ.
   Proof. solve_inG. Qed.
 
-  Definition ClosedΣ := #[ TLΣ; ClientΣ].
+  Definition ClosedOP := LocaleOP (Locale := locale heap_lang). 
+  Existing Instance ClosedOP. 
+  Let ASEM := ObligationsASEM.
+  Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls τ ∅ (oGS := aGS)).
+  Let OM := ObligationsModel. 
+  Let M := AM2M ObligationsAM. 
+
+  Definition ClosedΣ := #[ TLΣ; ClientΣ; heapΣ EM].
 
   Program Definition TLPreInstance := TLPre d__l d__h d__e d__m _ _ _ l__acq (OPRE := ClosedObligationsPre).
   Next Obligation. apply ith_bn_lt. lia. Qed. 
   Next Obligation. apply ith_bn_lt. lia. Qed. 
   Next Obligation. apply ith_bn_lt. lia. Qed.
 
-  foobar. 
-
-  Lemma eofin_terminates_impl
+  Lemma closed_program_terminates_impl
+    (prog := client_prog (FLP := TLPreInstance))
     (extr : heap_lang_extrace)
-    (START: trfirst extr = ([start #(0%nat) #B], Build_state ∅ ∅)):
-    extrace_fairly_terminating extr. 
+    (START: trfirst extr = ([prog #()], Build_state ∅ ∅)):
+    extrace_fairly_terminating extr.
   Proof.
-    assert (heapGpreS eofinΣ EM) as HPreG.
+    assert (heapGpreS ClosedΣ EM) as HPreG.
     { apply _. }
 
     eapply @obls_terminates_impl with
-      (cps_degs := (2 * B + 5) *: {[+ d2 B +]} ⊎ 50 *: {[+ d0 B +]})
-      (eb := 20); eauto.
+      (cps_degs := 4 *: {[+ d__r +]})
+      (eb := 70); eauto.
     1-5: by apply _.
     1-2: by apply fin_wf.
-    Unshelve. 2-6: by apply _.
 
     iIntros (?) "[HEAP INIT]".
-    iApply (main_spec with "[-]").
-    5: { simpl. iNext. iIntros (_) "X". iApply "X". }
-    3: { simpl. iIntros (? _) "X". iApply "X". }
+
+    eset (tfl := TL_FL). specialize (tfl d__w d__l d__h d__e d__m).
+    specialize tfl with (lvl_acq := l__acq) (hGS := HEAP) (oGS := (@heap_fairnessGS _ _ _ HEAP)).
+
+    pose proof @client_spec as SPEC. specialize SPEC with (OPRE := ClosedObligationsPre) (hGS := HEAP) (oGS := (@heap_fairnessGS _ _ _ HEAP)).
+    specialize SPEC with (l__o := l0) (l__f := l__f) (l__fl := l__acq) (d0 := d0) (d__r := d__r).
+
+    iApply (SPEC with "[-]").
+    { apply tfl. 
+      - apply ith_bn_lt. lia.
+      - apply AMU_lift_top.
+      - rewrite /ClosedLim. etrans.
+        2: { apply max_list_elem_of_le, elem_of_list_here. }
+        lia. }
+    1, 2: simpl; rewrite /lvls_acq; intros ? ->%elem_of_singleton; apply ith_bn_lt; lia.
+    { apply ith_bn_lt; lia. }
+    { simpl. rewrite /lvls_acq. by apply elem_of_singleton. }
     { apply AMU_lift_top. }
+    1, 2: apply ith_bn_lt; lia.
+    1, 2, 3: rewrite /ClosedLim; simpl; rewrite /tl_exc; lia. 
     { intros. rewrite /AMU_lift_MU__f.
       rewrite -nclose_nroot.
       apply AMU_lift_top. }
-    
-    simpl. rewrite START.
-    rewrite /obls_init_resource /init_om_state. 
-      
+    { simpl. iIntros (? _) "X". iApply "X". }
+    { simpl. by apply _. }
+    2: { simpl. iNext. iIntros (_) "X". iApply "X". }
+
+    clear SPEC tfl.     
+    rewrite START. simpl.
+    rewrite /obls_init_resource /init_om_state.      
     rewrite init_phases_helper.
     rewrite locales_of_cfg_simpl. simpl.
-    rewrite union_empty_r_L.
     iDestruct "INIT" as "(CPS & SIGS & OB & EPS & PH & EB)".
-    rewrite /cps_repr /sig_map_repr /eps_repr /obls_map_repr. 
-    rewrite big_sepM_singleton. 
-    rewrite fmap_empty.
-    rewrite !gset_to_gmap_singleton. 
-    rewrite map_fmap_singleton.      
+    rewrite union_empty_r_L !gset_to_gmap_singleton.
+    rewrite big_sepM_singleton. iFrame.  
+    rewrite /cps_repr /sig_map_repr /eps_repr /obls_map_repr.
+    rewrite !fmap_empty map_fmap_singleton.      
     iFrame.
-    rewrite mset_map_disj_union. rewrite big_sepMS_disj_union.
     rewrite !mset_map_mul !mset_map_singleton.
-
     rewrite -!(cp_mul_alt (oGS := (@heap_fairnessGS _ _ _ HEAP))).
-    iDestruct "CPS" as "[CPS2 CPS0]". 
-    iSplitL "CPS2"; (iApply cp_mul_weaken; [..| by iFrame]); apply phase_lt_fork || lia. 
+    iApply cp_mul_weaken; [..| by iFrame]; apply phase_lt_fork || lia. 
   Qed.
 
 End Adequacy.
 
-Theorem eofin_terminates (N: nat):
+
+Theorem closed_program_terminates:
   forall extr,
-    trfirst extr = ([start #(0%nat) #N], Build_state ∅ ∅) ->
+    trfirst extr = ([client_prog (OPRE := ClosedObligationsPre) (FLP := TLPreInstance) #()], Build_state ∅ ∅) ->
     extrace_fairly_terminating extr.
 Proof using.
-  intros. eapply eofin_terminates_impl; eauto.  
+  intros. eapply closed_program_terminates_impl; eauto.  
 Qed.
+
+Print Assumptions closed_program_terminates.

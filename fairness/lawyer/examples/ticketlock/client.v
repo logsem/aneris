@@ -113,16 +113,16 @@ Section MotivatingClient.
 
   Definition left_thread: val :=
     λ: "lk" "flag",
-      (fl_acquire FL) "lk" ;;
+      (fl_acquire FLP) "lk" ;;
       "flag" <- #true ;;
-      (fl_release FL) "lk"
+      (fl_release FLP) "lk"
     .
 
     Definition right_thread_iter: val :=
       λ: "lk" "flag" "c",
-        (fl_acquire FL) "lk" ;;
+        (fl_acquire FLP) "lk" ;;
         "c" <- !"flag" ;;
-        (fl_release FL) "lk"
+        (fl_release FLP) "lk"
     .
 
     Definition right_thread_rep: val :=
@@ -139,7 +139,7 @@ Section MotivatingClient.
 
   Definition client_prog: val :=
     λ: <>,
-      let: "lk" := fl_create FL #() in
+      let: "lk" := fl_create FLP #() in
       let: "flag" := ref #false in
       (Fork (left_thread "lk" "flag") ;;
        Fork (right_thread "lk" "flag")).
@@ -274,7 +274,7 @@ Section MotivatingClient.
           cp π (fl_d__m FLP) (oGS := oGS) ∗
           sgns_levels_gt' Ob (fl_acq_lvls FLP) (oGS := oGS)
       }}}
-        (fl_acquire FL) lk @ τ
+        (fl_acquire FLP) lk @ τ
       {{{ v, RET v; ∃ s__o (f: bool), obls τ (Ob ∪ {[ s__o ]}) (oGS := oGS) ∗ 
                           th_phase_eq τ π (oGS := oGS) ∗
                           P__lock flag s__f f ∗ lock_owner_frag (Some s__o) ∗
@@ -391,7 +391,7 @@ Section MotivatingClient.
           cp π (fl_d__m FLP) (oGS := oGS) ∗
           sgn s__f l__f None (oGS := oGS)
       }}}
-        (fl_acquire FL) lk @ τ
+        (fl_acquire FLP) lk @ τ
       {{{ v, RET v; ∃ s__o, obls τ {[ s__f; s__o ]} (oGS := oGS) ∗ flag_unset ∗
                           th_phase_eq τ π (oGS := oGS) ∗
                           P__lock flag s__f false ∗ lock_owner_frag (Some s__o) ∗
@@ -429,7 +429,7 @@ Section MotivatingClient.
            BMU ∅ 3 (((Qp.sub 1%Qp q) ≫= Some ∘ th_phase_frag τ π (oGS := oGS)) -∗? Q) (oGS := oGS))
           (* ∗ (P__lock flag s__f f ==∗ P__lock flag s__f f ∗ W) *)
       }}}
-        (fl_release FL) lk @ τ
+        (fl_release FLP) lk @ τ
       {{{ v, RET v; Q }}}.
     Proof using All.
       iIntros (Φ).
@@ -547,7 +547,7 @@ Section MotivatingClient.
           (* P__lock flag s__f false ∗ *)
           flag ↦ #true ∗ sgn s__f l__f (Some false) (oGS := oGS) ∗
           lock_owner_frag (Some s__o) ∗ fl_release_token FL (FLG := FLG) }}}
-        (fl_release FL) lk @ τ
+        (fl_release FLP) lk @ τ
       {{{ v, RET v; obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) }}}.
     Proof using All.
       iIntros (Φ).
@@ -593,7 +593,7 @@ Section MotivatingClient.
       rewrite /left_thread.
       pure_steps. simpl.
 
-      wp_bind (fl_acquire FL lk).
+      wp_bind (fl_acquire FLP lk).
       iDestruct (cp_mul_take with "CPSm") as "[CPSm CPm]".
       iApply (acquire_left with "[-CPSm CPS POST]").
       { iFrame "#∗". }
@@ -623,7 +623,7 @@ Section MotivatingClient.
           obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
           cp π (fl_d__m FLP) (oGS := oGS)
       }}}
-        (fl_acquire FL) lk @ τ
+        (fl_acquire FLP) lk @ τ
       {{{ v, RET v; ∃ s__o f, obls τ {[ s__o ]} (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
                           P__lock flag s__f f ∗ lock_owner_frag (Some s__o) ∗
                           fl_release_token FL (FLG := FLG) ∗
@@ -651,7 +651,7 @@ Section MotivatingClient.
           th_phase_eq τ π (oGS := oGS) ∗ cp π (fl_d__m FLP) (oGS := oGS) ∗
           P__lock flag s__f f ∗          
           lock_owner_frag (Some s__o) ∗ fl_release_token FL (FLG := FLG) }}}
-        (fl_release FL) lk @ τ
+        (fl_release FLP) lk @ τ
       {{{ v, RET v; obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗ 
                          (⌜ f = true ⌝ ∗ flag_set ∨ ⌜ f = false ⌝ ∗ cp_mul π (fl_d__m FLP) 3 (oGS := oGS)) }}}.
     Proof using All.
@@ -934,7 +934,7 @@ Section MotivatingClient.
     BMU_burn_cp.
 
     split_cps "CPSm" 1. rewrite -cp_mul_1.  
-    wp_bind (fl_create FL _)%E.
+    wp_bind (fl_create FLP _)%E.
     unshelve iApply (fl_create_spec FL with "[//] [$CPSm' $PH]").
     { eauto. }
     { exact c__cl. }

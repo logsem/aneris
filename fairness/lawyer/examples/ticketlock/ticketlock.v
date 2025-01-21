@@ -184,6 +184,33 @@ Section Ticketlock.
 
   Definition lvls_acq: gset Level := {[ lvl_acq ]}. 
   
+  Definition tl_newlock: val :=
+    λ: <>,
+       let: "ow" := ref #(0%nat) in
+       let: "tk" := ref #(0%nat) in
+       ("ow", "tk").
+
+  Definition get_ticket: val :=
+    λ: "lk", FAA (Snd "lk") #1.
+
+  Definition wait: val :=
+    rec: "wait" "lk" "t" :=
+      let: "o" := !(Fst "lk") in
+      if: "t" = "o"
+      then #()
+      else "wait" "lk" "t"
+  .
+
+  Definition tl_acquire : val :=
+    λ: "lk",
+      let: "t" := get_ticket "lk" in
+      wait "lk" "t"
+  .
+
+  Definition tl_release: val :=
+      λ: "lk", FAA (Fst "lk") #1
+  .
+
   Program Definition TLPre: FairLockPre := {|    
     fl_c__cr := 2 + tl_exc;
     fl_B := fun c => 2 * c + 3 + tl_exc;
@@ -193,6 +220,9 @@ Section Ticketlock.
     fl_degs_lh := fl_degs_lh0;
     fl_d__m := d__m0;
     fl_acq_lvls := lvls_acq;
+    fl_create := tl_newlock;
+    fl_acquire := tl_acquire;
+    fl_release := tl_release;
   |}.
   Next Obligation.
     etrans; eauto.
@@ -413,34 +443,7 @@ Section Ticketlock.
     apply disjoint_singleton_l. by (intros ?%elem_of_set_seq; lia).
   Qed.
 
-  Definition get_ticket: val :=
-    λ: "lk", FAA (Snd "lk") #1.
-
-  Definition wait: val :=
-    rec: "wait" "lk" "t" :=
-      let: "o" := !(Fst "lk") in
-      if: "t" = "o"
-      then #()
-      else "wait" "lk" "t"
-  .
-
-  Definition tl_acquire : val :=
-    λ: "lk",
-      let: "t" := get_ticket "lk" in
-      wait "lk" "t"
-  .
-
-  Definition tl_release: val :=
-      λ: "lk", FAA (Fst "lk") #1
-  .
-
   Definition tl_is_lock `{TicketlockG Σ} lk c := inv fl_ι (tl_inv_inner lk c).
-
-  Definition tl_newlock: val :=
-    λ: <>,
-       let: "ow" := ref #(0%nat) in
-       let: "tk" := ref #(0%nat) in
-       ("ow", "tk").
 
   Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS _ EM hGS (↑ nroot)}.
 
@@ -1193,7 +1196,6 @@ Section Ticketlock.
 
   Program Definition TL_FL: FairLock (oGS := oGS) (FLP := TLPre) := {|
     fl_is_lock FLG hGS := @tl_is_lock FLG;
-    fl_create := tl_newlock; fl_acquire := tl_acquire; fl_release := tl_release;
     fl_release_token FLG := @rel_tok _ FLG;
   |}.
   Next Obligation.
@@ -1210,6 +1212,6 @@ Section Ticketlock.
   Next Obligation.
     iIntros "%%%% (#LOCK & RT)".
     iApply (tl_release_spec with "[$]"). done.
-  Qed.     
+  Qed.
     
 End Ticketlock.

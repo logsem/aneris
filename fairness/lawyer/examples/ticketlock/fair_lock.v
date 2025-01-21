@@ -32,6 +32,7 @@ Section FairLockSpec.
     fl_degs_lh: deg_lt fl_d__l fl_d__h;
     fl_degs_hm: deg_lt fl_d__h fl_d__m;
     fl_acq_lvls: gset Level;                                     
+    fl_create: val; fl_acquire: val; fl_release: val;
   }.
 
   Definition fl_ι: namespace := nroot .@ "fair_lock".
@@ -80,7 +81,6 @@ Section FairLockSpec.
     fl_LK FLP y (FLG := FLG) ∗ ⌜ y.1.2 = (x.1.2 + 1)%nat /\ y.2 = false /\ y.1.1 = x.1.1 ⌝.
   
   Record FairLock := {    
-    fl_create: val; fl_acquire: val; fl_release: val;
 
     fl_is_lock `{FLG: fl_GS FLP Σ} {HEAP: gen_heapGS loc val Σ}: val -> nat -> iProp Σ;
     fl_is_lock_pers {FLG: fl_GS FLP Σ} lk c :> Persistent (fl_is_lock lk c (FLG := FLG));
@@ -89,7 +89,7 @@ Section FairLockSpec.
 
     fl_create_spec {FLG_PRE: fl_GpreS FLP Σ}: ⊢ ⌜ fl_c__cr FLP <= LIM_STEPS ⌝ -∗ ∀ τ π c,
         {{{ cp π (fl_d__m FLP) (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) }}}
-            fl_create #() @ τ
+            fl_create FLP #() @ τ
         {{{ lk, RET lk; ∃ FLG: fl_GS FLP Σ, fl_LK _ (lk, 0, false) (FLG := FLG) ∗ fl_is_lock lk c (FLG := FLG) ∗ th_phase_eq τ π (oGS := oGS) }}};
 
     fl_acquire_spec {FLG: fl_GS FLP Σ} (lk: val) c τ: (fl_is_lock (FLG := FLG)) lk c ⊢
@@ -100,7 +100,7 @@ Section FairLockSpec.
         (fun '(_, _, b) => b = false)
         (fun _ _ => Some $ fl_release_token (FLG := FLG))
         (fun _ _ => #())
-        c (fl_acquire lk);
+        c (fl_acquire FLP lk);
                                      
     fl_release_spec {FLG: fl_GS FLP Σ} (lk: val) c τ: (fl_is_lock (FLG := FLG)) lk c ∗ fl_release_token (FLG := FLG) ⊢
         TLAT_FL τ
@@ -110,7 +110,7 @@ Section FairLockSpec.
         (fun _ => True%type)
         (fun _ _ => None)
         (fun _ '(_, r, _) => #r)
-        c (fl_release lk);
+        c (fl_release FLP lk);
   }.
   
 End FairLockSpec.
