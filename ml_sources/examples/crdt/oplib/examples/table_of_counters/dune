@@ -1,4 +1,0 @@
-(executable
-  (name table_of_counters_code)
-  (flags :standard -rectypes)
-  (libraries oplib_code aneris map_comb_code pncounter_code))

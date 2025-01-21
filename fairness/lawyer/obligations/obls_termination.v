@@ -2,8 +2,8 @@ Require Import Coq.Program.Wf.
 Require Import Relation_Operators.
 From iris.proofmode Require Import tactics.
 From iris.algebra Require Import gset gmultiset.
-From trillium.fairness Require Import locales_helpers inftraces fairness trace_len my_omega.
-From trillium.fairness.lawyer.obligations Require Import obligations_model multiset_utils wf_utils obls_pf wf_ms obligations_wf.
+From trillium.fairness Require Import locales_helpers inftraces fairness trace_len my_omega utils_multisets utils_tactics.
+From trillium.fairness.lawyer.obligations Require Import obligations_model wf_utils obls_pf wf_ms obligations_wf.
 From stdpp Require Import relations.
 
 

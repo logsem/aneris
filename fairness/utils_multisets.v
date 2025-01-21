@@ -1,11 +1,12 @@
 From iris.proofmode Require Import tactics.
 From iris.algebra Require Import gset gmultiset.
-(* From stdpp Require Import relations. *)
-From trillium.fairness Require Import lemmas.
+From trillium.fairness Require Import utils_tactics.
 
 Ltac mss := multiset_solver. 
 
-(* TODO: move *)
+
+Close Scope Z.
+
 Section GmultisetUtils.
   Context `{Countable A}. 
   
@@ -55,7 +56,6 @@ Section GmultisetUtils.
     apply Nat.le_sum in LE as [d ->]. mss.
   Qed.
 
-  (* TODO: move *)
   Lemma gset_singleton_if_equiv (P: A -> Prop)
     `{forall k, Decision (P k)}:
     forall k, filter P ({[ k ]}: gset A) = if (decide (P k)) then {[ k ]} else ∅.
@@ -400,7 +400,6 @@ Section MultisetOrder.
     destruct LE as (?&?&?). lia.
   Qed.
 
-  (* TODO: move *)
   Lemma gmultiset_subseteq_empty (X: gmultiset A):
     X ⊆ ∅ <-> X = ∅.
   Proof using. clear. mss. Qed.  

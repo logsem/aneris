@@ -1,7 +1,5 @@
 TRILLIUM_DIR := 'trillium'
-ANERIS_DIR := 'aneris'
 FAIRNESS_DIR := 'fairness'
-# LOCAL_SRC_DIRS := $(TRILLIUM_DIR) $(ANERIS_DIR) $(FAIRNESS_DIR)
 LOCAL_SRC_DIRS := $(TRILLIUM_DIR) $(FAIRNESS_DIR)
 SRC_DIRS := $(LOCAL_SRC_DIRS) 'external'
 
@@ -45,9 +43,9 @@ clean:
 	rm -f .coqdeps.d
 
 # project-specific targets
-.PHONY: build clean-trillium clean-fairness clean-aneris trillium fairness aneris
+.PHONY: build clean-trillium clean-fairness trillium fairness
 
-VPATH= $(TRILLIUM_DIR) $(ANERIS_DIR) $(FAIRNESS_DIR)
+VPATH= $(TRILLIUM_DIR) $(FAIRNESS_DIR)
 VPATH_FILES := $(shell find $(VPATH) -name "*.v")
 
 build: $(VPATH_FILES:.v=.vo)
@@ -58,9 +56,6 @@ fairness :
 trillium :
 	@$(MAKE) build VPATH=$(TRILLIUM_DIR)
 
-aneris :
-	@$(MAKE) build VPATH=$(ANERIS_DIR)
-
 clean-local:
 	@echo "CLEAN vo glob aux"
 	$(Q)find $(LOCAL_SRC_DIRS) \( -name "*.vo" -o -name "*.vo[sk]" \
@@ -68,9 +63,6 @@ clean-local:
 
 clean-trillium:
 	@$(MAKE) clean-local LOCAL_SRC_DIRS=$(TRILLIUM_DIR)
-
-clean-aneris:
-	@$(MAKE) clean-local LOCAL_SRC_DIRS=$(ANERIS_DIR)
 
 clean-fairness:
 	@$(MAKE) clean-local LOCAL_SRC_DIRS=$(FAIRNESS_DIR)

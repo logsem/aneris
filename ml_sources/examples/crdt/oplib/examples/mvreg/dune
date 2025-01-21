@@ -1,4 +1,0 @@
-(library
-  (name mvreg_code)
-  (flags :standard -rectypes)
-  (libraries oplib_code aneris))

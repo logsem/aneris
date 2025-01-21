@@ -1,9 +1,10 @@
 From iris.algebra Require Import auth gmap gset excl excl_auth mono_nat.
 From iris.proofmode Require Import tactics.
 From iris.base_logic.lib Require Import saved_prop. 
+From trillium.fairness Require Import utils.
 From trillium.fairness.heap_lang Require Import simulation_adequacy.
 From trillium.fairness.lawyer Require Import sub_action_em action_model.
-From trillium.fairness.lawyer.obligations Require Import obligations_adequacy obligations_logic obligations_em obligations_resources obligations_model obligations_am multiset_utils.
+From trillium.fairness.lawyer.obligations Require Import obligations_adequacy obligations_logic obligations_em obligations_resources obligations_model obligations_am.
 From trillium.fairness.lawyer.examples.ticketlock Require Import fair_lock ticketlock client.
 From trillium.fairness.lawyer.examples Require Import bounded_nat signal_map.
 
@@ -166,4 +167,4 @@ Proof using.
   intros. eapply closed_program_terminates_impl; eauto.  
 Qed.
 
-Print Assumptions closed_program_terminates.
+(* Print Assumptions closed_program_terminates. *)

@@ -1,4 +1,0 @@
-(executable
-  (name causality_example_code)
-  (flags :standard -rectypes)
-  (libraries sharding_code aneris))

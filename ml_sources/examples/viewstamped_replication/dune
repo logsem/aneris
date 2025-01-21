@@ -1,5 +1,0 @@
-(library
-  (wrapped false)
-  (name vr)
-  (flags :standard -rectypes)
-  (libraries aneris))

@@ -119,8 +119,7 @@ Section GeneralizedFairness.
     do 3 eexists. repeat split; eauto.
     intros k * [LE LT] KTH. intros SAT.
     apply Nat.le_sum in LE as [d ->]. 
-    specialize (MINm d). specialize_full MINm; [| lia].
-    eauto.
+    specialize (MINm d ltac:(eauto)). lia.
   Qed.
 
 End GeneralizedFairness.
@@ -327,10 +326,6 @@ End model_traces.
 
 Definition FM_strong_lr (FM: FairModel) :=
   forall st ρ, ρ ∈ live_roles FM st <-> exists st', fmtrans FM st (Some ρ) st'.
-
-
-Canonical Structure ModelO (Mdl : FairModel) := leibnizO Mdl.
-Canonical Structure RoleO (Mdl : FairModel) := leibnizO (Mdl.(fmrole)).
 
 
 Global Hint Resolve fair_by_cons: core.

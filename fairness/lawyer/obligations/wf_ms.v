@@ -164,10 +164,9 @@ Require Import Relation_Operators.
 
 
 From stdpp Require Import gmultiset.
-From trillium.fairness.lawyer.obligations Require Import multiset_utils.
 From iris.proofmode Require Import tactics.
 Require Import Coq.Program.Wf.
-From trillium.fairness Require Import utils.
+From trillium.fairness Require Import utils_multisets utils_relations.
 
 Section GmultisetLtWf.
   Context `{ED: EqDecision A}. 

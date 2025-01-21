@@ -1,7 +1,7 @@
-From trillium.program_logic Require Export adequacy.
 From stdpp Require Import option.
 From Paco Require Import paco1 paco2 pacotac.
-From trillium.fairness Require Export lemmas.
+From trillium.program_logic Require Export adequacy.
+From trillium.fairness Require Import utils_logic.
 
 Require Import
         Coq.Relations.Relation_Definitions
@@ -611,9 +611,7 @@ Section destuttering.
       specialize (PRE _ _ H H0). eauto. 
     - intros str' Hafter. simpl in Hafter.
       apply Hw. simpl.
-      specialize (IH btr str str'). specialize_full IH.
-      { by destruct Hind. }
-      { done. }
+      specialize (IH btr str str' ltac:(by destruct Hind) ltac:(done)). 
       destruct IH as (n' & btr' & AFTER & UPTO & PRE). 
       exists n', btr'. do 2 (split; eauto). intros. 
       destruct i.

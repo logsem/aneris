@@ -1,7 +1,7 @@
 Require Import Relation_Operators.
 From stdpp Require Import namespaces. 
-From trillium.fairness Require Import fairness locales_helpers utils.
-From trillium.fairness.lawyer.obligations Require Import obligations_model obls_utils multiset_utils.
+From trillium.fairness Require Import fairness locales_helpers utils utils_tactics.
+From trillium.fairness.lawyer.obligations Require Import obligations_model obls_utils.
 
 
 Section Wf.

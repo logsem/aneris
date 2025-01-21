@@ -3,7 +3,7 @@ From stdpp Require Import namespaces.
 From iris.base_logic Require Import ghost_map.
 From iris.algebra Require Import auth gmap gset excl gmultiset big_op mono_nat.
 From trillium.fairness Require Import fairness locales_helpers execution_model.
-From trillium.fairness.lawyer.obligations Require Import obligations_model obls_utils obligations_resources multiset_utils obligations_wf.
+From trillium.fairness.lawyer.obligations Require Import obligations_model obls_utils obligations_resources obligations_wf.
 
 
 Section ObligationsEM.
@@ -38,10 +38,10 @@ Section ObligationsEM.
   Proof.
     destruct c1 as [tp1 σ1], c2 as [tp2 σ2].
     red. rewrite NOFORK.
-    unshelve forward eapply (pres_by_loc_step_implies_progress _ _ _ _ _ _ TRANS). 
-    2: { eapply @loc_step_dom_obls_pres. }
-    { reflexivity. }
-    intros EQ. by rewrite EQ. 
+    symmetry. pattern δ2. eapply pres_by_loc_step_implies_progress.
+    { eapply @loc_step_dom_obls_pres. }
+    2: { eauto. }
+    congruence. 
   Qed.
       
   Definition obls_cfg_corr (σ: cfg Λ) (δ: mstate OM) :=

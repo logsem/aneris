@@ -1,8 +1,8 @@
 Require Import Relation_Operators.
 From iris.proofmode Require Import tactics.
 From iris.algebra Require Import gset gmultiset.
-From trillium.fairness Require Import inftraces trace_lookup.
-From trillium.fairness.lawyer.obligations Require Import obligations_model multiset_utils.
+From trillium.fairness Require Import inftraces trace_lookup utils_multisets utils_tactics.
+From trillium.fairness.lawyer.obligations Require Import obligations_model.
 From stdpp Require Import relations.
 
 

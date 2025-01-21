@@ -1,5 +1,6 @@
-From trillium.fairness Require Import inftraces fairness lm_fair.
-From trillium.fairness Require Import my_omega lemmas trace_len trace_helpers trace_lookup.
+From trillium.fairness Require Import inftraces fairness.
+From trillium.fairness Require Import my_omega trace_len trace_helpers trace_lookup.
+From trillium.fairness Require Import utils_tactics.
 Require Import Coq.Logic.Classical.
 
 Local Ltac gd t := generalize dependent t.

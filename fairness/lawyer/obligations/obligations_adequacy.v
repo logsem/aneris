@@ -148,19 +148,19 @@ Section OblsAdequacy.
 
     pose proof (traces_match_valid2 _ _ _ _ _ _ MATCH'') as OM_VALID.
     pose proof (obls_fair_trace_terminate _ OM_VALID OM_FAIR) as OM_TERM.
-    specialize_full OM_TERM.
-    { intros. eapply pres_by_valid_trace with (i := 0) (j := i) in OM_VALID.
-      2: apply wf_preserved_by_loc_step.
-      2: apply wf_preserved_by_fork_step.
-      2: { rewrite state_lookup_0. simpl.
-           apply traces_match_first in MATCHo.
-           by rewrite -MATCHo. }
-      2: lia.
-      by rewrite H in OM_VALID. }
-    1, 2: by eauto.
+
+    eapply (traces_match_preserves_termination _ _ _ _ _ _ MATCH'').
+    apply OM_TERM. 
+    2, 3: by eauto.
     
-    pose proof (traces_match_preserves_termination _ _ _ _ _ _ MATCH'' OM_TERM).
-    done.
+    intros. eapply pres_by_valid_trace with (i := 0) (j := i) in OM_VALID.
+    2: apply wf_preserved_by_loc_step.
+    2: apply wf_preserved_by_fork_step.
+    2: { rewrite state_lookup_0. simpl.
+         apply traces_match_first in MATCHo.
+         by rewrite -MATCHo. }
+    2: lia.
+    by rewrite H in OM_VALID. 
   Qed.
 
   Let ASEM := ObligationsASEM.

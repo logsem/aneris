@@ -1,5 +1,6 @@
-From trillium.fairness Require Import my_omega lemmas. 
-From trillium.fairness Require Import inftraces trace_utils.
+From trillium.fairness Require Import my_omega. 
+From trillium.fairness Require Import inftraces trace_utils utils.
+From trillium.fairness Require Import utils_tactics.
 
 Section TraceLen.
   Context {St L: Type}. 
