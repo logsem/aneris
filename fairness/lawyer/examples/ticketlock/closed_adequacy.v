@@ -115,9 +115,9 @@ Section Adequacy.
     iIntros (?) "[HEAP INIT]".
 
     eset (tfl := TL_FL). specialize (tfl d__w d__l d__h d__e d__m).
-    specialize tfl with (lvl_acq := l__acq) (hGS := HEAP) (oGS := (@heap_fairnessGS _ _ _ HEAP)).
+    specialize tfl with (lvl_acq := l__acq) (hGS := HEAP) (oGS' := (@heap_fairnessGS _ _ _ HEAP)).
 
-    pose proof @client_spec as SPEC. specialize SPEC with (OPRE := ClosedObligationsPre) (hGS := HEAP) (oGS := (@heap_fairnessGS _ _ _ HEAP)).
+    pose proof @client_spec as SPEC. specialize SPEC with (OPRE := ClosedObligationsPre) (hGS := HEAP) (oGS' := (@heap_fairnessGS _ _ _ HEAP)).
     specialize SPEC with (l__o := l0) (l__f := l__f) (l__fl := l__acq) (d0 := d0) (d__r := d__r).
 
     iApply (SPEC with "[-]").

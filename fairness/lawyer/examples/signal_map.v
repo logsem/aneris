@@ -29,7 +29,7 @@ Section SignalMap.
   Context (L: nat -> Level). 
 
   Definition ex_ith_sig B (i: nat) (s: SignalId): iProp Σ :=
-    sgn s (L i) (Some $ B i) (oGS := oGS). 
+    sgn s (L i) (Some $ B i). 
   
   Definition smap_repr `{SigMapG Σ} B (smap: gmap nat SignalId): iProp Σ :=
     own sm_γ__smap (● (to_agree <$> smap: gmapUR nat (agreeR SignalId))) ∗
@@ -51,7 +51,7 @@ Section SignalMap.
 
   Lemma init_smap_repr `{SigMapPreG Σ, invGS_gen HasNoLc Σ} τ R B (D: gset nat):
     obls τ R -∗ BMU ∅ (2 * size D) (∃ smap (SMG: SigMapG Σ), 
-          smap_repr B smap ∗ ⌜ dom smap = D ⌝ ∗ obls τ (R ∪ map_img (filter (fun '(i, _) => B i = false) smap))) (oGS := oGS).
+          smap_repr B smap ∗ ⌜ dom smap = D ⌝ ∗ obls τ (R ∪ map_img (filter (fun '(i, _) => B i = false) smap))) (oGS' := oGS).
   Proof using LEQUIV__l DISCR__l .
     clear DISCR__d.
     iIntros "OB".
@@ -69,7 +69,7 @@ Section SignalMap.
       { destruct (B i).
         2: { iApply BMU_intro. iFrame. }
         iApply OU_BMU. iApply (OU_wand with "[]").
-        2: { iApply (OU_set_sig (oGS := oGS) with "[$] [$]"). set_solver. }
+        2: { iApply (OU_set_sig with "[$] [$]"). set_solver. }
         iIntros "[SIG OB]". iApply BMU_intro. iFrame.
         iApply obls_proper; [| by iFrame].
         set_solver. }
@@ -151,7 +151,7 @@ Section SignalMap.
   Qed.
 
   Lemma ith_sig_sgn i s B (smap: gmap nat SignalId):
-    ⊢ ith_sig i s -∗ smap_repr B smap -∗ sgn s (L i) None (oGS := oGS).
+    ⊢ ith_sig i s -∗ smap_repr B smap -∗ sgn s (L i) None.
   Proof using.
     iIntros "S SR".
     iDestruct (ith_sig_in with "[$] [$]") as "%ITH". 
@@ -202,8 +202,8 @@ Section SignalMap.
     (OTHER_PRES: forall j, j ≠ i -> j ∈ dom smap -> B' j = B j):
     ⊢ smap_repr B smap -∗ 
       ith_sig i s -∗
-      obls τ R (oGS := oGS) -∗
-      OU (smap_repr B' smap ∗ obls τ (R ∖ {[ s ]})) (oGS := oGS).
+      obls τ R -∗
+      OU (smap_repr B' smap ∗ obls τ (R ∖ {[ s ]})).
   Proof using LEQUIV__l DISCR__l.
     iIntros "SR #ITH OB".
     iDestruct (smap_repr_split_upd with "[$] [$]") as "[SIGi SR']"; [done| ].
@@ -220,11 +220,11 @@ Section SignalMap.
     (LT: i ∈ dom smap)
     (DEG_LT: deg_lt d__l d__h):
     ⊢ smap_repr B smap -∗ 
-      cp π d__h (oGS := oGS) -∗
-      th_phase_frag τ π q (oGS := oGS) -∗
+      cp π d__h -∗
+      th_phase_frag τ π q -∗
       OU (|==> ∃ s, ith_sig i s ∗
-                    ep s π d__l (oGS := oGS) ∗ smap_repr B smap ∗
-                    th_phase_frag τ π q (oGS := oGS)) (oGS := oGS).
+                    ep s π d__l ∗ smap_repr B smap ∗
+                    th_phase_frag τ π q).
   Proof using DISCR__d DISCR__l LEQUIV__l.
     iIntros "SR CP PH".
     rewrite /smap_repr. iDestruct "SR" as "(AUTH & SIGS)".
@@ -263,9 +263,9 @@ Section SignalMap.
     (FRESH: m ∉ dom smap)
     (PRES: forall i, i ∈ dom smap -> B' i = B i)
     :
-    ⊢ ([∗ map] k↦y ∈ smap, sgn y (L k) (Some (B k)) (oGS := oGS)) -∗
-       sgn s (L m) (Some (B' m)) (oGS := oGS) -∗
-       [∗ map] i↦s0 ∈ <[m := s]> smap, sgn s0 (L i) (Some $ B' i) (oGS := oGS).
+    ⊢ ([∗ map] k↦y ∈ smap, sgn y (L k) (Some (B k))) -∗
+       sgn s (L m) (Some (B' m)) -∗
+       [∗ map] i↦s0 ∈ <[m := s]> smap, sgn s0 (L i) (Some $ B' i).
   Proof using.
     iIntros "SIGS SG".
     rewrite big_opM_insert_delete. 
@@ -283,12 +283,12 @@ Section SignalMap.
     (FRESH_UNSET: B' m = false)
     (FRESH: m ∉ dom smap)
     :
-    ⊢ obls τ R (oGS := oGS) -∗ smap_repr B smap -∗
+    ⊢ obls τ R -∗ smap_repr B smap -∗
       BMU ∅ 1 (
         |==> (∃ s',
              smap_repr B' (<[m := s']> smap) ∗
-             ith_sig m s' ∗ obls τ (R ∪ {[s']}) (oGS := oGS) ∗
-             ⌜ s' ∉ R ⌝ ∗ sgn s' (L m) None)) (oGS := oGS).
+             ith_sig m s' ∗ obls τ (R ∪ {[s']}) ∗
+             ⌜ s' ∉ R ⌝ ∗ sgn s' (L m) None)) (oGS' := oGS).
     Proof using LEQUIV__l DISCR__l DISCR__d.
       iIntros "OBLS SM".
       iApply OU_BMU.
@@ -311,10 +311,10 @@ Section SignalMap.
       
     Lemma ith_sig_expect i sw τ π q smap R d B
       (UNSETi: B i = false):
-      ⊢ ep sw π d (oGS := oGS) -∗ th_phase_frag τ π q (oGS := oGS) -∗
+      ⊢ ep sw π d -∗ th_phase_frag τ π q -∗
          smap_repr B smap -∗ ith_sig i sw -∗
-         obls τ R (oGS := oGS) -∗ sgns_level_gt R (L i) (oGS := oGS) -∗ 
-         OU (cp π d (oGS := oGS) ∗ smap_repr B smap ∗ th_phase_frag τ π q (oGS := oGS) ∗ obls τ R (oGS := oGS)) (oGS := oGS).
+         obls τ R -∗ sgns_level_gt R (L i) -∗ 
+         OU (cp π d ∗ smap_repr B smap ∗ th_phase_frag τ π q ∗ obls τ R).
     Proof using LEQUIV__l DISCR__l.
       iIntros "#EP PH SR #SW OBLS #OBLS_LT". 
       iDestruct (ith_sig_in with "[$] [$]") as "%ITH".

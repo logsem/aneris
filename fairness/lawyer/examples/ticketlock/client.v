@@ -87,11 +87,15 @@ Section MotivatingClient.
   Context `{EM: ExecutionModel heap_lang M}.
 
   Context {Σ: gFunctors}.
-  Context {oGS: @asem_GS _ _ ASEM Σ}.
+  (* Keeping the more general interface for future developments *)
+  Context `{oGS': @asem_GS _ _ ASEM Σ}.
+  Let oGS: ObligationsGS (OP := OP) Σ := oGS'.
+  Existing Instance oGS.
+
   Context `{hGS: @heapGS Σ _ EM}.
   Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
 
-  Context {FLP: FairLockPre} (FL: FairLock (FLP := FLP) (oGS := oGS)).
+  Context {FLP: FairLockPre} (FL: FairLock (FLP := FLP) (oGS' := oGS')).
 
   Context (l__o l__f: Level).
   Hypothesis
@@ -104,7 +108,7 @@ Section MotivatingClient.
   (* TODO: can we change either TAU or levels order? *)
   Context (l__fl: Level).
   Hypothesis (L__FL: l__fl ∈ fl_acq_lvls FLP).
-  Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS _ EM hGS (↑ nroot)}.
+  Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS' _ EM hGS (↑ nroot)}.
 
   Definition client_ns := nroot .@ "client".
 
@@ -171,13 +175,13 @@ Section MotivatingClient.
       own cl_γ__ow (◯ Excl' oo).
     
     Definition P__lock flag s__f (b: bool): iProp Σ :=
-      flag ↦ #b ∗ (⌜ b = false ⌝ ∗ sgn s__f l__f (Some false) (oGS := oGS) ∨
+      flag ↦ #b ∗ (⌜ b = false ⌝ ∗ sgn s__f l__f (Some false) ∨
                     ⌜ b = true ⌝ ∗ flag_set).
 
     Let s__def: SignalId := 0.
 
     Definition smap_repr_cl r K smap: iProp Σ :=
-      smap_repr (fun _ => l__o) (flip Nat.ltb r) (oGS := oGS) smap ∗
+      smap_repr (fun _ => l__o) (flip Nat.ltb r) smap ∗
       ⌜ dom smap = set_seq 0 K ⌝.
     
     Definition client_inv_inner lk flag s__f: iProp Σ :=
@@ -193,16 +197,15 @@ Section MotivatingClient.
     Definition RR__L π (r': option nat): iProp Σ :=
       match r' with
       | None => ⌜ True ⌝
-      | Some r => ∃ s, ith_sig r s ∗ ep s π (fl_d__l FLP) (oGS := oGS)
+      | Some r => ∃ s, ith_sig r s ∗ ep s π (fl_d__l FLP)
       end.
 
     Lemma BMU_wait_owner τ π q O r m smap i
       (WAIT: r <= i):
-      obls τ O (oGS := oGS) ∗ sgns_levels_ge' O (fl_acq_lvls FLP) (oGS := oGS)∗
-      th_phase_frag τ π q (oGS := oGS) ∗ RR__L π (Some i) ∗ smap_repr_cl r m smap ⊢
-      BMU ∅ 1 (cp π (fl_d__l FLP) (oGS := oGS) ∗ th_phase_frag τ π q (oGS := oGS) ∗
-          obls τ O (oGS := oGS) ∗ smap_repr_cl r m smap
-      ) (oGS := oGS).
+      obls τ O ∗ sgns_levels_ge' O (fl_acq_lvls FLP)∗
+      th_phase_frag τ π q ∗ RR__L π (Some i) ∗ smap_repr_cl r m smap ⊢
+      BMU ∅ 1 (cp π (fl_d__l FLP) ∗ th_phase_frag τ π q ∗
+          obls τ O ∗ smap_repr_cl r m smap) (oGS' := oGS').
     Proof using LVL_ORDo L__FL ODl LEl.
       clear LS_LB CR_LIM.
       clear FL_STEPS.
@@ -231,9 +234,9 @@ Section MotivatingClient.
     Lemma BMU_create_wait_owner τ π q r m smap i
       (DOM: i ∈ dom smap)
       :
-      th_phase_frag τ π q (oGS := oGS) ∗ cp π (fl_d__h FLP) (oGS := oGS) ∗ smap_repr_cl r m smap ⊢
-      BMU ∅ 1 (th_phase_frag τ π q (oGS := oGS) ∗ RR__L π (Some i) ∗
-                smap_repr_cl r m smap) (oGS := oGS).
+      th_phase_frag τ π q ∗ cp π (fl_d__h FLP) ∗ smap_repr_cl r m smap ⊢
+      BMU ∅ 1 (th_phase_frag τ π q ∗ RR__L π (Some i) ∗
+                smap_repr_cl r m smap) (oGS' := oGS').
     Proof using LVL_ORDo L__FL ODd ODl LEl.
       iIntros "(PH & CP & [SR %SR_DOM])".
       rewrite /RR__L.
@@ -246,7 +249,6 @@ Section MotivatingClient.
 
       iIntros "X". iMod "X" as "(%s&?&?&?&?)". iApply BMU_intro.
       iFrame. iSplit; [| done]. iExists _. iFrame "#∗".
-      Unshelve. apply _.
     Qed.
 
     Lemma lock_owner_agree n1 n2:
@@ -270,16 +272,16 @@ Section MotivatingClient.
 
     Lemma acquire_usage τ (lk: val) flag s__f π Ob:
       {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗
-          obls τ Ob (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
-          cp π (fl_d__m FLP) (oGS := oGS) ∗
-          sgns_levels_gt' Ob (fl_acq_lvls FLP) (oGS := oGS)
+          obls τ Ob ∗ th_phase_eq τ π ∗
+          cp π (fl_d__m FLP) ∗
+          sgns_levels_gt' Ob (fl_acq_lvls FLP)
       }}}
         (fl_acquire FLP) lk @ τ
-      {{{ v, RET v; ∃ s__o (f: bool), obls τ (Ob ∪ {[ s__o ]}) (oGS := oGS) ∗ 
-                          th_phase_eq τ π (oGS := oGS) ∗
+      {{{ v, RET v; ∃ s__o (f: bool), obls τ (Ob ∪ {[ s__o ]}) ∗ 
+                          th_phase_eq τ π ∗
                           P__lock flag s__f f ∗ lock_owner_frag (Some s__o) ∗
                           ⌜ s__o ∉ Ob ⌝ ∗ fl_release_token FL (FLG := FLG) ∗
-                          sgn s__o l__o None (oGS := oGS)
+                          sgn s__o l__o None
       }}}.
     Proof using All.
       iIntros (Φ).
@@ -326,7 +328,7 @@ Section MotivatingClient.
         iMod "LOCK_OW". iMod "SR".
         iApply "GOAL". iClear "GOAL".
 
-        iAssert (BMU ∅ 1 (RR__L π (Some r) ∗ th_phase_frag τ π q' (oGS := oGS) ∗
+        iAssert (BMU ∅ 1 (RR__L π (Some r) ∗ th_phase_frag τ π q' ∗
                            smap_repr_cl r (r + 1) smap))%I with "[CASES PH SR]" as "EXP".
         { iDestruct "CASES" as "[-> | RR]".
           { iApply BMU_intro. iFrame "#∗". }
@@ -360,8 +362,7 @@ Section MotivatingClient.
         2: { iApply (BMU_smap_extend (λ _, l__o) _ r with "[$] [$]").
              { intros. reflexivity. }
              { simpl. apply Nat.ltb_irrefl. }
-             rewrite DOM. intros ?%elem_of_set_seq. lia.
-             Unshelve. apply _. }
+             rewrite DOM. intros ?%elem_of_set_seq. lia. }
         iIntros "X". iMod "X" as "(%s' & SR & #SIGr & OB & %FRESH' & #SGNo)".
         iApply BMU_intro. iFrame.
         iIntros ([[??]?]) "[LK (%X & % & %)]".
@@ -387,16 +388,16 @@ Section MotivatingClient.
 
     Lemma acquire_left τ (lk: val) flag s__f π:
       {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗ flag_unset ∗
-          obls τ {[ s__f ]} (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
-          cp π (fl_d__m FLP) (oGS := oGS) ∗
-          sgn s__f l__f None (oGS := oGS)
+          obls τ {[ s__f ]} ∗ th_phase_eq τ π ∗
+          cp π (fl_d__m FLP) ∗
+          sgn s__f l__f None
       }}}
         (fl_acquire FLP) lk @ τ
-      {{{ v, RET v; ∃ s__o, obls τ {[ s__f; s__o ]} (oGS := oGS) ∗ flag_unset ∗
-                          th_phase_eq τ π (oGS := oGS) ∗
+      {{{ v, RET v; ∃ s__o, obls τ {[ s__f; s__o ]} ∗ flag_unset ∗
+                          th_phase_eq τ π ∗
                           P__lock flag s__f false ∗ lock_owner_frag (Some s__o) ∗
                           ⌜ s__o ≠ s__f ⌝ ∗ fl_release_token FL (FLG := FLG) ∗
-                          sgn s__o l__o None (oGS := oGS)                          
+                          sgn s__o l__o None                          
       }}}.
     Proof using All.
       iIntros (Φ).
@@ -421,13 +422,12 @@ Section MotivatingClient.
       (ADD: s__o ∉ Ob)
       :
       {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗
-          sgns_levels_gt' Ob (fl_acq_lvls FLP) (oGS := oGS) ∗ sgn s__o l__o None (oGS := oGS) ∗
-          obls τ (Ob ∪ {[ s__o ]}) (oGS := oGS) ∗ 
-          th_phase_eq τ π (oGS := oGS) ∗ cp π (fl_d__m FLP) (oGS := oGS) ∗
+          sgns_levels_gt' Ob (fl_acq_lvls FLP) ∗ sgn s__o l__o None ∗
+          obls τ (Ob ∪ {[ s__o ]}) ∗ 
+          th_phase_eq τ π ∗ cp π (fl_d__m FLP) ∗
           P__lock flag s__f f ∗ fl_release_token FL (FLG := FLG) ∗ lock_owner_frag (Some s__o) ∗
-          (∀ q, ⌜ Qp.le q 1 ⌝ -∗ th_phase_frag τ π q (oGS := oGS) -∗ obls τ Ob (oGS := oGS) -∗
-           BMU ∅ 3 (((Qp.sub 1%Qp q) ≫= Some ∘ th_phase_frag τ π (oGS := oGS)) -∗? Q) (oGS := oGS))
-          (* ∗ (P__lock flag s__f f ==∗ P__lock flag s__f f ∗ W) *)
+          (∀ q, ⌜ Qp.le q 1 ⌝ -∗ th_phase_frag τ π q -∗ obls τ Ob -∗
+           BMU ∅ 3 (((Qp.sub 1%Qp q) ≫= Some ∘ th_phase_frag τ π) -∗? Q) (oGS' := oGS'))
       }}}
         (fl_release FLP) lk @ τ
       {{{ v, RET v; Q }}}.
@@ -530,8 +530,8 @@ Section MotivatingClient.
     (* TODO: move, change the original lemma*)
     Lemma th_phase_frag_combine'' τ π q p
       (LE: Qp.le p q):
-      th_phase_frag τ π q (oGS := oGS) ⊣⊢ th_phase_frag τ π p (oGS := oGS)∗
-        default emp ((q - p)%Qp ≫= Some ∘ th_phase_frag τ π (oGS := oGS)).
+      th_phase_frag τ π q ⊣⊢ th_phase_frag τ π p∗
+        default emp ((q - p)%Qp ≫= Some ∘ th_phase_frag τ π).
     Proof using.
       rewrite th_phase_frag_combine'; [| eauto].
       iApply bi.sep_proper; [done| ].
@@ -541,14 +541,14 @@ Section MotivatingClient.
     Lemma release_left (lk: val) τ s__o flag s__f π
       (SIGS_NEQ: s__o ≠ s__f):
       {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗
-          sgn s__o l__o None (oGS := oGS) ∗
-          flag_set ∗ obls τ {[ s__f; s__o ]} (oGS := oGS) ∗
-          th_phase_eq τ π (oGS := oGS) ∗ cp π (fl_d__m FLP) (oGS := oGS) ∗
+          sgn s__o l__o None ∗
+          flag_set ∗ obls τ {[ s__f; s__o ]} ∗
+          th_phase_eq τ π ∗ cp π (fl_d__m FLP) ∗
           (* P__lock flag s__f false ∗ *)
-          flag ↦ #true ∗ sgn s__f l__f (Some false) (oGS := oGS) ∗
+          flag ↦ #true ∗ sgn s__f l__f (Some false) ∗
           lock_owner_frag (Some s__o) ∗ fl_release_token FL (FLG := FLG) }}}
         (fl_release FLP) lk @ τ
-      {{{ v, RET v; obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) }}}.
+      {{{ v, RET v; obls τ ∅ ∗ th_phase_eq τ π }}}.
     Proof using All.
       iIntros (Φ).
       pose proof (fl_is_lock_pers FL lk c__cl (FLG := FLG)) as PERS. (* TODO: why Existing Instance doesn't work? *)
@@ -565,7 +565,7 @@ Section MotivatingClient.
       { iRight. by iFrame. }
       iIntros (?) "%QQ PH OB".
       iApply OU_BMU. iApply (OU_wand with "[-OB SGNf]").
-      2: { iApply (OU_set_sig (oGS := oGS) with "[$] [$]"). set_solver. }
+      2: { iApply (OU_set_sig with "[$] [$]"). set_solver. }
       iIntros "[SGNf OB]". rewrite difference_diag_L.
       iApply BMU_intro. simpl.
 
@@ -578,14 +578,14 @@ Section MotivatingClient.
       (* π__cp (PH_LE: phase_le π__cp π) *)
       :
       {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗ flag_unset ∗
-          obls τ {[ s__f ]} (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
-          cp_mul π (fl_d__m FLP) 2 (oGS := oGS) ∗
-          sgn s__f l__f None (oGS := oGS) ∗
+          obls τ {[ s__f ]} ∗ th_phase_eq τ π ∗
+          cp_mul π (fl_d__m FLP) 2 ∗
+          sgn s__f l__f None ∗
 
-          cp_mul π d0 20 (oGS := oGS)
+          cp_mul π d0 20
       }}}
         left_thread lk #flag @ τ
-      {{{ v, RET v; obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) }}}.
+      {{{ v, RET v; obls τ ∅ ∗ th_phase_eq τ π }}}.
     Proof using All.
       iIntros (Φ).
       pose proof (fl_is_lock_pers FL lk c__cl (FLG := FLG)) as PERS. (* TODO: why Existing Instance doesn't work? *)
@@ -620,14 +620,14 @@ Section MotivatingClient.
 
     Lemma acquire_right τ (lk: val) flag s__f π:
       {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗
-          obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
-          cp π (fl_d__m FLP) (oGS := oGS)
+          obls τ ∅ ∗ th_phase_eq τ π ∗
+          cp π (fl_d__m FLP)
       }}}
         (fl_acquire FLP) lk @ τ
-      {{{ v, RET v; ∃ s__o f, obls τ {[ s__o ]} (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
+      {{{ v, RET v; ∃ s__o f, obls τ {[ s__o ]} ∗ th_phase_eq τ π ∗
                           P__lock flag s__f f ∗ lock_owner_frag (Some s__o) ∗
                           fl_release_token FL (FLG := FLG) ∗
-                          sgn s__o l__o None (oGS := oGS)
+                          sgn s__o l__o None
       }}}.
     Proof using All.
       iIntros (Φ).
@@ -645,15 +645,15 @@ Section MotivatingClient.
     (* TODO: maybe generalize release_usage ? *)
     Lemma release_right (lk: val) τ s__o flag s__f π f:
       {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗
-          sgn s__o l__o None (oGS := oGS) ∗
-          ep s__f π (fl_d__m FLP) (oGS := oGS) ∗
-          obls τ {[ s__o ]} (oGS := oGS) ∗
-          th_phase_eq τ π (oGS := oGS) ∗ cp π (fl_d__m FLP) (oGS := oGS) ∗
+          sgn s__o l__o None ∗
+          ep s__f π (fl_d__m FLP) ∗
+          obls τ {[ s__o ]} ∗
+          th_phase_eq τ π ∗ cp π (fl_d__m FLP) ∗
           P__lock flag s__f f ∗          
           lock_owner_frag (Some s__o) ∗ fl_release_token FL (FLG := FLG) }}}
         (fl_release FLP) lk @ τ
-      {{{ v, RET v; obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗ 
-                         (⌜ f = true ⌝ ∗ flag_set ∨ ⌜ f = false ⌝ ∗ cp_mul π (fl_d__m FLP) 3 (oGS := oGS)) }}}.
+      {{{ v, RET v; obls τ ∅ ∗ th_phase_eq τ π ∗ 
+                         (⌜ f = true ⌝ ∗ flag_set ∨ ⌜ f = false ⌝ ∗ cp_mul π (fl_d__m FLP) 3) }}}.
     Proof using All.
       iIntros (Φ).
       pose proof (fl_is_lock_pers FL lk c__cl (FLG := FLG)) as PERS. (* TODO: why Existing Instance doesn't work? *)
@@ -720,7 +720,7 @@ Section MotivatingClient.
         iIntros "[SR OB]".
         rewrite difference_diag_L.
 
-        iAssert (BMU ∅ 3 ((⌜f = true⌝ ∗ flag_set ∨ ⌜f = false⌝ ∗ cp_mul π (fl_d__m FLP) 3 (oGS := oGS)) ∗ P__lock flag s__f f ∗ obls τ ∅ (oGS := oGS) ∗ th_phase_frag τ π q' (oGS := oGS)) (oGS := oGS))%I with "[P OB PH]" as "FIN".
+        iAssert (BMU ∅ 3 ((⌜f = true⌝ ∗ flag_set ∨ ⌜f = false⌝ ∗ cp_mul π (fl_d__m FLP) 3) ∗ P__lock flag s__f f ∗ obls τ ∅ ∗ th_phase_frag τ π q'))%I with "[P OB PH]" as "FIN".
         { rewrite /P__lock. destruct f.
           { iDestruct "P" as "[? [[% ?] | [_ #SET]]]"; [done| ].
             iApply BMU_intro. iFrame.
@@ -751,16 +751,16 @@ Section MotivatingClient.
 
     Lemma right_thread_iter_spec (lk: val) τ π flag s__f (c: loc):
       {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗ 
-          obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
-          sgn s__f l__f None (oGS := oGS) ∗
-          ep s__f π (fl_d__m FLP) (oGS := oGS) ∗
-          cp_mul π (fl_d__m FLP) 2 (oGS := oGS) ∗
+          obls τ ∅ ∗ th_phase_eq τ π ∗
+          sgn s__f l__f None ∗
+          ep s__f π (fl_d__m FLP) ∗
+          cp_mul π (fl_d__m FLP) 2 ∗
           c ↦ #false ∗
-          cp_mul π d0 20 (oGS := oGS)
+          cp_mul π d0 20
       }}}
         right_thread_iter lk #flag #c @ τ
-      {{{ v, RET v; obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
-                    ∃ (v: bool), c ↦ #v ∗ (⌜ v = true ⌝ ∗ flag_set ∨ ⌜ v = false ⌝ ∗ cp_mul π (fl_d__m FLP) 3 (oGS := oGS))
+      {{{ v, RET v; obls τ ∅ ∗ th_phase_eq τ π ∗
+                    ∃ (v: bool), c ↦ #v ∗ (⌜ v = true ⌝ ∗ flag_set ∨ ⌜ v = false ⌝ ∗ cp_mul π (fl_d__m FLP) 3)
                      }}}.
     Proof using All.
       iIntros (Φ).
@@ -792,17 +792,17 @@ Section MotivatingClient.
     Qed.
 
     Lemma right_thread_rep_spec (lk: val) τ π (flag c: loc) s__f:
-      {{{ exc_lb 30 (oGS := oGS) ∗
+      {{{ exc_lb 30 ∗
           fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗ 
-          obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
-          sgn s__f l__f None (oGS := oGS) ∗
-          ep s__f π (fl_d__m FLP) (oGS := oGS) ∗
-          cp_mul π (fl_d__m FLP) 2 (oGS := oGS) ∗
+          obls τ ∅ ∗ th_phase_eq τ π ∗
+          sgn s__f l__f None ∗
+          ep s__f π (fl_d__m FLP) ∗
+          cp_mul π (fl_d__m FLP) 2 ∗
           c ↦ #false ∗
-          cp_mul π d0 30 (oGS := oGS)
+          cp_mul π d0 30
       }}}
         right_thread_rep lk #flag #c @ τ
-      {{{ v, RET v; obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
+      {{{ v, RET v; obls τ ∅ ∗ th_phase_eq τ π ∗
                     flag_set ∗ c ↦ #true }}}.
     Proof using All.
       iIntros (Φ).
@@ -848,16 +848,16 @@ Section MotivatingClient.
     Qed.
 
     Theorem right_thread_spec (lk: val) τ π (flag: loc) s__f:
-      {{{ exc_lb 30 (oGS := oGS) ∗ 
+      {{{ exc_lb 30 ∗ 
           fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗ 
-          obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
-          sgn s__f l__f None (oGS := oGS) ∗
-          cp_mul π d__r 2 (oGS := oGS) ∗
-          (* cp π (fl_d__m FLP) (oGS := oGS) ∗ *)
-          cp_mul π d0 40 (oGS := oGS)
+          obls τ ∅ ∗ th_phase_eq τ π ∗
+          sgn s__f l__f None ∗
+          cp_mul π d__r 2 ∗
+          (* cp π (fl_d__m FLP) ∗ *)
+          cp_mul π d0 40
       }}}
         right_thread lk #flag @ τ
-      {{{ v, RET v; obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
+      {{{ v, RET v; obls τ ∅ ∗ th_phase_eq τ π ∗
                     flag_set }}}.
     Proof using All.
       iIntros (Φ).
@@ -903,15 +903,15 @@ Section MotivatingClient.
 
   End AfterInit.
 
-  Context {OBLS_AMU__f: forall τ, @AMU_lift_MU__f _ _ _ τ oGS _ EM _ ⊤}.
-  Context {NO_OBS_POST: ∀ τ v, obls τ ∅ (oGS := oGS) -∗ fork_post τ v}. 
+  Context {OBLS_AMU__f: forall τ, @AMU_lift_MU__f _ _ _ τ oGS' _ EM _ ⊤}.
+  Context {NO_OBS_POST: ∀ τ v, obls τ ∅ -∗ fork_post τ v}. 
 
   Theorem client_spec `{ClientPreG Σ, fl_GpreS FLP Σ} τ π:
-    {{{ exc_lb 70 (oGS := oGS) ∗
-        obls τ ∅ (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) ∗
-        cp_mul π d__r 4 (oGS := oGS) }}}
+    {{{ exc_lb 70 ∗
+        obls τ ∅ ∗ th_phase_eq τ π ∗
+        cp_mul π d__r 4 }}}
       client_prog #() @ τ
-    {{{ v, RET v; obls τ ∅ (oGS := oGS) }}}.
+    {{{ v, RET v; obls τ ∅ }}}.
   Proof using All.
     iIntros (Φ) "(#EB & OB & PH & CPSr) POST". rewrite /client_prog.
     pure_step_hl. 

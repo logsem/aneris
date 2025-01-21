@@ -4,8 +4,8 @@ From iris.base_logic.lib Require Import invariants.
 From trillium.fairness Require Import locales_helpers utils.
 From trillium.fairness.lawyer Require Import program_logic sub_action_em.
 From trillium.fairness.lawyer.obligations Require Import obligations_model obls_utils obligations_resources obligations_logic obligations_em.
+From trillium.fairness.lawyer.examples Require Import bounded_nat signal_map obls_tactics.
 From trillium.fairness.heap_lang Require Export heap_lang_defs tactics notation sswp_logic locales_helpers_hl.
-From trillium.fairness.lawyer.examples Require Import bounded_nat signal_map.
 
 
 Close Scope Z.
@@ -39,7 +39,10 @@ Section EoFin.
   Context `{hGS: @heapGS Σ _ EM}.
 
   Let ASEM := ObligationsASEM.
-  Context {oGS: @asem_GS _ _ ASEM Σ}. 
+  (* Keeping the more general interface for future developments *)
+  Context `{oGS': @asem_GS _ _ ASEM Σ}.
+  Let oGS: ObligationsGS (OP := EO_OP) Σ := oGS'.
+  Existing Instance oGS.
   
   Let thread_prog: val :=
     rec: "thread_prog" "l" "n" "M" :=
@@ -75,31 +78,9 @@ Section EoFin.
   Proof using. apply ith_bn_lt. lia. Qed. 
   Lemma d01_lt: strict (bounded_nat_le _) d0 d1.
   Proof using. apply ith_bn_lt. lia. Qed.
+    
+  Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS' _ EM _ (↑ nroot)}.
   
-  Ltac BMU_burn_cp :=
-    iApply BMU_intro;
-    iDestruct (cp_mul_take with "CPS") as "[CPS CP]";
-    iSplitR "CP";
-    [| do 2 iExists _; iFrame; iPureIntro; done]. 
-  
-  Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS _ EM _ (↑ nroot)}.
-  
-  Ltac MU_by_BMU :=
-    iApply OBLS_AMU; [by rewrite nclose_nroot| ];
-    iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH". 
-  
-  Ltac MU_by_burn_cp := MU_by_BMU; BMU_burn_cp.
-  
-  Ltac pure_step_hl := 
-    iApply sswp_MU_wp; [done| ];
-    iApply sswp_pure_step; [done| ]; simpl;
-    iNext.
-  
-  Ltac pure_step := pure_step_hl; MU_by_burn_cp.   
-  Ltac pure_step_cases := pure_step || (iApply wp_value; []) || wp_bind (RecV _ _ _ _)%V.
-  Ltac pure_steps := repeat (pure_step_cases; []).
-
-
   Section ThreadResources.
     Context {PRE: EoFinPreG Σ}.
 
@@ -149,7 +130,7 @@ Section EoFin.
       end.
 
     Definition smap_repr_eo n K smap: iProp Σ :=
-      smap_repr B__eo (flip Nat.ltb n) (oGS := oGS) smap ∗
+      smap_repr B__eo (flip Nat.ltb n) smap ∗
       ⌜ dom smap = set_seq 0 K ⌝. 
 
     Definition eofin_inv_inner l: iProp Σ :=
@@ -182,14 +163,16 @@ Section EoFin.
 
     Lemma lt_B_LIM: B < LIM. lia. Qed. 
 
+    Existing Instance oGS.
+    
     Lemma BMU_update_SR smap τ m:
-  obls τ ∅ (oGS := oGS) -∗
+  obls τ ∅ -∗
   smap_repr_eo (m + 1) (B `min` (m + 2)) smap -∗
       BMU ∅ 1 (
         |==> ∃ smap' R', smap_repr_eo (m + 1) (B `min` (m + 3)) smap' ∗
-                         obls τ R' (oGS := oGS) ∗
+                         obls τ R' ∗
           (⌜ B <= m + 2 /\ smap' = smap /\ R' = ∅ ⌝ ∨
-           ∃ s', ith_sig (m + 2) s' ∗ ⌜ m + 2 < B /\ smap' = (<[(m + 2)%nat := s']> smap) /\ R' = {[ s' ]} ⌝)) (oGS := oGS).
+           ∃ s', ith_sig (m + 2) s' ∗ ⌜ m + 2 < B /\ smap' = (<[(m + 2)%nat := s']> smap) /\ R' = {[ s' ]} ⌝)) (oGS' := oGS').
     Proof using OBLS_AMU.
       iIntros "OBLS [SR %DOM]".
       destruct (Nat.le_gt_cases B (m + 2)).
@@ -220,7 +203,6 @@ Section EoFin.
         set_solver. }
       iRight. iExists _. iFrame. iPureIntro.
       eexists. repeat split; eauto. set_solver.
-      Unshelve. apply _.
     Qed.
 
     Lemma B__eo_simpl i (DOM: i < LIM):
@@ -233,17 +215,17 @@ Section EoFin.
     Lemma thread_spec_holds τ l π n
       `(ThreadResource th_res cond)
       :
-      {{{ eofin_inv l ∗ exc_lb 20 (oGS := oGS) ∗
+      {{{ eofin_inv l ∗ exc_lb 20 ∗
            th_res n ∗
-           cp_mul π d2 (B - n) (oGS := oGS) ∗
-           cp_mul π d0 20 (oGS := oGS) ∗
-           (cp π d2 (oGS := oGS) ∨ ∃ sw, ith_sig (n - 1) sw ∗ ep sw π d1 (oGS := oGS)) ∗
-           th_phase_eq τ π (oGS := oGS) ∗
+           cp_mul π d2 (B - n) ∗
+           cp_mul π d0 20 ∗
+           (cp π d2 ∨ ∃ sw, ith_sig (n - 1) sw ∗ ep sw π d1) ∗
+           th_phase_eq τ π ∗
            (if n <? B
-            then ∃ s, ith_sig n s ∗ obls τ {[s]} (oGS := oGS)
-            else obls τ ∅ (oGS := oGS)) }}}
+            then ∃ s, ith_sig n s ∗ obls τ {[s]}
+            else obls τ ∅) }}}
         thread_prog #l #n #B @ τ
-      {{{ v, RET v; obls τ ∅ (oGS := oGS) }}}.       
+      {{{ v, RET v; obls τ ∅ }}}.       
     Proof using OBLS_AMU. 
       iIntros (Φ). iLöb as "IH" forall (n).
       iIntros "(#INV & #EB & TH & CPS2 & CPS & EXTRA & PH & SN_OB) POST".
@@ -394,7 +376,6 @@ Section EoFin.
           iPoseProof (smap_create_ep B__eo m with "[$] [$] [$]") as "OU"; eauto.
           { rewrite DOM. apply elem_of_set_seq. lia. } 
           { apply d12_lt. }
-          Unshelve. 2: by apply _.
           iApply OU_BMU.
           iApply (OU_wand with "[-OU]"); [| done].
           iIntros "X". iMod "X" as "(%sw & #SW & #EP & SR & PH)".
@@ -481,16 +462,16 @@ Section EoFin.
     Time Qed.
 
     Lemma thread_spec_wrapper τ l π n `(ThreadResource th_res cond):
-      {{{ eofin_inv l ∗ exc_lb 20 (oGS := oGS) ∗
+      {{{ eofin_inv l ∗ exc_lb 20 ∗
            th_res n ∗
-           cp_mul π d2 (S (B - n)) (oGS := oGS) ∗
-           cp_mul π d0 20 (oGS := oGS) ∗           
-           th_phase_eq τ π (oGS := oGS) ∗
+           cp_mul π d2 (S (B - n)) ∗
+           cp_mul π d0 20 ∗           
+           th_phase_eq τ π ∗
            (if n <? B
-            then ∃ s, ith_sig n s ∗ obls τ {[s]} (oGS := oGS)
-            else obls τ ∅ (oGS := oGS)) }}}
+            then ∃ s, ith_sig n s ∗ obls τ {[s]}
+            else obls τ ∅) }}}
         thread_prog #l #n #B @ τ
-      {{{ v, RET v; obls τ ∅ (oGS := oGS) }}}.
+      {{{ v, RET v; obls τ ∅ }}}.
     Proof using OBLS_AMU.
       iIntros (Φ). iIntros "(#INV & #EB & TH & CPS2 & CPS & PH & SN_OB) POST".
       iDestruct (cp_mul_take with "CPS2") as "[??]".
@@ -551,16 +532,16 @@ Section EoFin.
     Lemma alloc_inv l (* (i: nat) *) τ
       (* (i := 0) *)
       :
-      obls τ ∅ (oGS := oGS) -∗ l ↦ #0 -∗ 
+      obls τ ∅ -∗ l ↦ #0 -∗ 
         BMU ⊤ 2 (|={∅}=> ∃ (eoG: EoFinG Σ) (sigs: list SignalId),
                        even_res 0 (H := eoG)∗
                        odd_res 1 (H := eoG) ∗
                        eofin_inv l (H := eoG) ∗
-                       obls τ (list_to_set sigs) (oGS := oGS) ∗
+                       obls τ (list_to_set sigs) ∗
                        ⌜ length sigs = min B 2 ⌝ ∗
                        ⌜ NoDup sigs ⌝ ∗
                        ([∗ list] k ↦ s ∈ sigs, ith_sig k s)
-        ) (oGS := oGS).
+        ) (oGS' := oGS').
     Proof using OBLS_AMU PRE.
       iIntros "OB L".
       iMod (thread_res_alloc 0) as "(%γ & AUTH & FRAG)".
@@ -569,10 +550,10 @@ Section EoFin.
       set (m := min B 2).
       iAssert (BMU ⊤ 2 
                  (|==> ∃ smap (smG: SigMapG Σ),
-                              smap_repr B__eo (flip Nat.ltb 0) (oGS := oGS) smap ∗
+                              smap_repr B__eo (flip Nat.ltb 0) smap ∗
                               ⌜ dom smap = set_seq 0 m ⌝ ∗
                                let sigs := sigs_block smap 0 m in
-                               obls τ (list_to_set sigs) (oGS := oGS) ∗
+                               obls τ (list_to_set sigs) ∗
                                ⌜ NoDup sigs ⌝ ∗ 
                                own sm_γ__smap (◯ ((to_agree <$> smap): gmapUR nat _)) ∗
                                ⌜ @sm_PreG _ smG = @eofin_sigs _ PRE ⌝
@@ -691,17 +672,17 @@ Section EoFin.
 
     Close Scope Z. 
 
-    Context {OBLS_AMU__f: forall τ, @AMU_lift_MU__f _ _ _ τ oGS _ EM _ ⊤}.
-    Context {NO_OBS_POST: ∀ τ v, obls τ ∅ (oGS := oGS) -∗ fork_post τ v}. 
+    Context {OBLS_AMU__f: forall τ, @AMU_lift_MU__f _ _ _ τ oGS' _ EM _ ⊤}.
+    Context {NO_OBS_POST: ∀ τ v, obls τ ∅ -∗ fork_post τ v}. 
 
     Theorem main_spec τ π:
-      {{{ exc_lb 20 (oGS := oGS) ∗
-           cp_mul π d2 (S (2 * (S B))) (oGS := oGS) ∗
-           cp_mul π d0 40 (oGS := oGS) ∗
-           th_phase_eq τ π (oGS := oGS) ∗
-           obls τ ∅ (oGS := oGS) }}}
+      {{{ exc_lb 20 ∗
+           cp_mul π d2 (S (2 * (S B))) ∗
+           cp_mul π d0 40 ∗
+           th_phase_eq τ π ∗
+           obls τ ∅ }}}
       start #(0%nat) #B @ τ
-      {{{ v, RET v; obls τ ∅ (oGS := oGS) }}}.
+      {{{ v, RET v; obls τ ∅ }}}.
     Proof using PRE OBLS_AMU__f OBLS_AMU NO_OBS_POST.
       iIntros (Φ). iIntros "(#EB & CPS2 & CPS_FORK & PH & OB) POST". rewrite /start.
       iDestruct (cp_mul_take with "CPS2") as "[CPS2 CP]". 

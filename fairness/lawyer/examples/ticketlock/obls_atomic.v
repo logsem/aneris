@@ -21,7 +21,11 @@ Section TotalTriples.
 
   Let OAM := ObligationsAM. 
   Let ASEM := ObligationsASEM.
-  Context {oGS: @asem_GS _ _ ASEM Σ}.
+  (* Context {oGS: @asem_GS _ _ ASEM Σ}. *)
+  (* Keeping the more general interface for future developments *)
+  Context `{oGS': @asem_GS _ _ ASEM Σ}.
+  Let oGS: ObligationsGS (OP := OP) Σ := oGS'.
+  Existing Instance oGS.
 
   Let Locale := locale heap_lang. 
 
@@ -52,24 +56,24 @@ Section TotalTriples.
       Definition TAU_acc (V: iProp Σ): iProp Σ :=
         |={ε, ∅}=> ∃ x, P x ∗ (
               let abort := P x ={∅, ε}=∗ V in
-              let PH q := th_phase_frag τ π q (oGS := oGS) in
+              let PH q := th_phase_frag τ π q in
               (let r := round x in
-               ∀ O' q', obls τ O' (oGS := oGS) ∗ sgns_levels_ge' O' L (oGS := oGS) ∗ 
+               ∀ O' q', obls τ O' ∗ sgns_levels_ge' O' L ∗ 
                         PH q' ∗ ⌜ Qp.le q' q0 ⌝ ∗
-                      (∃ r__p, RR r__p ∗ (⌜ r__p = Some r ⌝ ∨ cp π d__h (oGS := oGS))) ∗
+                      (∃ r__p, RR r__p ∗ (⌜ r__p = Some r ⌝ ∨ cp π d__h)) ∗
                       ⌜ ¬ TGT x ⌝ -∗
-                      BMU ∅ c (oGS := oGS) (
-                        RR (Some r) ∗ cp π d__l (oGS := oGS) ∗ PH q' ∗
-                        obls τ O' (oGS := oGS) ∗
+                      BMU ∅ c (oGS' := oGS) (
+                        RR (Some r) ∗ cp π d__l ∗ PH q' ∗
+                        obls τ O' ∗
                         abort
                       )
               ) ∧
               (∀ q',
                (* (∃ r__p, RR r__p) ∗ *)
-               ⌜ TGT x ⌝ ∗ obls τ O (oGS := oGS)
+               ⌜ TGT x ⌝ ∗ obls τ O
                  ∗ PH q' ∗ ⌜ Qp.le q' q0 ⌝
                  -∗
-               BMU ∅ c (oGS := oGS) (
+               BMU ∅ c (oGS' := oGS) (
                  ∀ y, Q y x ={∅, ε}=∗ from_option PH ⌜ True ⌝ (Qp.sub q0 q') -∗ Φ y x)) ∧
               abort
       ).
@@ -187,8 +191,8 @@ Section TotalTriples.
     Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
 
     Definition TLAT_pre (RR: option RO -> iProp Σ) π q (O: gset SignalId): iProp Σ :=
-      RR None ∗ obls τ O (oGS := oGS) ∗ sgns_levels_gt' O L (oGS := oGS) ∗
-      th_phase_frag τ π q (oGS := oGS) ∗ cp π d__m (oGS := oGS).
+      RR None ∗ obls τ O ∗ sgns_levels_gt' O L ∗
+      th_phase_frag τ π q ∗ cp π d__m.
     
     Definition TLAT e s
       (POST: ST -> ST -> option (iProp Σ))

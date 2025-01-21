@@ -233,22 +233,26 @@ Section Ticketlock.
 
   Context {Σ: gFunctors}.
   (* Context {invs_inΣ: invGS_gen HasNoLc Σ}. *)
-  Context {oGS: @asem_GS _ _ ASEM Σ}.
+  (* Keeping the more general interface for future developments *)
+  Context `{oGS': @asem_GS _ _ ASEM Σ}.
+  Let oGS: ObligationsGS (OP := OP) Σ := oGS'.
+  Existing Instance oGS.
+
   Context `{EM: ExecutionModel heap_lang M}.
   Context `{hGS: @heapGS Σ _ EM}.
   Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
            
-  Let tl_TAU := TAU_FL (FLP := TLPre) (oGS := oGS).
+  Let tl_TAU := TAU_FL (FLP := TLPre) (oGS' := oGS').
 
   Definition TAU_stored `{TLG: TicketlockG Σ} (lk: val) (c: nat) (cd: tau_codom Σ): iProp Σ :=
     let '(τ, π, q, Ob, L, Φ, RR) := cd in
-    obls τ Ob (oGS := oGS) ∗ sgns_levels_gt' Ob L (oGS := oGS) ∗
-    th_phase_frag τ π (q /2) (oGS := oGS) ∗
+    obls τ Ob ∗ sgns_levels_gt' Ob L ∗
+    th_phase_frag τ π (q /2) ∗
     tl_TAU τ (acquire_at_pre lk (FLP := TLPre) (FLG := TLG)) (acquire_at_post lk (FLP := TLPre) (FLG := TLG))
         L
         (fun '(_, _, b) => b = false)
         c π
-        (* (fun _ _ => bi_wand (th_phase_eq τ π (oGS := oGS): iProp Σ) (Φ #())) *)
+        (* (fun _ _ => bi_wand (th_phase_eq τ π: iProp Σ) (Φ #())) *)
         q
         (fun _ _ => Φ #())
         Ob RR.
@@ -270,7 +274,7 @@ Section Ticketlock.
   Definition tau_interp `{TicketlockG Σ} (lk: val) (c: nat) (ow: nat) (i: nat) (cd: tau_codom Σ): iProp Σ :=
       let '((((((τ, π), q), _), _), Φ), _) := cd in
       (TAU_stored lk c cd ∗ ⌜ ow < i ⌝ ∨
-       (((th_phase_frag τ π (q /2) (oGS := oGS) -∗ Φ #()) ∗ rel_tok ∨ ticket_token i) ∗ ⌜ ow = i ⌝) ∨
+       (((th_phase_frag τ π (q /2) -∗ Φ #()) ∗ rel_tok ∨ ticket_token i) ∗ ⌜ ow = i ⌝) ∨
        ticket_token i ∗ ⌜ i < ow ⌝).
 
   Arguments tau_interp _ _ _ _ _ cd: simpl nomatch. 
@@ -306,7 +310,7 @@ Section Ticketlock.
   
   Definition tl_inv_inner `{TicketlockG Σ} (tl: val) (c: nat): iProp Σ :=
     ∃ (l__ow l__tk: loc) (ow tk: nat) TM,
-      ⌜ tl = (#l__ow, #l__tk)%V ⌝ ∗ ⌜ ow <= tk ⌝ ∗ exc_lb (tk - ow + 2) (oGS := oGS) ∗
+      ⌜ tl = (#l__ow, #l__tk)%V ⌝ ∗ ⌜ ow <= tk ⌝ ∗ exc_lb (tk - ow + 2) ∗
       l__ow ↦{/ 2} #ow ∗ l__tk ↦ #tk ∗ ow_exact ow ∗ held_auth (negb (ow =? tk)) ∗
       tokens_auth tk ∗
       ⌜ dom TM = set_seq 0 tk ⌝ ∗ (* tau_map_auth TM ∗ *) tau_map_interp tl c ow TM ∗
@@ -418,7 +422,7 @@ Section Ticketlock.
     (DOM: dom TM = set_seq 0 ow):
     let '((((((τ, π), q), _), _), Φ), _) := cd in   
     tau_map_interp lk c ow TM -∗ rel_tok -∗
-    (th_phase_frag τ π (q /2) (oGS := oGS) -∗ cd.1.2 #()) ==∗
+    (th_phase_frag τ π (q /2) -∗ cd.1.2 #()) ==∗
     ∃ cd_gn, tau_map_interp lk c ow (<[ ow := cd_gn ]> TM) ∗ ticket_tau ow cd.
   Proof using.
     destruct_cd cd. simpl. 
@@ -445,13 +449,13 @@ Section Ticketlock.
 
   Definition tl_is_lock `{TicketlockG Σ} lk c := inv fl_ι (tl_inv_inner lk c).
 
-  Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS _ EM hGS (↑ nroot)}.
+  Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS' _ EM hGS (↑ nroot)}.
 
   Lemma tl_newlock_spec `{TicketlockPreG Σ} τ π c
     (BOUND: fl_c__cr TLPre <= LIM_STEPS):
-      {{{ cp π d__m0 (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) }}}
+      {{{ cp π d__m0 ∗ th_phase_eq τ π }}}
         tl_newlock #() @ τ
-      {{{ lk, RET lk; ∃ TLG: TicketlockG Σ, tl_LK (lk, 0, false) ∗ tl_is_lock lk c ∗ th_phase_eq τ π (oGS := oGS) }}}.
+      {{{ lk, RET lk; ∃ TLG: TicketlockG Σ, tl_LK (lk, 0, false) ∗ tl_is_lock lk c ∗ th_phase_eq τ π }}}.
   Proof using OBLS_AMU.
     clear fl_degs_wl0 d__w ODl ODd LEl.
     iIntros (Φ) "(CP & PH) POST". rewrite /tl_newlock.
@@ -520,12 +524,12 @@ Section Ticketlock.
 
   Definition wait_res o' t τ π q Ob Φ RR: iProp Σ :=
     ⌜ o' <= t ⌝ ∗
-    ow_lb o' ∗ cp_mul π d__h0 (t - o') (oGS := oGS) ∗
-    (∃ r__p, RR r__p ∗ (⌜ r__p = Some o' ⌝ ∨ cp π d__h0 (oGS := oGS))) ∗
-    cp_mul π d__w 10 (oGS := oGS) ∗
+    ow_lb o' ∗ cp_mul π d__h0 (t - o') ∗
+    (∃ r__p, RR r__p ∗ (⌜ r__p = Some o' ⌝ ∨ cp π d__h0)) ∗
+    cp_mul π d__w 10 ∗
     let cd: tau_codom Σ := (τ, π, q, Ob, lvls_acq, Φ, RR) in
     ticket_token t ∗ ticket_tau t cd
-    ∗ th_phase_frag τ π (q / 2) (oGS := oGS)
+    ∗ th_phase_frag τ π (q / 2)
   .
 
   (* TODO: move, remove duplicates *)
@@ -545,7 +549,7 @@ Section Ticketlock.
     (* (RR: ofe_mor (option nat) (iProp Σ)) *)
     RR
     (LIM_STEPS': fl_B TLPre c <= LIM_STEPS):
-    tl_is_lock lk c ∗ exc_lb 20 (oGS := oGS) ⊢
+    tl_is_lock lk c ∗ exc_lb 20 ⊢
         TAU_FL τ
         (acquire_at_pre lk (FLP := TLPre) (FLG := TLG))
         (acquire_at_post lk (FLP := TLPre) (FLG := TLG))
@@ -553,10 +557,10 @@ Section Ticketlock.
         (fun '(_, _, b) => b = false)
         c π q (fun _ _ => Φ #())
         Ob RR
-        (oGS := oGS) (FLP := TLPre)
+        (FLP := TLPre) (oGS' := oGS')
         -∗
-        TLAT_pre τ {[lvl_acq]} d__e RR π q Ob (oGS := oGS) -∗
-        cp_mul π d__w 10 (oGS := oGS) -∗
+        TLAT_pre τ {[lvl_acq]} d__e RR π q Ob (oGS' := oGS') -∗
+        cp_mul π d__w 10 -∗
         WP (get_ticket lk) @ s; τ; ⊤ {{ tv, ∃ (t o': nat), ⌜ tv = #t ⌝ ∗ wait_res o' t τ π q Ob Φ RR }}.
   Proof using OBLS_AMU fl_degs_wl0.
     clear ODl ODd LEl.
@@ -712,7 +716,7 @@ Section Ticketlock.
 
   (* TODO: move, derive from generalized Proper instance(s) *)
   Lemma sgns_levels_gt'_ge' R L:
-    sgns_levels_gt' R L (oGS := oGS) -∗ sgns_levels_ge' R L (oGS := oGS).
+    sgns_levels_gt' R L -∗ sgns_levels_ge' R L.
   Proof using.
     iIntros "?". iApply (big_sepS_impl with "[$]").
     iIntros "!> % %IN (%l & #SGN & %GT)".
@@ -723,7 +727,7 @@ Section Ticketlock.
 
   Lemma wait_spec (lk: val) c o' (t: nat) τ π q Ob Φ RR
     (LIM_STEPS': fl_B TLPre c <= LIM_STEPS):
-    tl_is_lock lk c ∗ exc_lb 20 (oGS := oGS) ∗ wait_res o' t τ π q Ob Φ RR 
+    tl_is_lock lk c ∗ exc_lb 20 ∗ wait_res o' t τ π q Ob Φ RR 
     ⊢ WP (wait lk #t) @ τ {{ v, Φ v ∗ rel_tok }}.
   Proof using fl_degs_wl0 OBLS_AMU.
     clear ODl ODd LEl.
@@ -877,7 +881,7 @@ Section Ticketlock.
     l__ow ↦{/ 2} #(ow + 1)%nat -∗ rel_tok -∗
     BMU (⊤ ∖ ↑fl_ι) c (held_auth next ∗ l__ow ↦{/ 2} #(ow + 1)%nat ∗
                         (⌜ next = false ⌝ → rel_tok) ∗
-                        tau_map_interp lk c (ow + 1) TM) (oGS := oGS).
+                        tau_map_interp lk c (ow + 1) TM) (oGS' := oGS').
   Proof using.
     clear fl_degs_wl0 d__w ODl ODd LEl OBLS_AMU.
     iIntros "TMI AUTH LOW RTOK". rewrite /tau_map_interp.
@@ -965,8 +969,8 @@ Section Ticketlock.
   Lemma first_BMU τ π q d0 d n E
     (DEG_LT: deg_lt d d0)
     (LIM: S n <= LIM_STEPS):
-    th_phase_frag τ π q (oGS := oGS) -∗ cp π d0 (oGS := oGS) -∗
-    BMU E (S n) (cp_mul π d n (oGS := oGS) ∗ exc_lb n (oGS := oGS) ∗ th_phase_frag τ π q (oGS := oGS)) (oGS := oGS).
+    th_phase_frag τ π q -∗ cp π d0 -∗
+    BMU E (S n) (cp_mul π d n ∗ exc_lb n ∗ th_phase_frag τ π q) (oGS' := oGS').
   Proof using.
     iIntros "PH CP".
     do 2 rewrite -Nat.add_1_r. simpl. iApply BMU_split.
@@ -996,7 +1000,7 @@ Section Ticketlock.
         (fun _ '(_, r, _) => #r)
          c
          (tl_release lk)
-        (oGS := oGS)
+        (oGS' := oGS')
         (FLP := TLPre).
   Proof using fl_degs_wl0 OBLS_AMU LS_LB.
     clear ODl ODd LEl.
@@ -1118,7 +1122,7 @@ Section Ticketlock.
         (fun _ _ => Some rel_tok)
         (fun _ _ => #())
         c (tl_acquire lk)
-        (oGS := oGS)
+        (oGS' := oGS')
         (FLP := TLPre).
   Proof using fl_degs_wl0 d__w OBLS_AMU LS_LB.
     clear ODl ODd LEl. 
@@ -1194,7 +1198,7 @@ Section Ticketlock.
   (* TODO: move, remove duplicates *)
   Hypothesis (LS_LB: S tl_exc ≤ LIM_STEPS). 
 
-  Program Definition TL_FL: FairLock (oGS := oGS) (FLP := TLPre) := {|
+  Program Definition TL_FL: FairLock (oGS' := oGS') (FLP := TLPre) := {|
     fl_is_lock FLG hGS := @tl_is_lock FLG;
     fl_release_token FLG := @rel_tok _ FLG;
   |}.

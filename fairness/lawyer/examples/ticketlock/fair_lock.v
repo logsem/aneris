@@ -41,7 +41,10 @@ Section FairLockSpec.
   
   Let OAM := ObligationsAM. 
   Let ASEM := ObligationsASEM.
-  Context {oGS: @asem_GS _ _ ASEM Σ}.
+  (* Keeping the more general interface for future developments *)
+  Context `{oGS': @asem_GS _ _ ASEM Σ}.
+  Let oGS: ObligationsGS (OP := OP) Σ := oGS'.
+  Existing Instance oGS.
   
   Context `{EM: ExecutionModel heap_lang M}.
   Context `{hGS: @heapGS Σ _ EM}.
@@ -58,7 +61,7 @@ Section FairLockSpec.
       π q
       Φ
       O RR
-      (oGS := oGS). 
+      (oGS' := oGS'). 
   
   Definition TLAT_FL τ P Q L TGT (POST: FL_st -> FL_st -> option (iProp Σ))
     get_ret c e : iProp Σ := 
@@ -69,7 +72,7 @@ Section FairLockSpec.
       (↑ fl_ι) e NotStuck
       POST
       get_ret
-      (oGS := oGS).
+      (oGS' := oGS').
   
   Definition acquire_at_pre {FLG: fl_GS FLP Σ} (lk: val) (x: FL_st): iProp Σ :=
     ▷ fl_LK FLP x (FLG := FLG) ∗ ⌜ x.1.1 = lk ⌝. 
@@ -88,9 +91,9 @@ Section FairLockSpec.
     fl_release_token `{FLG: fl_GS FLP Σ}: iProp Σ;
 
     fl_create_spec {FLG_PRE: fl_GpreS FLP Σ}: ⊢ ⌜ fl_c__cr FLP <= LIM_STEPS ⌝ -∗ ∀ τ π c,
-        {{{ cp π (fl_d__m FLP) (oGS := oGS) ∗ th_phase_eq τ π (oGS := oGS) }}}
+        {{{ cp π (fl_d__m FLP) ∗ th_phase_eq τ π }}}
             fl_create FLP #() @ τ
-        {{{ lk, RET lk; ∃ FLG: fl_GS FLP Σ, fl_LK _ (lk, 0, false) (FLG := FLG) ∗ fl_is_lock lk c (FLG := FLG) ∗ th_phase_eq τ π (oGS := oGS) }}};
+        {{{ lk, RET lk; ∃ FLG: fl_GS FLP Σ, fl_LK _ (lk, 0, false) (FLG := FLG) ∗ fl_is_lock lk c (FLG := FLG) ∗ th_phase_eq τ π }}};
 
     fl_acquire_spec {FLG: fl_GS FLP Σ} (lk: val) c τ: (fl_is_lock (FLG := FLG)) lk c ⊢
         TLAT_FL τ 
