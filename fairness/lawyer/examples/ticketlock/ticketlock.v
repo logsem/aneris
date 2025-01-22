@@ -462,16 +462,16 @@ Section Ticketlock.
     pure_step_hl. MU_by_BMU.
     simpl. do 2 rewrite -Nat.add_1_r. rewrite -Nat.add_assoc. iApply BMU_split.
     iApply OU_BMU_rep.
-    iApply (OU_rep_wand with "[-PH]").
-    2: { iApply (increase_eb_upd_rep0 with "[$]"). }
-    iIntros "[#EB PH]".
+    iApply (OU_rep_wand with "[-]").
+    2: { iApply increase_eb_upd_rep0. }
+    iIntros "#EB".
     
-    iApply OU_BMU. iApply (OU_wand with "[-CP PH]").
+    iApply OU_BMU. iApply (OU_wand with "[-CP]").
     2: { (* TODO: can we remove phase restriction for exchange? *)
-         iApply (exchange_cp_upd with "[$] [$] [$]").
+         iApply (exchange_cp_upd with "[$] [$]").
          { reflexivity. }
          apply fl_degs_em. }
-    iIntros "[CPS PH]". BMU_burn_cp.
+    iIntros "CPS". BMU_burn_cp.
 
     wp_bind (ref _)%E. iApply sswp_MU_wp; [done| ].
     iApply wp_alloc. iIntros "!> %l__ow OW _". MU_by_burn_cp.
@@ -599,23 +599,22 @@ Section Ticketlock.
     rewrite (Nat.add_comm _ 3). iApply OU_BMU.
     (* iDestruct (cp_mul_take with "CPSw") as "[CPSw CPw]". *)
     apply Nat.le_sum in LEot as [d ->].
-    iApply (OU_wand with "[-CPe PH]").
+    iApply (OU_wand with "[-CPe]").
     2: { iApply (exchange_cp_upd with "[$] [$]").
-         { apply (Nat.le_refl (S (S d))). }
-         { apply fl_degs_he. }
-         rewrite Nat.sub_add'. by rewrite Nat.add_comm. }
-    iIntros "[CPSh PH]".
+         { apply (reflexive_eq (S (S d))). lia. }
+         apply fl_degs_he. }
+    iIntros "CPSh".
     iDestruct (cp_mul_take with "CPSh") as "[CPSh CPh]".
 
-    iApply OU_BMU. iApply (OU_wand with "[-CPh PH]").
-    2: { iApply (exchange_cp_upd with "[$] [$] EB").
+    iApply OU_BMU. iApply (OU_wand with "[-CPh]").
+    2: { iApply (exchange_cp_upd with "[$] EB").
          { Unshelve. 3: exact 10. lia. shelve. }
          etrans; [apply fl_degs_wl0 | apply fl_degs_lh0]. }
-    iIntros "[CPS' PH]".
+    iIntros "CPS'".
 
-    iApply OU_BMU. iApply (OU_wand with "[-PH]").
-    2: { iApply (increase_eb_upd with "EBd [$]"). }
-    iClear "EBd". iIntros "[#EBd' PH]".
+    iApply OU_BMU. iApply (OU_wand with "[-]").
+    2: { iApply (increase_eb_upd with "EBd"). }
+    iClear "EBd". iIntros "#EBd'".
     
     iDestruct (ow_exact_lb with "[$]") as "[EXACT LB]".
     remember_goal.
@@ -827,11 +826,11 @@ Section Ticketlock.
     iSpecialize ("CLOS'" with "[OW' HELD']").
     { iFrame. iSplit; [| done]. iNext. do 2 iExists _. iFrame. eauto. }
     iApply OU_BMU.
-    iApply (OU_wand with "[-CP PH]").
-    2: { iApply (exchange_cp_upd with "[$] [$] EXC").
+    iApply (OU_wand with "[-CP]").
+    2: { iApply (exchange_cp_upd with "[$] EXC").
          { reflexivity. }
          apply fl_degs_wl0. }
-    iIntros "[CPS' PH]".
+    iIntros "CPS'".
     iDestruct (cp_mul_split with "[CPS CPS']") as "CPS"; [iFrame| ]. simpl.
     iApply BMU_intro. iMod "CLOS'" as "TAUs". iModIntro.
     (* rewrite cp_mul_take. iDestruct "CPS" as "[CPS CP]". *)
@@ -975,16 +974,16 @@ Section Ticketlock.
     iIntros "PH CP".
     do 2 rewrite -Nat.add_1_r. simpl. iApply BMU_split.
     iApply OU_BMU_rep.
-    iApply (OU_rep_wand with "[-PH]").
-    2: { iApply (increase_eb_upd_rep0 with "[$]"). }
-    iIntros "[#EB PH]".    
+    iApply (OU_rep_wand with "[-]").
+    2: { iApply (increase_eb_upd_rep0). }
+    iIntros "#EB".
     
-    iApply OU_BMU. iApply (OU_wand with "[-CP PH]").
+    iApply OU_BMU. iApply (OU_wand with "[-CP]").
     2: { (* TODO: can we remove phase restriction for exchange? *)
-         iApply (exchange_cp_upd with "[$] [$] [$]").
+         iApply (exchange_cp_upd with "[$] [$]").
          { reflexivity. }
          eauto. }
-    iIntros "[CPS PH]".
+    iIntros "CPS".
     iApply BMU_intro. iFrame "#∗".
   Qed.
 
@@ -1140,16 +1139,16 @@ Section Ticketlock.
     iApply (BMU_lower _ 2).
     { simpl. lia. }
     iDestruct (cp_mul_take with "CPSe") as "[CPSe CPe]".
-    iApply OU_BMU. iApply (OU_wand with "[-CPe PH]").
-    2: { iApply (exchange_cp_upd with "[$] [$] [$]").
+    iApply OU_BMU. iApply (OU_wand with "[-CPe]").
+    2: { iApply (exchange_cp_upd with "[$] [$]").
          { reflexivity. }
          apply fl_degs_he. }
-    iIntros "[CPSh PH]". iDestruct (cp_mul_take with "CPSh") as "[CPSh CPh]".
-    iApply OU_BMU. iApply (OU_wand with "[-CPh PH]").
-    2: { iApply (exchange_cp_upd _ _ _ _ d__w with "[$] [$] [$]").
+    iIntros "CPSh". iDestruct (cp_mul_take with "CPSh") as "[CPSh CPh]".
+    iApply OU_BMU. iApply (OU_wand with "[-CPh]").
+    2: { iApply (exchange_cp_upd _ _ d__w with "[$] [$]").
          { reflexivity. }
          do 2 (etrans; eauto). }
-    iIntros "[CPS PH]". BMU_burn_cp.
+    iIntros "CPS". BMU_burn_cp.
     replace 19 with (10 + 9) at 3 by lia.
     iDestruct (cp_mul_split with "CPS") as "[CPS1 CPS]".
 

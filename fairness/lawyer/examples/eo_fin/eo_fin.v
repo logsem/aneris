@@ -340,10 +340,10 @@ Section EoFin.
 
           pure_step_hl. 
           MU_by_BMU. iApply OU_BMU.
-          iDestruct (exchange_cp_upd with "CP2'' [$] [$]") as "OU".
+          iDestruct (exchange_cp_upd with "CP2'' [$]") as "OU".
           { reflexivity. }
           { etrans; [apply d01_lt| apply d12_lt]. }
-          iApply (OU_wand with "[-OU]"); [| by iFrame]. iIntros "[CPS' PH]".
+          iApply (OU_wand with "[-OU]"); [| by iFrame]. iIntros "CPS'".
           BMU_burn_cp.
 
           iApply wp_value.
@@ -393,10 +393,10 @@ Section EoFin.
           iIntros "(CP1 & SR & PH & OBLS)".
 
           iApply OU_BMU.
-          iDestruct (exchange_cp_upd with "[$] [$] [$]") as "OU".
+          iDestruct (exchange_cp_upd with "[$] [$]") as "OU".
           { reflexivity. }
           { apply d01_lt. }
-          iApply (OU_wand with "[-OU]"); [| by iFrame]. iIntros "[CPS' PH]".
+          iApply (OU_wand with "[-OU]"); [| by iFrame]. iIntros "CPS'".
           BMU_burn_cp.
  
           iApply wp_value.
@@ -437,10 +437,10 @@ Section EoFin.
           iIntros "(CP1 & SR & PH & OBLS)".
 
           iApply OU_BMU.
-          iDestruct (exchange_cp_upd with "[$] [$] [$]") as "OU". 
+          iDestruct (exchange_cp_upd with "[$] [$]") as "OU". 
           { done. }
           { apply d01_lt. }
-          iApply (OU_wand with "[-OU]"); [| by iFrame]. iIntros "[CPS' PH]".
+          iApply (OU_wand with "[-OU]"); [| by iFrame]. iIntros "CPS'".
           BMU_burn_cp.
  
           iApply wp_value.
@@ -691,10 +691,10 @@ Section EoFin.
       pure_step_hl.
       MU_by_BMU.
       iApply OU_BMU.
-      iDestruct (exchange_cp_upd with "[$] [$] [$]") as "OU". 
+      iDestruct (exchange_cp_upd with "[$] [$]") as "OU". 
       { done. }
       { etrans; [apply d01_lt| apply d12_lt]. }
-      iApply (OU_wand with "[-OU]"); [| by iFrame]. iIntros "[CPS PH]".
+      iApply (OU_wand with "[-OU]"); [| by iFrame]. iIntros "CPS".
       BMU_burn_cp.
       
       pure_steps.

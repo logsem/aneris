@@ -480,9 +480,9 @@ Section TestProg.
     iApply (BMU_AMU with "[-PH] [$]"); [eauto| ]. iIntros "PH".
     iApply OU_BMU.
     iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
-    iDestruct (exchange_cp_upd with "[$] [$] [$]") as "OU"; eauto.
+    iDestruct (exchange_cp_upd with "[$] [$]") as "OU"; eauto.
     iApply (OU_wand with "[-OU]"); [| done].
-    iIntros "[CPS' PH]". 
+    iIntros "CPS'". 
     iApply BMU_intro.
     iDestruct (cp_mul_take with "CPS'") as "[CPS' CP']". 
     iSplitR "CP'".

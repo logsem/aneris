@@ -839,11 +839,11 @@ Section MotivatingClient.
         pure_step_hl.
         split_cps "CPh" 1.
         MU_by_BMU. iApply OU_BMU.
-        iApply (OU_wand with "[-PH CPh']").
-        2: { rewrite -cp_mul_1. iApply (exchange_cp_upd with "[$] [$] [$]").
+        iApply (OU_wand with "[-CPh']").
+        2: { rewrite -cp_mul_1. iApply (exchange_cp_upd with "[$] [$]").
              1: reflexivity.
              apply LT0m. }
-        iIntros "[CPSm PH]". BMU_burn_cp. 
+        iIntros "CPSm". BMU_burn_cp. 
         iApply ("IH" with "[-POST]"); [| done]. iFrame "#∗".
     Qed.
 
@@ -878,11 +878,11 @@ Section MotivatingClient.
       2: { iApply (@create_ep_upd with "[$] [$] [$]").
            apply LThm. } (* TODO: rename that hypothesis *)
       iIntros "(EPf & _ & PH)". iApply OU_BMU.
-      iApply (OU_wand with "[-CPSm' PH]").
-      2: { iApply (exchange_cp_upd with "[$] [$] [$]").
+      iApply (OU_wand with "[-CPSm']").
+      2: { iApply (exchange_cp_upd with "[$] [$]").
            1: reflexivity.
            apply LThm. }
-      iIntros "[CPSh PH]".
+      iIntros "CPSh".
       
       BMU_burn_cp.
 
@@ -916,17 +916,17 @@ Section MotivatingClient.
     iIntros (Φ) "(#EB & OB & PH & CPSr) POST". rewrite /client_prog.
     pure_step_hl. 
     MU_by_BMU. iApply OU_BMU.
-    split_cps "CPSr" 1. rewrite -cp_mul_1. iApply (OU_wand with "[-CPSr' PH]").
-    2: { iApply (exchange_cp_upd with "[$] [$] [$]").
+    split_cps "CPSr" 1. rewrite -cp_mul_1. iApply (OU_wand with "[-CPSr']").
+    2: { iApply (exchange_cp_upd with "[$] [$]").
          1: reflexivity.
          etrans; [apply LT0m | apply LThm]. }
-    iIntros "[CPS PH]".    
+    iIntros "CPS".
     split_cps "CPSr" 1. rewrite -cp_mul_1.
-    iApply OU_BMU. iApply (OU_wand with "[-CPSr' PH]").
-    2: { iApply (exchange_cp_upd with "[$] [$] [$]").
+    iApply OU_BMU. iApply (OU_wand with "[-CPSr']").
+    2: { iApply (exchange_cp_upd with "[$] [$]").
          1: reflexivity.
          apply LThm. }
-    iIntros "[CPSm PH]".
+    iIntros "CPSm".
     iApply OU_BMU. iApply (OU_wand with "[-OB]").
     2: { iApply (OU_create_sig _ _ l__f with "OB"). }
     iIntros "(%s__f & SGNf & OB & _)". rewrite union_empty_l_L.

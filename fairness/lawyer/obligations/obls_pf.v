@@ -6,25 +6,55 @@ From trillium.fairness.lawyer.obligations Require Import obligations_model.
 From stdpp Require Import relations.
 
 
+Ltac inv_loc_step_of_no_exp STEP :=
+  destruct STEP as [T|[T|[T|T]]];
+  [destruct T as (?π&?d&T) |
+    destruct T as (?l&T) |
+    destruct T as (?s&T) |
+    destruct T as (?s&?π&?d&?d'&T)
+  ];
+  inversion T; subst. 
+
+Ltac inv_loc_step_with_no_exp STEP :=
+  destruct STEP as [T | T]; [inv_loc_step_of_no_exp T | inv_loc_step0 T]. 
+
 Section PhaseFuel.
   Context `{OP: ObligationsParams Degree Level Locale LIM_STEPS}.
   Let OM := ObligationsModel.
 
-  Definition loc_step_no_exp_all δ1 τ δ2 :=
+  Definition loc_step_of_no_exp δ1 τ δ2 :=
     (exists π δ, burns_cp δ1 τ δ2 π δ) \/
-    (exists π δ δ' n, exchanges_cp δ1 τ δ2 π δ δ' n) \/
     (exists l, creates_signal δ1 τ δ2 l) \/
     (exists s, sets_signal δ1 τ δ2 s) \/
-    (exists s π δ δ', creates_ep δ1 τ δ2 s π δ δ') \/
-    (increases_eb δ1 τ δ2).
+    (exists s π δ δ', creates_ep δ1 τ δ2 s π δ δ')
+    (* \/ (exists s π δ, expects_ep δ1 τ δ2 s π δ) *)
+  .
 
-  Lemma loc_step_split δ1 τ δ2:
-    loc_step δ1 τ δ2 <->
-      (loc_step_no_exp_all δ1 τ δ2 \/ (exists sid π d, expects_ep δ1 τ δ2 sid π d)).
+  (* Definition loc_step_no_exp_all δ1 τ δ2 := *)
+  Definition loc_step_with_no_exp δ1 τ δ2 :=
+    loc_step_of_no_exp δ1 τ δ2 \/ loc_step0 δ1 δ2.
+
+  Lemma loc_step_of_no_exp_weaken δ1 τ δ2
+    (STEP: loc_step_of_no_exp δ1 τ δ2):
+    loc_step_of δ1 τ δ2.
   Proof using.
-    rewrite /loc_step_no_exp_all. split.
-    - intros [T|[T|[T|[T|[T|[T|T]]]]]]; tauto.
-    - intros [[T|[T|[T|[T|T]]]] | ?]; red; tauto.
+    destruct STEP as [?|[?|[?|?]]]; red; eauto.
+  Qed.
+  
+  Lemma loc_step_with_split δ1 τ δ2:
+    loc_step_with δ1 τ δ2 <->
+    (loc_step_with_no_exp δ1 τ δ2 \/ (exists sid π d, expects_ep δ1 τ δ2 sid π d)).
+  Proof using.
+    rewrite /loc_step_with_no_exp. split.
+    - intros [T|T]; [inv_loc_step_of T| ].
+      all: try by left; left; red; eauto.
+      + left; left; red; eauto. set_solver.
+      + by eauto. 
+      + by eauto. 
+    - intros [[T|?]|?]; red; eauto.
+      2: { left. red. eauto. }
+      left. red.
+      destruct T as [?|[?|[?|?]]]; eauto.      
   Qed.
     
   Context (tr: obls_trace).
@@ -65,8 +95,7 @@ Section PhaseFuel.
   
   Definition TPF' (i: nat): gmultiset Degree :=
     from_option (PF' ((LIM_STEPS + 2) * i)) ∅ (tr S!! i).
-
-  
+ 
   Lemma ms_le_exp_mono m n X Y
     (LE: m <= n)
     (SUB: X ⊆ Y)
@@ -110,9 +139,9 @@ Section PhaseFuel.
     destruct e as [[??]?]. done.
   Qed.
   
-  Lemma exchange_cp_ms_le δ1 τ δ2 k π d d' n
+  Lemma exchange_cp_ms_le δ1 δ2 k π d d' n
     `{forall π, Decision (P π)}
-    (EXC: exchanges_cp δ1 τ δ2 π d d' n):
+    (EXC: exchanges_cp δ1 δ2 π d d' n):
     ms_le deg_le (PF' (S k) δ2) (PF' k δ1).
   Proof using.
     clear -EXC OM. rewrite /PF'. 
@@ -185,35 +214,44 @@ Section PhaseFuel.
       * done.
   Qed.
   
-  Lemma loc_step_no_exp_all_ms_le δ1 τ δ2 k
-    (STEP: loc_step_no_exp_all δ1 τ δ2)
+  Lemma loc_step0_ms_le δ1 δ2 k
+    (STEP: loc_step0 δ1 δ2)
     :
     ms_le deg_le (PF' (S k) δ2) (PF' k δ1).
   Proof using.
     clear -STEP OM.
-    destruct STEP as [T|[T|[T|[T|[T|T]]]]]. 
-    - destruct T as (?&?&T). inversion T; subst. 
-      destruct δ1. simpl in *.
-      apply ms_le_disj_union; [apply _| ..].
-      + apply ms_le_sub. apply mset_map_sub. apply mset_filter_subseteq_mono. mss.
-      + apply ms_le_exp_mono; [lia | reflexivity].
-    - destruct T as (?&?&?&?&T).
-      eapply exchange_cp_ms_le; eauto. 
-    - destruct T as (?&T). inversion T; subst.
-      destruct δ1. simpl in *.
-      apply ms_le_disj_union; [apply _| ..].
-      + apply ms_le_sub. apply mset_map_sub. mss. 
-      + apply ms_le_exp_mono; [lia | reflexivity].
-    - destruct T as (?&T). inversion T; subst.
-      destruct δ1. simpl in *.  
-      apply ms_le_disj_union; [apply _| ..].
-      + apply ms_le_sub. apply mset_map_sub. mss. 
-      + apply ms_le_exp_mono; [lia | reflexivity].
-    - destruct T as (?&?&?&?&T). eapply create_ep_ms_le; eauto.
+    (* destruct STEP as [T|[T|[T|[T|[T|T]]]]].  *)
+    inv_loc_step0 STEP. 
+    - eapply exchange_cp_ms_le; eauto. 
     - inversion T; subst. destruct δ1. simpl.
       apply ms_le_disj_union; [apply _| ..].
       + apply ms_le_sub. apply mset_map_sub. mss. 
       + apply ms_le_exp_mono; [lia | reflexivity]. 
+  Qed.
+  
+  Lemma loc_step_with_no_exp_ms_le δ1 τ δ2 k
+    (STEP: loc_step_with_no_exp δ1 τ δ2)
+    :
+    ms_le deg_le (PF' (S k) δ2) (PF' k δ1).
+  Proof using.
+    clear -STEP OM.
+    (* destruct STEP as [T|[T|[T|[T|[T|T]]]]].  *)
+    inv_loc_step_with_no_exp STEP. 
+    - destruct δ1. simpl in *.
+      apply ms_le_disj_union; [apply _| ..].
+      + apply ms_le_sub. apply mset_map_sub. apply mset_filter_subseteq_mono. mss.
+      + apply ms_le_exp_mono; [lia | reflexivity].
+    - destruct δ1. simpl in *.
+      apply ms_le_disj_union; [apply _| ..].
+      + apply ms_le_sub. apply mset_map_sub. mss. 
+      + apply ms_le_exp_mono; [lia | reflexivity].
+    - destruct δ1. simpl in *.  
+      apply ms_le_disj_union; [apply _| ..].
+      + apply ms_le_sub. apply mset_map_sub. mss. 
+      + apply ms_le_exp_mono; [lia | reflexivity].
+    - eapply create_ep_ms_le; eauto.
+    - apply loc_step0_ms_le. red. left. eauto. 
+    - apply loc_step0_ms_le. red. eauto. 
   Qed.
   
   Definition expect_ms_le δ1 τ δ2 k :=
@@ -222,13 +260,13 @@ Section PhaseFuel.
       ms_le deg_le (PF' (S k) δ2) (PF' k δ1). 
   
   Lemma loc_step_ms_le δ1 τ δ2 k
-    (STEP: loc_step δ1 τ δ2)
+    (STEP: loc_step_with δ1 τ δ2)
     (EXP_CASE: expect_ms_le δ1 τ δ2 k)
     :
     ms_le deg_le (PF' (S k) δ2) (PF' k δ1).
   Proof using.
-    apply loc_step_split in STEP as [NOEXP | EXP].
-    - eapply loc_step_no_exp_all_ms_le; eauto.
+    apply loc_step_with_split in STEP as [NOEXP | EXP].
+    - eapply loc_step_with_no_exp_ms_le; eauto.
     - destruct EXP as (?&?&?&?). eapply EXP_CASE; eauto.
   Qed.
   

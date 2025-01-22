@@ -38,10 +38,6 @@ Section Termination.
   Context {set_before: SignalId -> nat}.
   Hypothesis (SET_BEFORE_SPEC: forall sid, sb_prop sid (set_before sid)).
 
-  (* TODO: clean up similar definitions *)
-  Definition loc_step_with (τ: Locale) :=
-    fun δ1 δ2 => loc_step δ1 τ δ2.
-  
   Definition lvl_at (sid_i: SignalId * nat): option Level :=
     let '(sid, i) := sid_i in
     δ ← tr S!! i;
@@ -182,17 +178,22 @@ Section Termination.
     Lemma loc_step_sig_st_le_pres sid st: 
       preserved_by loc_step_ex (fun δ => sig_st_le st (ps_sigs δ !! sid)).
     Proof using.
-      do 2 red. intros δ1 δ2 SIG_LE [τ STEP].
-      pose proof (next_sig_id_fresh (default ∅ (ps_obls δ1 !! τ) ∪ (dom $ ps_sigs δ1))) as FRESH.
-      inv_loc_step STEP; destruct δ1; try done; simpl in *.
-      - subst new_sigs0.
+      do 2 red. intros δ1 δ2 SIG_LE STEP.
+      
+      inv_loc_step_ex STEP.
+      all: try by (destruct δ1). 
+      -
+        pose proof (next_sig_id_fresh (default ∅ (ps_obls δ1 !! τ) ∪ (dom $ ps_sigs δ1))) as FRESH.
+        destruct δ1; simpl in *.
+        subst new_sigs0.
         destruct (decide (sid = s0)) as [-> | ?].
         2: { rewrite lookup_insert_ne. apply SIG_LE. done. }
         rewrite lookup_insert.
         apply not_elem_of_union, proj2, not_elem_of_dom_1 in FRESH. rewrite FRESH in SIG_LE.
         by destruct st as [[??]|]; done.
       - subst new_sigs0.
-        destruct (decide (sid = x)) as [-> | ?].
+        destruct δ1; simpl in *.
+        destruct (decide (sid = s)) as [-> | ?].
         2: { rewrite lookup_insert_ne; [| done]. apply SIG_LE. }
         rewrite lookup_insert.
         rewrite SIG in SIG_LE. destruct st as [[??]| ]; try done.
@@ -254,14 +255,23 @@ Section Termination.
       edestruct (om_wf_ph_disj δ); eauto. tauto. 
     Qed.
 
+  (* TODO: move *)
+  Lemma loc_step_with_ex δ1 τ δ2
+    (WITH: loc_step_with δ1 τ δ2):
+    loc_step_ex δ1 δ2.
+  Proof using.
+    destruct WITH as [?|?]; [left | right]; eauto.
+  Qed.
+
     Lemma other_loc_step_pres_obls τ R τs
       (OTHER: τs ≠ τ):
-      preserved_by (loc_step_with τs) (fun δ => ps_obls δ !! τ = Some R /\ om_st_wf δ).
+      preserved_by (flip loc_step_with τs) (fun δ => ps_obls δ !! τ = Some R /\ om_st_wf δ).
     Proof using.
       red. intros δ1 δ2 [OB WF1] STEP.
       split.
-      2: { eapply wf_preserved_by_loc_step; eauto. red. eauto. } 
-      inv_loc_step STEP; destruct δ1; try done; simpl in *.
+      2: { eapply wf_preserved_by_loc_step; eauto.
+           eapply loc_step_with_ex; eauto. } 
+      inv_loc_step_with STEP; destruct δ1; try done; simpl in *.
       - subst new_obls0. rewrite lookup_insert_ne; done.
       - subst new_obls0. rewrite lookup_insert_ne; done.
     Qed.
@@ -286,13 +296,13 @@ Section Termination.
     Context (δ1 δ2: ProgressState).    
     Context (WF1: om_st_wf δ1).
 
-    Lemma om_step_wf_dom τ (LOC_STEP: loc_step δ1 τ δ2):
+    Lemma om_step_wf_dom τ (LOC_STEP: loc_step_of δ1 τ δ2):
       τ ∈ dom $ ps_obls δ1.
     Proof using WF1.
       enough (τ ∈ dom $ ps_obls δ1 \/ τ ∈ dom $ ps_phases δ1 \/
               is_Some (ps_obls δ1 !! τ) \/ is_Some (ps_phases δ1 !! τ)) as IN.
       { rewrite -!elem_of_dom in IN. rewrite om_wf_dpo in IN; eauto. tauto. }
-      inv_loc_step LOC_STEP; eauto.
+      inv_loc_step_of LOC_STEP; eauto.
     Qed.
 
   End MoreWF.
@@ -328,7 +338,7 @@ Section Termination.
 
   (* TODO: rephrase in terms of preserved_by? *)
   Lemma expected_signal_created_before δ1 δ2 τ n sid l
-    (NSTEPS: nsteps (loc_step_with τ) n δ1 δ2)
+    (NSTEPS: nsteps (flip loc_step_with τ) n δ1 δ2)
     (* (NSTEPS: nsteps (loc_step_ex) n δ1 δ2) *)
     (SIG2: ps_sigs δ2 !! sid = Some (l, false))
     (LT2: lt_locale_obls l τ δ2):
@@ -352,7 +362,7 @@ Section Termination.
     forward eapply (loc_step_sig_st_le_pres sid).
     intros LE'. red in LE'. specialize_full LE'; [| eauto |]. 
     { reflexivity. }
-    { red. eauto. }
+    { eapply loc_step_with_ex; eauto. }
     rewrite SIG2 in LE'.
 
     assert (ps_sigs δ' !! sid = Some (l, false)) as SIG'.
@@ -360,7 +370,7 @@ Section Termination.
       { simpl in LE'. destruct LE' as [??]. subst. destruct b; tauto. }
       clear dependent δ1. 
       red in STEP.
-      inv_loc_step STEP; destruct δ'; simpl in *; subst.
+      inv_loc_step_with STEP; destruct δ'; simpl in *; subst.
       all: try by rewrite SIG2 in SIG'.
       + subst new_sigs0. rewrite lookup_insert_ne in SIG2.
         { by rewrite SIG2 in SIG'. }
@@ -373,13 +383,13 @@ Section Termination.
 
     eapply IHn; eauto.
     destruct (ps_obls δ' !! τ) eqn:OBLS'; [| done]. simpl. intros IN'.
-    inv_loc_step STEP; destruct δ'; simpl in *; subst.
+    inv_loc_step_with STEP; destruct δ'; simpl in *; subst.
     all: try by rewrite OBLS' in NO2. 
     + subst new_sigs0 new_obls0.
       destruct NO2. subst cur_loc_obls0. rewrite OBLS' lookup_insert. set_solver.
     + subst new_sigs0 new_obls0.
       subst cur_loc_obls0.
-      destruct (decide (x = sid)) as [-> | ?].
+      destruct (decide (s = sid)) as [-> | ?].
       { rewrite lookup_insert in SIG2. done. }
       rewrite lookup_insert_ne in SIG2; [| done].
       destruct NO2. rewrite OBLS'. simpl. rewrite lookup_insert. simpl. set_solver.
@@ -463,9 +473,9 @@ Section Termination.
     clear set_before WF SET_BEFORE_SPEC LVL_WF VALID.
 
     red. intros δ1 δ2 [AB WF1] STEP'.
-    pose proof STEP' as [τ STEP]. 
+    pose proof STEP' as STEP. 
     split.
-    2: { eapply wf_preserved_by_loc_step; eauto. } 
+    2: { eapply wf_preserved_by_loc_step; eauto. }
 
     destruct AB as [SET | AB].
     { destruct SET as [l SID]. red.
@@ -477,9 +487,11 @@ Section Termination.
       destruct b; try done. eauto. }
 
     red.
-    pose proof (@next_sig_id_fresh (default ∅ (ps_obls δ1 !! τ) ∪ (dom $ ps_sigs δ1))) as FRESH. 
-    inv_loc_step STEP; destruct δ1; try (right; done).
-    - right. subst new_obls0.
+    inv_loc_step_ex STEP.
+    all: try by (destruct δ1; try (right; done)). 
+    -
+      pose proof (@next_sig_id_fresh (default ∅ (ps_obls δ1 !! τ) ∪ (dom $ ps_sigs δ1))) as FRESH. 
+      destruct δ1. subst new_obls0.
       destruct AB as (?&?&?&PH&?).
       destruct (decide (sid = s0)) as [-> | OLD].
       + destruct FRESH. 
@@ -491,20 +503,21 @@ Section Termination.
         apply mk_is_Some, elem_of_dom in PH.
         red in WF1. rewrite WF1 in PH. simpl in PH.
         apply elem_of_dom in PH as [? OB].
-        exists x0. rewrite OB. done.
-      + subst new_ps. 
-        destruct (decide (x0 = τ)) as [-> | NEQ].
-        * exists τ. rewrite lookup_insert. simpl. eexists. split; eauto.
+        exists x. rewrite OB. done.
+      + subst new_ps.
+        destruct (decide (x = τ)) as [-> | NEQ].
+        * right. exists τ. rewrite lookup_insert. simpl. eexists. split; eauto.
           set_solver.
-        * exists x0. rewrite lookup_insert_ne; [| done]. eauto.
+        * right. exists x. rewrite lookup_insert_ne; [| done]. eauto.
     - simpl in *.
-      destruct (decide (x = sid)) as [-> | NEQ].
+      destruct δ1. subst. 
+      destruct (decide (s = sid)) as [-> | NEQ].
       { left. subst new_sigs0. rewrite lookup_insert. eauto. }
       right. move AB at bottom. destruct AB as (?&?&?&?&?).
-      destruct (decide (x0 = τ)) as [-> | NEQ'].
+      destruct (decide (x = τ)) as [-> | NEQ'].
       + exists τ. rewrite lookup_insert. simpl. eexists. split; eauto.
         set_solver.
-      + exists x0. rewrite lookup_insert_ne; [| done]. eauto.
+      + exists x. rewrite lookup_insert_ne; [| done]. eauto.
   Qed.
 
   Lemma fork_step_pres_asg_bound sid πb τ:
@@ -603,7 +616,7 @@ Section Termination.
   Lemma owm_loc_step_ms_le
   (πτ : Phase)
   (τ : Locale)
-  (τs : mlabel ObligationsModel)
+  (τs : mlabel ObligationsModel) τc
   (n : nat)
   (s : SignalId)
   (δk : ProgressState)
@@ -622,7 +635,7 @@ Section Termination.
   (SIGsn' : ps_sigs δ'' !! s = Some (ls, false))
   (δ' mb : ProgressState)
   (STEPS : nsteps (λ p1 p2 : ProgressState, loc_step_ex p1 p2) k δk δ')
-  (STEP : loc_step_ex δ' mb)
+  (STEP : loc_step_with δ' τc mb)
   (SIG_LE'' : ∀ sid, sig_st_le (ps_sigs mb !! sid) (ps_sigs δ'' !! sid))
   (SF : ps_sigs mb !! s = Some (ls, false))
   (SIG' : ps_sigs δ' !! s = Some (ls, false))
@@ -631,10 +644,13 @@ Section Termination.
     (PF' set_before (phase_ge πτ) ((LIM_STEPS + 2) * n + k) δ').
   Proof using VALID WF SET_BEFORE_SPEC.
     clear LVL_WF.
-    destruct STEP as [τc STEP]. 
+
+    destruct STEP as [STEP | STEP0].
+    2: { rewrite Nat.add_succ_r. eapply loc_step0_ms_le; eauto. }
     
     eapply ms_le_Proper; [| | eapply loc_step_ms_le]; eauto.
     { rewrite -PeanoNat.Nat.add_succ_comm. simpl. reflexivity. }
+    { left. eauto. }
     
     assert (ps_phases δ' !! τ = Some πτ) as PHδ'.
     { eapply loc_steps_rep_phase_exact_pres; eauto. }
@@ -776,13 +792,13 @@ Section Termination.
     destruct X as (?&SIGsn').
 
     forward eapply sig_st_le_lookup_helper with (i := n) (j := n + 1) (s := s); eauto; [lia| ].
-    rewrite SIGsn SIGsn'. simpl. intros [<- _].   
+    rewrite SIGsn SIGsn'. simpl. intros [<- _].
 
     assert (forall sid, sig_st_le (ps_sigs mb !! sid) (ps_sigs δk' !! sid)) as SIG_LE''.
     { intros.
       etrans.
       { eapply loc_step_sig_st_le_pres; [reflexivity| ].
-        red. eexists. red. left. eauto. }
+        red. left. eexists. red. left. eauto. }
       inversion FSTEP as [? F| ]; subst.
       2: { reflexivity. }
       destruct F as (?&?&F).
@@ -794,7 +810,7 @@ Section Termination.
     { eapply nsteps_mono; [| apply NSTEPS].
       do 2 red. rewrite /obls_any_step_of. eauto. }
     { apply rel_compose_nsteps_next'. eexists. split. 
-      - red. left. red. exists τs. red. left. eauto.
+      - red. left. red. left. exists τs. red. left. eauto.
       - eapply nsteps_mono; [| apply FSTEP].
         do 2 red. rewrite /obls_any_step_of. eauto. }
     intros SIGmb. 
@@ -821,7 +837,11 @@ Section Termination.
       eapply loc_step_sig_st_le_pres; eauto. reflexivity. }
 
     etrans; eauto.
-    eapply owm_loc_step_ms_le; eauto. 
+
+    destruct STEP as [[? STEP] | STEP0].
+    2: { rewrite Nat.add_succ_r. eapply loc_step0_ms_le; eauto. }
+    eapply owm_loc_step_ms_le; eauto.
+    left. eauto.
   Qed.
 
   Lemma loc_step_pres_phase_eq τ π:
@@ -842,8 +862,7 @@ Section Termination.
     rewrite lookup_insert_ne.
     2: { intros ->. destruct FRESH'. by eapply elem_of_dom. }
     rewrite lookup_insert_ne; done. 
-  Qed.  
-    
+  Qed.    
 
   Definition s_ow (s: SignalId) (i: nat) := 
     let π := 
@@ -887,29 +906,37 @@ Section Termination.
     preserved_by loc_step_ex (fun δ => asg_to_or_set s τ δ /\ om_st_wf δ).
   Proof using.
     clear dependent WF VALID set_before LVL_WF.
-    red. intros δ1 δ2 [P1 WF1] [τs STEP].
+    red. intros δ1 δ2 [P1 WF1] STEP.
     split.
-    2: { eapply wf_preserved_by_loc_step; eauto. red. eauto. }
+    2: { eapply wf_preserved_by_loc_step; eauto. }
     red in P1. destruct P1 as [ASG | SET].
     2: { destruct (ps_sigs δ1 !! s) as [[??]|] eqn:SIG; [| done]. simpl in SET. subst.
-         pattern τs in STEP. apply ex_intro in STEP.
+         (* pattern τs in STEP. apply ex_intro in STEP. *)
          eapply (loc_step_sig_st_le_pres s) in STEP; [| reflexivity].
          rewrite SIG in STEP. destruct (ps_sigs δ2 !! s) as [[??]|] eqn:SIG'; [| done].
          simpl in STEP. destruct b; [| tauto].
          right. by rewrite SIG'. }
 
     destruct (ps_obls δ1 !! τ) as [obs |] eqn:OBLS; [| done].
+    destruct STEP as [[τs STEP] | STEP0].
+    2: { inv_loc_step0 STEP0; destruct δ1; subst; simpl in *.
+         - red. simpl. rewrite OBLS. set_solver.
+         - red. simpl. rewrite OBLS. set_solver. }
+    
     destruct (decide (τs = τ)) as [-> | ?].
-    2: { left. eapply other_loc_step_pres_obls in STEP as [OBLS' ?]; eauto.
+    2: { left.
+         assert (loc_step_with δ1 τs δ2) as STEP'.
+         { by left. } 
+         eapply other_loc_step_pres_obls in STEP' as [OBLS' ?]; eauto.
          by rewrite OBLS'. }
     add_case (ps_obls δ2 = ps_obls δ1) SAME_OBLS.
     { left. congruence. }
-    inv_loc_step STEP; destruct δ1; try by apply SAME_OBLS.
+    inv_loc_step_of STEP; destruct δ1; try by apply SAME_OBLS.
     - red. subst new_ps new_obls0. simpl. rewrite lookup_insert. simpl.
       subst cur_loc_obls0. simpl. left. rewrite OBLS. set_solver.
     - red. subst new_ps. simpl. subst new_obls0 new_sigs0. simpl.
       rewrite lookup_insert. simpl. subst cur_loc_obls0. simpl.
-      destruct (decide (s = x)) as [-> | ?].
+      destruct (decide (s = s0)) as [-> | ?].
       + right. by rewrite lookup_insert.
       + left. rewrite OBLS. set_solver.
   Qed.
@@ -1631,7 +1658,7 @@ Section Termination.
     { intros.
       etrans.
       { eapply loc_step_sig_st_le_pres; [reflexivity| ].
-        red. eexists. red. left. eauto. }
+        left. eexists. left. eauto. }
       inversion FSTEP as [? F| ]; subst.
       2: { reflexivity. }
       destruct F as (?&?&F).
@@ -1643,14 +1670,18 @@ Section Termination.
     generalize dependent mb. induction k.
     { intros ? ->%nsteps_0.
       rewrite Nat.add_0_r. reflexivity. }
-    intros δ'' (δ' & STEPS & [τ STEP])%nsteps_inv_r SIG_LE'''.
+    intros δ'' (δ' & STEPS & STEP)%nsteps_inv_r SIG_LE'''.
     specialize (IHk ltac:(lia) _ STEPS). specialize_full IHk.
     { intros. etrans; [| apply SIG_LE'''].
-      eapply loc_step_sig_st_le_pres; [reflexivity| ]. red. eauto. }    
+      eapply loc_step_sig_st_le_pres; [reflexivity| ]. red. eauto. }
     
     etrans; eauto.
+    destruct STEP as [[τs STEP] | STEP0].
+    2: { rewrite Nat.add_succ_r. eapply loc_step0_ms_le; eauto. }
+    
     eapply ms_le_Proper; [| | eapply loc_step_ms_le]; eauto.
     { rewrite -PeanoNat.Nat.add_succ_comm. simpl. reflexivity. }
+    { left. eauto. }
     
     eapply any_expect_ms_le. 
     
@@ -1693,9 +1724,8 @@ Section Termination.
     unshelve eapply (pres_by_rel_implies_rep _ _ _ _ _ _) in STEPS.
     { apply loc_step_sig_st_le_pres. }
     2: { simpl. eapply reflexive_eq. symmetry. apply SIDn. }
-    simpl in STEPS. rewrite SIG in STEPS. tauto. 
-    
-  Qed. 
+    simpl in STEPS. rewrite SIG in STEPS. tauto.     
+  Qed.
 
   Theorem trace_terminates
     (FAIR: forall τ, obls_trace_fair τ tr)

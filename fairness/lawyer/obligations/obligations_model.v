@@ -76,15 +76,13 @@ Section Model.
       (CP: (π, δ) ∈ ps_cps ps):
     burns_cp ps θ (update_cps (ps_cps ps ∖ {[+ (π, δ) +]}) ps) π δ. 
 
-  Inductive exchanges_cp: PS -> Locale -> PS -> Phase -> Degree -> Degree -> nat -> Prop :=
-  | lcp_step ps θ π δ δ' n π__max 
-      (LOC_PHASE: ps_phases ps !! θ = Some π__max)
-      (PHASE_LE: phase_le π π__max)
+  Inductive exchanges_cp: PS -> PS -> Phase -> Degree -> Degree -> nat -> Prop :=
+  | lcp_step ps π δ δ' n
       (CP: (π, δ) ∈ ps_cps ps)
       (DEG_LE: deg_lt δ' δ)
       (LOW_BOUND: n <= ps_exc_bound ps):
     let new_cps := ps_cps ps ∖ {[+ (π, δ) +]} ⊎ n *: {[+ (π, δ') +]} in
-    exchanges_cp ps θ (update_cps new_cps ps) π δ δ' n.
+    exchanges_cp ps (update_cps new_cps ps) π δ δ' n.
 
   Definition next_sig_id (R: gset SignalId): SignalId :=
     list_max (elements R) + 1.
@@ -144,11 +142,9 @@ Section Model.
     let new_cps := ps_cps ps ⊎ {[+ (π__max, δ) +]} in
     expects_ep ps θ (update_cps new_cps ps) s π δ.
 
-  (* TODO: get rid of mandatory locale parameter in these lemmas *)
-  Inductive increases_eb: PS -> Locale -> PS -> Prop :=
-  | ieb_step ps θ
-      (DOM: θ ∈ dom $ ps_phases ps):
-    increases_eb ps θ (update_eb (ps_exc_bound ps + 1) ps).
+  Inductive increases_eb: PS -> PS -> Prop :=
+  | ieb_step ps:
+    increases_eb ps (update_eb (ps_exc_bound ps + 1) ps).
 
   Definition ext_phase (π: Phase) (d: nat) := d :: π.
   Definition fork_left (π: Phase): Phase := ext_phase π 0.
@@ -166,16 +162,25 @@ Section Model.
       let ps' := update_phases new_phases $ update_obls new_obls ps in
       forks_locale ps θ ps' θ' obls_.
 
-  Definition loc_step ps1 θ ps2 :=
+  (* small steps that are "made by" a particular locale *)
+  Definition loc_step_of ps1 θ ps2 :=
     (exists π δ, burns_cp ps1 θ ps2 π δ) \/
-    (exists π δ δ' n, exchanges_cp ps1 θ ps2 π δ δ' n) \/
     (exists l, creates_signal ps1 θ ps2 l) \/
     (exists s, sets_signal ps1 θ ps2 s) \/
     (exists s π δ δ', creates_ep ps1 θ ps2 s π δ δ') \/
-    (exists s π δ, expects_ep ps1 θ ps2 s π δ) ∨
-    (increases_eb ps1 θ ps2). 
+    (exists s π δ, expects_ep ps1 θ ps2 s π δ).
 
-  Definition loc_step_ex := fun ps1 ps2 => exists θ, loc_step ps1 θ ps2.
+  (* small steps that don't depend on any thread *)
+  Definition loc_step0 ps1 ps2 :=
+    (exists π δ δ' n, exchanges_cp ps1 ps2 π δ δ' n) \/
+    (increases_eb ps1 ps2).
+
+  Definition loc_step_ex ps1 ps2 :=
+    (exists θ, loc_step_of ps1 θ ps2) \/ loc_step0 ps1 ps2.
+
+  Definition loc_step_with ps1 θ ps2 :=
+    loc_step_of ps1 θ ps2 \/ loc_step0 ps1 ps2.
+
   Definition fork_step_of θ := fun ps1 ps2 => exists τ' R, forks_locale ps1 θ ps2 τ' R.
 
   Definition obls_any_step_of θ := 
@@ -254,13 +259,25 @@ Section Model.
 
 End Model.
 
-Ltac inv_loc_step STEP :=
-    destruct STEP as [T|[T|[T|[T|[T|[T|T]]]]]];
-    [destruct T as (?&?&T) |
-     destruct T as (?&?&?&?&T) |
-     destruct T as (?&T) |
-     destruct T as (?&T) |
-     destruct T as (?&?&?&?&T) |
-     destruct T as (?&?&?&T) |
-    ];
-    inversion T; subst. 
+
+Ltac inv_loc_step_of STEP :=
+  destruct STEP as [T|[T|[T|[T|T]]]];
+  [destruct T as (?π&?d&T) |
+    destruct T as (?l&T) |
+    destruct T as (?s&T) |
+    destruct T as (?s&?π&?d&?d'&T) |
+    destruct T as (?s&?π&?d&T)
+  ];
+  inversion T; subst. 
+
+Ltac inv_loc_step0 STEP :=
+  destruct STEP as [T|T];
+  [destruct T as (?π&?d&?d'&?n&T) | ];
+  inversion T; subst. 
+
+Ltac inv_loc_step_ex STEP :=
+  destruct STEP as [[?τ T]|T]; [inv_loc_step_of T | inv_loc_step0 T]. 
+
+Ltac inv_loc_step_with STEP :=
+  destruct STEP as [T | T]; [inv_loc_step_of T | inv_loc_step0 T]. 
+

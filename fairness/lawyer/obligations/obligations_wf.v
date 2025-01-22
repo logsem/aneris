@@ -115,6 +115,14 @@ Section Wf.
     red. intros. eapply pres_by_rel_implies_rep; eauto.
   Qed.
 
+  (* TODO: move *)
+  Lemma loc_step_with_ex δ1 τ δ2
+    (WITH: loc_step_with δ1 τ δ2):
+    loc_step_ex δ1 δ2.
+  Proof using.
+    destruct WITH as [?|?]; [left | right]; eauto.
+  Qed.
+
   Lemma pres_by_loc_step_implies_progress τ P
     (PPRES: preserved_by_loc_step_ex P)
     :
@@ -125,7 +133,8 @@ Section Wf.
     eapply rel_compose_mono in STEP.
     2: reflexivity.
     1: apply rel_compose_nsteps_next in STEP.
-    2: { do 2 red. intros. eexists. by left. }    
+    2: { do 2 red. intros.
+         eapply loc_step_with_ex. left. red. eauto. }
     eapply pres_by_loc_step_implies_rep; eauto.
   Qed.
 
@@ -192,16 +201,16 @@ Section Wf.
 
   Lemma loc_step_dpo_pres: preserved_by_loc_step_ex dom_phases_obls.
   Proof using.
-    do 2 red. intros δ1 δ2 PHASES_CORR [τ STEP].
-    inv_loc_step STEP; destruct δ1; try done; simpl in *.
+    do 2 red. intros δ1 δ2 PHASES_CORR STEP.
+    inv_loc_step_ex STEP; destruct δ1; try done; simpl in *.
     - subst new_obls0. red. subst new_ps. simpl. set_solver. 
     - subst new_obls0. simpl. red. set_solver. 
   Qed.
 
   Lemma loc_step_asg_pres: preserved_by_loc_step_ex obls_assigned.
   Proof using.
-    do 2 red. intros δ1 δ2 ASG [τ STEP].
-    inv_loc_step STEP; destruct δ1; try done; simpl in *. 
+    do 2 red. intros δ1 δ2 ASG STEP.
+    inv_loc_step_ex STEP; destruct δ1; try done; simpl in *. 
     - subst new_ps. red. simpl.
       subst new_sigs0 new_obls0. 
       rewrite map_filter_insert. setoid_rewrite decide_True; [| done].
@@ -237,24 +246,24 @@ Section Wf.
 
   Lemma loc_step_dpd_pres: preserved_by_loc_step_ex dom_phases_disj.
   Proof using.
-    do 2 red. intros δ1 δ2 DPD [τ STEP].
-    inv_loc_step STEP; destruct δ1; try done; simpl in *.
+    do 2 red. intros δ1 δ2 DPD STEP.
+    inv_loc_step_ex STEP; destruct δ1; try done; simpl in *.
   Qed.
 
   Definition phases_eq R δ1 := ps_phases δ1 = R.
 
   Lemma loc_step_phases_pres R: preserved_by loc_step_ex (phases_eq R).
   Proof using. 
-    do 2 red. intros δ1 δ2 PH [τ STEP].
-    inv_loc_step STEP; destruct δ1; try done; simpl in *.
+    do 2 red. intros δ1 δ2 PH STEP.
+    inv_loc_step_ex STEP; destruct δ1; try done; simpl in *.
   Qed.
 
   Lemma loc_step_epb_pres': preserved_by_loc_step_ex 
                                 (fun δ => eps_phase_bound δ /\ dom_phases_disj δ).
   Proof using.
-    do 2 red. intros δ1 δ2 [EPB DPD] [τ STEP].
+    do 2 red. intros δ1 δ2 [EPB DPD] STEP.
     split.
-    2: { eapply loc_step_dpd_pres; eauto. red. eauto. } 
+    2: { eapply loc_step_dpd_pres; eauto. } 
 
     pose proof (@loc_step_phases_pres _ _ _ eq_refl ltac:(red; eauto)) as PH. 
     
@@ -263,14 +272,14 @@ Section Wf.
       eapply elem_of_subseteq in IN; eauto.
       rewrite PH in PH2. 
       edestruct EPB; eauto. set_solver. }
-    inv_loc_step STEP; destruct δ1; try done; simpl in *.
-    red. intros (τ' & π & ep & PH2 & IN & LT).
+    inv_loc_step_ex STEP; destruct δ1; try done; simpl in *.
+    red. intros (τ' & π' & ep & PH2 & IN & LT).
     subst new_ps new_eps0. simpl in IN.
     apply elem_of_union in IN as [IN | IN].
     { edestruct EPB; eauto. set_solver. }
     apply elem_of_singleton in IN as ->. (* simpl in *. *)
     simpl in *.
-    assert (phase_lt π π__max) as LE'.
+    assert (phase_lt π' π__max) as LE'.
     { eapply strict_transitive_l; eauto. } 
     pose proof LE' as LE''%strict_include. 
     eapply phases_disj_not_le in LE''; eauto.
@@ -282,9 +291,9 @@ Section Wf.
   Lemma loc_step_cpb_pres': preserved_by_loc_step_ex
                                 (fun δ => cps_phase_bound δ /\ dom_phases_disj δ). 
   Proof using.
-    do 2 red. intros δ1 δ2 [CPB DPD] [τ STEP].
+    do 2 red. intros δ1 δ2 [CPB DPD] STEP.
     split.
-    2: { eapply loc_step_dpd_pres; eauto. red. eauto. }
+    2: { eapply loc_step_dpd_pres; eauto.  }
     pose proof (@loc_step_phases_pres _ _ _ eq_refl ltac:(red; eauto)) as PH.
     add_case (ps_cps δ2 ⊆ ps_cps δ1) CPS_LE.
     { intros LE. red. intros (τ' & π & cp & PH2 & IN & LT).
@@ -292,18 +301,10 @@ Section Wf.
       rewrite PH in PH2. 
       edestruct CPB; eauto. set_solver. }
     
-    inv_loc_step STEP; destruct δ1; try done; simpl in *.
+    inv_loc_step_ex STEP; destruct δ1; try done; simpl in *.
     - apply CPS_LE. multiset_solver.
-    - red. simpl. intros (τ' & π & cp & PH2 & IN & LT).
-      subst new_cps0. rewrite gmultiset_elem_of_disj_union in IN.
-      destruct IN as [IN | IN].
-      { apply gmultiset_elem_of_weaken in IN.
-        edestruct CPB; eauto. set_solver. }
-      apply gmultiset_elem_of_scalar_mul in IN as [? IN].
-      apply gmultiset_elem_of_singleton in IN as ->. simpl in *.
-      edestruct CPB; eauto. set_solver.
     - apply CPS_LE. multiset_solver.
-    - red. simpl. intros (τ' & π & cp & PH2 & IN & LT).
+    - red. simpl. intros (τ' & π' & cp & PH2 & IN & LT).
       subst new_cps0. rewrite gmultiset_elem_of_disj_union in IN.
       destruct IN as [IN | IN].
       { edestruct CPB; eauto. set_solver. }
@@ -312,13 +313,21 @@ Section Wf.
       eapply phases_disj_not_le in LE''; eauto.
       eapply DPD; eauto.
       intros ->. rewrite LOC_PHASE in PH2. inversion PH2. subst.
-      apply strict_spec_alt in LT. tauto. 
+      apply strict_spec_alt in LT. tauto.
+    - red. simpl. intros (τ' & π' & cp & PH2 & IN & LT).
+      subst new_cps0. rewrite gmultiset_elem_of_disj_union in IN.
+      destruct IN as [IN | IN].
+      { apply gmultiset_elem_of_weaken in IN.
+        edestruct CPB; eauto. set_solver. }
+      apply gmultiset_elem_of_scalar_mul in IN as [? IN].
+      apply gmultiset_elem_of_singleton in IN as ->. simpl in *.
+      edestruct CPB; eauto. set_solver.
   Qed.
 
   Lemma loc_step_obls_sigs_pres: preserved_by_loc_step_ex obligations_are_signals.
   Proof using.
-    do 2 red. intros δ1 δ2 OS [τ STEP].
-    inv_loc_step STEP; destruct δ1; try done; simpl in *.
+    do 2 red. intros δ1 δ2 OS STEP.
+    inv_loc_step_ex STEP; destruct δ1; try done; simpl in *.
     - subst new_ps. red. simpl. subst new_obls0 new_sigs0.
       rewrite map_img_insert_L dom_insert_L.
       rewrite flatten_gset_union flatten_gset_singleton.
@@ -339,10 +348,10 @@ Section Wf.
   Lemma loc_step_obls_disj_pres': preserved_by_loc_step_ex
                                       (fun δ => obls_disjoint δ /\ obligations_are_signals δ).
   Proof using.
-    do 2 red. intros δ1 δ2 [DPI OS] [τ STEP].
+    do 2 red. intros δ1 δ2 [DPI OS] STEP.
     split.
-    2: { eapply loc_step_obls_sigs_pres; eauto. red. eauto. }
-    inv_loc_step STEP; destruct δ1; try done; simpl in *.
+    2: { eapply loc_step_obls_sigs_pres; eauto.  }
+    inv_loc_step_ex STEP; destruct δ1; try done; simpl in *.
     - subst new_ps. red. simpl. intros τ1 τ2 NEQ.
       subst new_obls0. simpl.
 
@@ -619,10 +628,10 @@ subst new_obls0.
       
   Lemma loc_step_dom_obls_pres R: preserved_by loc_step_ex (dom_obls_eq R).
   Proof using.
-    do 2 red. intros δ1 δ2 OE [τ STEP]. 
+    do 2 red. intros δ1 δ2 OE STEP. 
     add_case (dom $ ps_obls δ2 = dom $ ps_obls δ1) SAME.
     { intros EQ. by rewrite EQ. }
-    inv_loc_step STEP; destruct δ1; try done; simpl in *.
+    inv_loc_step_ex STEP; destruct δ1; try done; simpl in *.
     - subst new_obls0. rewrite dom_insert_L. simpl. set_solver.
     - subst new_obls0. rewrite dom_insert_L. simpl. set_solver.
   Qed.

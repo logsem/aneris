@@ -554,8 +554,8 @@ Section ObligationsRepr.
 
       rewrite bi.sep_comm bi.sep_assoc.  
       iSplitL.
-      2: { iPureIntro. exists ζ. 
-           red. do 2 right. left. exists l. 
+      2: { iPureIntro. left. exists ζ. 
+           red. do 1 right. left. exists l. 
            erewrite (f_equal (creates_signal _ _)).
            { econstructor; eauto. simpl. eapply elem_of_dom; eauto. }
            simpl. reflexivity. }
@@ -605,8 +605,8 @@ Section ObligationsRepr.
 
       rewrite bi.sep_comm -!bi.sep_assoc.  
       iSplitR.
-      { iPureIntro. exists ζ.
-        red. do 3 right. left. exists sid. 
+      { iPureIntro. left. exists ζ.
+        red. do 2 right. left. exists sid. 
         erewrite (f_equal (sets_signal _ _)).
         { econstructor; eauto. simpl. eapply elem_of_dom; eauto. }
         simpl. reflexivity. }
@@ -636,15 +636,15 @@ Section ObligationsRepr.
       by apply exclusive_local_update.
     Qed.
 
-    Lemma exchange_cp_upd ζ π q d d' b k
+    Lemma exchange_cp_upd π d d' b k
       (LE: k <= b)
       (DEG: deg_lt d' d):
-      ⊢ cp π d -∗ th_phase_frag ζ π q -∗ exc_lb b -∗ OU (cp_mul π d' k ∗ th_phase_frag ζ π q).
+      ⊢ cp π d -∗ exc_lb b -∗ OU (cp_mul π d' k).
     Proof using.
       clear H1 H0 H.
-      rewrite /OU /OU'. iIntros "CP PH #LB %δ MSI".
+      rewrite /OU /OU'. iIntros "CP #LB %δ MSI".
       iDestruct (exc_lb_msi_bound with "[$] [$]") as %LB.
-      iDestruct (th_phase_msi_frag with "[$] [$]") as "%".
+      (* iDestruct (th_phase_msi_frag with "[$] [$]") as "%". *)
       (* iDestruct "CP" as "(%π0 & CP & %PH_LE)".  *)
       iDestruct (cp_msi_unfold with "[$] [$]") as "(MSI & %π0 & CP & [%IN %PH_LE])".
       rewrite {1}/obls_msi. iDestruct "MSI" as "(CPS&?&?&?&?&?)".
@@ -655,9 +655,9 @@ Section ObligationsRepr.
 
       rewrite bi.sep_comm -!bi.sep_assoc.
       iSplitR.
-      { iPureIntro. exists ζ. 
-        red. right. left. exists π0, d, d', k. 
-        erewrite (f_equal (exchanges_cp _ _)).
+      { iPureIntro. right. left. 
+        exists π0, d, d', k. 
+        erewrite (f_equal (exchanges_cp _)).
         { econstructor; eauto.
           simpl. lia. }
         simpl. reflexivity. }
@@ -705,8 +705,8 @@ Section ObligationsRepr.
  
       rewrite bi.sep_comm -!bi.sep_assoc.
       iSplitR.
-      { iPureIntro. exists ζ. 
-        red. do 4 right. left. exists sid, π0. do 2 eexists. 
+      { iPureIntro. left. exists ζ. 
+        red. do 3 right. left. exists sid, π0. do 2 eexists. 
         erewrite (f_equal (creates_ep _ _)).
         { econstructor; eauto.
           - simpl. by apply elem_of_dom. }
@@ -767,8 +767,8 @@ Section ObligationsRepr.
       rewrite /cp /cps_repr /eps_repr. 
       rewrite bi.sep_comm -bi.sep_assoc.
       iSplitR.
-      { iPureIntro. exists ζ. 
-        red. do 5 right. left. do 3 eexists. 
+      { iPureIntro. left. exists ζ. 
+        red. do 4 right. do 3 eexists. 
         erewrite (f_equal (expects_ep _ _)).
         { econstructor.
           { apply PH. }
@@ -856,19 +856,18 @@ Section ObligationsRepr.
       rewrite /OU /OU'. iIntros "% MSI".
       iMod ("OU'" with "[$]") as "(%&?&[% %]&?)". iModIntro.
       iExists _. iFrame. iPureIntro.
-      red. eexists. left. eauto.
+      left. eexists. left. eauto. 
     Qed.
 
     (* actually the locale doesn't matter here, but we need to provide some according to the definition of loc_step_ex.
        In fact, the only place where it matters is last burning fuel step and fork.
        TODO: remove locale parameter from the cases of loc_step_ex, rename it *)
-    Lemma increase_eb_upd τ n π q:
-      ⊢ exc_lb n -∗ th_phase_frag τ π q -∗ OU (exc_lb (S n) ∗ th_phase_frag τ π q).
+    Lemma increase_eb_upd n:
+      ⊢ exc_lb n -∗ OU (exc_lb (S n)).
     Proof using.
       clear H1 H0 H. 
-      rewrite /OU /OU'. iIntros "EB PH %δ MSI".
+      rewrite /OU /OU'. iIntros "EB %δ MSI".
       iDestruct (exc_lb_msi_bound with "[$] [$]") as %LB. iClear "EB".
-      iDestruct (th_phase_msi_frag with "[$] [$]") as "%".
       rewrite {1}/obls_msi. iDestruct "MSI" as "(?&?&?&?&?&EE)".
       destruct δ. simpl. iFrame. simpl in *.
       iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _). 
@@ -876,10 +875,9 @@ Section ObligationsRepr.
       
       rewrite bi.sep_comm -bi.sep_assoc.  
       iSplitR.
-      { iPureIntro. exists τ. 
-        red. repeat right.
-        erewrite (f_equal (increases_eb _ _)).
-        { econstructor; eauto. simpl. eapply elem_of_dom; eauto. }
+      { iPureIntro. right. right. 
+        erewrite (f_equal (increases_eb _)).
+        { econstructor; eauto. }
         simpl. reflexivity. }
 
       rewrite -own_op cmra_comm. 
@@ -909,28 +907,27 @@ Section ObligationsRepr.
       iApply (OU'_mod with "[$] [$]").
     Qed.
 
-    Lemma increase_eb_upd_rep τ n π q k:
-      ⊢ exc_lb n -∗ th_phase_frag τ π q -∗ OU_rep k (exc_lb (n + k) ∗ th_phase_frag τ π q).
+    Lemma increase_eb_upd_rep n k:
+      ⊢ exc_lb n -∗ OU_rep k (exc_lb (n + k)).
     Proof using.
       clear H1 H0 H.
-      iIntros "EB PH".
+      iIntros "EB".
       iInduction k as [| k] "IH" forall (n); simpl.
       { iFrame "#∗". rewrite Nat.add_0_r.
-        iIntros. iExists _. by iFrame. }      
+        iIntros (?) "?". iExists _. by iFrame. }      
       iApply (OU_wand with "[]").
-      2: { iApply (increase_eb_upd with "[$] [$]"). }
-      iIntros "[EB PH]". iApply (OU_rep_wand with "[]").
-      2: { iApply ("IH" with "[$] [$]"). }
+      2: { iApply (increase_eb_upd with "[$]"). }
+      iIntros "EB". iApply (OU_rep_wand with "[]").
+      2: { iApply ("IH" with "[$]"). }
       rewrite Nat.add_succ_comm. set_solver.
     Qed.
 
-    Lemma increase_eb_upd_rep0 τ π q k:
-      ⊢ th_phase_frag τ π q -∗ OU_rep k (exc_lb k ∗ th_phase_frag τ π q).
+    Lemma increase_eb_upd_rep0 k:
+      ⊢ OU_rep k (exc_lb k).
     Proof using.
       clear H1 H0 H.
-      iIntros "PH".
       iApply (OU_rep_mod _ _ (exc_lb 0)).
-      2: { iIntros. rewrite -{2}(Nat.add_0_l k). iApply (increase_eb_upd_rep with "[$] [$]"). }
+      2: { iIntros. rewrite -{2}(Nat.add_0_l k). iApply (increase_eb_upd_rep with "[$]"). }
       iIntros "% (?&?&?&?&?&EX)".
       rewrite mono_nat_auth_lb_op. iDestruct "EX" as "[??]". iFrame.
       iApply (exc_lb_le with "[$]"). lia.
