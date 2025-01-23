@@ -8,7 +8,7 @@ From trillium.fairness.lawyer Require Import sub_action_em program_logic action_
 From trillium.fairness.heap_lang Require Export heap_lang_defs tactics notation sswp_logic locales_helpers_hl.
 
 
-Close Scope Z. 
+Close Scope Z.
 
 (* some lemmas about heap lang rely on concrete instances of EqDecision and Countable *)
 (* TODO: find better solution *)
@@ -31,6 +31,129 @@ Global Instance LocaleOP
 Proof using.
   esplit; try by apply OPRE. apply CNT.
 Defined.                 
+
+
+Section BOU.
+  Context `{OfeDiscrete DegO} `{OfeDiscrete LevelO}.
+  Context `{@LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}. 
+  
+  Let Degree := ofe_car DegO.
+  Let Level := ofe_car LevelO.
+  
+  (* Context `{OP: ObligationsParams Degree Level (locale heap_lang) LIM_STEPS}. *)
+  Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}.
+  Let OP := LocaleOP (Locale := locale heap_lang).
+  Existing Instance OP. 
+  Let OM := ObligationsModel.
+  
+  Context {Σ: gFunctors}.
+  Context {invs_inΣ: invGS_gen HasNoLc Σ}.
+
+  Let OAM := ObligationsAM. 
+  Let ASEM := ObligationsASEM.
+
+  Goal @asem_GS _ _ ASEM Σ = ObligationsGS (OP := OP) Σ.
+    reflexivity.
+  Abort. 
+
+  (* Keeping the more general interface for future developments *)
+  Context {oGS': @asem_GS _ _ ASEM Σ}.
+  Let oGS: ObligationsGS (OP := OP) Σ := oGS'.
+  Existing Instance oGS. 
+  
+  Definition obls_msi_interim (δ: amSt OAM) (k: nat): iProp Σ :=
+    ∃ δ__k, obls_msi δ__k ∗ ⌜ nsteps (fun p1 p2 => loc_step_ex p1 p2) k δ δ__k ⌝.
+
+  Lemma obls_msi_interim_progress δ n τ π' deg
+    (BOUND: n <= LIM_STEPS)
+    (LE: exists π, ps_phases δ !! τ = Some π /\ phase_le π' π):
+    ⊢ obls_msi_interim δ n -∗ cp π' deg ==∗
+      ∃ δ', obls_msi δ' ∗ ⌜ progress_step δ τ δ' ⌝.
+  Proof.
+    iIntros "MSI' cp".
+    rewrite /obls_msi_interim.
+    
+    iDestruct "MSI'" as (δ__k) "(MSI&%TRANSS)".
+    destruct LE as (π__max & PH & LE0).
+    
+    iMod (burn_cp_upd_impl with "[$] [$]") as "X".
+    { eexists. split; eauto.
+      rewrite -PH.
+      unshelve eapply (pres_by_loc_step_implies_rep _ _ _ _ _) in TRANSS.
+      { eapply loc_step_phases_pres. }
+      3: reflexivity.
+      2: { rewrite TRANSS. reflexivity. } 
+    }
+    iDestruct "X" as "(%δ' & MSI & [%π__b %BURNS])". 
+    iModIntro. iExists _. iFrame.
+
+    iPureIntro. eexists. split; eauto.
+    eexists. split; eauto.
+  Qed.
+    
+  Lemma obls_msi_interim_omtrans_nofork δ n τ π' deg
+    (BOUND: n <= LIM_STEPS)
+    (LE: exists π, ps_phases δ !! τ = Some π /\ phase_le π' π):
+    ⊢ obls_msi_interim δ n -∗ cp π' deg ==∗
+      ∃ δ', obls_msi δ' ∗ ⌜ om_trans δ τ δ' ⌝.
+  Proof.
+    iIntros "MSI' cp".
+    iMod (obls_msi_interim_progress with "[$] [$]") as (?) "(?&%PSTEP)".
+    all: eauto.
+    iModIntro. iExists _. iFrame. iPureIntro.
+    eexists. split; eauto.
+    right.
+  Qed. 
+
+  Lemma obls_msi_interim_omtrans_fork δ n τ τ' π deg R R'
+    (BOUND: n <= LIM_STEPS)
+    (FRESH: τ' ∉ dom $ ps_phases δ)
+    (WF: om_st_wf δ):
+      ⊢ obls_msi_interim δ n -∗ cp π deg  -∗ obls τ R -∗ th_phase_eq τ π ==∗
+        ∃ δ' π1 π2,
+          obls_msi δ' ∗
+          obls τ (R ∖ R') ∗ th_phase_eq τ π1 ∗
+          obls τ' (R ∩ R') ∗ th_phase_eq τ' π2 ∗
+          ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝ ∗ ⌜ om_trans δ τ δ' ⌝.
+  Proof using.
+    clear H1 H0 H.
+    iIntros "MSI' CP OB PH".
+    rewrite /obls_msi_interim. 
+    iDestruct "MSI'" as (δ__k) "(MSI&%TRANSS)".
+    iDestruct (th_phase_msi_frag with "[$] [$]") as "%PH".
+
+    pose proof TRANSS as PH_EQ. 
+    unshelve eapply (pres_by_loc_step_implies_rep _ _ _ _ _) in PH_EQ.
+    { eapply loc_step_phases_pres. }
+    2: reflexivity.
+    
+    iMod (obls_msi_interim_progress _ _ τ with "[MSI] [$]") as (?) "(MSI&%PSTEP)".
+    3: { iExists _. iFrame. eauto. }
+    { eauto. }
+    { rewrite -PH_EQ. eexists. split; eauto. reflexivity. }      
+
+    iMod (fork_locale_upd_impl with "[$] [$] [$]") as "Y"; eauto.
+    { unshelve eapply (pres_by_loc_step_implies_progress _ _ _ _ _) in PSTEP.
+      { eapply loc_step_phases_pres. }
+      3: reflexivity.
+      2: { rewrite -PSTEP in FRESH. apply FRESH. }
+    }
+    { eapply pres_by_loc_step_implies_progress; eauto.
+      { apply loc_step_dpo_pres. }
+      apply WF. }
+    
+    iDestruct "Y" as "(%δ'' & %π1 & %π2 & MSI & PH1 & PH3 & OB1 & OB2 & %FORKS & [%LT1 %LT2])".
+    iModIntro. do 3 iExists _. iFrame. iPureIntro. split; eauto.
+    eexists. split; eauto.
+    left. red. eauto.
+  Qed.
+
+  Definition BOU E b (P: iProp Σ): iProp Σ :=
+      ∀ δ k,
+      obls_msi_interim δ k ={E}=∗
+      ∃ k', obls_msi_interim δ k' ∗ ⌜ k' - k <= b ⌝ ∗ P. 
+  
+End BOU.
 
 
 Section ProgramLogic.
@@ -295,11 +418,6 @@ Section ProgramLogic.
       rewrite /AM_st_interp_interim.
       iDestruct "TI'" as "(MSI&%STEP&%FORK)". iFrame. 
 
-      (* iDestruct (th_phase_msi_ge with "[MSI] [$]") as %(π__max & PH & LE0). *)
-      iDestruct "MSI" as "(MSI&%OBLS&%DPO)".
-      iDestruct (th_phase_msi_frag with "[$] [$]") as "%PH".
-      (* { rewrite /AM_st_interp_interim. *)
-      (*   simpl. iDestruct "TI'" as "((?&?&?)&?&?)". iFrame. } *)
       iSpecialize ("BMU" with "[$]").
       iSpecialize ("BMU" $! c c' δ ζ 0 None with "[MSI]").
       { rewrite /OAM_st_interp_interim_step /AM_st_interp_interim.
