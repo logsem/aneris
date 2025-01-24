@@ -880,7 +880,7 @@ Section Ticketlock.
     l__ow ↦{/ 2} #(ow + 1)%nat -∗ rel_tok -∗
     BOU (⊤ ∖ ↑fl_ι) c (held_auth next ∗ l__ow ↦{/ 2} #(ow + 1)%nat ∗
                         (⌜ next = false ⌝ → rel_tok) ∗
-                        tau_map_interp lk c (ow + 1) TM) (oGS' := oGS').
+                        tau_map_interp lk c (ow + 1) TM).
   Proof using.
     clear fl_degs_wl0 d__w ODl ODd LEl OBLS_AMU.
     iIntros "TMI AUTH LOW RTOK". rewrite /tau_map_interp.
