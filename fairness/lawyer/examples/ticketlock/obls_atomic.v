@@ -62,7 +62,7 @@ Section TotalTriples.
                         PH q' ∗ ⌜ Qp.le q' q0 ⌝ ∗
                       (∃ r__p, RR r__p ∗ (⌜ r__p = Some r ⌝ ∨ cp π d__h)) ∗
                       ⌜ ¬ TGT x ⌝ -∗
-                      BMU ∅ c (oGS' := oGS) (
+                      BOU ∅ c (
                         RR (Some r) ∗ cp π d__l ∗ PH q' ∗
                         obls τ O' ∗
                         abort
@@ -73,7 +73,7 @@ Section TotalTriples.
                ⌜ TGT x ⌝ ∗ obls τ O
                  ∗ PH q' ∗ ⌜ Qp.le q' q0 ⌝
                  -∗
-               BMU ∅ c (oGS' := oGS) (
+               BOU ∅ c (
                  ∀ y, Q y x ={∅, ε}=∗ from_option PH ⌜ True ⌝ (Qp.sub q0 q') -∗ Φ y x)) ∧
               abort
       ).
@@ -89,7 +89,7 @@ Section TotalTriples.
         iSplit; [| iSplit].
         - iIntros (??) "X". iDestruct "T1" as "[T1 _]".
           iSpecialize ("T1" with "[$]").
-          iApply (BMU_wand with "[-T1]"); [| done].
+          iApply (BOU_wand with "[-T1]"); [| done].
           iIntros "(?&?&?&?&AB)". iFrame.
           iIntros "?". iMod ("AB" with "[$]"). by iApply "V12".
         - iDestruct "T1" as "[_ [T1 _]]". done.
@@ -141,7 +141,7 @@ Section TotalTriples.
       iMod "TAU" as (?) "[P T1]". iModIntro. iExists _. iFrame "P".
       iSplit; [| iSplit].
     - iIntros (??) "X". iDestruct "T1" as "[T1 _]".
-      iApply (BMU_wand with "[]").
+      iApply (BOU_wand with "[]").
       2: { iApply "T1". iDestruct "X" as "(?&?&?&?&X&?)". iFrame.
            iDestruct "X" as (?) "(?&?)". iExists _. iFrame.
            iSpecialize ("EQ_RR" $! r__p). by iRewrite "EQ_RR". }
@@ -150,7 +150,7 @@ Section TotalTriples.
       iRewrite "EQ_V" in "VV". iFrame. 
     - iDestruct "T1" as "[_ [T1 _]]".
       iIntros (?) "(%&?&?)".
-      iApply (BMU_wand with "[]").
+      iApply (BOU_wand with "[]").
       2: { iApply "T1". iFrame. done. }
       iIntros "P". iFrame. iIntros (?) "?". iSpecialize ("P" with "[$]").
       iMod "P". iModIntro. by iRewrite -("EQ_Φ" $! y x).

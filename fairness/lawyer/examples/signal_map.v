@@ -50,35 +50,35 @@ Section SignalMap.
   Qed.
 
   Lemma init_smap_repr `{SigMapPreG Σ, invGS_gen HasNoLc Σ} τ R B (D: gset nat):
-    obls τ R -∗ BMU ∅ (2 * size D) (∃ smap (SMG: SigMapG Σ), 
-          smap_repr B smap ∗ ⌜ dom smap = D ⌝ ∗ obls τ (R ∪ map_img (filter (fun '(i, _) => B i = false) smap))) (oGS' := oGS).
+    obls τ R -∗ BOU ∅ (2 * size D) (∃ smap (SMG: SigMapG Σ), 
+          smap_repr B smap ∗ ⌜ dom smap = D ⌝ ∗ obls τ (R ∪ map_img (filter (fun '(i, _) => B i = false) smap))) (oGS := oGS).
   Proof using LEQUIV__l DISCR__l .
     clear DISCR__d.
     iIntros "OB".
-    iAssert (BMU ∅ (2 * size D) (∃ smap, ⌜ dom smap = D ⌝ ∗ obls τ (R ∪ map_img (filter (fun '(i, _) => B i = false) smap)) ∗ [∗ map] i ↦ s ∈ smap, ex_ith_sig B i s))%I with "[OB]" as "SIGS".
+    iAssert (BOU ∅ (2 * size D) (∃ smap, ⌜ dom smap = D ⌝ ∗ obls τ (R ∪ map_img (filter (fun '(i, _) => B i = false) smap)) ∗ [∗ map] i ↦ s ∈ smap, ex_ith_sig B i s))%I with "[OB]" as "SIGS".
     { iInduction D as [| i D FRESH] "IH" using set_ind_L forall (R). 
-      { iApply BMU_intro. iExists ∅.
+      { iApply BOU_intro. iExists ∅.
         rewrite big_opM_empty. iSplit; [iPureIntro; set_solver| ].
         rewrite map_img_empty_L union_empty_r_L. set_solver. }
       rewrite size_union; [| set_solver].
       rewrite Nat.mul_add_distr_l. rewrite size_singleton. simpl. 
-      iApply OU_BMU. iApply (OU_wand with "[-OB]").
+      iApply OU_BOU. iApply (OU_wand with "[-OB]").
       2: { iApply (OU_create_sig _ _ (L i) with "OB"). }
       iIntros "(%sid & SIG & OB & %FRESH_SID)".
-      iAssert (BMU ∅ 1 (sgn sid (L i) (Some $ B i) ∗ obls τ (R ∪ if B i then ∅ else {[sid]})))%I with "[-]" as "SET".
+      iAssert (BOU ∅ 1 (sgn sid (L i) (Some $ B i) ∗ obls τ (R ∪ if B i then ∅ else {[sid]})))%I with "[-]" as "SET".
       { destruct (B i).
-        2: { iApply BMU_intro. iFrame. }
-        iApply OU_BMU. iApply (OU_wand with "[]").
+        2: { iApply BOU_intro. iFrame. }
+        iApply OU_BOU. iApply (OU_wand with "[]").
         2: { iApply (OU_set_sig with "[$] [$]"). set_solver. }
-        iIntros "[SIG OB]". iApply BMU_intro. iFrame.
+        iIntros "[SIG OB]". iApply BOU_intro. iFrame.
         iApply obls_proper; [| by iFrame].
         set_solver. }
-      iApply (BMU_split _ _ 1). iApply (BMU_wand with "[-SET] [$]").
+      iApply (BOU_split _ _ 1). iApply (BOU_wand with "[-SET] [$]").
       iIntros "[SIG OB]".
 
       rewrite Nat.add_0_r.
       iSpecialize ("IH" with "[$]").
-      iApply (BMU_wand with "[-IH] [$]").
+      iApply (BOU_wand with "[-IH] [$]").
       iIntros "(%smap & %DOM & OB & SIGS)". 
       iExists (<[ i := sid ]> smap).
       iSplit.
@@ -96,11 +96,11 @@ Section SignalMap.
       rewrite big_opM_insert; [| apply not_elem_of_dom; congruence].
       iFrame. }
 
-    rewrite {2}(plus_n_O (2 * _)). iApply BMU_split.
-    iApply (BMU_wand with "[] [$]"). iIntros "(%smap & %DOM & OB & SIGS)".
+    rewrite {2}(plus_n_O (2 * _)). iApply BOU_split.
+    iApply (BOU_wand with "[] [$]"). iIntros "(%smap & %DOM & OB & SIGS)".
     iMod (own_alloc (● ((to_agree <$> smap): gmapUR nat (agreeR SignalId)) ⋅ ◯ _)) as (γ) "[A F]".
     { apply auth_both_valid_2; [| reflexivity]. apply map_nat_agree_valid. }
-    iApply BMU_intro.
+    iApply BOU_intro.
     iExists _, {| sm_γ__smap := γ |}. by iFrame.
   Qed.
 
@@ -277,25 +277,25 @@ Section SignalMap.
     eapply elem_of_dom; eauto. 
   Qed.
 
-  Lemma BMU_smap_extend `{invGS_gen HasNoLc Σ} τ m smap R
+  Lemma BOU_smap_extend `{invGS_gen HasNoLc Σ} τ m smap R
     (B B': nat -> bool)
     (PRES: forall i, i ∈ dom smap -> B' i = B i)
     (FRESH_UNSET: B' m = false)
     (FRESH: m ∉ dom smap)
     :
     ⊢ obls τ R -∗ smap_repr B smap -∗
-      BMU ∅ 1 (
+      BOU ∅ 1 (
         |==> (∃ s',
              smap_repr B' (<[m := s']> smap) ∗
              ith_sig m s' ∗ obls τ (R ∪ {[s']}) ∗
-             ⌜ s' ∉ R ⌝ ∗ sgn s' (L m) None)) (oGS' := oGS).
+             ⌜ s' ∉ R ⌝ ∗ sgn s' (L m) None)).
     Proof using LEQUIV__l DISCR__l DISCR__d.
       iIntros "OBLS SM".
-      iApply OU_BMU.
+      iApply OU_BOU.
       iDestruct (OU_create_sig with "OBLS") as "FOO".
       iApply (OU_wand with "[-FOO]"); [| by iFrame].
       iIntros "(%s' & SG & OBLS & %NEW)".
-      iApply BMU_intro.
+      iApply BOU_intro.
       rewrite /smap_repr. iDestruct "SM" as "(SM & SIGS)".
       iMod (own_update with "SM") as "SM".
       { apply auth_update_alloc. eapply (alloc_singleton_local_update _ m (to_agree s')).

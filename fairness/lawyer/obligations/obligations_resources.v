@@ -1,10 +1,9 @@
-From iris.proofmode Require Import tactics.
-From iris.base_logic Require Import own ghost_map.
-From iris.algebra Require Import auth gmap gset excl gmultiset big_op mono_nat gmap_view.
-From trillium.fairness Require Import (* fairness *) locales_helpers utils.
-From trillium.fairness.lawyer.obligations Require Import obligations_model. 
 From stdpp Require Import namespaces. 
-From trillium.fairness.lawyer.obligations Require Import obls_utils.
+From iris.proofmode Require Import tactics.
+From iris.base_logic Require Import own ghost_map fancy_updates.
+From iris.algebra Require Import auth gmap gset excl gmultiset big_op mono_nat gmap_view.
+From trillium.fairness Require Import locales_helpers utils.
+From trillium.fairness.lawyer.obligations Require Import obligations_model obls_utils obligations_wf.
 
 Section ObligationsRepr.
   Context {DegO LevelO: ofe}.
@@ -155,12 +154,6 @@ Section ObligationsRepr.
       rewrite /sgns_levels_rel. set_solver.
     Qed.
 
-    (* Lemma sgns_level_gt'_empty R: *)
-    (*   ⊢ sgns_level_gt' R ∅. *)
-    (* Proof using. *)
-    (*   rewrite /sgns_level_gt'. by rewrite big_sepS_empty. *)
-    (* Qed. *)
-    
     Global Instance sgns_levels_rel'_Proper rel:
       Proper (equiv ==> equiv ==> equiv) (sgns_levels_rel rel).
     Proof using. solve_proper. Qed.
@@ -998,6 +991,215 @@ Section ObligationsRepr.
         rewrite lookup_insert_ne.
         2: { intros <-. destruct FRESH. by apply elem_of_dom. }
         rewrite lookup_fmap. by rewrite not_elem_of_dom_1.  
+    Qed.
+
+
+    (***** Bounded obligations update *****)
+    
+    Definition obls_msi_interim δ (k: nat): iProp Σ :=
+      ∃ δ__k, obls_msi δ__k ∗ ⌜ nsteps (fun p1 p2 => loc_step_ex p1 p2) k δ δ__k ⌝.
+
+    Lemma obls_msi_interim_progress δ n τ π' deg
+      (BOUND: n <= LIM_STEPS)
+      (LE: exists π, ps_phases δ !! τ = Some π /\ phase_le π' π):
+      ⊢ obls_msi_interim δ n -∗ cp π' deg ==∗
+        ∃ δ', obls_msi δ' ∗ ⌜ progress_step δ τ δ' ⌝.
+    Proof.
+      iIntros "MSI' cp".
+      rewrite /obls_msi_interim.
+      
+      iDestruct "MSI'" as (δ__k) "(MSI&%TRANSS)".
+      destruct LE as (π__max & PH & LE0).
+      
+      iMod (burn_cp_upd_impl with "[$] [$]") as "X".
+      { eexists. split; eauto.
+        rewrite -PH.
+        unshelve eapply (pres_by_loc_step_implies_rep _ _ _ _ _) in TRANSS.
+        { eapply loc_step_phases_pres. }
+        3: reflexivity.
+        2: { rewrite TRANSS. reflexivity. } 
+      }
+      iDestruct "X" as "(%δ' & MSI & [%π__b %BURNS])". 
+      iModIntro. iExists _. iFrame.
+
+      iPureIntro. eexists. split; eauto.
+      eexists. split; eauto.
+    Qed.
+    
+    Lemma obls_msi_interim_omtrans_fork δ n τ τ' π deg R R'
+      (BOUND: n <= LIM_STEPS)
+      (FRESH: τ' ∉ dom $ ps_phases δ)
+      (DPO: dom_phases_obls δ)
+      :
+      ⊢ obls_msi_interim δ n -∗ cp π deg  -∗ obls τ R -∗ th_phase_eq τ π ==∗
+        ∃ δ' π1 π2,
+          obls_msi δ' ∗
+            obls τ (R ∖ R') ∗ th_phase_eq τ π1 ∗
+            obls τ' (R ∩ R') ∗ th_phase_eq τ' π2 ∗
+            ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝ ∗
+                                ⌜ rel_compose (flip progress_step τ) (fork_step_of τ) δ δ' ⌝.
+    Proof using.
+      clear H1 H0 H.
+      iIntros "MSI' CP OB PH".
+      rewrite /obls_msi_interim. 
+      iDestruct "MSI'" as (δ__k) "(MSI&%TRANSS)".
+      iDestruct (th_phase_msi_frag with "[$] [$]") as "%PH".
+
+      pose proof TRANSS as PH_EQ. 
+      unshelve eapply (pres_by_loc_step_implies_rep _ _ _ _ _) in PH_EQ.
+      { eapply loc_step_phases_pres. }
+      2: reflexivity.
+      
+      iMod (obls_msi_interim_progress _ _ τ with "[MSI] [$]") as (?) "(MSI&%PSTEP)".
+      3: { iExists _. iFrame. eauto. }
+      { eauto. }
+      { rewrite -PH_EQ. eexists. split; eauto. reflexivity. }      
+
+      iMod (fork_locale_upd_impl with "[$] [$] [$]") as "Y"; eauto.
+      { unshelve eapply (pres_by_loc_step_implies_progress _ _ _ _ _) in PSTEP.
+        { eapply loc_step_phases_pres. }
+        3: reflexivity.
+        2: { rewrite -PSTEP in FRESH. apply FRESH. }
+      }
+      { eapply pres_by_loc_step_implies_progress; eauto.
+        apply loc_step_dpo_pres. }
+      
+      iDestruct "Y" as "(%δ'' & %π1 & %π2 & MSI & PH1 & PH3 & OB1 & OB2 & %FORKS & [%LT1 %LT2])".
+      iModIntro. do 3 iExists _. iFrame. iPureIntro. split; eauto.
+      eexists. split; eauto.
+      red. eauto.
+    Qed.
+
+    Context {invs_inΣ: invGS_gen HasNoLc Σ}.
+
+    Definition BOU E b (P: iProp Σ): iProp Σ :=
+      ∀ δ k, obls_msi_interim δ k ={E}=∗ ∃ k', obls_msi_interim δ k' ∗ ⌜ k' - k <= b ⌝ ∗ P. 
+
+    Lemma BOU_intro E b (P : iProp Σ):
+      ⊢ P -∗ BOU E b P.
+    Proof using.
+      rewrite /BOU. iIntros "**". 
+      iExists _. iFrame. iPureIntro. lia.
+    Qed.
+    
+    Global Instance BOU_proper:
+      Proper (equiv ==> eq ==> equiv ==> equiv) BOU.
+    Proof using. solve_proper. Qed.
+    
+    Lemma BOU_frame_l E b (P Q : iProp Σ):
+      ⊢ P -∗ BOU E b Q -∗ BOU E b (P ∗ Q).
+    Proof using.
+      rewrite /BOU. iIntros "P BOU **".
+      iMod ("BOU" with "[$]") as "(%&?&?&?)". iModIntro.
+      iExists _. iFrame.
+    Qed.
+    
+    Lemma BOU_frame_r E b (P Q : iProp Σ):
+      ⊢ Q -∗ BOU E b P -∗ BOU E b (P ∗ Q).
+    Proof using.
+      rewrite bi.sep_comm. iApply BOU_frame_l.
+    Qed.
+    
+    Lemma BOU_weaken E1 E2 m1 m2 P1 P2
+      (LE: m1 <= m2)
+      (SUB: E1 ⊆ E2):
+      ⊢ (P1 -∗ P2) -∗ BOU E1 m1 P1 -∗ BOU E2 m2 P2.
+    Proof using.
+      rewrite /BOU.
+      iIntros "IMPL BOU". iIntros "**".
+      iApply fupd_mask_mono; [apply SUB| ].
+      iMod ("BOU" with "[$]") as (?) "(? & % & ?)". iModIntro.
+      iExists _. iFrame. iSplitR.
+      { iPureIntro. lia. }
+      by iApply "IMPL".
+    Qed.
+    
+    Lemma BOU_wand E b (P Q : iProp Σ):
+      ⊢ (P -∗ Q) -∗ BOU E b P -∗ BOU E b Q.
+    Proof using.
+      iIntros "**". by iApply (BOU_weaken with "[$]").
+    Qed.
+    
+    Lemma BOU_lower E m n P (LE: m <= n):
+      ⊢ BOU E m P -∗ BOU E n P.
+    Proof using.
+      clear H1 H0 H.
+      iIntros "**". iApply (BOU_weaken); try done. set_solver.
+    Qed.
+    
+    Lemma BOU_invs E P n:
+      (|={E, ∅}=> BOU ∅ n (|={∅, E}=>P)) -∗ BOU E n P.
+    Proof using.
+      iIntros "BOU". rewrite /BOU. iIntros.
+      iMod "BOU". iMod ("BOU" with "[$]") as (?) "(SI & % & P)".
+      iMod "P". iModIntro. iExists _. by iFrame.
+    Qed.
+    
+    Lemma BOU_mask_comm E E' n Φ P
+      (SUB: E' ⊆ E):
+      (P -∗ BOU E n Φ) -∗ (|={E', E}=> P) -∗ BOU E' n (|={E', E}=> Φ).
+    Proof using.
+      iIntros "BOU CLOS".
+      rewrite /BOU. iIntros.
+      iMod "CLOS" as "P".
+      iSpecialize ("BOU" with "[$] [$]").
+      iMod "BOU" as (?) "(?&?&?)".
+      iApply fupd_mask_intro; [done| ].
+      iIntros "CLOS". iFrame. iExists _. iFrame.
+    Qed.
+
+    Lemma BOU_split E P n m:
+      ⊢ BOU E n (BOU E m P) -∗ BOU E (n + m) P.
+    Proof using.
+      iIntros "BOU1".
+      rewrite {1}/BOU. 
+      iIntros (δ k) "TI'".
+      iMod ("BOU1" with "[$]") as (t) "(TI' & %LE & BOU')".
+      iMod ("BOU'" with "[$]") as (v) "(TI' & %LE' & P)".
+      iModIntro. iExists _. iFrame. iPureIntro. lia. 
+    Qed.
+
+    Lemma OU_BOU E P b:
+      ⊢ OU (BOU E b P) -∗ BOU E (S b) P.
+    Proof using.
+      iIntros "OU". rewrite {2}/BOU /obls_msi_interim.
+      iIntros (δ n) "TI'".
+      iDestruct "TI'" as "(%δ_ & MSI & %TRANS1)".
+      rewrite /OU. iMod ("OU" with "[$]") as "(%δ' & MSI & %TRANS2 & CONT)".
+      
+      iSpecialize ("CONT" with "[MSI]").
+      { iExists _. iFrame. 
+        iPureIntro.
+        eapply rel_compose_nsteps_next. eexists. split; eauto. }
+      iMod "CONT" as "(%n' & TI' & %BOUND' & P)". iModIntro.
+      iExists _. iFrame.
+      iPureIntro. lia. 
+    Qed.
+
+    Lemma OU_BOU_rep E P b:
+      ⊢ OU_rep b P -∗ BOU E b P.
+    Proof using.
+      iIntros "OUs". iInduction b as [| b] "IH"; simpl.
+      { rewrite /BOU /obls_msi_interim.
+        iIntros (δ n) "TI'".
+        iDestruct "TI'" as "(%δ_ & MSI & %TRANS1)".
+        iMod ("OUs" with "[$]") as "(% & ? & -> & ?)".
+        iModIntro. iExists n. iFrame. iSplit; [| by rewrite Nat.sub_diag].        
+        iExists _. iFrame. eauto. }
+      iApply OU_BOU. iApply (OU_wand with "[-OUs] [$]"). done.
+    Qed.
+    
+    (* an example usage of OU+BOU *)
+    Lemma BOU_step_create_signal E ζ P b l R:
+      ⊢ (∀ sid, sgn sid l (Some false) -∗ obls ζ (R ∪ {[ sid ]}) -∗ BOU E b P) -∗ obls ζ R -∗ BOU E (S b) P.
+    Proof using.
+      iIntros "CONT OB".
+      iApply OU_BOU. iApply (OU_wand with "[CONT]").
+      { setoid_rewrite bi.wand_curry. rewrite -bi.exist_wand_forall.
+        iFrame. }
+      iPoseProof (OU_create_sig with "OB") as "OU".
+      iApply (OU_wand with "[-OU] [$]").
+      iIntros "(%&?&?&?)". iExists _. iFrame. 
     Qed.
 
   End Resources.

@@ -200,19 +200,19 @@ Section MotivatingClient.
       | Some r => ∃ s, ith_sig r s ∗ ep s π (fl_d__l FLP)
       end.
 
-    Lemma BMU_wait_owner τ π q O r m smap i
+    Lemma BOU_wait_owner τ π q O r m smap i
       (WAIT: r <= i):
       obls τ O ∗ sgns_levels_ge' O (fl_acq_lvls FLP)∗
       th_phase_frag τ π q ∗ RR__L π (Some i) ∗ smap_repr_cl r m smap ⊢
-      BMU ∅ 1 (cp π (fl_d__l FLP) ∗ th_phase_frag τ π q ∗
-          obls τ O ∗ smap_repr_cl r m smap) (oGS' := oGS').
+      BOU ∅ 1 (cp π (fl_d__l FLP) ∗ th_phase_frag τ π q ∗
+          obls τ O ∗ smap_repr_cl r m smap).
     Proof using LVL_ORDo L__FL ODl LEl.
       clear LS_LB CR_LIM.
       clear FL_STEPS.
       
       iIntros "(OBLS & #LVLS & PH & #RR & [SR %SR_DOM])".
       rewrite /RR__L. iDestruct "RR" as (s) "(#ITH & #EP)".  (* & %PH__e *)
-      iApply OU_BMU.
+      iApply OU_BOU.
       iApply (OU_wand with "[]").
       2: { rewrite /smap_repr_cl.
            iApply (ith_sig_expect (λ _, l__o) with "[$] [$] [$] [$] [$] []").
@@ -227,27 +227,27 @@ Section MotivatingClient.
            eapply strict_transitive_l; [| apply LE].
            1: apply LVL_ORDo.
            all: apply L__FL. }
-      iIntros "(?&?&?&?)". iApply BMU_intro.
+      iIntros "(?&?&?&?)". iApply BOU_intro.
       iFrame. iPureIntro. repeat split; try done.
     Qed.
 
-    Lemma BMU_create_wait_owner τ π q r m smap i
+    Lemma BOU_create_wait_owner τ π q r m smap i
       (DOM: i ∈ dom smap)
       :
       th_phase_frag τ π q ∗ cp π (fl_d__h FLP) ∗ smap_repr_cl r m smap ⊢
-      BMU ∅ 1 (th_phase_frag τ π q ∗ RR__L π (Some i) ∗
-                smap_repr_cl r m smap) (oGS' := oGS').
+      BOU ∅ 1 (th_phase_frag τ π q ∗ RR__L π (Some i) ∗
+                smap_repr_cl r m smap).
     Proof using LVL_ORDo L__FL ODd ODl LEl.
       iIntros "(PH & CP & [SR %SR_DOM])".
       rewrite /RR__L.
       
-      iApply OU_BMU.
+      iApply OU_BOU.
       iApply (OU_wand with "[]").
       2: { iApply (smap_create_ep (λ _, l__o) with "[$] [$] [$]").
            { done. }
            apply fl_degs_lh. }
 
-      iIntros "X". iMod "X" as "(%s&?&?&?&?)". iApply BMU_intro.
+      iIntros "X". iMod "X" as "(%s&?&?&?&?)". iApply BOU_intro.
       iFrame. iSplit; [| done]. iExists _. iFrame "#∗".
     Qed.
 
@@ -322,26 +322,26 @@ Section MotivatingClient.
 
       { iIntros (O' q') "(OB & #LVLS' & PH & %Q' & (%r' & #RR' & CASES) & %BB)".
         apply not_false_is_true in BB as ->.
-        (* TODO: don't unfold BMU *)
+        (* TODO: don't unfold BOU *)
         remember_goal.
         iDestruct "ST" as "[>(_ & (%s__o & [-> %SMAP__o])) | [>% ?]]"; [| done].
         iMod "LOCK_OW". iMod "SR".
         iApply "GOAL". iClear "GOAL".
 
-        iAssert (BMU ∅ 1 (RR__L π (Some r) ∗ th_phase_frag τ π q' ∗
+        iAssert (BOU ∅ 1 (RR__L π (Some r) ∗ th_phase_frag τ π q' ∗
                            smap_repr_cl r (r + 1) smap))%I with "[CASES PH SR]" as "EXP".
         { iDestruct "CASES" as "[-> | RR]".
-          { iApply BMU_intro. iFrame "#∗". }
-          iApply (BMU_wand with "[]").
-          2: { iApply BMU_create_wait_owner; [..| iFrame "#∗"].
+          { iApply BOU_intro. iFrame "#∗". }
+          iApply (BOU_wand with "[]").
+          2: { iApply BOU_create_wait_owner; [..| iFrame "#∗"].
                eapply elem_of_dom; eauto. }
           iIntros "(?&?&?)". iFrame. }
 
-        iApply (BMU_split _ _ 1 _). iApply (BMU_wand with "[-EXP] EXP").
+        iApply (BOU_split _ _ 1 _). iApply (BOU_wand with "[-EXP] EXP").
         iIntros "(#RR & PH & SR)".
-        iApply (BMU_lower _ 1); [unfold c__cl; lia| ].
-        iApply (BMU_wand with "[-OB PH SR]").
-        2: { iApply BMU_wait_owner; [..| iFrame "#∗"]. all: done. }
+        iApply (BOU_lower _ 1); [unfold c__cl; lia| ].
+        iApply (BOU_wand with "[-OB PH SR]").
+        2: { iApply BOU_wait_owner; [..| iFrame "#∗"]. all: done. }
         iIntros "(CP & PH & OB & SR)".
         iFrame "#∗". iIntros "[LK %]".
         iMod "CLOS'" as "_".
@@ -357,14 +357,14 @@ Section MotivatingClient.
         iApply "GOAL". iClear "GOAL".
 
         rewrite Nat.add_0_r in DOM.
-        iApply (BMU_split _ _ 1).
-        iApply (BMU_wand with "[-OB SR]").
-        2: { iApply (BMU_smap_extend (λ _, l__o) _ r with "[$] [$]").
+        iApply (BOU_split _ _ 1).
+        iApply (BOU_wand with "[-OB SR]").
+        2: { iApply (BOU_smap_extend (λ _, l__o) _ r with "[$] [$]").
              { intros. reflexivity. }
              { simpl. apply Nat.ltb_irrefl. }
              rewrite DOM. intros ?%elem_of_set_seq. lia. }
         iIntros "X". iMod "X" as "(%s' & SR & #SIGr & OB & %FRESH' & #SGNo)".
-        iApply BMU_intro. iFrame.
+        iApply BOU_intro. iFrame.
         iIntros ([[??]?]) "[LK (%X & % & %)]".
         simpl in *. inversion X. subst.
         iMod "CLOS'" as "_".
@@ -427,14 +427,14 @@ Section MotivatingClient.
           th_phase_eq τ π ∗ cp π (fl_d__m FLP) ∗
           P__lock flag s__f f ∗ fl_release_token FL (FLG := FLG) ∗ lock_owner_frag (Some s__o) ∗
           (∀ q, ⌜ Qp.le q 1 ⌝ -∗ th_phase_frag τ π q -∗ obls τ Ob -∗
-           BMU ∅ 3 (((Qp.sub 1%Qp q) ≫= Some ∘ th_phase_frag τ π) -∗? Q) (oGS' := oGS'))
+           BOU ∅ 3 (((Qp.sub 1%Qp q) ≫= Some ∘ th_phase_frag τ π) -∗? Q))
       }}}
         (fl_release FLP) lk @ τ
       {{{ v, RET v; Q }}}.
     Proof using All.
       iIntros (Φ).
       pose proof (fl_is_lock_pers FL lk c__cl (FLG := FLG)) as PERS. (* TODO: why Existing Instance doesn't work? *)
-      iIntros "(#LOCK & #INV & #SGT & #SGNo & OB & PH & CPm & P & RT & LOCKED & FIN_BMU) POST".
+      iIntros "(#LOCK & #INV & #SGT & #SGNo & OB & PH & CPm & P & RT & LOCKED & FIN_BOU) POST".
 
       iApply (wp_step_fupd _ _ ⊤ _ _ with "[POST]").
       { done. }
@@ -459,7 +459,7 @@ Section MotivatingClient.
       4: { iSplit; [| iAccu].
            iCombine "INV" as "X". iApply "X". }
       1, 2: by apply _.
-      iIntros "(#INV & P & LOCKED & FIN_BMU)".
+      iIntros "(#INV & P & LOCKED & FIN_BOU)".
       iInv "INV" as "inv" "CLOS".
       iDestruct "inv" as (r b oo smap) "(LK & >LOCK_OW & >ST & >SR)".
 
@@ -489,7 +489,7 @@ Section MotivatingClient.
            iLeft. iSplit; [done| ]. eauto. }
       { iIntros (??) "(?&?&?&?&?&%)". done. }
       { iIntros "% (_ & OB & PH & %Q')".
-        iApply OU_BMU.
+        iApply OU_BOU.
         iApply (OU_wand with "[-OB SR]").
         2: { iApply (smap_set_sig (λ _, l__o) with "[$] [$] [$]").
              { Unshelve. 2: exact (flip Nat.ltb (S r)).
@@ -505,8 +505,8 @@ Section MotivatingClient.
         rewrite difference_union_distr_l_L difference_diag_L.
         rewrite union_empty_r_L (difference_disjoint_L Ob); [| set_solver].
 
-        iSpecialize ("FIN_BMU" with "[//][$] [$]").
-        iApply (BMU_wand with "[-FIN_BMU] [$]").
+        iSpecialize ("FIN_BOU" with "[//][$] [$]").
+        iApply (BOU_wand with "[-FIN_BOU] [$]").
         iIntros "FIN".
         
         iIntros (st). destruct st as ((?&?)&?).
@@ -564,10 +564,10 @@ Section MotivatingClient.
       iSplitL "SET".
       { iRight. by iFrame. }
       iIntros (?) "%QQ PH OB".
-      iApply OU_BMU. iApply (OU_wand with "[-OB SGNf]").
+      iApply OU_BOU. iApply (OU_wand with "[-OB SGNf]").
       2: { iApply (OU_set_sig with "[$] [$]"). set_solver. }
       iIntros "[SGNf OB]". rewrite difference_diag_L.
-      iApply BMU_intro. simpl.
+      iApply BOU_intro. simpl.
 
       iIntros "PH'". iFrame.
       iDestruct (th_phase_frag_combine'' with "[$PH $PH']") as "foo"; [done| ].
@@ -705,7 +705,7 @@ Section MotivatingClient.
            iLeft. iSplit; [done| ]. eauto. }
       { iIntros (??) "(?&?&?&?&?&%)". done. }
       { iIntros "%q' (_ & OB & PH & %Q')".
-        iApply OU_BMU.
+        iApply OU_BOU.
         iApply (OU_wand with "[-OB SR]").
         2: { iApply (smap_set_sig (λ _, l__o) with "[$] [$] [$]").
              { Unshelve. 2: exact (flip Nat.ltb (S r)).
@@ -720,19 +720,19 @@ Section MotivatingClient.
         iIntros "[SR OB]".
         rewrite difference_diag_L.
 
-        iAssert (BMU ∅ 3 ((⌜f = true⌝ ∗ flag_set ∨ ⌜f = false⌝ ∗ cp_mul π (fl_d__m FLP) 3) ∗ P__lock flag s__f f ∗ obls τ ∅ ∗ th_phase_frag τ π q'))%I with "[P OB PH]" as "FIN".
+        iAssert (BOU ∅ 3 ((⌜f = true⌝ ∗ flag_set ∨ ⌜f = false⌝ ∗ cp_mul π (fl_d__m FLP) 3) ∗ P__lock flag s__f f ∗ obls τ ∅ ∗ th_phase_frag τ π q'))%I with "[P OB PH]" as "FIN".
         { rewrite /P__lock. destruct f.
           { iDestruct "P" as "[? [[% ?] | [_ #SET]]]"; [done| ].
-            iApply BMU_intro. iFrame.
+            iApply BOU_intro. iFrame.
             rewrite bi.or_comm. iSplitL ""; iRight; by iFrame "#∗". }
           iDestruct "P" as "[FLAG [[_ UNSET] | [% ?]]]"; [| done].
-          iApply OU_BMU_rep. iApply (OU_rep_wand with "[FLAG]").
+          iApply OU_BOU_rep. iApply (OU_rep_wand with "[FLAG]").
           2: { iApply (expect_sig_upd_rep with "EPf [$] [$] [] [$]").
                iApply empty_sgns_levels_rel. }
           iIntros "(CPSm & UNSET & OB & PH)". iFrame.
           rewrite bi.or_comm. iSplitL "CPSm"; iLeft; by iFrame "#∗". }
         
-        iApply (BMU_wand with "[-FIN] [$]"). iIntros "(FIN & P & OB & PH)". 
+        iApply (BOU_wand with "[-FIN] [$]"). iIntros "(FIN & P & OB & PH)". 
         iIntros (st). destruct st as ((?&?)&?).
         rewrite /release_at_post. simpl.
         iIntros "(LK & (->&->&->))".
@@ -838,12 +838,12 @@ Section MotivatingClient.
       - rewrite bool_decide_eq_false_2; [| done].
         pure_step_hl.
         split_cps "CPh" 1.
-        MU_by_BMU. iApply OU_BMU.
+        MU_by_BOU. iApply OU_BOU.
         iApply (OU_wand with "[-CPh']").
         2: { rewrite -cp_mul_1. iApply (exchange_cp_upd with "[$] [$]").
              1: reflexivity.
              apply LT0m. }
-        iIntros "CPSm". BMU_burn_cp. 
+        iIntros "CPSm". BOU_burn_cp. 
         iApply ("IH" with "[-POST]"); [| done]. iFrame "#∗".
     Qed.
 
@@ -867,24 +867,24 @@ Section MotivatingClient.
 
       wp_bind (ref _)%E.
       iApply sswp_MU_wp; [done| ]. iApply wp_alloc. iIntros "!> %c C _".
-      (* MU_by_BMU. *)
+      (* MU_by_BOU. *)
       iApply OBLS_AMU; [by rewrite nclose_nroot| ]. 
-      iApply (BMU_AMU with "[-PH] [$]").
+      iApply (BOU_AMU with "[-PH] [$]").
       { reflexivity. }
       iIntros "PH".
-      iApply BMU_lower; [apply LS_LB| ]. iApply OU_BMU.
+      iApply BOU_lower; [apply LS_LB| ]. iApply OU_BOU.
       split_cps "CPSm" 1. rewrite -!cp_mul_1.
       iApply (OU_wand with "[-CPSm PH]").
       2: { iApply (@create_ep_upd with "[$] [$] [$]").
            apply LThm. } (* TODO: rename that hypothesis *)
-      iIntros "(EPf & _ & PH)". iApply OU_BMU.
+      iIntros "(EPf & _ & PH)". iApply OU_BOU.
       iApply (OU_wand with "[-CPSm']").
       2: { iApply (exchange_cp_upd with "[$] [$]").
            1: reflexivity.
            apply LThm. }
       iIntros "CPSh".
       
-      BMU_burn_cp.
+      BOU_burn_cp.
 
       do 1 pure_step_cases.
 
@@ -915,23 +915,23 @@ Section MotivatingClient.
   Proof using All.
     iIntros (Φ) "(#EB & OB & PH & CPSr) POST". rewrite /client_prog.
     pure_step_hl. 
-    MU_by_BMU. iApply OU_BMU.
+    MU_by_BOU. iApply OU_BOU.
     split_cps "CPSr" 1. rewrite -cp_mul_1. iApply (OU_wand with "[-CPSr']").
     2: { iApply (exchange_cp_upd with "[$] [$]").
          1: reflexivity.
          etrans; [apply LT0m | apply LThm]. }
     iIntros "CPS".
     split_cps "CPSr" 1. rewrite -cp_mul_1.
-    iApply OU_BMU. iApply (OU_wand with "[-CPSr']").
+    iApply OU_BOU. iApply (OU_wand with "[-CPSr']").
     2: { iApply (exchange_cp_upd with "[$] [$]").
          1: reflexivity.
          apply LThm. }
     iIntros "CPSm".
-    iApply OU_BMU. iApply (OU_wand with "[-OB]").
+    iApply OU_BOU. iApply (OU_wand with "[-OB]").
     2: { iApply (OU_create_sig _ _ l__f with "OB"). }
     iIntros "(%s__f & SGNf & OB & _)". rewrite union_empty_l_L.
     iDestruct (sgn_get_ex with "[$]") as "[SGNf #SGNf']".
-    BMU_burn_cp.
+    BOU_burn_cp.
 
     split_cps "CPSm" 1. rewrite -cp_mul_1.  
     wp_bind (fl_create FLP _)%E.
@@ -945,14 +945,14 @@ Section MotivatingClient.
     wp_bind (Rec _ _ _)%E. pure_steps.
     wp_bind (ref _)%E. iApply sswp_MU_wp_fupd; [done| ]. iModIntro. 
     iApply wp_alloc. iIntros "!> %flag FLAG _".
-    iNext. MU_by_BMU.
+    iNext. MU_by_BOU.
     
     iMod (own_alloc (● Excl' None ⋅ ◯ _: excl_authUR (optionUR SignalId))) as (?) "[OW_A OW_F]".
     { apply auth_both_valid_2; [| reflexivity]. done. }
     iMod (own_alloc (@Pending unitO)) as (?) "UNSET"; [done| ].
     iPoseProof (init_smap_repr (fun _ => l__o) _ _ (flip Nat.ltb 0) ∅ with "OB") as "SR".
-    rewrite size_empty. simpl. iApply (BMU_weaken ∅ _ 0 with "[-SR] [$]"); [lia| done| ..].
-    iIntros "(%smap & %SMG & SR & %DOM__SM & OB)". burn_cp_after_BMU.
+    rewrite size_empty. simpl. iApply (BOU_weaken ∅ _ 0 with "[-SR] [$]"); [lia| done| ..].
+    iIntros "(%smap & %SMG & SR & %DOM__SM & OB)". burn_cp_after_BOU.
     apply dom_empty_inv_L in DOM__SM as ->. rewrite map_img_empty_L union_empty_r_L.
 
     set (CG := {| cl_γ__ow := γ; cl_γ__os := γ0 |}).
@@ -973,8 +973,8 @@ Section MotivatingClient.
     iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
     iApply (MU__f_wand with "[-CP PH OB]").
     2: { iApply OBLS_AMU__f; [done| ].
-         iApply (BMU_AMU__f with "[-PH] [$]"); [reflexivity| ..].
-         iIntros "?". iApply BMU_intro. iFrame.
+         iApply (BOU_AMU__f with "[-PH] [$]"); [reflexivity| ..].
+         iIntros "?". iApply BOU_intro. iFrame.
          iSplitR; [iAccu| ]. 
          do 2 iExists _. by iFrame. }
     iIntros "(_ & (%π1 & %π2 & PH1 & OB1 & PH2 & OB2 & [%PH_LT1 %PH_LT2]))".
@@ -996,8 +996,8 @@ Section MotivatingClient.
     iApply sswp_MUf_wp. iIntros "%τ2 !>". 
     iApply (MU__f_wand with "[-CP PH OB1]").
     2: { iApply OBLS_AMU__f; [done| ].
-         iApply (BMU_AMU__f with "[-PH] [$]"); [reflexivity| ..].
-         iIntros "?". iApply BMU_intro. iFrame.
+         iApply (BOU_AMU__f with "[-PH] [$]"); [reflexivity| ..].
+         iIntros "?". iApply BOU_intro. iFrame.
          iSplitR; [iAccu| ]. 
          do 2 iExists _. by iFrame. }
     iIntros "(_ & (%π11 & %π12 & PH1 & OB1 & PH2 & OB2 & [%PH_LT11 %PH_LT12]))".

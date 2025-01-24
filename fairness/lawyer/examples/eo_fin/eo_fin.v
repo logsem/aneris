@@ -165,29 +165,29 @@ Section EoFin.
 
     Existing Instance oGS.
     
-    Lemma BMU_update_SR smap τ m:
+    Lemma BOU_update_SR smap τ m:
   obls τ ∅ -∗
   smap_repr_eo (m + 1) (B `min` (m + 2)) smap -∗
-      BMU ∅ 1 (
+      BOU ∅ 1 (
         |==> ∃ smap' R', smap_repr_eo (m + 1) (B `min` (m + 3)) smap' ∗
                          obls τ R' ∗
           (⌜ B <= m + 2 /\ smap' = smap /\ R' = ∅ ⌝ ∨
-           ∃ s', ith_sig (m + 2) s' ∗ ⌜ m + 2 < B /\ smap' = (<[(m + 2)%nat := s']> smap) /\ R' = {[ s' ]} ⌝)) (oGS' := oGS').
+           ∃ s', ith_sig (m + 2) s' ∗ ⌜ m + 2 < B /\ smap' = (<[(m + 2)%nat := s']> smap) /\ R' = {[ s' ]} ⌝)).
     Proof using OBLS_AMU.
       iIntros "OBLS [SR %DOM]".
       destruct (Nat.le_gt_cases B (m + 2)).
       { rewrite !PeanoNat.Nat.min_l; try lia.
-        iApply BMU_intro. iModIntro. do 2 iExists _. iFrame.
+        iApply BOU_intro. iModIntro. do 2 iExists _. iFrame.
         iSplit.
         { by rewrite Nat.min_l in DOM. } 
         iLeft. done. }
 
       (* iDestruct (smap_expose_dom with "[$]") as "%SM_DOM". *)
       rewrite PeanoNat.Nat.min_r in DOM; [| lia].
-      iApply BMU_wand.
+      iApply BOU_wand.
       2: { rewrite /smap_repr_eo. simpl.
            (* rewrite !PeanoNat.Nat.min_r; [| lia]. *)
-           iPoseProof (BMU_smap_extend B__eo τ (m + 2) smap ∅
+           iPoseProof (BOU_smap_extend B__eo τ (m + 2) smap ∅
 (flip Nat.ltb (m + 1)) (flip Nat.ltb (m + 1)) with "[$] [$]") as "foo".
            4: by iFrame.
            { done. }
@@ -262,7 +262,7 @@ Section EoFin.
         { econstructor. done. }
         iNext. iIntros "L".
        
-        MU_by_BMU. iApply OU_BMU.
+        MU_by_BOU. iApply OU_BOU.
         iApply (OU_wand with "[-OB SR]").
         2: { iApply (smap_set_sig B__eo with "[$] [$] [$]").
              { Unshelve. 2: exact (flip Nat.ltb (S m)).
@@ -277,10 +277,10 @@ Section EoFin.
         iIntros "(SR & OBLS)".
         rewrite (subseteq_empty_difference_L {[ s ]}); [| done].
                 
-        iApply (BMU_weaken ∅ _ 1 _ _ _); [lia| set_solver|iIntros "X"; iApply "X"|].
+        iApply (BOU_weaken ∅ _ 1 _ _ _); [lia| set_solver|iIntros "X"; iApply "X"|].
                 
-        iApply (BMU_wand with "[-OBLS SR]").
-        2: { iApply (BMU_update_SR with "[$] [SR]").
+        iApply (BOU_wand with "[-OBLS SR]").
+        2: { iApply (BOU_update_SR with "[$] [SR]").
              rewrite /smap_repr_eo. rewrite Nat.add_1_r. iFrame. done. }
         iIntros "UPD".
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
@@ -339,12 +339,12 @@ Section EoFin.
           replace (B - S (m + 1)) with (m + 1 + x - m) by lia.
 
           pure_step_hl. 
-          MU_by_BMU. iApply OU_BMU.
+          MU_by_BOU. iApply OU_BOU.
           iDestruct (exchange_cp_upd with "CP2'' [$]") as "OU".
           { reflexivity. }
           { etrans; [apply d01_lt| apply d12_lt]. }
           iApply (OU_wand with "[-OU]"); [| by iFrame]. iIntros "CPS'".
-          BMU_burn_cp.
+          BOU_burn_cp.
 
           iApply wp_value.
           
@@ -369,14 +369,14 @@ Section EoFin.
         rewrite LE.
 
         iDestruct "EXTRA" as "[CP2' | EXP]". 
-        + MU_by_BMU. 
-          (* TODO: avoid unfolding BMU *)
+        + MU_by_BOU. 
+          (* TODO: avoid unfolding BOU *)
           (* rewrite Nat.min_r; [| lia]. *)
           rewrite /smap_repr_eo. 
           iPoseProof (smap_create_ep B__eo m with "[$] [$] [$]") as "OU"; eauto.
           { rewrite DOM. apply elem_of_set_seq. lia. } 
           { apply d12_lt. }
-          iApply OU_BMU.
+          iApply OU_BOU.
           iApply (OU_wand with "[-OU]"); [| done].
           iIntros "X". iMod "X" as "(%sw & #SW & #EP & SR & PH)".
           iDestruct (ith_sig_sgn with "SN [$]") as "#EX". 
@@ -388,16 +388,16 @@ Section EoFin.
             rewrite !B__eo_simpl; try lia. intros.
             apply ith_bn_lt. lia. }
             
-          iApply OU_BMU.
+          iApply OU_BOU.
           iApply (OU_wand with "[-OU]"); [| done].
           iIntros "(CP1 & SR & PH & OBLS)".
 
-          iApply OU_BMU.
+          iApply OU_BOU.
           iDestruct (exchange_cp_upd with "[$] [$]") as "OU".
           { reflexivity. }
           { apply d01_lt. }
           iApply (OU_wand with "[-OU]"); [| by iFrame]. iIntros "CPS'".
-          BMU_burn_cp.
+          BOU_burn_cp.
  
           iApply wp_value.
 
@@ -408,7 +408,7 @@ Section EoFin.
           wp_bind (Snd _)%E.
 
           pure_step_hl.
-          MU_by_BMU. BMU_burn_cp.
+          MU_by_BOU. BOU_burn_cp.
           
           do 2 pure_step_cases. 
           iApply ("IH" $! _ with "[-POST]"); [..| by iFrame].
@@ -420,7 +420,7 @@ Section EoFin.
                iExists _. iFrame "#∗". }
           iRight.
           iExists _. iFrame "#∗". 
-        + MU_by_BMU. 
+        + MU_by_BOU. 
           iDestruct "EXP" as "(%sw & #SW & #EP)".
           rewrite Nat.add_sub.
           iDestruct (ith_sig_sgn with "SN [$]") as "#EX".
@@ -432,16 +432,16 @@ Section EoFin.
             apply set_Forall_singleton.
             rewrite !B__eo_simpl; try lia. intros.
             apply ith_bn_lt. lia. }
-          iApply OU_BMU.
+          iApply OU_BOU.
           iApply (OU_wand with "[-OU]"); [| done].
           iIntros "(CP1 & SR & PH & OBLS)".
 
-          iApply OU_BMU.
+          iApply OU_BOU.
           iDestruct (exchange_cp_upd with "[$] [$]") as "OU". 
           { done. }
           { apply d01_lt. }
           iApply (OU_wand with "[-OU]"); [| by iFrame]. iIntros "CPS'".
-          BMU_burn_cp.
+          BOU_burn_cp.
  
           iApply wp_value.
 
@@ -533,7 +533,7 @@ Section EoFin.
       (* (i := 0) *)
       :
       obls τ ∅ -∗ l ↦ #0 -∗ 
-        BMU ⊤ 2 (|={∅}=> ∃ (eoG: EoFinG Σ) (sigs: list SignalId),
+        BOU ⊤ 2 (|={∅}=> ∃ (eoG: EoFinG Σ) (sigs: list SignalId),
                        even_res 0 (H := eoG)∗
                        odd_res 1 (H := eoG) ∗
                        eofin_inv l (H := eoG) ∗
@@ -541,14 +541,14 @@ Section EoFin.
                        ⌜ length sigs = min B 2 ⌝ ∗
                        ⌜ NoDup sigs ⌝ ∗
                        ([∗ list] k ↦ s ∈ sigs, ith_sig k s)
-        ) (oGS' := oGS').
+        ).
     Proof using OBLS_AMU PRE.
       iIntros "OB L".
       iMod (thread_res_alloc 0) as "(%γ & AUTH & FRAG)".
       iMod (thread_res_alloc 1) as "(%γ' & AUTH' & FRAG')".
       
       set (m := min B 2).
-      iAssert (BMU ⊤ 2 
+      iAssert (BOU ⊤ 2 
                  (|==> ∃ smap (smG: SigMapG Σ),
                               smap_repr B__eo (flip Nat.ltb 0) smap ∗
                               ⌜ dom smap = set_seq 0 m ⌝ ∗
@@ -559,19 +559,19 @@ Section EoFin.
                                ⌜ @sm_PreG _ smG = @eofin_sigs _ PRE ⌝
               ))%I with "[OB]" as "-#SR".
       { assert (m <= 0 \/ m = 0 + 1 \/ m = 0 + 2) as [LE | [EQ | EQ]] by lia; revgoals.
-        - iApply OU_BMU.
+        - iApply OU_BOU.
           assert (0 < LIM) as Di by lia. 
           unshelve iDestruct (OU_create_sig with "[$]") as "OU".
           { eexists. apply Di. }
           iApply (OU_wand with "[-OU] [$]"). iIntros "(%si & SGi & OBLS & _)". 
 
-          iApply OU_BMU.
+          iApply OU_BOU.
           assert (0 + 1 < LIM) as Di' by lia. 
           unshelve iDestruct (OU_create_sig with "[$]") as "OU".
           { eexists. apply Di'. }
           iApply (OU_wand with "[-OU] [$]"). iIntros "(%si' & SGi' & OBLS & %NEW)".
 
-          iApply BMU_intro.
+          iApply BOU_intro.
           set (smap0 := {[ 0 := si; 0 + 1 := si']}: gmap nat SignalId).
           iMod (own_alloc (● ((to_agree <$> smap0): gmapUR nat (agreeR SignalId)) ⋅ ◯ _)) as (?) "[A F]".
           { apply auth_both_valid_2; [| reflexivity]. apply map_nat_agree_valid. }
@@ -596,13 +596,13 @@ Section EoFin.
           rewrite big_sepM_empty. rewrite /ex_ith_sig.
           simpl. rewrite !(proj2 (PeanoNat.Nat.ltb_ge _ _)); try lia.
           rewrite !B__eo_simpl. iFrame.
-        - iApply OU_BMU.
+        - iApply OU_BOU.
           assert (0 < LIM) as Di by lia. 
           unshelve iDestruct (OU_create_sig with "[$]") as "OU".
           { eexists. apply Di. }
           iApply (OU_wand with "[-OU] [$]"). iIntros "(%si & SGi & OBLS & _)".
 
-          iApply BMU_intro.
+          iApply BOU_intro.
           set (smap0 := {[ 0 := si]}: gmap nat SignalId).
           iMod (own_alloc (● ((to_agree <$> smap0): gmapUR nat (agreeR SignalId)) ⋅ ◯ _)) as (?) "[A F]".
           { apply auth_both_valid_2; [| reflexivity]. apply map_nat_agree_valid. }
@@ -619,7 +619,7 @@ Section EoFin.
           rewrite big_sepM_empty. rewrite /ex_ith_sig.
           simpl. rewrite !(proj2 (PeanoNat.Nat.ltb_ge _ _)); try lia.
           rewrite !B__eo_simpl. iFrame.
-        - iApply BMU_intro.
+        - iApply BOU_intro.
           set (smap0 := ∅: gmap nat SignalId).
           iMod (own_alloc (● ((to_agree <$> smap0): gmapUR nat (agreeR SignalId)) ⋅ ◯ _)) as (?) "[A F]".
           { apply auth_both_valid_2; [| reflexivity]. apply map_nat_agree_valid. }
@@ -637,7 +637,7 @@ Section EoFin.
           (*   rewrite H. set_solver. } *)
           subst smap0. rewrite big_sepM_empty. done. }
 
-      iApply (BMU_wand with "[-SR] [$]"). 
+      iApply (BOU_wand with "[-SR] [$]"). 
       iIntros "X". iMod "X" as "(%smap & %SMG & SR & %DOM & OB & %SIZE & #F & %EQ_PRE)".
       
       set (eoG := {| 
@@ -689,13 +689,13 @@ Section EoFin.
 
       wp_bind (RecV _ _ _ _)%V.
       pure_step_hl.
-      MU_by_BMU.
-      iApply OU_BMU.
+      MU_by_BOU.
+      iApply OU_BOU.
       iDestruct (exchange_cp_upd with "[$] [$]") as "OU". 
       { done. }
       { etrans; [apply d01_lt| apply d12_lt]. }
       iApply (OU_wand with "[-OU]"); [| by iFrame]. iIntros "CPS".
-      BMU_burn_cp.
+      BOU_burn_cp.
       
       pure_steps.
       wp_bind (ref _)%E.
@@ -703,8 +703,8 @@ Section EoFin.
       iApply sswp_MU_wp_fupd; [done| ]. iApply wp_alloc.
       iModIntro.
       iNext. iIntros "%l L _".
-      iPoseProof (alloc_inv _ _  with "[$] [$]") as "BMU". 
-      MU_by_BMU. iApply (BMU_weaken with "[-BMU] [$]"); [lia| done| ]. iIntros "INV".
+      iPoseProof (alloc_inv _ _  with "[$] [$]") as "BOU". 
+      MU_by_BOU. iApply (BOU_weaken with "[-BOU] [$]"); [lia| done| ]. iIntros "INV".
       (* TODO: make a tactic, remove duplication *)
       iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
       iSplitR "CP".
@@ -732,12 +732,12 @@ Section EoFin.
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
         iApply sswp_MUf_wp. iIntros (τ'). iApply (MU__f_wand with "[-CP PH OB]").
         2: { iApply OBLS_AMU__f; [done| ]. 
-             iApply (BMU_AMU__f with "[-PH]"); [reflexivity| ..].
+             iApply (BOU_AMU__f with "[-PH]"); [reflexivity| ..].
              2: by iFrame. 
              
              iIntros "PH".
-             (* TODO: change BMU_burn_cp*)
-             iApply BMU_intro. iFrame "PH OB".
+             (* TODO: change BOU_burn_cp*)
+             iApply BOU_intro. iFrame "PH OB".
              iSplitR "CP".
              2: { do 2 iExists _. iFrame. done. }
              iAccu. }
@@ -768,12 +768,12 @@ Section EoFin.
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
         iApply sswp_MUf_wp. iIntros (τ''). iApply (MU__f_wand with "[-CP PH OB1]").
         2: { iApply OBLS_AMU__f; [done| ]. 
-             iApply (BMU_AMU__f with "[-PH]"); [reflexivity| ..].
+             iApply (BOU_AMU__f with "[-PH]"); [reflexivity| ..].
              2: by iFrame. 
              
              iIntros "PH".
-             (* TODO: change BMU_burn_cp*)
-             iApply BMU_intro. iFrame "PH OB1".
+             (* TODO: change BOU_burn_cp*)
+             iApply BOU_intro. iFrame "PH OB1".
              iSplitR "CP".
              2: { do 2 iExists _. iFrame. done. }
              iAccu. }
@@ -812,12 +812,12 @@ Section EoFin.
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
         iApply sswp_MUf_wp. iIntros (τ'). iApply (MU__f_wand with "[-CP PH OB]").
         2: { iApply OBLS_AMU__f; [done| ]. 
-             iApply (BMU_AMU__f with "[-PH]"); [reflexivity| ..].
+             iApply (BOU_AMU__f with "[-PH]"); [reflexivity| ..].
              2: by iFrame. 
              
              iIntros "PH".
-             (* TODO: change BMU_burn_cp*)
-             iApply BMU_intro. iFrame "PH OB".
+             (* TODO: change BOU_burn_cp*)
+             iApply BOU_intro. iFrame "PH OB".
              iSplitR "CP".
              2: { do 2 iExists _. iFrame. done. }
              iAccu. }
@@ -845,12 +845,12 @@ Section EoFin.
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
         iApply sswp_MUf_wp. iIntros (τ''). iApply (MU__f_wand with "[-CP PH OB1]").
         2: { iApply OBLS_AMU__f; [done| ]. 
-             iApply (BMU_AMU__f with "[-PH]"); [reflexivity| ..].
+             iApply (BOU_AMU__f with "[-PH]"); [reflexivity| ..].
              2: by iFrame. 
              
              iIntros "PH".
-             (* TODO: change BMU_burn_cp*)
-             iApply BMU_intro. iFrame "PH OB1".
+             (* TODO: change BOU_burn_cp*)
+             iApply BOU_intro. iFrame "PH OB1".
              iSplitR "CP".
              2: { do 2 iExists _. iFrame. done. }
              iAccu. }
@@ -887,12 +887,12 @@ Section EoFin.
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
         iApply sswp_MUf_wp. iIntros (τ'). iApply (MU__f_wand with "[-CP PH OB]").
         2: { iApply OBLS_AMU__f; [done| ]. 
-             iApply (BMU_AMU__f with "[-PH]"); [reflexivity| ..].
+             iApply (BOU_AMU__f with "[-PH]"); [reflexivity| ..].
              2: by iFrame. 
              
              iIntros "PH".
-             (* TODO: change BMU_burn_cp*)
-             iApply BMU_intro. iFrame "PH OB".
+             (* TODO: change BOU_burn_cp*)
+             iApply BOU_intro. iFrame "PH OB".
              iSplitR "CP".
              2: { do 2 iExists _. iFrame. done. }
              iAccu. }
@@ -917,12 +917,12 @@ Section EoFin.
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
         iApply sswp_MUf_wp. iIntros (τ''). iApply (MU__f_wand with "[-CP PH OB1]").
         2: { iApply OBLS_AMU__f; [done| ]. 
-             iApply (BMU_AMU__f with "[-PH]"); [reflexivity| ..].
+             iApply (BOU_AMU__f with "[-PH]"); [reflexivity| ..].
              2: by iFrame. 
              
              iIntros "PH".
-             (* TODO: change BMU_burn_cp*)
-             iApply BMU_intro. iFrame "PH OB1".
+             (* TODO: change BOU_burn_cp*)
+             iApply BOU_intro. iFrame "PH OB1".
              iSplitR "CP".
              2: { do 2 iExists _. iFrame. done. }
              iAccu. }

@@ -10,23 +10,23 @@ From trillium.fairness.lawyer.obligations Require Import obligations_model oblig
 From trillium.fairness.lawyer Require Import sub_action_em.
 From trillium.fairness.lawyer Require Import program_logic.
 
-Ltac burn_cp_after_BMU :=
+Ltac burn_cp_after_BOU :=
   iDestruct (cp_mul_take with "CPS") as "[CPS CP]";
   iSplitR "CP";
   [| do 2 iExists _; iFrame; iPureIntro; done].
 
-Ltac BMU_burn_cp :=
-  iApply BMU_intro;
-  burn_cp_after_BMU.
+Ltac BOU_burn_cp :=
+  iApply BOU_intro;
+  burn_cp_after_BOU.
 
-Ltac MU_by_BMU :=
+Ltac MU_by_BOU :=
   match goal with
   | [OB_AMU: AMU_lift_MU _ _ _ _ _ |- envs_entails _ ?P ] =>
       iApply OB_AMU; [by rewrite nclose_nroot| ];
-      iApply (BMU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH"
+      iApply (BOU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH"
   end.
 
-Ltac MU_by_burn_cp := MU_by_BMU; BMU_burn_cp.
+Ltac MU_by_burn_cp := MU_by_BOU; BOU_burn_cp.
 
 Ltac pure_step_hl :=
   iApply sswp_MU_wp; [done| ];
