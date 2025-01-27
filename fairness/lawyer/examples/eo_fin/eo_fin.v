@@ -262,7 +262,8 @@ Section EoFin.
         { econstructor. done. }
         iNext. iIntros "L".
        
-        MU_by_BOU. iApply OU_BOU.
+        MU_by_BOU. iFrame "PH". 
+        iApply OU_BOU.
         iApply (OU_wand with "[-OB SR]").
         2: { iApply (smap_set_sig B__eo with "[$] [$] [$]").
              { Unshelve. 2: exact (flip Nat.ltb (S m)).
@@ -283,9 +284,7 @@ Section EoFin.
         2: { iApply (BOU_update_SR with "[$] [SR]").
              rewrite /smap_repr_eo. rewrite Nat.add_1_r. iFrame. done. }
         iIntros "UPD".
-        iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
-        iSplitR "CP".
-        2: { do 2 iExists _. iFrame. done. }
+        burn_cp_after_BOU.
         iMod "UPD" as (smap' R') "(SR & OB & COND)". 
         iApply wp_value.
         
@@ -705,10 +704,7 @@ Section EoFin.
       iNext. iIntros "%l L _".
       iPoseProof (alloc_inv _ _  with "[$] [$]") as "BOU". 
       MU_by_BOU. iApply (BOU_weaken with "[-BOU] [$]"); [lia| done| ]. iIntros "INV".
-      (* TODO: make a tactic, remove duplication *)
-      iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
-      iSplitR "CP".
-      2: { do 2 iExists _. iFrame. done. }
+      burn_cp_after_BOU. 
       iApply wp_value.
       iApply fupd_mask_mono; [apply empty_subseteq| ].
       iMod "INV" as "(% & %sigs & RE & RO & #INV & OB & %SIGS_LEN & %SIGS_UNIQ & #SIGS)".
@@ -732,15 +728,12 @@ Section EoFin.
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
         iApply sswp_MUf_wp. iIntros (τ'). iApply (MU__f_wand with "[-CP PH OB]").
         2: { iApply OBLS_AMU__f; [done| ]. 
-             iApply (BOU_AMU__f with "[-PH]"); [reflexivity| ..].
-             2: by iFrame. 
-             
-             iIntros "PH".
+             iApply BOU_AMU__f.
              (* TODO: change BOU_burn_cp*)
              iApply BOU_intro. iFrame "PH OB".
              iSplitR "CP".
-             2: { do 2 iExists _. iFrame. done. }
-             iAccu. }
+             2: { iExists _. iFrame. }
+             iNext. iAccu. }
 
         iIntros "[? (%π1 & %π2 & PH1 & OB1 & PH3 & OB2 & [%LT1 %LT2])]".
         Unshelve. 2: exact {[ si ]}.
@@ -768,15 +761,11 @@ Section EoFin.
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
         iApply sswp_MUf_wp. iIntros (τ''). iApply (MU__f_wand with "[-CP PH OB1]").
         2: { iApply OBLS_AMU__f; [done| ]. 
-             iApply (BOU_AMU__f with "[-PH]"); [reflexivity| ..].
-             2: by iFrame. 
-             
-             iIntros "PH".
-             (* TODO: change BOU_burn_cp*)
+             iApply BOU_AMU__f. 
              iApply BOU_intro. iFrame "PH OB1".
              iSplitR "CP".
-             2: { do 2 iExists _. iFrame. done. }
-             iAccu. }
+             2: { iExists _. iFrame. }
+             iNext. iAccu. }
 
         iIntros "[? (%π3 & %π4 & PH1 & OB1 & PH3 & OB2 & [%LT3 %LT4])]".
         Unshelve. 2: exact {[ si' ]}.        
@@ -812,15 +801,11 @@ Section EoFin.
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
         iApply sswp_MUf_wp. iIntros (τ'). iApply (MU__f_wand with "[-CP PH OB]").
         2: { iApply OBLS_AMU__f; [done| ]. 
-             iApply (BOU_AMU__f with "[-PH]"); [reflexivity| ..].
-             2: by iFrame. 
-             
-             iIntros "PH".
-             (* TODO: change BOU_burn_cp*)
+             iApply BOU_AMU__f. 
              iApply BOU_intro. iFrame "PH OB".
              iSplitR "CP".
-             2: { do 2 iExists _. iFrame. done. }
-             iAccu. }
+             2: { iExists _. iFrame. }
+             iNext. iAccu. }
 
         iIntros "[? (%π1 & %π2 & PH1 & OB1 & PH3 & OB2 & [%LT1 %LT2])]".
         Unshelve. 2: exact {[ si ]}.
@@ -845,15 +830,11 @@ Section EoFin.
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
         iApply sswp_MUf_wp. iIntros (τ''). iApply (MU__f_wand with "[-CP PH OB1]").
         2: { iApply OBLS_AMU__f; [done| ]. 
-             iApply (BOU_AMU__f with "[-PH]"); [reflexivity| ..].
-             2: by iFrame. 
-             
-             iIntros "PH".
-             (* TODO: change BOU_burn_cp*)
+             iApply BOU_AMU__f.
              iApply BOU_intro. iFrame "PH OB1".
              iSplitR "CP".
-             2: { do 2 iExists _. iFrame. done. }
-             iAccu. }
+             2: { iExists _. iFrame. }
+             iNext. iAccu. }
 
         iIntros "[? (%π3 & %π4 & PH1 & OB1 & PH3 & OB2 & [%LT3 %LT4])]".
         Unshelve. 2: exact ∅.
@@ -887,15 +868,12 @@ Section EoFin.
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
         iApply sswp_MUf_wp. iIntros (τ'). iApply (MU__f_wand with "[-CP PH OB]").
         2: { iApply OBLS_AMU__f; [done| ]. 
-             iApply (BOU_AMU__f with "[-PH]"); [reflexivity| ..].
-             2: by iFrame. 
-             
-             iIntros "PH".
+             iApply BOU_AMU__f.
              (* TODO: change BOU_burn_cp*)
              iApply BOU_intro. iFrame "PH OB".
              iSplitR "CP".
-             2: { do 2 iExists _. iFrame. done. }
-             iAccu. }
+             2: { iExists _. iFrame. }
+             iNext. iAccu. }
 
         iIntros "[? (%π1 & %π2 & PH1 & OB1 & PH3 & OB2 & [%LT1 %LT2])]".
         Unshelve. 2: exact ∅.
@@ -917,15 +895,12 @@ Section EoFin.
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
         iApply sswp_MUf_wp. iIntros (τ''). iApply (MU__f_wand with "[-CP PH OB1]").
         2: { iApply OBLS_AMU__f; [done| ]. 
-             iApply (BOU_AMU__f with "[-PH]"); [reflexivity| ..].
-             2: by iFrame. 
-             
-             iIntros "PH".
+             iApply BOU_AMU__f. 
              (* TODO: change BOU_burn_cp*)
              iApply BOU_intro. iFrame "PH OB1".
              iSplitR "CP".
-             2: { do 2 iExists _. iFrame. done. }
-             iAccu. }
+             2: { iExists _. iFrame. }
+             iNext. iAccu. }
 
         iIntros "[? (%π3 & %π4 & PH1 & OB1 & PH3 & OB2 & [%LT3 %LT4])]".
         Unshelve. 2: exact ∅.

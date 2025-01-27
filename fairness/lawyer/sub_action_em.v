@@ -69,7 +69,15 @@ Section AM_UPD.
     .
 
     Definition AMU := AMU_impl None.
-    Definition AMU__f E ζ ζ' P := AMU_impl (Some ζ') E ζ P. 
+    Definition AMU__f E ζ ζ' P := AMU_impl (Some ζ') E ζ P.
+
+    Lemma AMU_impl_wand f E ζ a P Q:
+      (P -∗ Q) -∗ AMU_impl f E ζ a P -∗ AMU_impl f E ζ a Q.
+    Proof using.
+      rewrite /AMU_impl. iIntros "PQ AMU" (???) "?".
+      iMod ("AMU" with "[$]") as (??) "(?&?&?)".
+      iModIntro. do 2 iExists _. iFrame. by iApply "PQ".
+    Qed.
 
   End AMU.
 

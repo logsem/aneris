@@ -838,7 +838,7 @@ Section MotivatingClient.
       - rewrite bool_decide_eq_false_2; [| done].
         pure_step_hl.
         split_cps "CPh" 1.
-        MU_by_BOU. iApply OU_BOU.
+        MU_by_BOU. iApply OU_BOU'; [lia| ].
         iApply (OU_wand with "[-CPh']").
         2: { rewrite -cp_mul_1. iApply (exchange_cp_upd with "[$] [$]").
              1: reflexivity.
@@ -867,11 +867,7 @@ Section MotivatingClient.
 
       wp_bind (ref _)%E.
       iApply sswp_MU_wp; [done| ]. iApply wp_alloc. iIntros "!> %c C _".
-      (* MU_by_BOU. *)
-      iApply OBLS_AMU; [by rewrite nclose_nroot| ]. 
-      iApply (BOU_AMU with "[-PH] [$]").
-      { reflexivity. }
-      iIntros "PH".
+      MU_by_BOU.
       iApply BOU_lower; [apply LS_LB| ]. iApply OU_BOU.
       split_cps "CPSm" 1. rewrite -!cp_mul_1.
       iApply (OU_wand with "[-CPSm PH]").
@@ -915,7 +911,10 @@ Section MotivatingClient.
   Proof using All.
     iIntros (Φ) "(#EB & OB & PH & CPSr) POST". rewrite /client_prog.
     pure_step_hl. 
-    MU_by_BOU. iApply OU_BOU.
+    MU_by_BOU.
+    iApply (BOU_lower _ 3); [lia| ].
+
+    iApply OU_BOU.
     split_cps "CPSr" 1. rewrite -cp_mul_1. iApply (OU_wand with "[-CPSr']").
     2: { iApply (exchange_cp_upd with "[$] [$]").
          1: reflexivity.
@@ -973,10 +972,10 @@ Section MotivatingClient.
     iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
     iApply (MU__f_wand with "[-CP PH OB]").
     2: { iApply OBLS_AMU__f; [done| ].
-         iApply (BOU_AMU__f with "[-PH] [$]"); [reflexivity| ..].
-         iIntros "?". iApply BOU_intro. iFrame.
+         iApply BOU_AMU__f.
+         iApply BOU_intro. iFrame.
          iSplitR; [iAccu| ]. 
-         do 2 iExists _. by iFrame. }
+         iExists _. by iFrame. }
     iIntros "(_ & (%π1 & %π2 & PH1 & OB1 & PH2 & OB2 & [%PH_LT1 %PH_LT2]))".
 
     iSplitL "CPS' CPSm' OB2 PH2 UNSET".
@@ -990,16 +989,20 @@ Section MotivatingClient.
     iRename "PH1" into "PH". rewrite difference_diag_L.
     (* Unset Printing Notations. *)
     apply strict_include in PH_LT1. 
-    wp_bind (Rec _ _ _)%E. pure_steps.
+    wp_bind (Rec _ _ _)%E.
+    iDestruct (cp_mul_weaken with "CPS") as "CPS".
+    { apply PH_LT1. }
+    { reflexivity. }
+    pure_steps.
 
     iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
     iApply sswp_MUf_wp. iIntros "%τ2 !>". 
     iApply (MU__f_wand with "[-CP PH OB1]").
     2: { iApply OBLS_AMU__f; [done| ].
-         iApply (BOU_AMU__f with "[-PH] [$]"); [reflexivity| ..].
-         iIntros "?". iApply BOU_intro. iFrame.
+         iApply BOU_AMU__f. 
+         iApply BOU_intro. iFrame.
          iSplitR; [iAccu| ]. 
-         do 2 iExists _. by iFrame. }
+         iExists _. by iFrame. }
     iIntros "(_ & (%π11 & %π12 & PH1 & OB1 & PH2 & OB2 & [%PH_LT11 %PH_LT12]))".
 
     iSplitR "POST OB1".
@@ -1012,7 +1015,7 @@ Section MotivatingClient.
     iSplit. 
     { iApply (exc_lb_le with "[$]"). lia. }
     apply strict_include in PH_LT12.
-    iSplitL "CPSr"; (iApply cp_mul_weaken; [| reflexivity| by iFrame]); etrans; eauto.
+    iSplitL "CPSr"; (iApply cp_mul_weaken; [| reflexivity| by iFrame]); etrans; done.
   Qed.
     
 End MotivatingClient.

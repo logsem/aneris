@@ -12,18 +12,22 @@ From trillium.fairness.lawyer Require Import program_logic.
 
 Ltac burn_cp_after_BOU :=
   iDestruct (cp_mul_take with "CPS") as "[CPS CP]";
-  iSplitR "CP";
-  [| do 2 iExists _; iFrame; iPureIntro; done].
+  (* iSplitR "CP PH"; [iIntros "PH" | iExists _; by iFrame].  *)
+  (iSplitR "CP PH"; [iIntros "PH" | iExists _; by iFrame]) ||
+  (iSplitR "CP"; [iIntros "PH" | iExists _; by iFrame])
+.
+                                                           
 
 Ltac BOU_burn_cp :=
   iApply BOU_intro;
+  try iNext;
   burn_cp_after_BOU.
 
 Ltac MU_by_BOU :=
   match goal with
   | [OB_AMU: AMU_lift_MU _ _ _ _ _ |- envs_entails _ ?P ] =>
       iApply OB_AMU; [by rewrite nclose_nroot| ];
-      iApply (BOU_AMU with "[-PH] [$]"); [by eauto| ]; iIntros "PH"
+      iApply BOU_AMU
   end.
 
 Ltac MU_by_burn_cp := MU_by_BOU; BOU_burn_cp.

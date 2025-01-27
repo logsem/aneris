@@ -451,6 +451,15 @@ Section Ticketlock.
 
   Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS' _ EM hGS (↑ nroot)}.
 
+  (* TODO: move *)
+  Lemma BOU_split' E P n m
+    (LE: n <= m):
+    ⊢ BOU E n (BOU E (m - n) P) -∗ BOU E m P.
+  Proof using.
+    apply Nat.le_sum in LE as [? ->].
+    rewrite Nat.sub_add'. apply BOU_split. 
+  Qed.
+
   Lemma tl_newlock_spec `{TicketlockPreG Σ} τ π c
     (BOUND: fl_c__cr TLPre <= LIM_STEPS):
       {{{ cp π d__m0 ∗ th_phase_eq τ π }}}
@@ -460,13 +469,14 @@ Section Ticketlock.
     clear fl_degs_wl0 d__w ODl ODd LEl.
     iIntros (Φ) "(CP & PH) POST". rewrite /tl_newlock.
     pure_step_hl. MU_by_BOU.
+    iApply BOU_lower; [apply BOUND| ].
     simpl. do 2 rewrite -Nat.add_1_r. rewrite -Nat.add_assoc. iApply BOU_split.
     iApply OU_BOU_rep.
     iApply (OU_rep_wand with "[-]").
     2: { iApply increase_eb_upd_rep0. }
     iIntros "#EB".
     
-    iApply OU_BOU. iApply (OU_wand with "[-CP]").
+    iApply OU_BOU'; [lia| ]. iApply (OU_wand with "[-CP]").
     2: { (* TODO: can we remove phase restriction for exchange? *)
          iApply (exchange_cp_upd with "[$] [$]").
          { reflexivity. }
@@ -595,7 +605,8 @@ Section Ticketlock.
     iApply (wp_faa with "TK").
     iIntros "!> TK'". iNext. MU_by_BOU.
     simpl.
-    iApply BOU_lower; [apply PeanoNat.Nat.le_add_r| ].
+    iApply BOU_lower.
+    { etrans; [eapply PeanoNat.Nat.le_add_r| apply LIM_STEPS']. }
     rewrite (Nat.add_comm _ 3). iApply OU_BOU.
     (* iDestruct (cp_mul_take with "CPSw") as "[CPSw CPw]". *)
     apply Nat.le_sum in LEot as [d ->].
@@ -607,8 +618,8 @@ Section Ticketlock.
     iDestruct (cp_mul_take with "CPSh") as "[CPSh CPh]".
 
     iApply OU_BOU. iApply (OU_wand with "[-CPh]").
-    2: { iApply (exchange_cp_upd with "[$] EB").
-         { Unshelve. 3: exact 10. lia. shelve. }
+    2: { iApply (exchange_cp_upd _ _ _ _ 10 with "[$] EB").
+         { lia. }
          etrans; [apply fl_degs_wl0 | apply fl_degs_lh0]. }
     iIntros "CPS'".
 
@@ -631,7 +642,7 @@ Section Ticketlock.
          iModIntro.
          pure_steps.
          do 2 iExists _.
-         iFrame. rewrite Nat.sub_add'.
+         iRevert "PH". iFrame. iIntros "PH". rewrite Nat.sub_add'.
          rewrite {1}cp_mul_take. iDestruct "CPSh" as "[CPSh CPh]".
          iFrame.
 
@@ -765,7 +776,11 @@ Section Ticketlock.
       2: { by iDestruct (ticket_token_excl with "[$] [$]") as %?. }
       iSpecialize ("TMI_CLOS" with "[TOK]").
       { rewrite /tau_interp. iRight. iLeft. iSplit; [| done]. iFrame. }
-      MU_by_burn_cp. iModIntro. pure_steps.
+
+      (* MU_by_burn_cp. *)
+      MU_by_BOU;   iApply BOU_intro; try iNext; burn_cp_after_BOU.
+      
+      iModIntro. pure_steps.
       iMod ("CLOS" with "[TMI_CLOS OW TOKS HELD EXACT Ltk]") as "_".
       { rewrite /tl_inv_inner. iNext. do 5 iExists _. iFrame "#∗".
         rewrite (proj2 (Nat.eqb_neq _ _)); [| lia].
@@ -820,7 +835,8 @@ Section Ticketlock.
       - rewrite Nat.add_0_r. by iLeft.
       - rewrite cp_mul_take. iDestruct "CPSh'" as "[??]". iFrame. }
     iModIntro.
-    iApply (BOU_lower _ (c + (3 + c))); [lia| ].
+    iApply (BOU_lower _ (c + (3 + c))).
+    { etrans; [| apply LIM_STEPS']. simpl. lia. }
     iApply BOU_split. iApply (BOU_wand with "[-WAIT] [$]").
     iIntros "(RR & CP & PH & OB & CLOS')".
     iSpecialize ("CLOS'" with "[OW' HELD']").
@@ -834,9 +850,7 @@ Section Ticketlock.
     iDestruct (cp_mul_split with "[CPS CPS']") as "CPS"; [iFrame| ]. simpl.
     iApply BOU_intro. iMod "CLOS'" as "TAUs". iModIntro.
     (* rewrite cp_mul_take. iDestruct "CPS" as "[CPS CP]". *)
-    split_cps "CPS" 1. rewrite -cp_mul_1.
-    iSplitR "CPS'".
-    2: { do 2 iExists _. iFrame. done. }
+    burn_cp_after_BOU. 
     iModIntro. pure_steps.
     iSpecialize ("TMI_CLOS" with "[TAUs SLT OB PH']").
     { rewrite /tau_interp. iLeft. iSplit; [| done].
@@ -987,7 +1001,31 @@ Section Ticketlock.
     iApply BOU_intro. iFrame "#∗".
   Qed.
 
-  (* TODO: mention exc_lb in the proof OR implement its increase *)
+  (* TODO: move *)
+  Lemma BOU_mask_comm' E E' n Φ P Q
+    (SUB: E' ⊆ E):
+    (P -∗ BOU E n (Q -∗ Φ)) -∗ (|={E', E}=> P) -∗ BOU E' n (Q ={E', E}=∗ Φ).
+  Proof using.
+    iIntros "BOU CLOS".
+    rewrite /BOU. iIntros.
+    iMod "CLOS" as "P".
+    iSpecialize ("BOU" with "[$] [$]").
+    iMod "BOU" as (?) "(?&?&WAND)".
+    iApply fupd_mask_intro; [done| ].
+    iIntros "CLOS". iFrame. iExists _. iFrame.
+    iIntros "?". iMod "CLOS". by iApply "WAND".
+  Qed.
+  
+  (* TODO: move *)
+  (* The old BOU_AMU rule looked like this and made easier to show certain lemmas:
+     Lemma BOU_AMU E ζ b (P : iProp Σ) π q
+     (BOUND: b <= LIM_STEPS)
+     :
+     ⊢ (th_phase_frag ζ π q -∗ BOU E b ((P) ∗ ∃ ph deg, cp ph deg ∗ ⌜ phase_le ph π ⌝) (oGS := oGS)) -∗
+        th_phase_frag ζ π q -∗
+        AMU E ζ obls_act P (aeGS := oGS').
+     Should we keep both variants? *)
+
   Lemma tl_release_spec (lk: val) c τ:
     tl_is_lock lk c ∗ rel_tok ⊢
         TLAT_FL τ
@@ -1010,7 +1048,7 @@ Section Ticketlock.
 
     pure_step_hl. MU_by_BOU.    
     iApply (BOU_lower _ 20).
-    { simpl. rewrite /tl_exc. lia. }
+    { etrans; [| apply LIM_STEPS']. simpl. rewrite /tl_exc. lia. }
     iApply (BOU_wand with "[-CP PH]").
     2: { iApply (first_BOU with "[$] [$]"); [| eauto].
          { trans d__e; [trans d__h0| ]; [trans d__l0|..]; eauto. }
@@ -1019,13 +1057,6 @@ Section Ticketlock.
     iIntros "(CPS & #EB & PH)".
     burn_cp_after_BOU. 
     
-    (* iApply OU_BOU. iApply (OU_wand with "[-CP PH]"). *)
-    (* 2: { (* TODO: can we remove phase restriction for exchange? *) *)
-    (*      iApply (exchange_cp_upd with "[$] [$] [$]"). *)
-    (*      { reflexivity. } *)
-    (*      trans d__e; [trans d__h0| ]; [trans d__l0|..]; eauto. } *)
-    (* iIntros "[CPS PH]". BOU_burn_cp. *)
-
     assert (FAA (Fst lk) #1 = fill_item (FaaLCtx #(LitInt 1)) (Fst lk)) as CTX by done.
     iApply (wp_bind [(FaaLCtx #1)] NotStuck ⊤ τ (Fst lk) (Λ := heap_lang)). simpl.
     iApply wp_atomic.
@@ -1058,9 +1089,12 @@ Section Ticketlock.
     iApply (wp_faa with "[$]"). iIntros "!> OW".
     iDestruct "TAU" as "[_ [TAU _]]".
     iNext. MU_by_BOU.
-    iSpecialize ("TAU" with "[$OB $PH]").
-    { done. }
-    simpl. iApply BOU_lower; [apply PeanoNat.Nat.le_add_r| ].
+
+    iDestruct (th_phase_frag_halve with "PH") as "[PH PH']".    
+    iSpecialize ("TAU" with "[$OB $PH']").
+    { iPureIntro. apply Qp.div_le. done. }
+    simpl. iApply BOU_lower.
+    { etrans; [| apply LIM_STEPS']. apply PeanoNat.Nat.le_add_r. }
     simpl. rewrite -Nat.add_assoc. iApply BOU_split.
     iApply (BOU_wand with "[-TAU] [$]"). iIntros "CLOS'". rewrite -Nat.add_assoc.
     iSpecialize ("CLOS'" $! (_, (ow + 1), false)).
@@ -1080,16 +1114,19 @@ Section Ticketlock.
     1, 2: reflexivity.
     { apply bi.sep_comm. }
     iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
-    iApply (BOU_frame_l with "[CP]").
-    { do 2 iExists _. by iFrame. }
-    iApply (BOU_mask_comm with "[-CLOS'] [$]"); [set_solver| ].
+
+    iApply (BOU_frame_l with "[CP PH]").
+    { iExists _. by iFrame. }
+    iApply (BOU_mask_comm' with "[-CLOS'] [$]"); [set_solver| ].
     iIntros "Φ". simpl.
 
     iPoseProof (tau_map_interp_update with "[$] [$] [OW] [$]") as "UPD".
     { by rewrite Nat2Z.inj_add. }
     iApply BOU_split. iApply (BOU_wand with "[-UPD] [$]"). iIntros "(HELD & OW & RTOK & TMI)".
-    rewrite Qp.sub_diag. simpl. iSpecialize ("Φ" with "[//]"). 
-    iApply BOU_intro. pure_steps.
+    iApply BOU_intro. iIntros "PH".
+    rewrite -{1}(Qp.div_2 q). rewrite Qp.add_sub. simpl. iSpecialize ("Φ" with "[$]").
+    
+    pure_steps.
     iMod ("CLOS" with "[-Φ RR0 CPS OW_LB]") as "_".
     { iNext. rewrite /tl_inv_inner. do 5 iExists _.
       iRevert "EBD". iFrame. iIntros "#EBd".
@@ -1130,7 +1167,9 @@ Section Ticketlock.
     rewrite /TLAT_pre. simpl. iDestruct "PRE" as "(RR0 & OB & #SGT & PH & CP)".
 
     rewrite /tl_acquire. pure_step_hl. MU_by_BOU.
-    simpl. iApply (BOU_lower _ (S tl_exc + (c + c + 2))); [lia| ].
+    simpl. 
+    iApply (BOU_lower _ (S tl_exc + (c + c + 2))).
+    { etrans; [| apply LIM_STEPS']. simpl fl_B. lia. } 
     iApply BOU_split. iApply (BOU_wand with "[-CP PH]").
     2: { iApply (first_BOU with "[$] [$]"); [| eauto].
          apply fl_degs_em. }
@@ -1152,16 +1191,6 @@ Section Ticketlock.
     replace 19 with (10 + 9) at 3 by lia.
     iDestruct (cp_mul_split with "CPS") as "[CPS1 CPS]".
 
-    (* Set Printing Coercions. *)
-    (* set (post := (fun x => bi_wand rel_tok (Φ x)) : ofe_car valO → ofe_car (iPropO Σ)).  *)
-    (* assert (NonExpansive post) as NE_Φ by apply _. *)
-    (* assert (NonExpansive RR) as NE_RR. *)
-    (* { (* TODO: why it's not inferred automatically? *) *)
-    (*   simpl in *. *)
-    (*   red. intros ????. *)
-    (*   apply discrete_iff in H. *)
-    (*   2: by apply _. *)
-    (*   apply leibniz_equiv_iff in H. by subst. } *)
     set (post := (fun x => bi_wand rel_tok (Φ x))). 
     
     pure_steps.
