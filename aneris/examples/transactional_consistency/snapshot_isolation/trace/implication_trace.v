@@ -1902,7 +1902,7 @@ Section trace_proof.
         iFrame.
         iSplit; first done. 
         iSplit; first (iPureIntro; set_solver).
-        iSplit; first (iPureIntro; by apply extraction_of_add1).
+        iSplit; first (iPureIntro; by apply (extraction_of_add1 _ _ _ _ tag1)).
         iSplit.
         - iPureIntro.
           apply (valid_transactions_add1 T' (Cm (tag1, c) b) c); try done.
@@ -2565,7 +2565,7 @@ Section trace_proof.
         iFrame.
         iSplit; first done.
         iSplit; first (iPureIntro; set_solver).
-        iSplit; first (iPureIntro; destruct vo; by apply extraction_of_add1).
+        iSplit; first (iPureIntro; destruct vo; by apply (extraction_of_add1 _ _ _ _ tag1)).
         iSplit.
         + iPureIntro.
           apply (valid_transactions_add1 T' (Rd (tag1, c) k vo) c); try done.
@@ -2805,7 +2805,7 @@ Section trace_proof.
       split_and!; try done.
       eexists T', exec'.
       split_and!; try done.
-      apply extraction_of_add_init_lin; rewrite /is_in_lin_event;
+      apply (extraction_of_add_init_lin tag1); rewrite /is_in_lin_event;
         set_solver.
     }
     iIntros "Htr_is".
@@ -2885,7 +2885,7 @@ Section trace_proof.
       do 2 (iSplit; first by iPureIntro).
       iSplit; first iPureIntro.
       {
-        apply extraction_of_add_init_lin; rewrite /is_in_lin_event;
+        apply (extraction_of_add_init_lin tag1); rewrite /is_in_lin_event;
         set_solver.
       }
       do 4 (iSplit; first by iPureIntro).
@@ -3361,7 +3361,7 @@ Section trace_proof.
       iSplitR.
       {
         iPureIntro.
-        destruct Hex' as (Hex1 & Hex2 & Hex3).
+        destruct Hex' as (Hex1 & Hex2 & Hex3 & Hex4).
         split.
         - intros le op Hle_in Hlin_le.
           specialize (Hex1 le op).
@@ -3374,12 +3374,15 @@ Section trace_proof.
           + intros trans op Hin_t Hin_op.
             specialize (Hex2 trans op Hin_t Hin_op).
             set_solver.
-          + intros trans op1 op2 Htrans_in Hrel.
-            specialize (Hex3 trans op1 op2 Htrans_in Hrel).
-            destruct Hex3 as (i & j & Hle & Hlookup_i & Hlookup_j).
-            exists i, j.
-            split; first done.
-            split; by apply lookup_app_l_Some.
+          + split.
+            * intros trans op1 op2 Htrans_in Hrel.
+              specialize (Hex3 trans op1 op2 Htrans_in Hrel).
+              destruct Hex3 as (i & j & Hle & Hlookup_i & Hlookup_j).
+              exists i, j.
+              split; first done.
+              split; by apply lookup_app_l_Some.
+            * intros trans op1 op2 c_trans Ht_in Hop1_in Hop2_in Hcm1 Hcm2 Hconn.
+              apply (next_commit_imp _ _ _ _ _ tag1); try done; set_solver.
       }
       iSplitR; first by iPureIntro.
       iSplitR.
@@ -3987,7 +3990,7 @@ Section trace_proof.
         iFrame.
         iSplit; first done.
         iSplit; first (iPureIntro; set_solver).
-        iSplit; first (iPureIntro; by apply extraction_of_add1).
+        iSplit; first (iPureIntro; by apply (extraction_of_add1 _ _ _ _ tag1)).
          do 2 (iSplit; first done).
         iSplit; first (iPureIntro; apply based_on_add2; rewrite /is_cm_op; set_solver).
         iSplit; first by simpl.
