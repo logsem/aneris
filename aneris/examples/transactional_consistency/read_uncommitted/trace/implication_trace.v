@@ -1088,7 +1088,9 @@ Section trace_proof.
       iSplit; last first.
       {
         iPureIntro.
-        admit.
+        apply open_trans_no_later_imp1; last done.
+        rewrite /is_st_lin_event.
+        eauto.
       }
       iExists (<[sa:=(Active (dom m), Some c)]> mstate').
       iFrame.
@@ -1226,7 +1228,7 @@ Section trace_proof.
       set_solver.
     }
     set_solver.
-  Admitted.
+  Qed.
 
   Lemma commit_implication γmstate γmlin γmpost γmname γl clients (res : RU_resources Mdl Σ) 
   (lib : KVS_transaction_api) : 

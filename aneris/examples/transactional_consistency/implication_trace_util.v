@@ -277,7 +277,7 @@ Section trace_proof_util.
         ([∗ set] sa ∈ clients, client_trace_state_resources lt T sa γmstate γmname extract mstate mname).
   
   Definition open_trans_no_later (lt : list val) (T : list transaction) : Prop :=
-    ∀ t op c, t ∈ T → (∀ op, op ∈ t → ¬is_cm_op op) → op ∈ t → connOfOp op = c → no_later_start_or_commit c (toLinEvent op) lt.
+    ∀ t op c, t ∈ T → (∀ op, op ∈ t → ¬is_cm_op op) → op ∈ t → connOfOp op = c → no_later_commit c (toLinEvent op) lt.
 
   Definition GlobalInvExt (test : commitTest) (T : list transaction) (extract : val → option val) 
     (γmstate γmlin γmpost γmname γl : gname) (clients : gset socket_address) (exec : execution) : iProp Σ := 
@@ -1625,12 +1625,12 @@ Section trace_proof_util.
   Qed.
 
   Lemma open_trans_no_later_imp1 (lt : list val) (T : list transaction) (le : val) :
-    is_in_lin_event le → 
+    (is_in_lin_event le ∨ is_st_lin_event le) → 
     open_trans_no_later lt T →
     open_trans_no_later (lt ++ [le]) T.
   Proof.
     intros Hin_event Hopen t op c Hin_t Hall Hin_op Hconn.
-    apply no_later_start_or_commit_wr_rd_imp; first set_solver.
+    apply no_later_commit_non_cm_imp; first set_solver.
     by apply (Hopen t op c).
   Qed.
 
@@ -1644,7 +1644,7 @@ Section trace_proof_util.
     open_trans_no_later (lt ++ [le]) (T1 ++ (trans ++ [op]) :: T2).
   Proof.
     intros Hdisj Hlin Htag Hnot Hopen t op' c Hin_t Hall Hin_op Hconn.
-    apply no_later_start_or_commit_wr_rd_imp; first set_solver.
+    apply no_later_commit_non_cm_imp; first set_solver.
     rewrite elem_of_app in Hin_t.
     destruct Hin_t as [Hin_t|Hin_t]; first (apply (Hopen t op' c); set_solver).
     rewrite elem_of_cons in Hin_t.
@@ -1688,7 +1688,7 @@ Section trace_proof_util.
         * specialize (Hall op_last Hlast).
           rewrite /is_cm_op in Hall.
           destruct op_last; set_solver.
-      + eapply no_later_start_or_commit_impl; try done.
+      + eapply no_later_commit_impl; try done.
         -- by apply conn_event_op.
         -- rewrite -Hlin. 
            by apply conn_event_op.
@@ -1759,7 +1759,7 @@ Section trace_proof_util.
           by apply last_Some_elem_of.
         * rewrite /is_cm_op. 
           destruct op_last'; simpl in Hcm_last; set_solver.
-      + eapply no_later_start_or_commit_impl; try done.
+      + eapply no_later_commit_impl; try done.
         * by apply conn_event_op.
         * rewrite -Hlin.
           by apply conn_event_op.
@@ -1821,7 +1821,7 @@ Section trace_proof_util.
              by apply last_Some_elem_of.
           -- rewrite /is_cm_op. 
              destruct op_last'; simpl in Hcm_last; set_solver.
-        * eapply no_later_start_or_commit_impl; try done.
+        * eapply no_later_commit_impl; try done.
           -- by apply conn_event_op.
           -- rewrite -Hlin.
              by apply conn_event_op.

@@ -227,6 +227,9 @@ Definition no_later_start_or_commit (c e_st : val) (lin_trace : list val) : Prop
   ¬∃ e, connOfEvent e = Some c ∧ rel_list lin_trace e_st e ∧
         (is_st_lin_event e ∨ is_cm_lin_event e).
 
+Definition no_later_commit (c e_st : val) (lin_trace : list val) : Prop := 
+  ¬∃ e, connOfEvent e = Some c ∧ rel_list lin_trace e_st e ∧ is_cm_lin_event e.
+
 Definition later_commit (c e_st : val) (lin_trace : list val) : Prop := 
   ∃ e_cm, connOfEvent e_cm = Some c ∧ is_cm_lin_event e_cm ∧ rel_list lin_trace e_st e_cm ∧ 
           (¬∃ e_st', connOfEvent e_st' = Some c ∧ is_st_lin_event e_st' ∧ 
@@ -1306,6 +1309,33 @@ Proof.
     set_solver.
 Qed.
 
+Lemma no_later_commit_impl e e' c c' lt: 
+  connOfEvent e = Some c →
+  connOfEvent e' = Some c' →
+  c ≠ c' →
+  no_later_commit c e lt →
+  no_later_commit c e (lt ++ [e']).
+Proof.
+  intros Heq1 Heq2 Hneq Hlater.
+  intros (e'' & Hconn & Hrel & HOr).
+  apply Hlater.
+  exists e''.
+  split; first done.
+  split; last done.
+  destruct Hrel as (i & j & Hlt & Hlookup_i & Hlookup_j).
+  rewrite lookup_app_Some in Hlookup_i.
+  destruct Hlookup_i as [Hlookup_i | (Hlength & Hlookup_i)].
+  - rewrite lookup_app_Some in Hlookup_j.
+    destruct Hlookup_j as [Hlookup_j | (Hlength & Hlookup_j)].
+    + by exists i, j.
+    + assert (e' = e'') as ->; last set_solver.
+      rewrite list_lookup_singleton_Some in Hlookup_j.
+      set_solver.
+  - assert (e' = e) as ->; last set_solver.
+    rewrite list_lookup_singleton_Some in Hlookup_i.
+    set_solver.
+Qed.
+
 Lemma prior_init_imp1 c lt i e :
   prior_init i c lt →
   prior_init i c (lt ++ [e]).
@@ -1429,6 +1459,23 @@ Proof.
   intros ->.
   rewrite /is_wr_lin_event /is_rd_lin_event /is_in_lin_event in Hdisj.
   rewrite /is_cm_lin_event /is_st_lin_event in Hevent.
+  set_solver.
+Qed.
+
+Lemma no_later_commit_non_cm_imp le c e lt : 
+  (is_wr_lin_event le ∨ is_rd_lin_event le ∨ is_in_lin_event le ∨ is_st_lin_event le) →
+  no_later_commit c e lt →
+  no_later_commit c e (lt ++ [le]).
+Proof.
+  intros Hdisj Hlater.
+  intros (e' & Hconn & Hrel & Hevent).
+  apply Hlater.
+  exists e'.
+  split_and!; try done.
+  apply (rel_list_last_neq _ _ _ le); last done.
+  intros ->.
+  rewrite /is_wr_lin_event /is_rd_lin_event /is_in_lin_event /is_st_lin_event in Hdisj.
+  rewrite /is_cm_lin_event in Hevent.
   set_solver.
 Qed.
 
@@ -2174,7 +2221,7 @@ Lemma extraction_of_add2 tag lt t T1 T2 le op :
   (∀ op, op ∈ t → ¬is_cm_op op) →
   tagOfEvent le = Some tag →
   (¬∃ le', le' ∈ lt ∧ tagOfEvent le' = Some tag) →
-  (∀ op' c, op' ∈ t → connOfOp op' = c → no_later_start_or_commit c (toLinEvent op') lt) →
+  (∀ op' c, op' ∈ t → connOfOp op' = c → no_later_commit c (toLinEvent op') lt) →
   toLinEvent op = le →
   linToOp le = Some op →
   extraction_of lt (T1 ++ t :: T2) →
