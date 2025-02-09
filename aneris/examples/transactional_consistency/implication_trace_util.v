@@ -275,6 +275,9 @@ Section trace_proof_util.
     ∃ (mstate : gmap socket_address (local_state * option val)), ghost_map_auth γmstate (1%Qp) mstate ∗ 
       ∃ (mname : gmap socket_address (gname * val)), ghost_map_auth γmname (1%Qp) mname ∗ 
         ([∗ set] sa ∈ clients, client_trace_state_resources lt T sa γmstate γmname extract mstate mname).
+  
+  Definition open_trans_no_later (lt : list val) (T : list transaction) : Prop :=
+    ∀ t op c, t ∈ T → (∀ op, op ∈ t → ¬is_cm_op op) → op ∈ t → connOfOp op = c → no_later_commit c (toLinEvent op) lt.
 
   Definition GlobalInvExt (test : commitTest) (T : list transaction) (extract : val → option val) 
     (γmstate γmlin γmpost γmname γl : gname) (clients : gset socket_address) (exec : execution) : iProp Σ := 
@@ -283,7 +286,8 @@ Section trace_proof_util.
       ⌜based_on exec (comTrans T)⌝ ∗ ⌜valid_execution test exec⌝ ∗
       trace_state_resources lt T γmstate γmname clients extract ∗
       trace_lin_resources lt t γmlin ∗
-      trace_post_resources t γmpost.
+      trace_post_resources t γmpost ∗
+      ⌜open_trans_no_later lt T⌝.
 
   (* Helper lemmas *)
 
@@ -1618,6 +1622,227 @@ Section trace_proof_util.
       iIntros (sa'' Hsa''_in) "Hres".
       iApply (client_trace_state_resources_neq6 sa sa'' with "[][][][][][$]"); try done.
       iPureIntro; set_solver.
+  Qed.
+
+  Lemma open_trans_no_later_imp1 (lt : list val) (T : list transaction) (le : val) :
+    (is_in_lin_event le ∨ is_st_lin_event le) → 
+    open_trans_no_later lt T →
+    open_trans_no_later (lt ++ [le]) T.
+  Proof.
+    intros Hin_event Hopen t op c Hin_t Hall Hin_op Hconn.
+    apply no_later_commit_non_cm_imp; first set_solver.
+    by apply (Hopen t op c).
+  Qed.
+
+  Lemma open_trans_no_later_imp2 (lt : list val) (T1 T2 : list transaction) (trans : transaction) (le : val) 
+  (op : operation) tag :
+    (is_rd_lin_event le ∨ is_wr_lin_event le) → 
+    toLinEvent op = le →
+    tagOfEvent le = Some tag →
+    (¬∃ le', le' ∈ lt ∧ tagOfEvent le' = Some tag) →
+    open_trans_no_later lt (T1 ++ trans :: T2) →
+    open_trans_no_later (lt ++ [le]) (T1 ++ (trans ++ [op]) :: T2).
+  Proof.
+    intros Hdisj Hlin Htag Hnot Hopen t op' c Hin_t Hall Hin_op Hconn.
+    apply no_later_commit_non_cm_imp; first set_solver.
+    rewrite elem_of_app in Hin_t.
+    destruct Hin_t as [Hin_t|Hin_t]; first (apply (Hopen t op' c); set_solver).
+    rewrite elem_of_cons in Hin_t.
+    destruct Hin_t as [->|Hin_t]; last (apply (Hopen t op' c); set_solver).
+    rewrite elem_of_app in Hin_op.
+    destruct Hin_op as [Hin_op|Hin_op]; first (apply (Hopen trans op' c); set_solver).
+    assert (op' = op) as ->; first set_solver.
+    intros (e & _ & (i & j & _ & Hlookup_i & _) & _).
+    apply Hnot.
+    exists le.
+    split; last done.
+    rewrite Hlin in Hlookup_i.
+    apply elem_of_list_lookup.
+    eauto.
+  Qed.
+
+  Lemma open_trans_no_later_imp3 (lt : list val) (T : list transaction) (le : val) (op : operation) (c : val) tag :
+    valid_transactions T →
+    toLinEvent op = le →
+    tagOfEvent le = Some tag →
+    (¬∃ le', le' ∈ lt ∧ tagOfEvent le' = Some tag) →
+    connOfOp op = c →
+    (¬ (∃ trans, trans ∈ T ∧ (∃ op', op' ∈ trans ∧ last trans = Some op' ∧ connOfOp op' = c ∧ isCmOp op' = false))) →
+    open_trans_no_later lt T →
+    open_trans_no_later (lt ++ [le]) (T ++ [[op]]).
+  Proof.
+    intros (Hvalid & _) Hlin Htag Hnot Hconn Hnot_trans Hopen t op' c' Hin_t Hall Hin_op Hconn'.
+    rewrite elem_of_app in Hin_t.
+    destruct Hin_t as [Hin_t|Hin_t].
+    - destruct (decide(c = c')) as [->|Hneq].
+      + exfalso.
+        apply Hnot_trans.
+        exists t; split; first done.
+        destruct (last t) as [op_last|] eqn:Hlast; last (apply last_None in Hlast; set_solver).
+        exists op_last.
+        apply last_Some_elem_of in Hlast.
+        split_and!; try done.
+        * destruct (Hvalid t Hin_t) as (_ & Hvalid' & _).
+          specialize (Hvalid' op' op_last Hin_op Hlast).
+          by rewrite -Hvalid'.
+        * specialize (Hall op_last Hlast).
+          rewrite /is_cm_op in Hall.
+          destruct op_last; set_solver.
+      + eapply no_later_commit_impl; try done.
+        -- by apply conn_event_op.
+        -- rewrite -Hlin. 
+           by apply conn_event_op.
+        -- by apply (Hopen t op' c').
+    - assert (t = [op]) as ->; first set_solver.
+      assert (op' = op) as ->; first set_solver.
+      intros (e & _ & (i & j & Hlength & Hlookup_i & Hlookup_j) & _).
+      rewrite lookup_app_Some in Hlookup_i.
+      destruct Hlookup_i as [Hlookup_i|Hlookup_i].
+      + apply Hnot.
+        exists le.
+        split; last done.
+        rewrite Hlin in Hlookup_i.
+        apply elem_of_list_lookup.
+        eauto.
+      + rewrite lookup_app_Some in Hlookup_j.
+        rewrite list_lookup_singleton_Some in Hlookup_i.
+        destruct Hlookup_j as [Hlookup_j|Hlookup_j].
+        * apply lookup_lt_Some in Hlookup_j.
+          lia.
+        * rewrite list_lookup_singleton_Some in Hlookup_j.
+          lia.
+  Qed.
+
+  Lemma open_trans_no_later_imp4 (lt : list val) (T1 T2 : list transaction) (trans : transaction) (le c : val) 
+  (op : operation) tag :
+    (is_cm_lin_event le) → 
+    toLinEvent op = le →
+    tagOfEvent le = Some tag →
+    connOfOp op = c →
+    (¬∃ le', le' ∈ lt ∧ tagOfEvent le' = Some tag) →
+    (∃ op, op ∈ trans ∧ last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) →
+    valid_transactions (T1 ++ trans :: T2) →
+    open_trans_no_later lt (T1 ++ trans :: T2) →
+    open_trans_no_later (lt ++ [le]) (T1 ++ (trans ++ [op]) :: T2).
+  Proof.
+    intros Hcm Hlin Htag Hconn Hnot Hlast Hvalid Hopen t op' c' Hin_t Hall Hin_op Hconn'.
+    rewrite elem_of_app in Hin_t.
+    destruct Hin_t as [Hin_t|Hin_t].
+    - destruct (decide(c = c')) as [<-|Hneq].
+      + exfalso.
+        destruct Hvalid as (Hvalid' & Hvalid & _).
+        rewrite elem_of_list_lookup in Hin_t.
+        destruct Hin_t as (i & Hin_t).
+        assert (trans ∈ (trans :: T2)) as Hin_trans; first set_solver.
+        rewrite elem_of_list_lookup in Hin_trans.
+        destruct Hin_trans as (j & Hin_trans).
+        assert (i = (j + length T1)%nat) as ->; last (apply lookup_lt_Some in Hin_t; lia).
+        destruct (last t) as [op_last|] eqn:Hlast_t; last (apply last_None in Hlast_t; set_solver).
+        destruct Hlast as (op_last' & _ & Hlast_trans & Hconn_last & Hcm_last).
+        eapply (Hvalid t trans op_last op_last'); try done.
+        * rewrite lookup_app_Some; set_solver.
+        * rewrite lookup_app_Some; right.
+          assert (length T1 <= j + length T1)%nat as Hleq; first lia.
+          split; first done.
+          assert (j + length T1 - length T1 = j)%nat as Heq; first lia.
+          by rewrite -Heq in Hin_trans.
+        * rewrite Hconn_last.
+          apply last_Some_elem_of in Hlast_t.
+          destruct (Hvalid' t) as (_ & Hconn_eq & _).
+          {
+            rewrite elem_of_app; left.
+            apply elem_of_list_lookup; eauto.
+          }
+          specialize (Hconn_eq op_last op' Hlast_t Hin_op).
+          by rewrite Hconn_eq.
+        * eapply Hall.
+          by apply last_Some_elem_of.
+        * rewrite /is_cm_op. 
+          destruct op_last'; simpl in Hcm_last; set_solver.
+      + eapply no_later_commit_impl; try done.
+        * by apply conn_event_op.
+        * rewrite -Hlin.
+          by apply conn_event_op.
+        * apply (Hopen t op' c'); set_solver.
+    - rewrite elem_of_cons in Hin_t.
+      destruct Hin_t as [->|Hin_t].
+      + exfalso. 
+        apply (Hall op); first set_solver.
+        rewrite /is_cm_lin_event in Hcm.
+        destruct Hcm as (tag'' & c'' & b & ->).
+        destruct op; simpl in Hlin.
+        * destruct s; destruct ov; set_solver.
+        * destruct s; set_solver.
+        * rewrite /is_cm_op; eauto.
+      + destruct (decide(c = c')) as [->|Hneq].
+        * exfalso.
+          destruct Hvalid as (Hvalid' & Hvalid & _).
+          rewrite elem_of_list_lookup in Hin_t.
+          destruct Hin_t as (i & Hin_t).
+          assert (trans ∈ T1 ++ [trans]) as Hin_trans; first set_solver.
+          rewrite elem_of_list_lookup in Hin_trans.
+          destruct Hin_trans as (j & Hin_trans).
+          assert ((i + 1 + length T1)%nat = j) as <-; last first.
+          {
+            apply lookup_lt_Some in Hin_trans.
+            rewrite last_length in Hin_trans.
+            lia.
+          }
+          destruct (last t) as [op_last|] eqn:Hlast_t; last (apply last_None in Hlast_t; set_solver).
+          destruct Hlast as (op_last' & _ & Hlast_trans & Hconn_last & Hcm_last).
+          eapply (Hvalid t trans op_last op_last'); try done.
+          -- rewrite lookup_app_Some; right.
+             assert (length T1 <= i + 1 + length T1)%nat as Hleq; first lia.
+             split; first done.
+             assert (i + 1 + length T1 - length T1 = i + 1)%nat as Heq; first lia.
+             rewrite Heq.
+             rewrite lookup_cons_Some; right.
+             split; first lia.
+             assert (i + 1 - 1 = i)%nat as Heq'; first lia.
+             by rewrite Heq'.
+          -- rewrite lookup_app_Some in Hin_trans.
+             destruct Hin_trans as [Hin_trans|(Hlength & Hin_trans)]; rewrite lookup_app_Some; first set_solver.
+             right.
+             split; first apply Hlength.
+             apply lookup_cons_Some.
+             left.
+             by rewrite list_lookup_singleton_Some in Hin_trans.
+          -- rewrite Hconn_last.
+             apply last_Some_elem_of in Hlast_t.
+             destruct (Hvalid' t) as (_ & Hconn_eq & _).
+             {
+              rewrite elem_of_app; right.
+              rewrite elem_of_cons; right.
+              apply elem_of_list_lookup; eauto.
+             }
+            specialize (Hconn_eq op_last op' Hlast_t Hin_op).
+            by rewrite Hconn_eq.
+          -- eapply Hall.
+             by apply last_Some_elem_of.
+          -- rewrite /is_cm_op. 
+             destruct op_last'; simpl in Hcm_last; set_solver.
+        * eapply no_later_commit_impl; try done.
+          -- by apply conn_event_op.
+          -- rewrite -Hlin.
+             by apply conn_event_op.
+          -- apply (Hopen t op' c'); set_solver.
+  Qed.
+
+  Lemma last_not_cm_impl_no_cm (T1 T2 : list transaction) (trans : transaction) (c : val) :
+    valid_transactions (T1 ++ trans :: T2) →
+    (∃ op, op ∈ trans ∧ last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) →
+    (∀ op, op ∈ trans → ¬ is_cm_op op).
+  Proof.
+    intros (Hvalid & _) Hop.
+    intros op Hin Hcm.
+    destruct (last trans) as [op'|] eqn:Hlast; last (apply last_None in Hlast; set_solver).
+    destruct Hcm as (s & b & Heq).
+    destruct (Hvalid trans) as (Hvalid' & _); first set_solver.
+    specialize (Hvalid' op s b Hin Heq).
+    destruct Hop as (op'' & _ & Heq_some & _ & Hcm).
+    subst.
+    assert (op'' = Cm s b) as ->; first set_solver.
+    by simpl in Hcm.
   Qed.
 
 End trace_proof_util.
