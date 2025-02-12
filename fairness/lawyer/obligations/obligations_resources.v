@@ -1192,6 +1192,20 @@ Section ObligationsRepr.
       iIntros "CLOS". iFrame. iExists _. iFrame.
     Qed.
 
+    Lemma BOU_mask_comm' E E' n Φ P Q
+      (SUB: E' ⊆ E):
+      (P -∗ BOU E n (Q -∗ Φ)) -∗ (|={E', E}=> P) -∗ BOU E' n (Q ={E', E}=∗ Φ).
+    Proof using.
+      iIntros "BOU CLOS".
+      rewrite /BOU. iIntros.
+      iMod "CLOS" as "P".
+      iSpecialize ("BOU" with "[$] [$]").
+      iMod "BOU" as (?) "(?&?&WAND)".
+      iApply fupd_mask_intro; [done| ].
+      iIntros "CLOS". iFrame. iExists _. iFrame.
+      iIntros "?". iMod "CLOS". by iApply "WAND".
+    Qed.
+  
     Lemma BOU_split E P n m:
       ⊢ BOU E n (BOU E m P) -∗ BOU E (n + m) P.
     Proof using.
@@ -1244,6 +1258,28 @@ Section ObligationsRepr.
       iPoseProof (OU_create_sig with "OB") as "OU".
       iApply (OU_wand with "[-OU] [$]").
       iIntros "(%&?&?&?)". iExists _. iFrame. 
+    Qed.
+
+    (* useful as the first step's BOU of a function call *)
+    Lemma first_BOU τ π q d0 d n E
+      (DEG_LT: deg_lt d d0)
+      (LIM: S n <= LIM_STEPS):
+      th_phase_frag τ π q -∗ cp π d0 -∗
+        BOU E (S n) (cp_mul π d n ∗ exc_lb n ∗ th_phase_frag τ π q).
+    Proof using.
+      iIntros "PH CP".
+      do 2 rewrite -Nat.add_1_r. simpl. iApply BOU_split.
+      iApply OU_BOU_rep.
+      iApply (OU_rep_wand with "[-]").
+      2: { iApply (increase_eb_upd_rep0). }
+      iIntros "#EB".
+      
+      iApply OU_BOU. iApply (OU_wand with "[-CP]").
+      2: { iApply (exchange_cp_upd with "[$] [$]").
+           { reflexivity. }
+           eauto. }
+      iIntros "CPS".
+      iApply BOU_intro. iFrame "#∗".
     Qed.
 
   End Resources.
