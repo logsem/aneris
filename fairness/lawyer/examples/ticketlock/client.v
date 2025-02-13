@@ -954,7 +954,42 @@ Section MotivatingClient.
   Context {OBLS_AMU__f: forall τ, @AMU_lift_MU__f _ _ _ τ oGS' _ EM _ ⊤}.
   Context {NO_OBS_POST: ∀ τ v, obls τ ∅ -∗ fork_post τ v}. 
 
-  Theorem client_spec `{ClientPreG Σ, fl_GpreS FLP Σ} τ π:
+(*   (* TODO: move *) *)
+(*   Lemma BOU_0 E P: *)    
+(* BOU ⊤ LIM_STEPS *)
+  Context {CL_PRE: ClientPreG Σ} {FL_PRE: fl_GpreS FLP Σ}. 
+
+  Lemma alloc_client_inv {FLG: fl_GS FLP Σ} R s__f lk τ π flag:
+    obls τ R -∗ sgn s__f l__f (Some false) -∗ fl_LK FLP (lk, 0, false) (FLG := FLG) -∗
+    th_phase_eq τ π -∗ flag ↦ #false -∗
+    BOU ∅ 0 (∃ (cG: ClientG Σ), inv client_ns (client_inv_inner lk flag s__f (FLG := FLG)) ∗
+    obls τ R ∗ th_phase_eq τ π ∗ flag_unset).
+  Proof using CL_PRE FL_PRE ODl LEl.
+    clear -CL_PRE FL_PRE ODl LEl.
+    iIntros "OB SGNf LK PH FLAG".
+    rewrite -(plus_O_n 0). iApply BOU_split.
+    iMod (own_alloc (● Excl' None ⋅ ◯ _: excl_authUR (optionUR SignalId))) as (?) "[OW_A OW_F]".
+    { apply auth_both_valid_2; [| reflexivity]. done. }
+    iMod (own_alloc (@Pending unitO)) as (?) "UNSET"; [done| ].
+    iPoseProof (init_smap_repr (fun _ => l__o) _ _ (flip Nat.ltb 0) ∅ with "OB") as "SR".
+    rewrite size_empty. simpl.
+    iApply (BOU_wand with "[-SR]"); [| by iFrame].
+    iIntros "(%smap & %SMG & SR & %DOM__SM & OB)". 
+    apply dom_empty_inv_L in DOM__SM as ->. rewrite map_img_empty_L union_empty_r_L.
+
+    set (CG := {| cl_γ__ow := γ; cl_γ__os := γ0 |}).
+    iMod (inv_alloc client_ns _ (client_inv_inner lk flag s__f) with "[LK FLAG OW_A OW_F SR SGNf]") as "#INV".
+    { iNext. rewrite /client_inv_inner.
+      do 4 iExists _. iFrame.
+      iSplit.
+      2: { simpl. iPureIntro. set_solver. }
+      iRight. iSplit; [done| ].
+      iFrame. iExists _. iFrame. iLeft. by iFrame. }
+    iApply BOU_intro.
+    iExists _. iFrame "#∗".
+  Qed.
+
+  Theorem client_spec τ π:
     {{{ obls τ ∅ ∗ th_phase_eq τ π ∗ cp_mul π d__r 3 }}}
       client_prog #() @ τ
     {{{ v, RET v; obls τ ∅ }}}.
@@ -989,24 +1024,12 @@ Section MotivatingClient.
     wp_bind (ref _)%E. iApply sswp_MU_wp_fupd; [done| ]. iModIntro. 
     iApply wp_alloc. iIntros "!> %flag FLAG _".
     iNext. MU_by_BOU.
-    
-    iMod (own_alloc (● Excl' None ⋅ ◯ _: excl_authUR (optionUR SignalId))) as (?) "[OW_A OW_F]".
-    { apply auth_both_valid_2; [| reflexivity]. done. }
-    iMod (own_alloc (@Pending unitO)) as (?) "UNSET"; [done| ].
-    iPoseProof (init_smap_repr (fun _ => l__o) _ _ (flip Nat.ltb 0) ∅ with "OB") as "SR".
-    rewrite size_empty. simpl. iApply (BOU_weaken ∅ _ 0 with "[-SR] [$]"); [lia| done| ..].
-    iIntros "(%smap & %SMG & SR & %DOM__SM & OB)". burn_cp_after_BOU.
-    apply dom_empty_inv_L in DOM__SM as ->. rewrite map_img_empty_L union_empty_r_L.
 
-    set (CG := {| cl_γ__ow := γ; cl_γ__os := γ0 |}).
-    iMod (inv_alloc client_ns _ (client_inv_inner lk flag s__f) with "[LK FLAG OW_A OW_F SR SGNf]") as "#INV".
-    { iNext. rewrite /client_inv_inner.
-      do 4 iExists _. iFrame.
-      iSplit.
-      2: { simpl. iPureIntro. set_solver. }
-      iRight. iSplit; [done| ].
-      iFrame. iExists _. iFrame. iLeft. by iFrame. }
-    iModIntro.
+    iApply (BOU_weaken with "[-OB PH LK FLAG SGNf]").
+    4: { iApply (alloc_client_inv with "[$] [$] [$] [$] [$]"). }
+    1, 2: done || lia.
+    iIntros "(%cG & #INV & OB & PH & UNSET)". 
+    burn_cp_after_BOU. iModIntro. 
 
     pure_steps. wp_bind (Rec _ _ _)%E. pure_steps.
 
