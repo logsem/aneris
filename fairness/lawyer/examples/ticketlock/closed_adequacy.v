@@ -55,7 +55,7 @@ Section Adequacy.
   Let l0 := CL 0.
 
   (* TODO: make the lower bounds separate definitions in ticketlock module *)
-  Definition ClosedLim := max_list [2 + tl_exc; 2 * c__cl + 3 + tl_exc].
+  Definition ClosedLim := max_list [2 + tl_exc; 2 * c__cl + 3 + tl_exc; MAX_EXC + 2].
 
   Instance ClosedObligationsPre: ObligationsParamsPre ClosedDegree ClosedLevel ClosedLim.
     esplit; try by apply _.
@@ -132,7 +132,7 @@ Section Adequacy.
     { simpl. rewrite /lvls_acq. by apply elem_of_singleton. }
     { apply AMU_lift_top. }
     1, 2: apply ith_bn_lt; lia.
-    1, 2, 3: rewrite /ClosedLim; simpl; rewrite /tl_exc; lia. 
+    1, 2, 3: rewrite /ClosedLim; simpl; rewrite /tl_exc; lia.    
     { intros. rewrite /AMU_lift_MU__f.
       rewrite -nclose_nroot.
       apply AMU_lift_top. }

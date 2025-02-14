@@ -231,22 +231,19 @@ Section MotivatingClient.
       iFrame. iPureIntro. repeat split; try done.
     Qed.
 
-    Lemma BOU_create_wait_owner τ π q r m smap i
-      (DOM: i ∈ dom smap)
-      :
-      th_phase_frag τ π q ∗ cp π (fl_d__h FLP) ∗ smap_repr_cl r m smap ⊢
-      BOU ∅ 1 (th_phase_frag τ π q ∗ RR__L π (Some i) ∗
-                smap_repr_cl r m smap).
+    Lemma BOU_create_wait_owner τ π q r smap:
+      th_phase_frag τ π q ∗ cp π (fl_d__h FLP) ∗ smap_repr_cl r (r + 1) smap ⊢
+      BOU ∅ 1 (th_phase_frag τ π q ∗ RR__L π (Some r) ∗
+                smap_repr_cl r (r + 1) smap).
     Proof using LVL_ORDo L__FL ODd ODl LEl.
+      clear LS_LB FL_STEPS CR_LIM.
       iIntros "(PH & CP & [SR %SR_DOM])".
       rewrite /RR__L.
-      
       iApply OU_BOU.
       iApply (OU_wand with "[]").
-      2: { iApply (smap_create_ep (λ _, l__o) with "[$] [$] [$]").
-           { done. }
-           apply fl_degs_lh. }
-
+      2: { iApply (smap_create_ep (λ _, l__o) r with "[$] [$] [$]").
+           2: { apply fl_degs_lh. }
+           rewrite SR_DOM. apply elem_of_set_seq. lia. }
       iIntros "X". iMod "X" as "(%s&?&?&?&?)". iApply BOU_intro.
       iFrame. iSplit; [| done]. iExists _. iFrame "#∗".
     Qed.
@@ -268,6 +265,23 @@ Section MotivatingClient.
       iIntros "HA HB". iCombine "HB HA" as "H".
       rewrite -!own_op. iApply own_update; [| by iFrame].
       apply excl_auth_update.
+    Qed.
+
+    Lemma BOU_smap_cl_extend τ smap R r:
+    ⊢ obls τ R -∗ smap_repr_cl r r smap -∗
+      BOU ∅ 1 (|==> (∃ s', smap_repr_cl r (r + 1) (<[ r := s']> smap) ∗ obls τ (R ∪ {[s']}) ∗ ⌜ s' ∉ R ⌝ ∗ sgn s' l__o None)).
+    Proof using ODd ODl LEl.
+      clear -ODd ODl LEl.
+      iIntros "OB [SR %DOM]".
+      iApply (BOU_wand with "[]").
+      2: { iApply (BOU_smap_extend (λ _, l__o) _ r with "[$] [$]").
+             { intros. reflexivity. }
+             { simpl. apply Nat.ltb_irrefl. }
+             rewrite DOM. intros ?%elem_of_set_seq. lia. }
+      iIntros "XX". iMod "XX" as "(%s' & SR & #ITH & OB & %FRESH & #SGN)".
+      iExists _. iFrame "#∗".
+      iPureIntro. split; eauto.
+      rewrite dom_insert_L. rewrite set_seq_add_L. set_solver.
     Qed.
 
     Lemma acquire_usage τ (lk: val) flag s__f π Ob:
@@ -297,7 +311,7 @@ Section MotivatingClient.
 
       iApply ("ACQ" $! _ _ _ _ (RR__L π) with "[] [OB PH CPm]").
       { done. }
-      { iFrame "#∗". }
+      { rewrite /TLAT_pre. iFrame "#∗". }
 
       iApply (TAU_intro with "[]").
       4: { iSplit; [| iAccu].
@@ -333,8 +347,7 @@ Section MotivatingClient.
         { iDestruct "CASES" as "[-> | RR]".
           { iApply BOU_intro. iFrame "#∗". }
           iApply (BOU_wand with "[]").
-          2: { iApply BOU_create_wait_owner; [..| iFrame "#∗"].
-               eapply elem_of_dom; eauto. }
+          2: { iApply BOU_create_wait_owner; [..| iFrame "#∗"]. }
           iIntros "(?&?&?)". iFrame. }
 
         iApply (BOU_split _ _ 1 _). iApply (BOU_wand with "[-EXP] EXP").
@@ -353,28 +366,23 @@ Section MotivatingClient.
         remember_goal.
         iDestruct "ST" as "[[>% ?] | X]"; [done| ].
         iDestruct "X" as "(_& >LOCKED & >[%f P])".
-        iMod "LOCK_OW". iMod "SR" as "[SR %DOM]".
+        iMod "LOCK_OW".
+        iMod "SR".
         iApply "GOAL". iClear "GOAL".
 
-        rewrite Nat.add_0_r in DOM.
+        rewrite Nat.add_0_r.
         iApply (BOU_split _ _ 1).
         iApply (BOU_wand with "[-OB SR]").
-        2: { iApply (BOU_smap_extend (λ _, l__o) _ r with "[$] [$]").
-             { intros. reflexivity. }
-             { simpl. apply Nat.ltb_irrefl. }
-             rewrite DOM. intros ?%elem_of_set_seq. lia. }
-        iIntros "X". iMod "X" as "(%s' & SR & #SIGr & OB & %FRESH' & #SGNo)".
+        2: { iApply (BOU_smap_cl_extend with "[$] [$]"). }
+        iIntros "X". iMod "X" as "(%s' & SR & OB & %FRESH' & #SGNo)".
         iApply BOU_intro. iFrame.
         iIntros ([[??]?]) "[LK (%X & % & %)]".
         simpl in *. inversion X. subst.
         iMod "CLOS'" as "_".
-        Unshelve.
         iMod (lock_owner_update _ _ (Some s') with "[$] [$]") as "[LOCK_OW LOCKED]".
         iMod ("CLOS" with "[LK SR LOCK_OW]").
         { iNext. rewrite /client_inv_inner.
-          do 4 iExists _. iFrame. iSplit.
-          2: { iPureIntro. rewrite dom_insert_L.
-               rewrite set_seq_add_L. set_solver. }
+          do 4 iExists _. iFrame. iFrame "SR". 
           iLeft. iSplit; [done| ].
           rewrite lookup_insert. eauto. }
         
@@ -384,7 +392,6 @@ Section MotivatingClient.
         { done. }
         by iFrame. }
     Qed.
-
 
     Lemma acquire_left τ (lk: val) flag s__f π:
       {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗ flag_unset ∗
