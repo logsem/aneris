@@ -238,7 +238,8 @@ Section SignalMap.
   Qed. 
 
   (* TODO: use bupd in definition of OU *)
-  Lemma smap_create_ep i B D π q τ d__h d__l
+  (* TODO: get rid of this version*)
+  Lemma smap_create_ep' i B D π q τ d__h d__l
     (* (PH_LE: phase_le π__cp π) *)
     (LT: i ∈ D)
     (DEG_LT: deg_lt d__l d__h):
@@ -247,8 +248,6 @@ Section SignalMap.
   Proof using DISCR__d DISCR__l LEQUIV__l.
     iIntros "SR CP PH".
     rewrite /smap_repr. iDestruct "SR" as "(% & AUTH & SIGS & %DOM)".
-    (* assert (i ∈ dom smap) as [s ITH]%elem_of_dom. *)
-    (* { rewrite DOM. apply elem_of_set_seq. lia. } *)
     rewrite -DOM in LT. apply elem_of_dom in LT as [s ITH].
     rewrite {2}(map_split smap i) ITH /=.
     setoid_rewrite big_sepM_union.
@@ -275,6 +274,43 @@ Section SignalMap.
     rewrite big_sepM_singleton. iFrame.  
   Qed.
 
+  (* Lemma ith_sig_agree i s s': *)
+  (*   ith_sig i s -∗ ith_sig i s' -∗ ⌜ s' = s ⌝. *)
+  (* Proof using. *)
+  (*   iIntros "S1 S2". iCombine "S1 S2" as "S". *)    
+
+  Lemma smap_create_ep i s B D π q τ d__h d__l
+    (DEG_LT: deg_lt d__l d__h):
+    ⊢ ith_sig i s -∗ smap_repr B D -∗ cp π d__h -∗ th_phase_frag τ π q -∗
+      OU (|==> ep s π d__l ∗ smap_repr B D ∗ th_phase_frag τ π q).
+  Proof using DISCR__d DISCR__l LEQUIV__l.
+    iIntros "ITH SR CP PH".
+    rewrite /smap_repr. iDestruct "SR" as "(% & AUTH & SIGS & %DOM)".
+    iDestruct (ith_sig_in with "[$] [$]") as %ITH.
+    rewrite {2}(map_split smap i) ITH /=.
+    setoid_rewrite big_sepM_union.
+    2: { apply map_disjoint_singleton_l_2. by apply lookup_delete. }
+    iDestruct "SIGS" as "[SIG SIGS]". setoid_rewrite big_sepM_singleton.
+    rewrite {1}/ex_ith_sig. 
+    iDestruct (create_ep_upd with "CP [$] [PH]") as "OU".
+    { done. }
+    { done. }
+    iMod (own_update with "AUTH") as "X". 
+    { apply auth_update_dfrac_alloc. 
+      2: { apply singleton_included_l with (i := i).
+           rewrite lookup_fmap ITH. eexists. split; [| reflexivity].
+           simpl. reflexivity. }
+      apply _. }
+    iApply (OU_wand with "[-OU]"); [| by iFrame].
+    iIntros "(EP & SIG & PH)". iFrame. 
+    iDestruct "X" as "[? ITH_]". 
+    iExists _. iFrame. iModIntro. iSplit; [| done].
+    rewrite {2}(map_split smap i) ITH /=.
+    setoid_rewrite big_sepM_union.
+    2: { apply map_disjoint_singleton_l_2. by apply lookup_delete. }
+    rewrite big_sepM_singleton. iFrame.
+  Qed.
+  
   Lemma lookup_delete_ne' `{Countable K} {V: Type} (k: K) (m: gmap K V)
     (NOk: k ∉ dom m):
     delete k m = m.

@@ -228,19 +228,18 @@ Section MotivatingClient.
       iIntros "(?&?&?&?)". iApply BOU_intro. iFrame.
     Qed.
 
-    Lemma BOU_create_wait_owner τ π q r:
-      th_phase_frag τ π q ∗ cp π (fl_d__h FLP) ∗ smap_repr_cl r true ⊢
+    Lemma BOU_create_wait_owner τ π q r s:
+      th_phase_frag τ π q ∗ cp π (fl_d__h FLP) ∗ smap_repr_cl r true ∗ ith_sig r s ⊢
       BOU ∅ 1 (th_phase_frag τ π q ∗ RR__L π (Some r) ∗ smap_repr_cl r true).
     Proof using LVL_ORDo L__FL ODd ODl LEl.
       clear LS_LB FL_STEPS CR_LIM.
-      iIntros "(PH & CP & SR)".
+      iIntros "(PH & CP & SR & #ITH)".
       rewrite /RR__L.
       iApply OU_BOU.
       iApply (OU_wand with "[]").
-      2: { iApply (smap_create_ep (λ _, l__o) r with "[$] [$] [$]").
-           2: { apply fl_degs_lh. }
-           apply elem_of_set_seq. lia. }
-      iIntros "X". iMod "X" as "(%s&?&?&?&?)". iApply BOU_intro.
+      2: { iApply (smap_create_ep (λ _, l__o) r with "[$] [$] [$] [$]").
+           apply fl_degs_lh. }
+      iIntros "X". iMod "X" as "(?&?&?)". iApply BOU_intro.
       iFrame. iExists _. iFrame "#∗".
     Qed.
 
