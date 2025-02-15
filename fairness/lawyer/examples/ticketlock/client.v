@@ -180,16 +180,16 @@ Section MotivatingClient.
 
     Let s__def: SignalId := 0.
 
-    Definition smap_repr_cl r K smap: iProp Σ :=
+    Definition smap_repr_cl r (b: bool) smap: iProp Σ :=
       smap_repr (fun _ => l__o) (flip Nat.ltb r) smap ∗
-      ⌜ dom smap = set_seq 0 K ⌝.
+      ⌜ dom smap = set_seq 0 (r + (if b then 1 else 0))⌝.
     
     Definition client_inv_inner lk flag s__f: iProp Σ :=
       ∃ r b oo smap, fl_LK FLP (lk, r, b) (FLG := FLG) ∗ lock_owner_auth oo ∗
         (⌜ b = true ⌝ ∗ (∃ s__o, ⌜ oo = Some s__o /\ smap !! r = Some s__o⌝)
          ∨
          ⌜ b = false ⌝ ∗ lock_owner_frag None ∗ ∃ f, P__lock flag s__f f) ∗
-        smap_repr_cl r (r + (if b then 1 else 0)) smap.
+        smap_repr_cl r b smap.
     
     Definition client_inv lk flag sf: iProp Σ :=
       inv client_ns (client_inv_inner lk flag sf).
@@ -200,12 +200,11 @@ Section MotivatingClient.
       | Some r => ∃ s, ith_sig r s ∗ ep s π (fl_d__l FLP)
       end.
 
-    Lemma BOU_wait_owner τ π q O r m smap i
-      (WAIT: r <= i):
+    Lemma BOU_wait_owner τ π q O r smap:
       obls τ O ∗ sgns_levels_ge' O (fl_acq_lvls FLP)∗
-      th_phase_frag τ π q ∗ RR__L π (Some i) ∗ smap_repr_cl r m smap ⊢
+      th_phase_frag τ π q ∗ RR__L π (Some r) ∗ smap_repr_cl r true smap ⊢
       BOU ∅ 1 (cp π (fl_d__l FLP) ∗ th_phase_frag τ π q ∗
-          obls τ O ∗ smap_repr_cl r m smap).
+                obls τ O ∗ smap_repr_cl r true smap).
     Proof using LVL_ORDo L__FL ODl LEl.
       clear LS_LB CR_LIM.
       clear FL_STEPS.
@@ -232,9 +231,8 @@ Section MotivatingClient.
     Qed.
 
     Lemma BOU_create_wait_owner τ π q r smap:
-      th_phase_frag τ π q ∗ cp π (fl_d__h FLP) ∗ smap_repr_cl r (r + 1) smap ⊢
-      BOU ∅ 1 (th_phase_frag τ π q ∗ RR__L π (Some r) ∗
-                smap_repr_cl r (r + 1) smap).
+      th_phase_frag τ π q ∗ cp π (fl_d__h FLP) ∗ smap_repr_cl r true smap ⊢
+      BOU ∅ 1 (th_phase_frag τ π q ∗ RR__L π (Some r) ∗ smap_repr_cl r true smap).
     Proof using LVL_ORDo L__FL ODd ODl LEl.
       clear LS_LB FL_STEPS CR_LIM.
       iIntros "(PH & CP & [SR %SR_DOM])".
@@ -268,8 +266,8 @@ Section MotivatingClient.
     Qed.
 
     Lemma BOU_smap_cl_extend τ smap R r:
-    ⊢ obls τ R -∗ smap_repr_cl r r smap -∗
-      BOU ∅ 1 (|==> (∃ s', smap_repr_cl r (r + 1) (<[ r := s']> smap) ∗ obls τ (R ∪ {[s']}) ∗ ⌜ s' ∉ R ⌝ ∗ sgn s' l__o None)).
+    ⊢ obls τ R -∗ smap_repr_cl r false smap -∗
+      BOU ∅ 1 (|==> (∃ s', smap_repr_cl r true (<[ r := s']> smap) ∗ obls τ (R ∪ {[s']}) ∗ ⌜ s' ∉ R ⌝ ∗ sgn s' l__o None)).
     Proof using ODd ODl LEl.
       clear -ODd ODl LEl.
       iIntros "OB [SR %DOM]".
@@ -281,7 +279,8 @@ Section MotivatingClient.
       iIntros "XX". iMod "XX" as "(%s' & SR & #ITH & OB & %FRESH & #SGN)".
       iExists _. iFrame "#∗".
       iPureIntro. split; eauto.
-      rewrite dom_insert_L. rewrite set_seq_add_L. set_solver.
+      rewrite dom_insert_L. rewrite set_seq_add_L.
+      simpl. rewrite DOM Nat.add_0_r. set_solver.
     Qed.
 
     Lemma acquire_usage τ (lk: val) flag s__f π Ob:
@@ -343,7 +342,7 @@ Section MotivatingClient.
         iApply "GOAL". iClear "GOAL".
 
         iAssert (BOU ∅ 1 (RR__L π (Some r) ∗ th_phase_frag τ π q' ∗
-                           smap_repr_cl r (r + 1) smap))%I with "[CASES PH SR]" as "EXP".
+                           smap_repr_cl r true smap))%I with "[CASES PH SR]" as "EXP".
         { iDestruct "CASES" as "[-> | RR]".
           { iApply BOU_intro. iFrame "#∗". }
           iApply (BOU_wand with "[]").
@@ -370,7 +369,6 @@ Section MotivatingClient.
         iMod "SR".
         iApply "GOAL". iClear "GOAL".
 
-        rewrite Nat.add_0_r.
         iApply (BOU_split _ _ 1).
         iApply (BOU_wand with "[-OB SR]").
         2: { iApply (BOU_smap_cl_extend with "[$] [$]"). }
@@ -382,7 +380,7 @@ Section MotivatingClient.
         iMod (lock_owner_update _ _ (Some s') with "[$] [$]") as "[LOCK_OW LOCKED]".
         iMod ("CLOS" with "[LK SR LOCK_OW]").
         { iNext. rewrite /client_inv_inner.
-          do 4 iExists _. iFrame. iFrame "SR". 
+          do 4 iExists _. iFrame.
           iLeft. iSplit; [done| ].
           rewrite lookup_insert. eauto. }
         
@@ -424,8 +422,34 @@ Section MotivatingClient.
       by iDestruct (os_pending_excl with "[$] [$]") as "?".
     Qed.
 
+    Lemma BOU_set_sig τ r smap s R:
+      ⊢ smap_repr_cl r true smap -∗ 
+         ith_sig r s -∗
+         obls τ (R ∪ {[ s ]}) -∗
+         BOU ∅ 1 (smap_repr_cl (r + 1) false smap ∗ obls τ (R ∖ {[ s ]})).
+    Proof using LEl ODl.
+      clear -LEl ODl.
+      iIntros "[SR %DOM] #SIG OB".
+      iApply OU_BOU.
+      iApply (OU_wand with "[-OB SR]").
+      2: { iApply (smap_set_sig (λ _, l__o) with "[$] [$] [$]").
+           { Unshelve. 2: exact (flip Nat.ltb (S r)).
+             simpl. apply Nat.ltb_lt. lia. }
+           { set_solver. }
+           (* TODO: extract lemma, use in eo_fin *)
+           intros. simpl.
+           rewrite DOM in H0. apply elem_of_set_seq in H0.
+           destruct (Nat.lt_trichotomy j (S r)) as [LT | [-> | LT]]; revgoals.
+           1,2: rewrite !(proj2 (Nat.ltb_ge _ _)); lia.
+           rewrite !(proj2 (Nat.ltb_lt _ _)); lia. }
+      iIntros "[SR OB]". iApply BOU_intro.
+      iSplitR "OB".
+      2: { iApply obls_proper; [..| by iFrame]. set_solver. }
+      rewrite /smap_repr_cl. rewrite Nat.add_1_r. iFrame.
+      iPureIntro. rewrite DOM. f_equal. lia.
+    Qed.
+
     Lemma release_usage (lk: val) τ s__o s__f flag Ob π f Q
-      (* (SIGS_NEQ: s__o ≠ s__f) *)
       (ADD: s__o ∉ Ob)
       :
       {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗
@@ -496,21 +520,11 @@ Section MotivatingClient.
            iLeft. iSplit; [done| ]. eauto. }
       { iIntros (??) "(?&?&?&?&?&%)". done. }
       { iIntros "% (_ & OB & PH & %Q')".
-        iApply OU_BOU.
-        iApply (OU_wand with "[-OB SR]").
-        2: { iApply (smap_set_sig (λ _, l__o) with "[$] [$] [$]").
-             { Unshelve. 2: exact (flip Nat.ltb (S r)).
-               simpl. apply Nat.ltb_lt. lia. }
-             { set_solver. }
-             (* TODO: extract lemma, use in eo_fin *)
-             intros. simpl.
-             rewrite DOM in H0. apply elem_of_set_seq in H0.
-             destruct (Nat.lt_trichotomy j (S r)) as [LT | [-> | LT]]; revgoals.
-             1,2: rewrite !(proj2 (Nat.ltb_ge _ _)); lia.
-             rewrite !(proj2 (Nat.ltb_lt _ _)); lia. }
+        iApply (BOU_split _ _ 1). 
+        iApply (BOU_wand with "[-SR OB]").
+        2: { by iApply (BOU_set_sig with "[$SR] [$] [$]"). }
         iIntros "[SR OB]".
-        rewrite difference_union_distr_l_L difference_diag_L.
-        rewrite union_empty_r_L (difference_disjoint_L Ob); [| set_solver].
+        rewrite (difference_disjoint_L Ob); [| set_solver]. 
 
         iSpecialize ("FIN_BOU" with "[//][$] [$]").
         iApply (BOU_wand with "[-FIN_BOU] [$]").
@@ -520,7 +534,6 @@ Section MotivatingClient.
         rewrite /release_at_post. simpl.
         iIntros "(LK & (->&->&->))".
         iMod (lock_owner_update _ _ None with "[$] [$]") as "[UNL' UNL]".
-        (* iMod ("WW" with "[$]") as "[P W]". *)
         iMod "CLOS'" as "_".
         iMod ("CLOS" with "[-FIN]") as "_".
         2: { iModIntro. iIntros "PH_CLOS POST". iApply "POST".
@@ -528,8 +541,6 @@ Section MotivatingClient.
              iApply "FIN".
              destruct (1 - q')%Qp; simpl; done. }
         iNext. rewrite /client_inv_inner. do 4 iExists _. iFrame.
-        iSplitR "SR".
-        2: { rewrite Nat.add_0_r -Nat.add_1_r. iFrame. done. }
         iRight. iSplit; [done| ]. iFrame.
         iExists _. iFrame. }
     Qed.
@@ -749,21 +760,12 @@ Section MotivatingClient.
            iLeft. iSplit; [done| ]. eauto. }
       { iIntros (??) "(?&?&?&?&?&%)". done. }
       { iIntros "%q' (_ & OB & PH & %Q')".
-        iApply OU_BOU.
-        iApply (OU_wand with "[-OB SR]").
-        2: { iApply (smap_set_sig (λ _, l__o) with "[$] [$] [$]").
-             { Unshelve. 2: exact (flip Nat.ltb (S r)).
-               simpl. apply Nat.ltb_lt. lia. }
-             { set_solver. }
-             (* TODO: extract lemma, use in eo_fin *)
-             intros. simpl.
-             rewrite DOM in H0. apply elem_of_set_seq in H0.
-             destruct (Nat.lt_trichotomy j (S r)) as [LT | [-> | LT]]; revgoals.
-             1,2: rewrite !(proj2 (Nat.ltb_ge _ _)); lia.
-             rewrite !(proj2 (Nat.ltb_lt _ _)); lia. }
-        iIntros "[SR OB]".
-        rewrite difference_diag_L.
-
+        iApply (BOU_split _ _ 1). 
+        iApply (BOU_wand with "[-SR OB]").
+        2: { rewrite -(union_empty_l_L (singleton _)). 
+             iApply (BOU_set_sig with "[$SR //] [$] [$]"). }
+        iIntros "[SR OB]". rewrite (subseteq_empty_difference_L ∅); [| done].
+        
         iAssert (BOU ∅ 4 ((⌜f = true⌝ ∗ flag_set ∨ ⌜f = false⌝ ∗ cp_mul π (fl_d__m FLP) 4) ∗ P__lock flag s__f f ∗ obls τ ∅ ∗ th_phase_frag τ π q'))%I with "[P OB PH]" as "FIN".
         { rewrite /P__lock. destruct f.
           { iDestruct "P" as "[? [[% ?] | [_ #SET]]]"; [done| ].
@@ -787,8 +789,6 @@ Section MotivatingClient.
              iDestruct (th_phase_frag_combine' with "[$PH $PH_CLOS]") as "foo".
              all: done. }
         iNext. rewrite /client_inv_inner. do 4 iExists _. iFrame.
-        iSplitR "SR".
-        2: { rewrite Nat.add_0_r -Nat.add_1_r. iFrame. done. }
         iRight. iSplit; [done| ]. iFrame.
         by iExists _. }
     Qed.
