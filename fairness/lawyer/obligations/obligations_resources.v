@@ -1261,13 +1261,11 @@ Section ObligationsRepr.
     Qed.
 
     (* useful as the first step's BOU of a function call *)
-    Lemma first_BOU τ π q d0 d n E
-      (DEG_LT: deg_lt d d0)
-      (LIM: S n <= LIM_STEPS):
-      th_phase_frag τ π q -∗ cp π d0 -∗
-        BOU E (S n) (cp_mul π d n ∗ exc_lb n ∗ th_phase_frag τ π q).
+    Lemma first_BOU π d0 d n E
+      (DEG_LT: deg_lt d d0):
+      cp π d0 -∗ BOU E (S n) (cp_mul π d n ∗ exc_lb n).
     Proof using.
-      iIntros "PH CP".
+      iIntros "CP".
       do 2 rewrite -Nat.add_1_r. simpl. iApply BOU_split.
       iApply OU_BOU_rep.
       iApply (OU_rep_wand with "[-]").

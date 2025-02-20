@@ -129,14 +129,13 @@ Section EoFin.
       | right LT => ith_bn LIM i LT
       end.
 
-    Definition smap_repr_eo n K smap: iProp Σ :=
-      smap_repr B__eo (flip Nat.ltb n) smap ∗
-      ⌜ dom smap = set_seq 0 K ⌝. 
+    Definition smap_repr_eo n K: iProp Σ :=
+      smap_repr B__eo (flip Nat.ltb n) (set_seq 0 K).
 
     Definition eofin_inv_inner l: iProp Σ :=
-      ∃ (n: nat) (smap: gmap nat SignalId), 
+      ∃ (n: nat), 
           l ↦ #n ∗ threads_auth n ∗
-          smap_repr_eo n (min B (n + 2)) smap.
+          smap_repr_eo n (min B (n + 2)).
 
     Definition eofin_inv l: iProp Σ :=
       inv (nroot .@ "eofin") (eofin_inv_inner l).
@@ -165,42 +164,39 @@ Section EoFin.
 
     Existing Instance oGS.
     
-    Lemma BOU_update_SR smap τ m:
+    Lemma BOU_update_SR τ m:
   obls τ ∅ -∗
-  smap_repr_eo (m + 1) (B `min` (m + 2)) smap -∗
+  smap_repr_eo (m + 1) (B `min` (m + 2)) -∗
       BOU ∅ 1 (
-        |==> ∃ smap' R', smap_repr_eo (m + 1) (B `min` (m + 3)) smap' ∗
+        |==> ∃ R', smap_repr_eo (m + 1) (B `min` (m + 3)) ∗
                          obls τ R' ∗
-          (⌜ B <= m + 2 /\ smap' = smap /\ R' = ∅ ⌝ ∨
-           ∃ s', ith_sig (m + 2) s' ∗ ⌜ m + 2 < B /\ smap' = (<[(m + 2)%nat := s']> smap) /\ R' = {[ s' ]} ⌝)).
+          (⌜ B <= m + 2 /\ R' = ∅ ⌝ ∨
+           ∃ s', ith_sig (m + 2) s' ∗ ⌜ m + 2 < B /\ R' = {[ s' ]} ⌝)).
     Proof using OBLS_AMU.
-      iIntros "OBLS [SR %DOM]".
+      iIntros "OBLS SR".
       destruct (Nat.le_gt_cases B (m + 2)).
       { rewrite !PeanoNat.Nat.min_l; try lia.
-        iApply BOU_intro. iModIntro. do 2 iExists _. iFrame.
-        iSplit.
-        { by rewrite Nat.min_l in DOM. } 
+        iApply BOU_intro. iModIntro. do 1 iExists _. iFrame.
         iLeft. done. }
 
       (* iDestruct (smap_expose_dom with "[$]") as "%SM_DOM". *)
-      rewrite PeanoNat.Nat.min_r in DOM; [| lia].
+      (* rewrite PeanoNat.Nat.min_r in DOM; [| lia]. *)
       iApply BOU_wand.
       2: { rewrite /smap_repr_eo. simpl.
            (* rewrite !PeanoNat.Nat.min_r; [| lia]. *)
-           iPoseProof (BOU_smap_extend B__eo τ (m + 2) smap ∅
+           iPoseProof (BOU_smap_extend B__eo τ (m + 2) _ ∅
 (flip Nat.ltb (m + 1)) (flip Nat.ltb (m + 1)) with "[$] [$]") as "foo".
            4: by iFrame.
            { done. }
            { simpl. apply Nat.ltb_ge. lia. }
-           rewrite DOM. intros ?%elem_of_set_seq. lia. }
+           intros ?%elem_of_set_seq. lia. }
 
       iIntros "UPD". iMod "UPD" as (?) "(SR & SIG & OB & % & #LVL)".
-      iModIntro. rewrite Nat.min_r; [| lia]. 
-      do 2 iExists _. iFrame. iSplit.
-      { rewrite dom_insert_L. iPureIntro.
-        rewrite (Nat.add_succ_r _ 2).
-        rewrite set_seq_S_end_union_L.
-        set_solver. }
+      iModIntro. repeat rewrite Nat.min_r; try lia. 
+      do 1 iExists _. iFrame. iSplit.
+      { rewrite /smap_repr_eo. 
+        rewrite (Nat.add_succ_r _ 2).        
+        rewrite set_seq_S_end_union_L. rewrite union_comm_L. iFrame. }
       iRight. iExists _. iFrame. iPureIntro.
       eexists. repeat split; eauto. set_solver.
     Qed.
@@ -251,7 +247,7 @@ Section EoFin.
       iApply wp_atomic. 
       iInv "INV" as ">inv" "CLOS". iModIntro. 
       rewrite {1}/eofin_inv_inner.
-      iDestruct "inv" as (m smap) "(L & AUTH & [SR %DOM])".
+      iDestruct "inv" as (m) "(L & AUTH & SR)".
       iDestruct (tr_agree with "[$] TH") as %EQ; eauto. subst n. 
       destruct (cond m) eqn:Cm.
       - 
@@ -270,7 +266,7 @@ Section EoFin.
                simpl. apply Nat.ltb_lt. lia. }
              { set_solver. }
              intros. simpl.
-             rewrite DOM in H2. apply elem_of_set_seq in H2.
+             apply elem_of_set_seq in H2.
              destruct (Nat.lt_trichotomy j (S m)) as [LT | [-> | LT]]; revgoals.
              1,2: rewrite !(proj2 (Nat.ltb_ge _ _)); lia.
              rewrite !(proj2 (Nat.ltb_lt _ _)); try lia. }
@@ -282,10 +278,10 @@ Section EoFin.
                 
         iApply (BOU_wand with "[-OBLS SR]").
         2: { iApply (BOU_update_SR with "[$] [SR]").
-             rewrite /smap_repr_eo. rewrite Nat.add_1_r. iFrame. done. }
+             rewrite /smap_repr_eo. rewrite Nat.add_1_r. iFrame. }
         iIntros "UPD".
         burn_cp_after_BOU.
-        iMod "UPD" as (smap' R') "(SR & OB & COND)". 
+        iMod "UPD" as (R') "(SR & OB & COND)". 
         iApply wp_value.
         
         iMod (tr_update with "[$] TH") as "[AUTH TH]"; eauto. 
@@ -293,10 +289,10 @@ Section EoFin.
         destruct (Nat.le_gt_cases B (m + 2)). 
         + iDestruct "COND" as "[COND | CC]".
           2: { iDestruct "CC" as "(%&?&%&?)". lia. }
-          iDestruct "COND" as "(_ & -> & ->)".
+          iDestruct "COND" as "(_ & ->)".
           
           iMod ("CLOS" with "[AUTH SR L]") as "?".
-          { rewrite /eofin_inv_inner. iNext. iExists (m + 1), smap.
+          { rewrite /eofin_inv_inner. iNext. iExists (m + 1).
             rewrite -Nat.add_assoc. rewrite Nat2Z.inj_add. 
             iFrame. }
           
@@ -315,11 +311,11 @@ Section EoFin.
           rewrite bool_decide_true; [| lia].
           pure_steps. by iApply "POST". 
         + iDestruct "COND" as "[CC | COND]".
-          { iDestruct "CC" as "(% & % & %)". lia. }
+          { iDestruct "CC" as "(% & %)". lia. }
           iClear "SN".  
-          iDestruct "COND" as "(%s'& SN & (%LT & -> & ->))".
+          iDestruct "COND" as "(%s' & SN & (%LT & ->))".
           iMod ("CLOS" with "[AUTH SR L]") as "?".
-          { rewrite /eofin_inv_inner. iNext. iExists (m + 1), _.
+          { rewrite /eofin_inv_inner. iNext. iExists (m + 1).
             rewrite -Nat.add_assoc. rewrite Nat2Z.inj_add. 
             iFrame. }
           
@@ -356,9 +352,7 @@ Section EoFin.
           replace (m + 2) with (S (m + 1)) by lia.
           iFrame. 
           iExists _. iFrame.
-      - 
-        rewrite Nat.min_r in DOM; [| lia]. 
-        iApply sswp_MU_wp; [done| ]. 
+      - iApply sswp_MU_wp; [done| ]. 
         iApply (wp_cmpxchg_fail with "[$]"); try done.
         { intros [=]. lia. }
         { econstructor. done. }
@@ -372,8 +366,8 @@ Section EoFin.
           (* TODO: avoid unfolding BOU *)
           (* rewrite Nat.min_r; [| lia]. *)
           rewrite /smap_repr_eo. 
-          iPoseProof (smap_create_ep B__eo m with "[$] [$] [$]") as "OU"; eauto.
-          { rewrite DOM. apply elem_of_set_seq. lia. } 
+          iPoseProof (smap_create_ep' B__eo m with "[$] [$] [$]") as "OU"; eauto.
+          { apply elem_of_set_seq. lia. } 
           { apply d12_lt. }
           iApply OU_BOU.
           iApply (OU_wand with "[-OU]"); [| done].
@@ -401,8 +395,8 @@ Section EoFin.
           iApply wp_value.
 
           iMod ("CLOS" with "[AUTH SR L]") as "?".
-          { rewrite /eofin_inv_inner. iNext. iExists m, smap.
-            rewrite Nat.min_r; [| lia]. iFrame. done. }
+          { rewrite /eofin_inv_inner. iNext. iExists m.
+            rewrite Nat.min_r; [| lia]. iFrame. }
           iModIntro.
           wp_bind (Snd _)%E.
 
@@ -445,8 +439,8 @@ Section EoFin.
           iApply wp_value.
 
           iMod ("CLOS" with "[AUTH SR L]") as "?".
-          { rewrite /eofin_inv_inner. iNext. iExists m, smap.
-            rewrite Nat.min_r; [| lia]. iFrame. done. }
+          { rewrite /eofin_inv_inner. iNext. iExists m.
+            rewrite Nat.min_r; [| lia]. iFrame. }
           iModIntro.
           wp_bind (Snd _)%E.
           do 3 pure_step_cases. 
@@ -549,7 +543,7 @@ Section EoFin.
       set (m := min B 2).
       iAssert (BOU ⊤ 2 
                  (|==> ∃ smap (smG: SigMapG Σ),
-                              smap_repr B__eo (flip Nat.ltb 0) smap ∗
+                              smap_repr B__eo (flip Nat.ltb 0) (set_seq 0 m) ∗
                               ⌜ dom smap = set_seq 0 m ⌝ ∗
                                let sigs := sigs_block smap 0 m in
                                obls τ (list_to_set sigs) ∗
@@ -590,11 +584,11 @@ Section EoFin.
           iSplit.
           2: { subst smap0. iPureIntro. rewrite !dom_insert_L.
                subst m. rewrite EQ. simpl. set_solver. }
-          subst smap0. rewrite /smap_repr. iFrame. 
-          rewrite !big_sepM_insert; try set_solver.
-          rewrite big_sepM_empty. rewrite /ex_ith_sig.
-          simpl. rewrite !(proj2 (PeanoNat.Nat.ltb_ge _ _)); try lia.
-          rewrite !B__eo_simpl. iFrame.
+          subst smap0. rewrite /smap_repr. iFrame.
+          iExists _. iFrame.
+          rewrite !big_sepM_insert. 2, 3: set_solver. rewrite big_sepM_empty. 
+          rewrite /ex_ith_sig. rewrite !B__eo_simpl. iFrame.
+          iPureIntro. subst m. rewrite EQ. set_solver. 
         - iApply OU_BOU.
           assert (0 < LIM) as Di by lia. 
           unshelve iDestruct (OU_create_sig with "[$]") as "OU".
@@ -614,10 +608,11 @@ Section EoFin.
                - subst smap0 m. rewrite EQ. rewrite /sigs_block. set_solver.
                - by apply NoDup_singleton. }
 
-          subst smap0. rewrite !big_sepM_insert; try set_solver.
-          rewrite big_sepM_empty. rewrite /ex_ith_sig.
-          simpl. rewrite !(proj2 (PeanoNat.Nat.ltb_ge _ _)); try lia.
-          rewrite !B__eo_simpl. iFrame.
+          subst smap0. rewrite /smap_repr. iExists _. iFrame. 
+          rewrite !big_sepM_insert; [| set_solver]. rewrite big_sepM_empty.
+          rewrite /ex_ith_sig. simpl. subst m. rewrite EQ.
+          rewrite !(proj2 (PeanoNat.Nat.ltb_ge _ _)); try lia.
+          rewrite !B__eo_simpl. iFrame. iPureIntro. set_solver. 
         - iApply BOU_intro.
           set (smap0 := ∅: gmap nat SignalId).
           iMod (own_alloc (● ((to_agree <$> smap0): gmapUR nat (agreeR SignalId)) ⋅ ◯ _)) as (?) "[A F]".
@@ -634,7 +629,8 @@ Section EoFin.
           (* { subst smap0. iPureIntro.  *)
           (*   subst m. (* subst i. *) *)
           (*   rewrite H. set_solver. } *)
-          subst smap0. rewrite big_sepM_empty. done. }
+          subst smap0. iExists _. iFrame. rewrite big_sepM_empty.
+          subst m. rewrite H. iPureIntro. set_solver. } 
 
       iApply (BOU_wand with "[-SR] [$]"). 
       iIntros "X". iMod "X" as "(%smap & %SMG & SR & %DOM & OB & %SIZE & #F & %EQ_PRE)".
@@ -651,10 +647,10 @@ Section EoFin.
       {
         (* admit.  *)
         iApply inv_alloc. iNext.
-        rewrite /eofin_inv_inner. iExists 0, smap. iFrame. done. }
+        rewrite /eofin_inv_inner. iExists 0. iFrame. }
       rewrite bi.sep_assoc. iSplit.
       { iPureIntro. split; try done. apply sigs_block_len. } 
-      iDestruct "SR" as "(?&SIGS)".
+      iDestruct "SR" as "SIGS".
       iApply big_sepL_forall. iIntros (k s IN).
       pose proof IN as DOMk%mk_is_Some%sigs_block_is_Some.
       rewrite sigs_block_lookup_eq in IN; try done.

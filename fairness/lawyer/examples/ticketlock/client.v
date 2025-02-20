@@ -104,6 +104,8 @@ Section MotivatingClient.
     (* in case fl_lvls is empty *)
     (LVL_ORDof: lvl_lt l__o l__f).
 
+  (* l_o < Лм < l_f *)
+
   (* need to assume at least one FL level *)
   (* TODO: can we change either TAU or levels order? *)
   Context (l__fl: Level).
@@ -218,10 +220,11 @@ Section MotivatingClient.
            rewrite /sgns_levels_ge'.
            (* iDestruct (big_sepS_forall with "LVLS") as "LVLS'". *)
            (* iSpecialize ("LVLS'" $! l__fl with "[//]"). *)
+           rewrite /sgns_level_gt /sgns_levels_gt'. rewrite /sgns_levels_rel. 
            iApply big_sepS_impl; [by iFrame| ].
            iModIntro. iIntros (??) "(%l & ? & %LE)".
            iExists _. iFrame. iPureIntro.
-           apply set_Forall_singleton. 
+           apply set_Forall_singleton.
            eapply strict_transitive_l; [| apply LE].
            1: apply LVL_ORDo.
            all: apply L__FL. }
@@ -608,11 +611,11 @@ Section MotivatingClient.
       iApply (sswp_wand with "[-FIN]"); [| by iFrame].
       simpl. iIntros (e2) "FIN".
       MU_by_BOU.
-      iApply (BOU_wand with "[FIN]").
+      iApply (BOU_wand with "[FIN PH]").
       2: { simpl. iApply (BOU_lower _ (S (S n))); [lia| ].
-           iApply (first_BOU with "[$] [$]"); [| lia]. 
+           iApply (first_BOU with "[$]"). 
            apply DEG_LT. }
-      iIntros "(CPS & #EXC & PH)".
+      iIntros "(CPS & #EXC)".
       burn_cp_after_BOU.
       iApply ("FIN" with "[$] [$] [$]").
     Qed.
@@ -957,8 +960,13 @@ Section MotivatingClient.
 (*   (* TODO: move *) *)
 (*   Lemma BOU_0 E P: *)    
 (* BOU ⊤ LIM_STEPS *)
-  Context {CL_PRE: ClientPreG Σ} {FL_PRE: fl_GpreS FLP Σ}. 
+  Context {CL_PRE: ClientPreG Σ} {FL_PRE: fl_GpreS FLP Σ}.
 
+  (* Lemma init_smap_repr_cl: *)
+  (*   ⊢ |==> ∃ (SMG: SigMapG Σ), smap_repr_cl 0 false. *)
+  (* Proof using.   *)
+  (*   iMod (init_smap_repr_empty (fun _ => l__o) _ _ (flip Nat.ltb 0) with "OB") as "SR". *)
+  
   Lemma alloc_client_inv {FLG: fl_GS FLP Σ} R s__f lk τ π flag:
     obls τ R -∗ sgn s__f l__f (Some false) -∗ fl_LK FLP (lk, 0, false) (FLG := FLG) -∗
     th_phase_eq τ π -∗ flag ↦ #false -∗
@@ -1000,11 +1008,10 @@ Section MotivatingClient.
     pure_step_hl. MU_by_BOU.
     iApply BOU_lower; [apply LS_LB| ]. iApply BOU_split.
     split_cps "CPSr" 1. rewrite -cp_mul_1.
-    iApply (BOU_wand with "[-PH CPSr']").
-    2: { iApply (first_BOU with "[$] [$]").
-         { apply LThm. }
-         etrans; [| apply LS_LB]. rewrite /MAX_EXC. lia. }
-    iIntros "(CPS & #EXC & PH)". 
+    iApply (BOU_wand with "[-CPSr']").
+    2: { iApply (first_BOU with "[$]").
+         apply LThm. }
+    iIntros "(CPS & #EXC)".
 
     iApply OU_BOU. iApply (OU_wand with "[-OB]").
     2: { iApply (OU_create_sig _ _ l__f with "OB"). }

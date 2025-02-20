@@ -119,6 +119,18 @@ Section SignalMap.
     by rewrite big_opM_fmap.
   Qed.
 
+  (* Weaker version that doesn't require passing obligations; justifies the rule presented in the paper.
+     It can't be derived from the stronger one. *)
+  Lemma init_smap_repr_empty `{SigMapPreG Σ} B:
+    ⊢ |==> ∃ (SMG: SigMapG Σ), smap_repr B ∅.
+  Proof using LEQUIV__l DISCR__l.
+    clear DISCR__d. 
+    iMod (own_alloc (● ((to_agree <$> ∅): gmapUR nat (agreeR SignalId)) ⋅ ◯ _)) as (γ) "[A F]".
+    { apply auth_both_valid_2; [| reflexivity]. apply map_nat_agree_valid. }
+    iExists {| sm_γ__smap := γ |}. rewrite /smap_repr. iExists _. iFrame.
+    iModIntro. iSplit; [| iPureIntro]; set_solver.
+  Qed.
+
   Context {SM_G: SigMapG Σ}.
 
   Lemma ith_sig_in i s smap:

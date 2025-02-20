@@ -1011,12 +1011,10 @@ Section Ticketlock.
     pure_step_hl. MU_by_BOU.    
     iApply (BOU_lower _ 20).
     { etrans; [| apply LIM_STEPS']. simpl. rewrite /tl_exc. lia. }
-    iApply (BOU_wand with "[-CP PH]").
-    2: { iApply (first_BOU with "[$] [$]"); [| eauto].
-         { trans d__e; [trans d__h0| ]; [trans d__l0|..]; eauto. }
-         simpl. etrans; [| apply LIM_STEPS'].
-         simpl. rewrite /tl_exc. lia. }
-    iIntros "(CPS & #EB & PH)".
+    iApply (BOU_wand with "[-CP]").
+    2: { iApply (first_BOU with "[$]"). 
+         trans d__e; [trans d__h0| ]; [trans d__l0|..]; eauto. }
+    iIntros "(CPS & #EB)".
     burn_cp_after_BOU. 
     
     assert (FAA (Fst lk) #1 = fill_item (FaaLCtx #(LitInt 1)) (Fst lk)) as CTX by done.
@@ -1132,10 +1130,10 @@ Section Ticketlock.
     simpl. 
     iApply (BOU_lower _ (S tl_exc + (c + c + 2))).
     { etrans; [| apply LIM_STEPS']. simpl fl_B. lia. } 
-    iApply BOU_split. iApply (BOU_wand with "[-CP PH]").
-    2: { iApply (first_BOU with "[$] [$]"); [| eauto].
+    iApply BOU_split. iApply (BOU_wand with "[-CP]").
+    2: { iApply (first_BOU with "[$]").
          apply fl_degs_em. }
-    iIntros "(CPSe & #EB & PH)".
+    iIntros "(CPSe & #EB)".
     
     iApply (BOU_lower _ 2).
     { simpl. lia. }
