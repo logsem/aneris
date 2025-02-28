@@ -195,6 +195,39 @@ Section ProgramLogic.
 
   End BOU.
 
+  Global Instance ElimOU p P Q:
+    ElimModal True p false (OU P) P (OU Q) Q.
+  Proof using.
+    red. simpl. iIntros "_ [OP PQ]".
+    iApply (OU_wand with "[$]").
+    by iApply bi.intuitionistically_if_elim.
+  Qed.
+
+  Global Instance ElimOU_BOU p P Q E n:
+    ElimModal (0 < n) p false (OU P) P (BOU E n Q) (BOU E (n - 1) Q).
+  Proof using.
+    red. simpl. iIntros "%NZ [OP PQ]".
+    apply Nat.le_sum in NZ as [? ->]. rewrite Nat.sub_add'. 
+    iApply OU_BOU. 
+    iDestruct (bi.intuitionistically_if_elim with "OP") as "OP".
+    iMod "OP". by iApply "PQ".
+  Qed.
+  (* Global Instance ElimOU_BOU p P Q E n m: *)
+  (*   S m <= n -> ElimModal True p false (OU P) P (BOU E n Q) (BOU E (n - 1) Q). *)
+  (* Proof using. *)
+  (*   clear LIM_STEPS_LB.  *)
+  (*   intros. red. simpl. iIntros "%NZ [OP PQ]". *)
+  (*   iApply OU_BOU'; [lia| ]. *)
+  (*   iDestruct (bi.intuitionistically_if_elim with "OP") as "OP". *)
+  (*   iMod "OP". by iApply "PQ". *)
+  (* Qed. *)
+
+  Global Instance FromModal_BOU E n P:
+    FromModal True modality_id (BOU E n P) (BOU E n P) P.
+  Proof using.
+    red. simpl. iIntros "_". iApply BOU_intro.
+  Qed.
+
 End ProgramLogic.
 
 
@@ -235,16 +268,7 @@ Section TestProg.
  
   Context {NO_OBLS_POST: ⊢ ∀ τ, obls τ ∅ -∗ 
                                   em_thread_post τ (em_GS0 := heap_fairnessGS (heapGS := hGS))}.
-
-  (* TODO: move *)
-  Lemma OU_BOU' E P b
-    (NZ: 0 < b):
-    ⊢ OU (BOU E (b - 1) P) -∗ BOU E b P.
-  Proof using.
-    red in NZ. apply Nat.le_sum in NZ as [? ->].
-    rewrite Nat.sub_add'. iApply OU_BOU.
-  Qed.
-
+  
   Lemma test_spec (τ: locale heap_lang) (π: Phase) (d d': Degree) (l: Level)
     (DEG: deg_lt d' d)
     :
@@ -262,13 +286,10 @@ Section TestProg.
     iNext.
 
     iApply OBLS_AMU; [by rewrite nclose_nroot| ].
-    iApply (BOU_AMU with "[-]"). 
-    iApply OU_BOU'; [lia| ].
-    iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
-    iDestruct (exchange_cp_upd with "[$] [$]") as "OU"; eauto.
-    iApply (OU_wand with "[-OU]"); [| done].
-    iIntros "CPS'". 
-    iApply BOU_intro.
+    iApply (BOU_AMU with "[-]").
+    iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
+    iMod (exchange_cp_upd with "[$] [$]") as "CPS'"; eauto; [lia| ].
+    iModIntro. 
     iDestruct (cp_mul_take with "CPS'") as "[CPS' CP']". 
     iSplitR "CP' PH".
     2: { iExists _. iFrame. }
@@ -280,11 +301,10 @@ Section TestProg.
     iApply sswp_MU_wp; [done| ].
     iApply wp_alloc. iIntros "!> %x L ?".
     iApply OBLS_AMU; [by rewrite nclose_nroot| ].
-    iApply BOU_AMU. iApply OU_BOU'; [lia| ].
-    iDestruct (OU_create_sig _ _ l with "[$]") as "OU".
-    iApply (OU_wand with "[-OU]"); [| done].
-    iIntros "(%sid & SIG & OBLS & %NEW)".
-    iApply BOU_intro.
+    iApply BOU_AMU. 
+    iMod (OU_create_sig _ _ l with "[$]") as "SIG"; [lia| ].
+    iDestruct "SIG" as "(%sid & SIG & OBLS & %NEW)".
+    iModIntro.
     iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
     iSplitR "CP PH". 
     2: { iExists _. iFrame. }
@@ -297,7 +317,7 @@ Section TestProg.
     iApply sswp_pure_step; [done| ].
     iNext. iApply OBLS_AMU; [by rewrite nclose_nroot| ].
     iApply BOU_AMU. 
-    iApply BOU_intro.
+    iModIntro.
     iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
     iSplitR "CP PH".
     2: { iExists _. iFrame. }
@@ -309,8 +329,7 @@ Section TestProg.
     iApply sswp_MU_wp; [done| ].      
     iApply sswp_pure_step; [done| ].
     iNext. iApply OBLS_AMU; [by rewrite nclose_nroot| ].
-    iApply BOU_AMU. 
-    iApply BOU_intro.
+    iApply BOU_AMU. iModIntro. 
     iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
     iSplitR "CP PH". 
     2: { iExists _. iFrame. }
@@ -321,14 +340,11 @@ Section TestProg.
     iApply sswp_MUf_wp. iIntros (τ'). iApply (MU__f_wand with "[]").
     2: {
       iApply OBLS_AMU__f; [by rewrite nclose_nroot| ]. 
-      iApply BOU_AMU__f. 
-      iApply OU_BOU'; [lia| ].
+      iApply BOU_AMU__f.
+      iNext. 
       iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
-      iApply (OU_wand with "[-CP PH]"). 
-      2: { iApply (burn_cp_upd with "CP [$]"). }
-      iIntros "PH".
-      
-      iApply BOU_intro. iFrame "PH OBLS".
+      iMod (burn_cp_upd with "CP [$]") as "PH"; [lia| ].
+      iModIntro. iFrame "PH OBLS".
       iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
       iSplitR "CP".
       2: { iExists _. iFrame. }
@@ -346,11 +362,9 @@ Section TestProg.
       iApply (wp_load with "[$]"). iNext. iIntros.
       iApply OBLS_AMU; [by rewrite nclose_nroot| ].
       iApply BOU_AMU.
-      iApply OU_BOU'; [lia| ].
-      iDestruct (OU_set_sig with "OB2 SIG") as "OU"; [set_solver| ].
-      iApply (OU_wand with "[-OU]"); [| done].
-      iIntros "[SIG OB2]". 
-      iApply BOU_intro.
+      iMod (OU_set_sig with "OB2 SIG") as "SIG"; [set_solver| lia| ].
+      iDestruct "SIG" as "[SIG OB2]".
+      iModIntro. 
       iDestruct (cp_mul_take with "CPS'") as "[CPS' CP]".
       iSplitR "CP PH3".
       2: { iExists _. iFrame "PH3".

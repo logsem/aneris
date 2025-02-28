@@ -1234,6 +1234,14 @@ Section ObligationsRepr.
       iPureIntro. lia. 
     Qed.
 
+    Lemma OU_BOU' E P b
+      (NZ: 0 < b):
+      ⊢ OU (BOU E (b - 1) P) -∗ BOU E b P.
+    Proof using.
+      red in NZ. apply Nat.le_sum in NZ as [? ->].
+      rewrite Nat.sub_add'. iApply OU_BOU.
+    Qed.
+
     Lemma OU_BOU_rep E P b:
       ⊢ OU_rep b P -∗ BOU E b P.
     Proof using.
