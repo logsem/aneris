@@ -195,39 +195,6 @@ Section ProgramLogic.
 
   End BOU.
 
-  Global Instance ElimOU p P Q:
-    ElimModal True p false (OU P) P (OU Q) Q.
-  Proof using.
-    red. simpl. iIntros "_ [OP PQ]".
-    iApply (OU_wand with "[$]").
-    by iApply bi.intuitionistically_if_elim.
-  Qed.
-
-  Global Instance ElimOU_BOU p P Q E n:
-    ElimModal (0 < n) p false (OU P) P (BOU E n Q) (BOU E (n - 1) Q).
-  Proof using.
-    red. simpl. iIntros "%NZ [OP PQ]".
-    apply Nat.le_sum in NZ as [? ->]. rewrite Nat.sub_add'. 
-    iApply OU_BOU. 
-    iDestruct (bi.intuitionistically_if_elim with "OP") as "OP".
-    iMod "OP". by iApply "PQ".
-  Qed.
-  (* Global Instance ElimOU_BOU p P Q E n m: *)
-  (*   S m <= n -> ElimModal True p false (OU P) P (BOU E n Q) (BOU E (n - 1) Q). *)
-  (* Proof using. *)
-  (*   clear LIM_STEPS_LB.  *)
-  (*   intros. red. simpl. iIntros "%NZ [OP PQ]". *)
-  (*   iApply OU_BOU'; [lia| ]. *)
-  (*   iDestruct (bi.intuitionistically_if_elim with "OP") as "OP". *)
-  (*   iMod "OP". by iApply "PQ". *)
-  (* Qed. *)
-
-  Global Instance FromModal_BOU E n P:
-    FromModal True modality_id (BOU E n P) (BOU E n P) P.
-  Proof using.
-    red. simpl. iIntros "_". iApply BOU_intro.
-  Qed.
-
 End ProgramLogic.
 
 

@@ -371,7 +371,7 @@ Section ObligationsRepr.
       rewrite own_op. by iIntros "[??]". 
     Qed.
 
-    Lemma obls_sgn_lt_locale_obls δ (L: Level -> Prop) ζ R lm
+    Lemma obls_rel_sgn_lt_locale_obls δ (L: Level -> Prop) ζ R lm
       (WAIT_L: L lm):
       ⊢ obls_msi δ -∗ obls_rel L  ζ R -∗ sgns_level_gt R lm -∗
         ⌜ lt_locale_obls lm ζ δ ⌝.
@@ -610,7 +610,7 @@ Section ObligationsRepr.
       simpl. by iApply OU'_proper'.
     Qed.
 
-    Lemma OU_create_sig_cur ζ R l (L: Level -> Prop)
+    Lemma OU_create_sig_cur_rel ζ R l (L: Level -> Prop)
       (Ll: L l):
       ⊢ obls_rel L ζ R -∗ OU (∃ sid, sgn sid l (Some false) ∗ obls_rel L ζ (R ∪ {[ sid ]}) ∗
                                  ⌜ sid ∉ R ⌝).
@@ -692,7 +692,7 @@ Section ObligationsRepr.
     Qed.
       
     (* TODO: do we need to generalize to "optional v" instead? *)
-    Lemma OU_set_sig L ζ R sid l v
+    Lemma OU_set_sig_rel L ζ R sid l v
       (IN: sid ∈ R):
       ⊢ obls_rel L ζ R -∗ sgn sid l (Some v) -∗
         OU (sgn sid l (Some true) ∗ obls_rel L ζ (R ∖ {[ sid ]})).
@@ -872,7 +872,7 @@ Section ObligationsRepr.
       iFrame.
     Qed.
 
-    Lemma expect_sig_upd (L: Level -> Prop) ζ sid π q d l R
+    Lemma expect_sig_upd_rel (L: Level -> Prop) ζ sid π q d l R
       (Ll: L l)
       :
       ⊢ ep sid π d -∗ sgn sid l (Some false) -∗ obls_rel L ζ R -∗
@@ -886,7 +886,7 @@ Section ObligationsRepr.
       iDestruct (th_phase_msi_align with "[$] [$]") as "[MSI PH]".
       rewrite PH. simpl.
       iDestruct (ep_msi_in with "[$] [$]") as %(π__e & IN & PH_LE).
-      iDestruct (obls_sgn_lt_locale_obls with "[$] [$] [$]") as %LT; [done| ].
+      iDestruct (obls_rel_sgn_lt_locale_obls with "[$] [$] [$]") as %LT; [done| ].
 
       rewrite {1}/obls_msi. iDestruct "MSI" as "(CPS&?&?&?&?&?)".
       destruct δ. simpl in *.
@@ -921,7 +921,7 @@ Section ObligationsRepr.
       f_equiv. rewrite gmultiset_disj_union_left_id. set_solver.
     Qed.
 
-    Lemma expect_sig_upd_rep (L: Level -> Prop) ζ sid π q d l R n
+    Lemma expect_sig_upd_rep_rel (L: Level -> Prop) ζ sid π q d l R n
       (Ll: L l):
       ⊢ ep sid π d -∗ sgn sid l (Some false) -∗ obls_rel L ζ R -∗
         sgns_level_gt R l -∗ th_phase_frag ζ π q -∗
@@ -934,7 +934,7 @@ Section ObligationsRepr.
         iExists _. iFrame. iApply bupd_frame_l. 
         iSplit; [done| ]. iApply cp_mul_0. }
       simpl. iApply (OU_wand with "[]").
-      2: { iApply (expect_sig_upd with "EP [$] [$] [$] [$]"). done. }
+      2: { iApply (expect_sig_upd_rel with "EP [$] [$] [$] [$]"). done. }
       iIntros "(CP & ?&?&?)".
       rewrite cp_mul_take. rewrite (bi.sep_comm _ (cp _ _)). rewrite -bi.sep_assoc.
       iApply OU_rep_frame_l. iFrame. iApply ("IH" with "[$] [$] [$]").
@@ -1180,8 +1180,6 @@ Section ObligationsRepr.
         (*   rewrite fmap_insert. apply singleton_local_update_any. *)
         (*   intros. replace (R0 ∖ (R0 ∩ R')) with (R0 ∖ R') by set_solver.  *)
         (*   apply exclusive_local_update. done. *)
-
-
         
         2: {
           (* rewrite auth_frag_op. *)
@@ -1315,7 +1313,7 @@ Section ObligationsRepr.
       red. eauto.
     Qed.
 
-    Lemma obls_msi_interim_omtrans_fork L δ E τ τ' π R R' P
+    Lemma obls_msi_interim_omtrans_fork_rel L δ E τ τ' π R R' P
       (FRESH: τ' ∉ dom $ ps_phases δ)
       (DPO: dom_phases_obls δ)
       (SUB: R' ⊆ R)
@@ -1505,6 +1503,108 @@ Section ObligationsRepr.
            eauto. }
       iIntros "CPS".
       iApply BOU_intro. iFrame "#∗".
+    Qed.
+
+
+    (***** Proof mode instances *)
+    Global Instance ElimOU p P Q:
+      ElimModal True p false (OU P) P (OU Q) Q.
+    Proof using.
+      red. simpl. iIntros "_ [OP PQ]".
+      iApply (OU_wand with "[$]").
+      by iApply bi.intuitionistically_if_elim.
+    Qed.
+    
+    Global Instance ElimOU_rep p P Q n:
+      ElimModal True p false (OU_rep n P) P (OU_rep n Q) Q.
+    Proof using.
+      red. simpl. iIntros "_ [OP PQ]".
+      iApply (OU_rep_wand with "[$]").
+      by iApply bi.intuitionistically_if_elim.
+    Qed.
+    
+    Global Instance ElimOU_BOU p P Q E n:
+      ElimModal (0 < n) p false (OU P) P (BOU E n Q) (BOU E (n - 1) Q).
+    Proof using.
+      red. simpl. iIntros "%NZ [OP PQ]".
+      apply Nat.le_sum in NZ as [? ->]. rewrite Nat.sub_add'. 
+      iApply OU_BOU. 
+      iDestruct (bi.intuitionistically_if_elim with "OP") as "OP".
+      iMod "OP". by iApply "PQ".
+    Qed.
+    
+    Global Instance FromModal_BOU E n P:
+      FromModal True modality_id (BOU E n P) (BOU E n P) P.
+    Proof using.
+      red. simpl. iIntros "_". iApply BOU_intro.
+    Qed.
+    
+    (***** Reimplementing "complete" obligations chunk and related lemmas *)
+    
+    Definition obls := obls_rel (fun _ => True).
+    
+    Lemma obls_msi_exact_res δ ζ R:
+      ⊢ obls_msi δ -∗ obls ζ R -∗
+         ⌜ ps_obls δ !! ζ = Some R ⌝.
+    Proof using H1 H0.
+      clear H.
+      iIntros "MSI OB".
+      iDestruct (obls_rel_msi_exact_res with "[$] [$]") as "(%R0 & MSI & OB & #REST & %Rζ & %SUB0 & %REST)".
+      iPureIntro. rewrite Rζ.
+      apply subseteq_disjoint_union_L in SUB0 as (D & -> & DISJ).
+      destruct (decide (D = ∅)) as [-> | D_NE]; [f_equal; set_solver| ].
+      apply set_choose_L in D_NE as [d ?]. specialize (REST d ltac:(set_solver)).
+      destruct REST as (ld & ? & ? & LT).
+      specialize (LT ld ltac:(done)).
+      by apply strict_ne in LT.
+    Qed. 
+
+    Lemma OU_create_sig_cur ζ R l:
+      ⊢ obls ζ R -∗ OU (∃ sid, sgn sid l (Some false) ∗ obls ζ (R ∪ {[ sid ]}) ∗ ⌜ sid ∉ R ⌝).
+    Proof using H1 H0.
+      iIntros "OB". iMod (OU_create_sig_cur_rel with "[$]") as "?"; done.
+    Qed.
+
+    Lemma OU_set_sig ζ R sid l v
+      (IN: sid ∈ R):
+      ⊢ obls ζ R -∗ sgn sid l (Some v) -∗
+         OU (sgn sid l (Some true) ∗ obls ζ (R ∖ {[ sid ]})).
+    Proof using H1 H0.
+      iIntros "OB SGN". iMod (OU_set_sig_rel with "[$] [$]") as "?"; done.
+    Qed.
+
+    Lemma expect_sig_upd ζ sid π q d l R:
+      ⊢ ep sid π d -∗ sgn sid l (Some false) -∗ obls ζ R -∗
+        sgns_level_gt R l -∗ th_phase_frag ζ π q -∗
+        OU (cp π d ∗ sgn sid l (Some false) ∗ obls ζ R ∗ th_phase_frag ζ π q).
+    Proof using H1 H0.
+      iIntros "?????". iMod (expect_sig_upd_rel with "[$][$][$][$][$]") as "?"; done.
+    Qed.
+
+    Lemma expect_sig_upd_rep ζ sid π q d l R n:
+      ⊢ ep sid π d -∗ sgn sid l (Some false) -∗ obls ζ R -∗
+        sgns_level_gt R l -∗ th_phase_frag ζ π q -∗
+        OU_rep n (cp_mul π d n ∗ sgn sid l (Some false) ∗
+                  obls ζ R ∗ th_phase_frag ζ π q).
+    Proof using H0 H1.
+      iIntros "?????". iMod (expect_sig_upd_rep_rel with "[$][$][$][$][$]") as "?"; done.
+    Qed.
+      
+    Lemma obls_msi_interim_omtrans_fork δ E τ τ' π R R' P
+      (FRESH: τ' ∉ dom $ ps_phases δ)
+      (DPO: dom_phases_obls δ)
+      (SUB: R' ⊆ R)
+      :
+      ⊢ obls_msi δ -∗
+        BOU E LIM_STEPS (∃ d, cp π d ∗ obls τ R ∗ th_phase_eq τ π ∗ P) ={E}=∗
+        ∃ δ' π1 π2,
+          obls_msi δ' ∗
+            obls τ (R ∖ R') ∗ th_phase_eq τ π1 ∗
+            obls τ' R' ∗ th_phase_eq τ' π2 ∗
+            ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝ ∗
+            ⌜ rel_compose (flip progress_step τ) (fork_step_of τ) δ δ' ⌝ ∗ P. 
+    Proof using H1 H0.
+      iIntros "??". iMod (obls_msi_interim_omtrans_fork_rel with "[$][$]") as "?"; done.
     Qed.
 
   End Resources.
