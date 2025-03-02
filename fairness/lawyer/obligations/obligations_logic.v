@@ -124,7 +124,8 @@ Section ProgramLogic.
       eapply locale_step_fresh_exact in FORK; eauto.
     Qed.
 
-    Lemma BOU_AMU__f E ζ ζ' π R0 R' P:
+    Lemma BOU_AMU__f E ζ ζ' π R0 R' P
+      (SUB: R' ⊆ R0):
       ⊢
         (* (th_phase_eq ζ π -∗ BOU E b *)
         (*    (P ∗ (∃ ph deg, cp ph deg ∗ ⌜ phase_le ph π ⌝) ∗ *)
@@ -140,14 +141,16 @@ Section ProgramLogic.
         BOU E LIM_STEPS (P ∗ ∃ d, cp π d ∗ obls ζ R0 ∗ th_phase_eq ζ π) -∗
         AMU__f E ζ ζ' obls_act (P ∗ ∃ π1 π2,
             th_phase_eq ζ π1 ∗ obls ζ (R0 ∖ R') ∗ 
-            th_phase_eq ζ' π2 ∗ obls ζ' (R0 ∩ R') ∗
+            th_phase_eq ζ' π2 ∗ obls ζ' R' ∗
             ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝) (aeGS := oGS').
-    Proof using.
-      clear H1 H0 H. 
+    Proof using H1 H0.
+      (* clear H1 H0 H.  *)
+      clear H.
       rewrite /AMU__f /AMU_impl. iIntros "BOU" (c c' δ) "TI'".
       iDestruct "TI'" as "(MSI&%STEP&%FORK)". iFrame. 
       iDestruct "MSI" as "(MSI&%OBLS&%DPO)".
-      iMod (obls_msi_interim_omtrans_fork with "[$] [BOU]") as "X".
+      iMod (obls_msi_interim_omtrans_fork with "MSI [BOU]") as "X".
+      3: { apply SUB. }
       3: { iApply (BOU_wand with "[-BOU] [$]"); try done.
            rewrite bi.sep_comm bi.sep_exist_r.
            repeat setoid_rewrite bi.sep_assoc. iIntros "X". iApply "X". }
@@ -308,6 +311,7 @@ Section TestProg.
     2: {
       iApply OBLS_AMU__f; [by rewrite nclose_nroot| ]. 
       iApply BOU_AMU__f.
+      { reflexivity. }
       iNext. 
       iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
       iMod (burn_cp_upd with "CP [$]") as "PH"; [lia| ].
@@ -323,8 +327,7 @@ Section TestProg.
 
     iSplitR "POST CPS MT OB1 PH1"; cycle 1.  
     - iApply "POST". 
-      iApply (obls_proper with "[$]").
-      symmetry. apply subseteq_empty_difference. reflexivity.
+      iApply (obls_rel_proper with "[$]"). set_solver. 
     - iApply sswp_MU_wp; [done| ].
       iApply (wp_load with "[$]"). iNext. iIntros.
       iApply OBLS_AMU; [by rewrite nclose_nroot| ].
@@ -341,7 +344,7 @@ Section TestProg.
       iApply wp_value.
       simpl.
       iApply NO_OBLS_POST. 
-      iApply (obls_proper with "[$]").
+      iApply (obls_rel_proper with "[$]").
       set_solver.
   Qed.
 

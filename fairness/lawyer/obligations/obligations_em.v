@@ -96,7 +96,8 @@ Section ObligationsEM.
     iMod (own_alloc (● (obls_map_repr $ ps_obls δ) ⋅ ◯ _)) as (?) "[OBLSa OBLSf]". 
     { apply auth_both_valid_discrete. split; [reflexivity| ].
       intros τ. rewrite lookup_fmap. 
-      by destruct lookup. }
+      destruct lookup; [| done].
+      simpl. apply Some_valid. apply auth_both_valid_2; done. }
     iMod (own_alloc (● (eps_repr $ ps_eps δ) ⋅ ◯ _)) as (?) "[EPSa EPSf]". 
     { by apply auth_both_valid_2. }
 

@@ -161,9 +161,9 @@ Section ObligationsRepr.
     Definition th_phase_eq ζ π: iProp Σ :=
       th_phase_frag ζ π 1%Qp.
 
-    (* Lemma obls_proper ζ R1 R2 (EQUIV: R1 ≡ R2): *)
-    (*   ⊢ obls ζ R1 ∗-∗ obls ζ R2. *)
-    (* Proof using. clear H H0 H1. set_solver. Qed. *)
+    Lemma obls_rel_proper L ζ R1 R2 (EQUIV: R1 ≡ R2):
+      ⊢ obls_rel L ζ R1 ∗-∗ obls_rel L ζ R2.
+    Proof using. clear H H0 H1. set_solver. Qed.
     
     Lemma empty_sgns_levels_rel rel L:
       ⊢ sgns_levels_rel rel ∅ L.
@@ -1542,6 +1542,32 @@ Section ObligationsRepr.
     (***** Reimplementing "complete" obligations chunk and related lemmas *)
     
     Definition obls := obls_rel (fun _ => True).
+
+    Lemma obls_exact_alt τ R:
+      obls τ R ⊣⊢ own obls_obls (◯ obls_map_repr ({[ τ := R ]})).
+    Proof using.
+      clear H1 H0 H.
+      rewrite /obls /obls_rel /obls_map_repr.
+      rewrite map_fmap_singleton.
+      setoid_rewrite bi.sep_assoc. 
+      setoid_rewrite <- own_op. setoid_rewrite <- auth_frag_op.
+      setoid_rewrite merge_helper.
+      iSplit.
+      2: { iIntros "?". iExists _. iFrame. by rewrite difference_diag_L. }
+      iIntros "(%R0 & OB & #REST)".
+      iDestruct (own_valid with "OB") as %V.
+      rewrite auth_frag_valid singleton_valid in V.
+      apply auth_both_valid_discrete in V as [SUB%gset_disj_included V].
+      apply subseteq_disjoint_union_L in SUB as (D & -> & DISJ).
+      destruct (decide (D = ∅)) as [-> | D_NE].
+      { by rewrite union_empty_r_L. }
+      apply set_choose_L in D_NE as [d ?].
+      iDestruct (big_sepS_elem_of_acc _ _ d with "[$]") as "[LT _]".
+      { set_solver. }
+      iDestruct "LT" as "(%ld & _ & %LT)".
+      specialize (LT ld ltac:(done)).
+      by apply strict_ne in LT.
+    Qed.
     
     Lemma obls_msi_exact_res δ ζ R:
       ⊢ obls_msi δ -∗ obls ζ R -∗
@@ -1550,6 +1576,7 @@ Section ObligationsRepr.
       clear H.
       iIntros "MSI OB".
       iDestruct (obls_rel_msi_exact_res with "[$] [$]") as "(%R0 & MSI & OB & #REST & %Rζ & %SUB0 & %REST)".
+      (* TODO: unify with obls_exact_alt *)
       iPureIntro. rewrite Rζ.
       apply subseteq_disjoint_union_L in SUB0 as (D & -> & DISJ).
       destruct (decide (D = ∅)) as [-> | D_NE]; [f_equal; set_solver| ].
@@ -1559,7 +1586,7 @@ Section ObligationsRepr.
       by apply strict_ne in LT.
     Qed. 
 
-    Lemma OU_create_sig_cur ζ R l:
+    Lemma OU_create_sig ζ R l:
       ⊢ obls ζ R -∗ OU (∃ sid, sgn sid l (Some false) ∗ obls ζ (R ∪ {[ sid ]}) ∗ ⌜ sid ∉ R ⌝).
     Proof using H1 H0.
       iIntros "OB". iMod (OU_create_sig_cur_rel with "[$]") as "?"; done.

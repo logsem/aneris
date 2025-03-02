@@ -62,12 +62,16 @@ Section EOFinAdequacy.
     rewrite locales_of_cfg_simpl. simpl.
     rewrite union_empty_r_L.
     iDestruct "INIT" as "(CPS & SIGS & OB & EPS & PH & EB)".
-    rewrite /cps_repr /sig_map_repr /eps_repr /obls_map_repr. 
+    rewrite !gset_to_gmap_singleton.
+    rewrite obls_exact_alt. 
+    rewrite /cps_repr /sig_map_repr /eps_repr. 
     rewrite big_sepM_singleton. 
     rewrite fmap_empty.
-    rewrite !gset_to_gmap_singleton. 
-    rewrite map_fmap_singleton.      
     iFrame.
+
+    (* iApply bi.sep_assoc. iSplitR "OB". *)
+    (* 2: { rewrite /obls.  *)
+    
     rewrite mset_map_disj_union. rewrite big_sepMS_disj_union.
     rewrite !mset_map_mul !mset_map_singleton.
 

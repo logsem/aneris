@@ -579,7 +579,7 @@ Section EoFin.
           2: { iPureIntro. econstructor; try set_solver. apply NoDup_singleton. }
           
           iSplitR "OBLS".
-          2: { iApply obls_proper; [| by iFrame]. set_solver. }
+          2: { iApply obls_rel_proper; [| by iFrame]. set_solver. }
 
           iSplit.
           2: { subst smap0. iPureIntro. rewrite !dom_insert_L.
@@ -725,6 +725,7 @@ Section EoFin.
         iApply sswp_MUf_wp. iIntros (τ'). iApply (MU__f_wand with "[-CP PH OB]").
         2: { iApply OBLS_AMU__f; [done| ]. 
              iApply BOU_AMU__f.
+             { eapply union_subseteq_l. }
              (* TODO: change BOU_burn_cp*)
              iApply BOU_intro. iFrame "PH OB".
              iSplitR "CP".
@@ -732,11 +733,9 @@ Section EoFin.
              iNext. iAccu. }
 
         iIntros "[? (%π1 & %π2 & PH1 & OB1 & PH3 & OB2 & [%LT1 %LT2])]".
-        Unshelve. 2: exact {[ si ]}.
         assert (si ≠ si') as NEQ.
         { intros <-. apply NoDup_cons in SIGS_UNIQ. set_solver. }
         replace (({[si; si']} ∖ {[si]})) with ({[si']}: gset _) by set_solver.
-        replace ({[si; si']} ∩ {[si]}) with ({[si]}: gset _) by set_solver.
         iSplitL "RE CPS2 CPS_FORK PH3 OB2".
         { iApply (thread_spec_wrapper with "[-]").
           { apply even_thread_resource. }
@@ -757,15 +756,15 @@ Section EoFin.
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
         iApply sswp_MUf_wp. iIntros (τ''). iApply (MU__f_wand with "[-CP PH OB1]").
         2: { iApply OBLS_AMU__f; [done| ]. 
-             iApply BOU_AMU__f. 
+             iApply BOU_AMU__f; [reflexivity| ]. 
              iApply BOU_intro. iFrame "PH OB1".
              iSplitR "CP".
              2: { iExists _. iFrame. }
              iNext. iAccu. }
 
         iIntros "[? (%π3 & %π4 & PH1 & OB1 & PH3 & OB2 & [%LT3 %LT4])]".
-        Unshelve. 2: exact {[ si' ]}.        
-        rewrite difference_diag_L. rewrite intersection_idemp_L.
+        (* Unshelve. 2: exact {[ si' ]}. *)
+        rewrite difference_diag_L.
 
         iSplitR "POST OB1".
         2: { by iApply "POST". }
@@ -797,16 +796,15 @@ Section EoFin.
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
         iApply sswp_MUf_wp. iIntros (τ'). iApply (MU__f_wand with "[-CP PH OB]").
         2: { iApply OBLS_AMU__f; [done| ]. 
-             iApply BOU_AMU__f. 
+             iApply BOU_AMU__f; [reflexivity| ]. 
              iApply BOU_intro. iFrame "PH OB".
              iSplitR "CP".
              2: { iExists _. iFrame. }
              iNext. iAccu. }
 
         iIntros "[? (%π1 & %π2 & PH1 & OB1 & PH3 & OB2 & [%LT1 %LT2])]".
-        Unshelve. 2: exact {[ si ]}.
 
-        rewrite difference_diag_L. rewrite intersection_idemp_L.
+        rewrite difference_diag_L. 
         iSplitL "RE CPS2 CPS_FORK PH3 OB2".
         { iApply (thread_spec_wrapper with "[-]").
           { apply even_thread_resource. }
@@ -826,15 +824,14 @@ Section EoFin.
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
         iApply sswp_MUf_wp. iIntros (τ''). iApply (MU__f_wand with "[-CP PH OB1]").
         2: { iApply OBLS_AMU__f; [done| ]. 
-             iApply BOU_AMU__f.
+             iApply BOU_AMU__f; [reflexivity| ].
              iApply BOU_intro. iFrame "PH OB1".
              iSplitR "CP".
              2: { iExists _. iFrame. }
              iNext. iAccu. }
 
         iIntros "[? (%π3 & %π4 & PH1 & OB1 & PH3 & OB2 & [%LT3 %LT4])]".
-        Unshelve. 2: exact ∅.
-        rewrite difference_diag_L. rewrite intersection_idemp_L.
+        rewrite difference_diag_L.
 
         iSplitR "POST OB1".
         2: { by iApply "POST". }
@@ -864,7 +861,7 @@ Section EoFin.
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
         iApply sswp_MUf_wp. iIntros (τ'). iApply (MU__f_wand with "[-CP PH OB]").
         2: { iApply OBLS_AMU__f; [done| ]. 
-             iApply BOU_AMU__f.
+             iApply BOU_AMU__f; [reflexivity| ].
              (* TODO: change BOU_burn_cp*)
              iApply BOU_intro. iFrame "PH OB".
              iSplitR "CP".
@@ -872,9 +869,8 @@ Section EoFin.
              iNext. iAccu. }
 
         iIntros "[? (%π1 & %π2 & PH1 & OB1 & PH3 & OB2 & [%LT1 %LT2])]".
-        Unshelve. 2: exact ∅.
 
-        rewrite difference_diag_L. rewrite intersection_idemp_L.
+        rewrite difference_diag_L. 
         iSplitL "RE CPS2 CPS_FORK PH3 OB2".
         { iApply (thread_spec_wrapper with "[-]").
           { apply even_thread_resource. }
@@ -891,7 +887,7 @@ Section EoFin.
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
         iApply sswp_MUf_wp. iIntros (τ''). iApply (MU__f_wand with "[-CP PH OB1]").
         2: { iApply OBLS_AMU__f; [done| ]. 
-             iApply BOU_AMU__f. 
+             iApply BOU_AMU__f; [reflexivity| ].
              (* TODO: change BOU_burn_cp*)
              iApply BOU_intro. iFrame "PH OB1".
              iSplitR "CP".
@@ -899,8 +895,7 @@ Section EoFin.
              iNext. iAccu. }
 
         iIntros "[? (%π3 & %π4 & PH1 & OB1 & PH3 & OB2 & [%LT3 %LT4])]".
-        Unshelve. 2: exact ∅.
-        rewrite difference_diag_L. rewrite intersection_idemp_L.
+        rewrite difference_diag_L. 
 
         iSplitR "POST OB1".
         2: { by iApply "POST". }

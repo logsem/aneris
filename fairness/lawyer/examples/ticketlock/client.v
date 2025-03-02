@@ -442,7 +442,7 @@ Section MotivatingClient.
            rewrite !(proj2 (Nat.ltb_lt _ _)); lia. }
       iIntros "[SR OB]". iApply BOU_intro.
       iSplitR "OB".
-      2: { iApply obls_proper; [..| by iFrame]. set_solver. }
+      2: { iApply obls_rel_proper; [..| by iFrame]. set_solver. }
       rewrite /smap_repr_cl. rewrite Nat.add_1_r Nat.add_0_r.
       iFrame.
     Qed.
@@ -1049,6 +1049,7 @@ Section MotivatingClient.
     iApply (MU__f_wand with "[-CP PH OB]").
     2: { iApply OBLS_AMU__f; [done| ].
          iApply BOU_AMU__f.
+         { reflexivity. }
          iApply BOU_intro. iFrame.
          iSplitR; [iAccu| ]. 
          iExists _. by iFrame. }
@@ -1057,8 +1058,7 @@ Section MotivatingClient.
     iSplitL "CPS' OB2 PH2 UNSET".
     { iApply (left_thread_spec with "[-]").
       2: { iIntros "!> % [OB PH]". by iApply NO_OBS_POST. }
-      iFrame "#∗". iSplitL "OB2".
-      { iApply obls_proper; [| done]. symmetry. apply intersection_idemp. }
+      iFrame "#∗".
       apply strict_include in PH_LT2.
       iApply cp_mul_weaken; [| reflexivity| by iFrame]. done. }
 
@@ -1075,21 +1075,20 @@ Section MotivatingClient.
     iApply sswp_MUf_wp. iIntros "%τ2 !>". 
     iApply (MU__f_wand with "[-CP PH OB1]").
     2: { iApply OBLS_AMU__f; [done| ].
-         iApply BOU_AMU__f. 
+         iApply BOU_AMU__f; [reflexivity| ]. 
          iApply BOU_intro. iFrame.
          iSplitR; [iAccu| ]. 
          iExists _. by iFrame. }
     iIntros "(_ & (%π11 & %π12 & PH1 & OB1 & PH2 & OB2 & [%PH_LT11 %PH_LT12]))".
 
     iSplitR "POST OB1".
-    2: { iApply "POST". iApply obls_proper; [| done].
+    2: { iApply "POST". iApply obls_rel_proper; [| done].
          symmetry. apply difference_diag. }
 
     split_cps "CPS" 3.
     iApply (right_thread_spec with "[-PH1]").
     2: { iIntros "!> % [OB PH]". by iApply NO_OBS_POST. }
-    rewrite intersection_idemp_L. iFrame "#∗".
-    apply strict_include in PH_LT12.
+    iFrame "#∗". apply strict_include in PH_LT12.
     iApply cp_mul_weaken; [| reflexivity| by iFrame]. 
     etrans; done.
   Qed.

@@ -208,7 +208,7 @@ Section OblsAdequacy.
     gen_heap_interp (heap σ) -∗ obls_msi δ' (oGS := oGS) -∗
       cur_posts tp ee (λ _ : val, obls 0 ∅ (oGS := oGS)) -∗
       ⌜om_live_tids id locale_enabled (tp, σ) δ'⌝.
-  Proof using.
+  Proof using H1 H0.
     iIntros "HEAP MSI POSTS".
     rewrite /om_live_tids. iIntros (τ OBτ).
     rewrite /locale_enabled.
@@ -221,9 +221,9 @@ Section OblsAdequacy.
     iExists _. iSplit; [done| ].
     destruct (language.to_val e) eqn:VALe; [| done].
     apply from_locale_lookup in Ee.
-    iDestruct (posts_of_empty_mapping with "[POSTS]") as "foo"; eauto.
-    iDestruct (obls_msi_exact with "MSI foo") as %OB.
-    rewrite OB_ in OB. congruence.
+    iDestruct (posts_of_empty_mapping with "[POSTS]") as "OB"; eauto. simpl.
+    iDestruct (obls_msi_exact_res with "MSI [$]") as %OB.
+    rewrite OB in OB_. congruence.
   Qed.
 
   (* TODO: generalize? move? *)
@@ -240,7 +240,7 @@ Section OblsAdequacy.
             _
             _ Hinv) 0) e σ1
     (@init_om_state _ _ _ LIM_STEPS OP ([e], σ1) ds eb).
-  Proof using.
+  Proof using H1 H0.
     rewrite /rel_always_holds0.
     
     iIntros (extr omtr [tp σ] VALID EX0 OM0 EX_FIN CONT_SIM).

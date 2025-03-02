@@ -75,7 +75,7 @@ Section SignalMap.
         iApply OU_BOU. iApply (OU_wand with "[]").
         2: { iApply (OU_set_sig with "[$] [$]"). set_solver. }
         iIntros "[SIG OB]". iApply BOU_intro. iFrame.
-        iApply obls_proper; [| by iFrame].
+        iApply obls_rel_proper; [| by iFrame].
         set_solver. }
       iApply (BOU_split _ _ 1). iApply (BOU_wand with "[-SET] [$]").
       iIntros "[SIG OB]".
@@ -88,7 +88,7 @@ Section SignalMap.
       iSplit.
       { iPureIntro. set_solver. }
       iSplitL "OB".
-      { iApply obls_proper; [| by iFrame].
+      { iApply obls_rel_proper; [| by iFrame].
         rewrite -union_assoc. eapply sets.union_proper; [done| ].
         destruct (B i) eqn:Bi.
         - rewrite map_filter_insert_not; [| by rewrite Bi].
