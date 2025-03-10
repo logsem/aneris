@@ -62,7 +62,7 @@ Section PhaseFuel.
   Context (sig_bound: SignalId -> nat).
   
   Definition approx_expects (k: nat) (eps: gset (@ExpectPermission Degree)) :=
-    ([^op set] ep ∈ eps, let '(sid, π, d) := ep in
+    ([^disj_union set] ep ∈ eps, let '(sid, π, d) := ep in
                          ((LIM_STEPS + 2) * sig_bound sid - k) *: {[+ d +]} ).
   
   Instance cmp_phase'_dec: forall (x y: Phase * Degree),
@@ -107,7 +107,7 @@ Section PhaseFuel.
     apply union_difference_L in SUB. rewrite SUB.
     rewrite big_opS_union; [| set_solver].
     etrans.
-    2: { rewrite gmultiset_op. apply ms_le_sub. 
+    2: { apply ms_le_sub. 
          apply gmultiset_disj_union_subseteq_l. }      
     apply big_opS_ms_le; [apply _| ]. 
     intros [[??]?].
@@ -135,7 +135,7 @@ Section PhaseFuel.
     rewrite /approx_expects.
     rewrite -leibniz_equiv_iff. 
     rewrite big_opS_insert; auto.
-    rewrite gmultiset_op gmultiset_disj_union_comm. f_equiv.
+    rewrite gmultiset_disj_union_comm. f_equiv.
     destruct e as [[??]?]. done.
   Qed.
   
@@ -270,6 +270,18 @@ Section PhaseFuel.
     - destruct EXP as (?&?&?&?). eapply EXP_CASE; eauto.
   Qed.
   
+  Definition nsteps_keep_ms_le0 τ n
+    :=
+    forall δ δ' mb mf k
+      (* (ITH: tr !! i = Some (δ, Some (τ, δ'))) *)
+      (TRANS: om_trans δ τ δ')
+      (BOUND : k ≤ LIM_STEPS)
+      (* (STEPS: nsteps (λ p1 p2, loc_step p1 τ p2) k δ mb) *)
+      (STEPS: nsteps (λ p1 p2, loc_step_ex p1 p2) k δ mb)
+      (BSTEP: (∃ π δ, burns_cp mb τ mf π δ))
+      (FSTEP: clos_refl (ProgressState) (λ p1 p2, ∃ τ' R, forks_locale p1 τ p2 τ' R) mf δ'),
+      ms_le deg_le (PF' (n + k) mb) (PF' (n) δ).
+
   Definition nsteps_keep_ms_le i τ
     :=
     forall δ δ' mb mf k
@@ -293,6 +305,60 @@ Section PhaseFuel.
     + apply ms_le_sub. apply mset_map_sub. mss. 
     + apply ms_le_exp_mono; [lia | reflexivity].
   Qed.
+
+  
+  Lemma om_trans_ms_rel0 (bd: bool) δ τ δ' n
+    (rel := (if bd then ms_lt deg_le else ms_le deg_le): relation (gmultiset Degree))
+    (BURN_REL:
+      forall mb mf k,
+        k ≤ LIM_STEPS ->
+        (* nsteps (λ p1 p2, loc_step p1 τ p2) k δ mb -> *)
+        nsteps (λ p1 p2, loc_step_ex p1 p2) k δ mb ->
+        (∃ π δ, burns_cp mb τ mf π δ) ->
+        clos_refl (ProgressState) (λ p1 p2, ∃ τ' R, forks_locale p1 τ p2 τ' R) mf δ' ->
+        rel (PF' (n + 1) mf) (PF' n mb))
+    (NSTEPS_LE: nsteps_keep_ms_le0 τ n)
+    :
+    rel (PF' (S i)) (PF' i).
+  Proof using.
+    rewrite /TPF'. simpl.
+    forward eapply (proj2 (label_lookup_states' _ _)) as [τ ITHl]; eauto.  
+    forward eapply (state_lookup_prev _ _ DOM _ (PeanoNat.Nat.le_succ_diag_r _)).
+    intros [δ ITH]. destruct DOM as [δ' ITH']. rewrite ITH ITH'. simpl. 
+    
+    forward eapply trace_valid_steps'' as STEP; eauto.
+    { rewrite Nat.add_1_r. eauto. }
+    simpl in STEP. red in STEP. destruct STEP as (mf & PSTEP & FSTEP).
+    red in PSTEP. destruct PSTEP as (k & BOUND & (mb & PSTEP & BSTEP)).
+    
+    rewrite /nsteps_keep_ms_le in NSTEPS_LE. specialize_full NSTEPS_LE; eauto.
+    { eapply state_label_lookup; eauto. rewrite Nat.add_1_r. eauto. }
+
+    eapply BURN_REL in BSTEP; eauto.
+    2: { eapply state_label_lookup; eauto. rewrite Nat.add_1_r. eauto. }
+
+    assert (ms_le deg_le (PF' ((LIM_STEPS + 2) * S i) δ')
+              (PF' ((LIM_STEPS + 2) * i + LIM_STEPS + 1) mf)) as LE. 
+    { inversion FSTEP as [? FORK | ]. 
+      2: { subst mf.
+           rewrite /PF'. apply ms_le_disj_union; [apply _| ..].
+           - reflexivity.
+           - apply ms_le_exp_mono; [lia | reflexivity]. }
+      destruct FORK as (?&?&?). 
+      subst y. eapply ms_le_Proper; [| reflexivity| eapply forks_locale_ms_le; eauto].
+      f_equiv. apply leibniz_equiv_iff. lia. }  
+    
+    destruct bd; subst rel.
+    - eapply strict_transitive_l; [| apply NSTEPS_LE]. 
+      eapply strict_transitive_r; [apply LE| ]. 
+      eapply strict_transitive_l; [apply BSTEP| ].
+      apply ms_le_PF_le. lia.
+    - etrans; [| apply NSTEPS_LE].
+      etrans; [apply LE| ].
+      etrans; [apply BSTEP| ].
+      apply ms_le_PF_le. lia.
+  Qed.
+
   
   Lemma om_trans_ms_rel (bd: bool) i
     (rel := (if bd then ms_lt deg_le else ms_le deg_le): relation (gmultiset Degree))

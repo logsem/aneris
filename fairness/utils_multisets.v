@@ -71,6 +71,19 @@ Section GmultisetUtils.
     a ∉ g ↔ multiplicity a g = 0.
   Proof using. mss. Qed.
 
+  Lemma multiplicity_big_DU_set_empty `{Countable B} (D: gset A):
+    ([^disj_union set] a ∈ D, (∅: gmultiset B)) = (∅: gmultiset B). 
+  Proof using.
+    pattern D. apply set_ind; clear D. 
+    { red. intros ???. set_solver. }
+    { intros. rewrite big_opS_empty. set_solver. }
+    intros d D FRESH IH.
+    apply gmultiset_eq. intros a. 
+    rewrite big_opS_insert; [| done].
+    rewrite multiplicity_disj_union. rewrite IH.
+    set_solver.
+  Qed.
+
   Lemma multiplicity_big_DU_set (D: gset A) (f: A -> nat):
     forall a, 
     multiplicity a ([^disj_union set] a ∈ D, f a *: {[+ a +]}) =
