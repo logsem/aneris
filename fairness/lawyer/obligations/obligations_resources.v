@@ -128,14 +128,18 @@ Section ObligationsRepr.
     (*   forall lx ly, X lx -> Y ly -> lvl_lt lx ly. *)
     Definition lvls_lt_lvl (L: Level -> Prop) (l: Level) :=
       forall l', L l' -> lvl_lt l' l.
+
+    Definition obls_full τ R := own obls_obls (◯ ({[ τ := ● (GSet R)]})).
+    Definition obls_frag τ R := own obls_obls (◯ ({[ τ := ◯ (GSet R)]})).
+
+    (* TODO: unify with sgns_levels_rel *)
+    Definition sgns_over (L: Level -> Prop) (R: gset SignalId): iProp Σ :=
+      ([∗ set] s ∈ R, ∃ l__s, sgn s l__s None ∗ ⌜ lvls_lt_lvl L l__s ⌝). 
     
     Definition obls_rel (L: Level -> Prop)
       τ (R: gset SignalId): iProp Σ :=
       (* own obls_obls (◯ ({[ τ := Excl R]}: gmapUR Locale (exclR (gsetR natO)))). *)
-      ∃ R0, 
-        own obls_obls (◯ ({[ τ := ● (GSet R0)]})) ∗ 
-        own obls_obls (◯ ({[ τ := ◯ (GSet R)]})) ∗
-        ([∗ set] s ∈ (R0 ∖ R), ∃ l__s, sgn s l__s None ∗ ⌜ lvls_lt_lvl L l__s ⌝). 
+      ∃ R0, obls_full τ R0 ∗ obls_frag τ R ∗ sgns_over L (R0 ∖ R). 
     
     Definition sgns_levels_rel (rel: Level -> Level -> Prop)
       (R: gset SignalId) (L: gset Level): iProp Σ := 
@@ -164,6 +168,212 @@ Section ObligationsRepr.
     Lemma obls_rel_proper L ζ R1 R2 (EQUIV: R1 ≡ R2):
       ⊢ obls_rel L ζ R1 ∗-∗ obls_rel L ζ R2.
     Proof using. clear H H0 H1. set_solver. Qed.
+
+    Local Lemma merge_helper ζ' (R1 R2: auth (gset_disjUR SignalId)): 
+      (* @merge _ (@gmap_merge Locale _ _) _ _ _ op *)
+      (*      {[ζ' := ● GSet R1]} {[ζ' := ◯ @GSet SignalId _ _ R2]} = *)
+      (*   {[ζ' := ● GSet R1 ⋅ ◯ GSet R2]}. *)
+      @merge _ (@gmap_merge Locale _ _) _ _ _ op
+           {[ζ' := R1]} {[ζ' := R2]} =
+        {[ζ' := R1 ⋅ R2 ]}.
+    Proof using.
+      etrans.
+      2: eapply merge_singleton.
+      { reflexivity. }
+      done.
+    Qed.
+
+    Lemma obls_full_frag τ R0 R:
+      obls_full τ R0 -∗ obls_frag τ R -∗ ⌜ R ⊆ R0 ⌝.
+    Proof using.
+      iStartProof. rewrite bi.wand_curry. rewrite -own_op.
+      rewrite -auth_frag_op. setoid_rewrite merge_helper.  
+      iIntros "OB". iDestruct (own_valid with "[$]") as %V.
+      rewrite auth_frag_valid singleton_valid in V.
+      by apply auth_both_valid_discrete in V as [?%gset_disj_included ?].
+    Qed.
+
+    (* TODO: use it in other lemmas *)
+    Lemma obls_rel_unfold L τ R:
+      obls_rel L τ R ⊣⊢
+      ∃ R__f, own obls_obls (◯ ({[ τ := ● (GSet R ⋅ GSet R__f)]})) ∗ 
+        obls_frag τ R ∗ sgns_over L R__f.
+    Proof using.
+      clear H1 H0 H.
+      rewrite /obls_rel /obls_map_repr.
+      iSplit.
+      2: { iIntros "(%R__f & AUTH & FRAG & OVER)".
+           iDestruct (own_valid with "AUTH") as %V.
+           assert (R ## R__f).
+           { rewrite auth_frag_valid singleton_valid in V.
+             rewrite auth_auth_valid in V. set_solver. }
+           rewrite gset_disj_union; [| done].
+           iExists _. iFrame.
+           replace ((R ∪ R__f) ∖ R) with R__f; set_solver. }
+      iIntros "(%R0 & AUTH & FRAG & OVER)".
+      iDestruct (obls_full_frag with "[$] [$]") as %SUB.
+      apply subseteq_disjoint_union_L in SUB as (D & -> & DISJ).
+      replace ((R ∪ D) ∖ R) with D; [| set_solver].
+      iExists _. iFrame "FRAG OVER". 
+      rewrite gset_disj_union; done. 
+    Qed.
+
+    Lemma obls_frag_union τ R1 R2
+      (DISJ: R1 ## R2):
+      obls_frag τ (R1 ∪ R2) ⊣⊢ obls_frag τ R1 ∗ obls_frag τ R2.
+    Proof using.
+      rewrite /obls_frag. rewrite -own_op. 
+      rewrite -auth_frag_op. rewrite gmap_op merge_helper.
+      rewrite -auth_frag_op.
+      repeat f_equiv. rewrite gset_disj_union; done.
+    Qed.
+
+    Lemma obls_auth_disj_helper τ R1 R2:
+      own obls_obls (◯ {[τ := ● (GSet R1 ⋅ GSet R2)]}) -∗
+      ⌜ R1 ## R2 ⌝.
+    Proof using.
+      clear H1 H0 H. 
+      iIntros "OB".
+      iDestruct (own_valid with "[$]") as %V.
+      rewrite auth_frag_valid singleton_valid in V.
+      rewrite auth_auth_valid in V. set_solver.
+    Qed.
+
+    Lemma obls_frag_disj_helper τ R1 R2:
+      own obls_obls (◯ {[τ := ◯ (GSet R1 ⋅ GSet R2)]}) -∗
+      ⌜ R1 ## R2 ⌝.
+    Proof using.
+      clear H1 H0 H. 
+      iIntros "OB".
+      iDestruct (own_valid with "[$]") as %V.
+      rewrite auth_frag_valid singleton_valid in V.
+      rewrite auth_frag_valid in V. set_solver.
+    Qed.
+
+    From stdpp Require Import coGset.
+    
+    Instance foobar: Countable (coGset Level).
+    Proof using.
+      apply _.
+    Qed. 
+      
+      eauto. 
+      apply _. 
+      
+    Lemma obls_rel_narrow (L L': Level -> Prop) τ R' R__d
+      (DISJ: R' ## R__d)
+      (SUB_L: forall l, L' l -> L l)
+      :
+      sgns_over L' R__d -∗
+      (obls_rel L τ (R' ∪ R__d) ∗-∗ obls_rel L' τ R' ∗ (∀ R'', obls_rel L' τ R'' -∗ obls_rel L τ (R'' ∪ R__d))).
+    Proof using.
+      iIntros "#OVER'd".
+      iSplit; revgoals.
+      { iIntros "(OB' & CLOS)".
+        by iApply "CLOS". }
+
+      rewrite !obls_rel_unfold.
+      iIntros "(%R__f & FULL & FRAG & #OVERf)".
+      rewrite obls_frag_union; [| done].
+      iDestruct "FRAG" as "[FRAG' FRAGd]".
+      iApply bi.sep_exist_r. iExists _. iFrame "FRAG'".
+      iDestruct (obls_auth_disj_helper with "[$]") as %DISJ0.
+      rewrite -gset_disj_union; [| set_solver].
+      iSplitL "FULL".
+      { iSplitL.
+        { iApply own_proper; [| by iFrame]. do 3 f_equiv.
+          rewrite -cmra_assoc. f_equal.
+          rewrite gset_disj_union; set_solver. }
+        rewrite {3}/sgns_over. rewrite big_opS_union; [| set_solver].
+        iFrame "OVER'd".
+        iApply (big_sepS_mono with "OVERf").
+        iIntros "%s %Fs (%l & #SGN & %LT)".
+        iExists _. iFrame "SGN". iPureIntro.
+        intros ??. apply LT. eauto. }
+      iIntros (R''). rewrite !obls_rel_unfold.
+      iIntros "(%Rf' & AUTH & FRAG & #OVER')".
+      iDestruct (obls_auth_disj_helper with "AUTH") as %DISJ'.
+      rewrite gset_disj_union; [| done].
+      iCombine "FRAG FRAGd" as "FRAG".
+      iDestruct (obls_frag_disj_helper with "FRAG") as %DISJ''. 
+      rewrite gset_disj_union; [| done].
+      iDestruct (obls_full_frag with "[$] [$]") as %SUB''.
+      assert (R__d ⊆ Rf') as SUBd by set_solver.
+      apply subseteq_disjoint_union_L in SUBd as (R''' & -> & DISJ''').
+      iExists _. iFrame "FRAG". iSplitL.
+      { iApply own_proper; [| by iFrame].
+        do 3 f_equiv. rewrite union_assoc_L. 
+        rewrite gset_disj_union; [reflexivity| ].
+        set_solver. }
+
+      coPset
+      
+      
+
+    Lemma obls_rel_narrow (L L': Level -> Prop) τ R' R__d
+      (DISJ: R' ## R__d)
+      (SUB_L: forall l, L' l -> L l):
+      obls_rel L τ (R' ∪ R__d) ∗ sgns_over L' R__d ⊣⊢
+      obls_rel L' τ R' ∗ obls_frag τ R__d.
+    Proof using.
+      rewrite !obls_rel_unfold.
+      iSplit.
+      - iIntros "((%R__f & FULL & FRAG & #OVER) & #OVER')".
+        rewrite obls_frag_union; [| done].
+        iDestruct "FRAG" as "[FRAG' FRAGd]". iFrame "FRAGd".
+        iExists _. iFrame "FRAG'".
+        iDestruct (obls_auth_disj_helper with "[$]") as %DISJ0.
+        rewrite -gset_disj_union; [| set_solver].
+        iSplitL.
+        { iApply own_proper; [| by iFrame]. do 3 f_equiv.
+          rewrite -cmra_assoc. f_equal.
+          rewrite gset_disj_union; set_solver. }
+        rewrite {3}/sgns_over. rewrite big_opS_union; [| set_solver].
+        iFrame "OVER'".
+        iApply (big_sepS_mono with "OVER").
+        iIntros "%s %Fs (%l & #SGN & %LT)".
+        iExists _. iFrame "SGN". iPureIntro.
+        intros ??. apply LT. eauto.
+      - iIntros "((%R__f & FULL & FRAG & #OVER') & FRAGd)".
+        iCombine "FRAG FRAGd" as "FRAG".
+        iDestruct (obls_auth_disj_helper with "[$]") as %DISJ0.
+        rewrite !gset_disj_union.
+        2, 3: set_solver.
+        iDestruct (obls_full_frag with "[$] [$]") as %SUB.
+        iFrame "FRAG".
+        assert (R__d ⊆ R__f) as SUBd by set_solver.
+        apply subseteq_disjoint_union_L in SUBd as (R'' & -> & DISJ').
+        rewrite {1}/sgns_over. erewrite big_opS_union; [| done].
+        iDestruct "OVER'" as "[OVERd OVER'']". iFrame "OVERd".
+        iExists _. iSplitL "FULL".
+        { iApply own_proper; [| by iFrame].
+          do 3 f_equiv. rewrite union_assoc_L.
+          rewrite gset_disj_union; [reflexivity| ].
+          set_solver. }
+        
+        rewrite (big_opS_union with "OVER'") as "[??]".
+       
+        iExists _. 
+        
+        
+        rewrite obls_frag_union; [| done].
+        iDestruct "FRAG" as "[FRAG' FRAGd]". iFrame "FRAGd".
+        iExists _. iFrame "FRAG'".
+        iDestruct (obls_auth_disj_helper with "[$]") as %DISJ0.
+        rewrite -gset_disj_union; [| set_solver].
+        iSplitL.
+        { iApply own_proper; [| by iFrame]. do 3 f_equiv.
+          rewrite -cmra_assoc. f_equal.
+          rewrite gset_disj_union; set_solver. }
+        rewrite {3}/sgns_over. rewrite big_opS_union; [| set_solver].
+        iFrame "OVER'".
+        iApply (big_sepS_mono with "OVER").
+        iIntros "%s %Fs (%l & #SGN & %LT)".
+        iExists _. iFrame "SGN". iPureIntro.
+        intros ??. apply LT. eauto.
+          
+        erewrite <- (cmra_assoc (GSet R') (GSet R__d) (GSet R__f)). 
+      
     
     Lemma empty_sgns_levels_rel rel L:
       ⊢ sgns_levels_rel rel ∅ L.
@@ -1067,17 +1277,6 @@ Section ObligationsRepr.
       iIntros "% (?&?&?&?&?&EX)".
       rewrite mono_nat_auth_lb_op. iDestruct "EX" as "[??]". iFrame.
       iApply (exc_lb_le with "[$]"). lia.
-    Qed.
-
-    Local Lemma merge_helper ζ' R1 R2: 
-      @merge _ (@gmap_merge Locale _ _) _ _ _ op
-           {[ζ' := ● GSet R1]} {[ζ' := ◯ @GSet SignalId _ _ R2]} =
-        {[ζ' := ● GSet R1 ⋅ ◯ GSet R2]}.
-    Proof using.
-      etrans.
-      2: eapply merge_singleton.
-      { reflexivity. }
-      done.
     Qed.
 
     (* TODO: use in other places, upstream? *)
