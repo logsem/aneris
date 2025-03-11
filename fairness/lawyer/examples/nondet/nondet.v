@@ -163,73 +163,27 @@ Section Nondet.
       by iApply "POST".    
   Qed.
 
-  (* Lemma alloc_decr_inv `{DecrPreG Σ} l (n: nat): *)
-  (*   l ↦ #n ={∅}=∗ ∃ (D: DecrG Σ), decr_inv l ∗ cnt_frag n. *)
-  (* Proof using. *)
-  (*   iIntros "L". *)
-  (*   iMod (own_alloc ((● Excl' n ⋅ ◯ _): excl_authUR natO)) as (γ) "[AUTH ?]". *)
-  (*   { apply auth_both_valid_2; [| reflexivity]. done. } *)
-  (*   set (D := {| γ__decr := γ |}).  *)
-  (*   iMod (inv_alloc decr_ns _ (decr_inv_inner l) with "[L AUTH]") as "#?". *)
-  (*   { iExists _. iNext. iFrame. } *)
-  (*   iModIntro. iExists _.  iFrame "#".  *)
-  (*   rewrite /cnt_frag. simpl. subst D. iFrame. *)
-  (* Qed. *)
+  Lemma alloc_nondet_inv `{NondetPreG Σ} τ cnt flag:
+    cnt ↦ #(0%nat) -∗ flag ↦ #false -∗ obls τ ∅ -∗
+    BOU ∅ 1 (∃ s__f (ND: NondetG Σ), nondet_inv cnt flag s__f ∗ obls τ {[ s__f ]}).
+  Proof using.
+    iIntros "CNT FLAG OB".
+    iMod (OU_create_sig _ _ l__f with "[$]") as "(%s__f & SGN & OB & _)".
+    iMod (own_alloc (Excl tt: exclR unitO)) as (γ) "TOK".
+    { done. }
 
-  (* Lemma const_term_spec `{DecrPreG Σ} τ π d: *)
-  (*   {{{ th_phase_eq τ π ∗ cp_mul π d ((N + 2) * 10) ∗ obls τ ∅ }}} *)
-  (*     const_term #() @ τ *)
-  (*   {{{ v, RET v; obls τ ∅ }}}. *)
-  (* Proof using OBLS_AMU__f OBLS_AMU NO_OBS_POST. *)
-  (*   clear ODl ODd LEl. *)
-  (*   iIntros (Φ) "(PH & CPS & OB) POST". *)
+    (* workaround to get exc_lb 0*)
+    rewrite Nat.sub_diag. rewrite {2}(plus_n_O 0). iApply BOU_split.
+    iApply OU_BOU_rep.
+    iApply (OU_rep_wand with "[-]").
+    2: { iApply (increase_eb_upd_rep0 0). }
+    iIntros "EB".
 
-  (*   replace (N + 2) with (N + 1 + 1) by lia. *)
-  (*   rewrite Nat.mul_add_distr_r. simpl.  *)
-  (*   iDestruct (cp_mul_split with "CPS") as "[CPSd CPS]". *)
-  (*   rewrite /const_term. *)
+    set (ND := {| γ__tok := γ |}).
+    iMod (inv_alloc nondet_ns _ (nondet_inv_inner _ _ _) with "[-OB]") as "#?".
+    { do 2 iExists _. iNext. iFrame. iLeft. by iFrame. }
 
-  (*   pure_steps. *)
-
-  (*   wp_bind (ref _)%E. *)
-  (*   iApply sswp_MU_wp; [done| ]. iApply wp_alloc. iIntros "!> %l L _". *)
-  (*   (* TODO: why elimination takes so long? *) *)
-  (*   iMod (alloc_decr_inv with "L") as (?) "[#INV CNT]".  *)
-    
-  (*   MU_by_burn_cp. iApply wp_value.  *)
-    
-  (*   wp_bind (Rec _ _ _)%E. pure_steps. *)
-  (*   wp_bind (Fork _)%E. *)
-  (*   iApply sswp_MUf_wp. iIntros (τ') "!>". *)
-  (*   split_cps "CPS" 1. *)
-
-  (*   MU__f_by_BOU (∅: gset SignalId).  *)
-  (*   iModIntro. iSplitR "CPS' PH OB".  *)
-  (*   2: { iExists _. rewrite cp_mul_1. by iFrame. } *)
-  (*   iIntros "(%π1 & %π2 & PH1 & OB1 & PH2 & OB2 & [%PH_LT1 %PH_LT2])". *)
-
-  (*   iSplitL "CPSd PH2 CNT OB2". *)
-  (*   - rewrite cp_mul_weaken; [..| reflexivity].  *)
-  (*     2: { apply PH_LT2. } *)
-  (*     iApply (decr_spec with "[-OB2]"). *)
-  (*     { iFrame "#∗". } *)
-  (*     iNext. iIntros. iApply NO_OBS_POST. *)
-  (*     iApply (obls_proper with "[$]"). symmetry. set_solver. *)
-  (*   - rewrite difference_diag_L. *)
-  (*     rewrite cp_mul_weaken; [.. | reflexivity]. *)
-  (*     2: { apply PH_LT1. } *)
-  (*     iRename "PH1" into "PH". *)
-  (*     wp_bind (Rec _ _ _)%E. pure_steps. *)
-
-  (*     iApply wp_atomic. *)
-  (*     iInv "INV" as "inv" "CLOS". iModIntro. *)
-  (*     rewrite {1}/decr_inv_inner. iDestruct "inv" as ">(%n & L & AUTH)". *)
-  (*     iApply sswp_MU_wp; [done| ]. iApply (wp_load with "[$]"). iIntros "!> L". *)
-  (*     MU_by_BOU.     *)
-  (*     BOU_burn_cp. iApply wp_value.  *)
-  (*     iMod ("CLOS" with "[AUTH L]") as "_". *)
-  (*     { iExists _. iFrame. } *)
-  (*     iModIntro. by iApply "POST". *)
-  (* Qed. *)
+    iModIntro. do 2 iExists _. rewrite union_empty_l_L. iFrame "#∗".
+  Qed.
   
 End Nondet.
