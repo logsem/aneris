@@ -126,17 +126,6 @@ Section ProgramLogic.
 
     Lemma BOU_AMU__f E ζ ζ' π R0 R' P:
       ⊢
-        (* (th_phase_eq ζ π -∗ BOU E b *)
-        (*    (P ∗ (∃ ph deg, cp ph deg ∗ ⌜ phase_le ph π ⌝) ∗ *)
-        (*    th_phase_eq ζ π ∗ *)
-        (*    obls ζ R0) (oGS := oGS)) -∗ *)
-        (* th_phase_eq ζ π -∗ *)
-        (* AMU__f E ζ ζ' obls_act (P ∗ ∃ π1 π2,  *)
-        (*              th_phase_eq ζ π1 ∗ obls ζ (R0 ∖ R') ∗ *)
-        (*              th_phase_eq ζ' π2 ∗ obls ζ' (R0 ∩ R') ∗ *)
-        (*              ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝ *)
-        (* ) (aeGS := oGS'). *)
-
         BOU E LIM_STEPS (P ∗ ∃ d, cp π d ∗ obls ζ R0 ∗ th_phase_eq ζ π) -∗
         AMU__f E ζ ζ' obls_act (P ∗ ∃ π1 π2,
             th_phase_eq ζ π1 ∗ obls ζ (R0 ∖ R') ∗ 
@@ -192,6 +181,23 @@ Section ProgramLogic.
       red. do 2 (split; auto). 
       eexists. split; eauto. by left.  
     Qed.
+
+    (* TODO: make this version the main one *)
+    Lemma BOU_AMU__f' E ζ ζ' π R0 R' P:
+      ⊢
+        let om_fork_post := ∃ π1 π2,
+            th_phase_eq ζ π1 ∗ obls ζ (R0 ∖ R') ∗ 
+            th_phase_eq ζ' π2 ∗ obls ζ' (R0 ∩ R') ∗
+            ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝ in
+        BOU E LIM_STEPS ((om_fork_post -∗ P) ∗ ∃ d, cp π d ∗ obls ζ R0 ∗ th_phase_eq ζ π) -∗
+        AMU__f E ζ ζ' obls_act P (aeGS := oGS').
+    Proof using.
+      simpl. iIntros "BOU".
+      iApply AMU_impl_wand.
+      2: { iApply (BOU_AMU__f with "[$]"). }
+      iIntros "[X Y]".
+      by iApply "X".
+    Qed.      
 
   End BOU.
 

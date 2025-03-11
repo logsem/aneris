@@ -80,7 +80,6 @@ Section ConstTermAdequacy.
     (extr : heap_lang_extrace)
     (START: trfirst extr = ([prog #()], Build_state ∅ ∅))
     (VALID: extrace_valid extr):
-    (* extrace_fairly_terminating extr. *)
     trace_len_le extr (bound + 1). 
   Proof.
     assert (heapGpreS CTΣ EM) as HPreG.
@@ -134,4 +133,3 @@ Section ConstTermAdequacy.
   Qed.
 
 End ConstTermAdequacy.
-

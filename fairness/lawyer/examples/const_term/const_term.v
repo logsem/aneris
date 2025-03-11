@@ -184,7 +184,8 @@ Section Decr.
     {{{ th_phase_eq τ π ∗ cp_mul π d ((N + 2) * 10) ∗ obls τ ∅ }}}
       const_term #() @ τ
     {{{ v, RET v; obls τ ∅ }}}.
-  Proof using OBLS_AMU__f OBLS_AMU NO_OBS_POST. 
+  Proof using OBLS_AMU__f OBLS_AMU NO_OBS_POST.
+    clear ODl ODd LEl.
     iIntros (Φ) "(PH & CPS & OB) POST".
 
     replace (N + 2) with (N + 1 + 1) by lia.
@@ -199,33 +200,17 @@ Section Decr.
     (* TODO: why elimination takes so long? *)
     iMod (alloc_decr_inv with "L") as (?) "[#INV CNT]". 
     
-Ltac MU_by_BOU :=
-  match goal with
-  | [OB_AMU: AMU_lift_MU _ _ _ _ _ |- envs_entails _ (MU _ _ _) ] =>
-      iApply OB_AMU; [by rewrite nclose_nroot| ];
-      iApply BOU_AMU
-  | [OBLS_AMU__f: forall τ, @AMU_lift_MU__f _ _ _ _ _ _ _ _ _ |-
-                       envs_entails _ (MU__f _ _ _ _) ] =>
-      iApply OBLS_AMU__f 
-      (* [| iApply BOU_AMU__f] *)
-  end. 
-Ltac MU_by_burn_cp := MU_by_BOU; BOU_burn_cp.
-
-    MU_by_burn_cp.
-    iApply wp_value. 
+    MU_by_burn_cp. iApply wp_value. 
     
     wp_bind (Rec _ _ _)%E. pure_steps.
     wp_bind (Fork _)%E.
     iApply sswp_MUf_wp. iIntros (τ') "!>".
-    (* MU_by_burn_cp.  *)
     split_cps "CPS" 1.
-    iApply (MU__f_wand with "[-CPS' PH OB]").
-    2: { iApply OBLS_AMU__f; [done| ].
-         iApply BOU_AMU__f.
-         iApply BOU_intro. iFrame.
-         iSplitR; [iAccu| ]. 
-         iExists _. rewrite cp_mul_1. by iFrame. }
-    iIntros "(_ & (%π1 & %π2 & PH1 & OB1 & PH2 & OB2 & [%PH_LT1 %PH_LT2]))".
+
+    MU__f_by_BOU (∅: gset SignalId). 
+    iModIntro. iSplitR "CPS' PH OB". 
+    2: { iExists _. rewrite cp_mul_1. by iFrame. }
+    iIntros "(%π1 & %π2 & PH1 & OB1 & PH2 & OB2 & [%PH_LT1 %PH_LT2])".
 
     iSplitL "CPSd PH2 CNT OB2".
     - rewrite cp_mul_weaken; [..| reflexivity]. 
@@ -233,7 +218,7 @@ Ltac MU_by_burn_cp := MU_by_BOU; BOU_burn_cp.
       iApply (decr_spec with "[-OB2]").
       { iFrame "#∗". }
       iNext. iIntros. iApply NO_OBS_POST.
-      iApply (obls_proper with "[$]"). symmetry. apply intersection_idemp.
+      iApply (obls_proper with "[$]"). symmetry. set_solver.
     - rewrite difference_diag_L.
       rewrite cp_mul_weaken; [.. | reflexivity].
       2: { apply PH_LT1. }
@@ -243,7 +228,6 @@ Ltac MU_by_burn_cp := MU_by_BOU; BOU_burn_cp.
       iApply wp_atomic.
       iInv "INV" as "inv" "CLOS". iModIntro.
       rewrite {1}/decr_inv_inner. iDestruct "inv" as ">(%n & L & AUTH)".
-      (* iDestruct (cnt_agree with "[$] [$]") as %->. *)
       iApply sswp_MU_wp; [done| ]. iApply (wp_load with "[$]"). iIntros "!> L".
       MU_by_BOU.    
       BOU_burn_cp. iApply wp_value. 

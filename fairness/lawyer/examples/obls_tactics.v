@@ -24,13 +24,23 @@ Ltac BOU_burn_cp :=
   burn_cp_after_BOU.
 
 Ltac MU_by_BOU :=
+  try iNext;
   match goal with
-  | [OB_AMU: AMU_lift_MU _ _ _ _ _ |- envs_entails _ ?P ] =>
-      iApply OB_AMU; [by rewrite nclose_nroot| ];
+  | [OB_AMU: AMU_lift_MU _ _ _ _ _ |- envs_entails _ (MU _ _ _) ] =>
+      iApply OB_AMU; [(try rewrite nclose_nroot); done| ];
       iApply BOU_AMU
   end.
 
 Ltac MU_by_burn_cp := MU_by_BOU; BOU_burn_cp.
+
+Ltac MU__f_by_BOU R' :=
+  try iNext;
+  match goal with
+  | [OBLS_AMU__f: forall τ, @AMU_lift_MU__f _ _ _ _ _ _ _ _ _ |-
+                       envs_entails _ (MU__f _ _ _ _) ] =>
+      iApply OBLS_AMU__f; [(try rewrite nclose_nroot); done| ];
+      iApply (BOU_AMU__f' _ _ _ _ _ R')
+  end.
 
 Ltac pure_step_hl :=
   iApply sswp_MU_wp; [done| ];
