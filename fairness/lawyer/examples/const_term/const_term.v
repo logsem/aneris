@@ -16,7 +16,7 @@ Class DecrPreG Σ := {
     decr_cnt :> inG Σ (excl_authUR natO);
 }.
 Class DecrG Σ := {
-    decr_pre :> inG Σ (excl_authUR natO);
+    decr_pre :> DecrPreG Σ;
     γ__decr: gname;
 }.
 
