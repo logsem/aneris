@@ -228,6 +228,33 @@ Section ProgramLogic.
     red. simpl. iIntros "_". iApply BOU_intro.
   Qed.
 
+  Global Instance ElimModal_bupd_BOU p E n P Q:
+    ElimModal True p false
+    (|==> P) P
+    (BOU E n Q) (BOU E n Q).
+  Proof using.
+    clear. 
+    red. simpl. iIntros "_ [P IMPL]".
+    rewrite bi.intuitionistically_if_elim.
+    iMod "P". by iApply "IMPL". 
+  Qed.
+
+  Global Instance ElimModal_fupd_BOU p E' E n P Q:
+    ElimModal (E' ⊆ E) p false
+    (|={E'}=> P) P
+    (BOU E n Q) (BOU E n Q).
+  Proof using.
+    clear. 
+    red. simpl. iIntros "%SUB [P IMPL]".
+    rewrite bi.intuitionistically_if_elim. 
+    iApply BOU_invs.
+    iMod (fupd_mask_subseteq E') as "CLOS"; [done| ]. iMod "P".
+    iApply (BOU_mask_comm with "[$]").
+    { set_solver. }
+    iFrame. iMod "CLOS".  
+    iApply fupd_mask_intro_subseteq; [set_solver | done].
+  Qed.
+
 End ProgramLogic.
 
 

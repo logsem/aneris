@@ -12,6 +12,15 @@ From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From iris.base_logic.lib Require Import invariants.
 
 
+Class DecrPreG Σ := {
+    decr_cnt :> inG Σ (excl_authUR natO);
+}.
+Class DecrG Σ := {
+    decr_pre :> inG Σ (excl_authUR natO);
+    γ__decr: gname;
+}.
+
+
 Section Decr.
   Context `{ODd: OfeDiscrete DegO} `{ODl: OfeDiscrete LevelO}.
   Context `{LEl: @LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}.
@@ -45,17 +54,48 @@ Section Decr.
       else ("l" <- "c" - #1 ;; "decr" "l")
     .
 
+  Definition cnt_auth `{DecrG Σ} (n: nat) :=
+    own γ__decr (● (Excl' n)). 
+  Definition cnt_frag `{DecrG Σ} (n: nat) :=
+    own γ__decr (◯ (Excl' n)). 
+
+  (* TODO: these lemmas are used way too often, move them to library *)
+  Lemma cnt_agree `{DecrG Σ} n1 n2:
+    cnt_auth n1-∗ cnt_frag n2 -∗ ⌜ n1 = n2 ⌝.
+  Proof using.
+    rewrite /cnt_frag /cnt_auth.
+    iIntros "HA HB". iCombine "HB HA" as "H".
+    iDestruct (own_valid with "H") as "%Hval".
+      iPureIntro. apply excl_auth_agree_L in Hval. set_solver.
+  Qed.
+  
+  Lemma cnt_update `{DecrG Σ} n1 n2 n':
+    cnt_auth n1 -∗ cnt_frag n2 ==∗
+      cnt_auth n' ∗ cnt_frag n'.
+  Proof using.
+    rewrite /cnt_frag /cnt_auth.
+    iIntros "HA HB". iCombine "HB HA" as "H".
+    rewrite -!own_op. iApply own_update; [| by iFrame].
+    apply excl_auth_update.
+  Qed.
+
+  Definition decr_inv_inner `{DecrG Σ} (l: loc): iProp Σ :=
+    ∃ (n: nat), l ↦ #n ∗ cnt_auth n.
+
+  Definition decr_ns := nroot.@"decr".
+  Definition decr_inv `{DecrG Σ} l := inv decr_ns (decr_inv_inner l).
+
   Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS' _ EM _ (↑ nroot)}.
   Context {OBLS_AMU__f: forall τ, @AMU_lift_MU__f _ _ _ τ oGS' _ EM _ ⊤}.
   Context {NO_OBS_POST: ∀ τ v, obls τ ∅ -∗ fork_post τ v}. 
 
-  Lemma decr_spec τ π d l (N: nat):
+  Lemma decr_spec `{DecrG Σ} τ π d l (N: nat):
     {{{ th_phase_eq τ π ∗ cp_mul π d ((N + 1) * 10) ∗
-        l ↦ #N }}}
+        decr_inv l ∗ cnt_frag N }}}
       decr #l @ τ
     {{{ v, RET v; ⌜ True ⌝ }}}.
   Proof using OBLS_AMU.
-    iIntros (Φ) "(PH & CPS & L) POST".
+    iIntros (Φ) "(PH & CPS & #INV & CNT) POST".
     iLöb as "IH" forall (N). 
     rewrite /decr.
     rewrite Nat.mul_add_distr_r Nat.mul_1_l.
@@ -64,10 +104,17 @@ Section Decr.
     pure_steps.
 
     wp_bind (! _)%E.
+    iApply wp_atomic.
+    iInv "INV" as "inv" "CLOS". iModIntro.
+    rewrite {1}/decr_inv_inner. iDestruct "inv" as ">(%n & L & AUTH)".
+    iDestruct (cnt_agree with "[$] [$]") as %->.     
     iApply sswp_MU_wp; [done| ]. iApply (wp_load with "[$]"). iIntros "!> L".
-    MU_by_burn_cp.
+    MU_by_burn_cp. iApply wp_value.
+    iMod ("CLOS" with "[AUTH L]") as "_".
+    { iExists _. iFrame. }
+    iModIntro. 
     
-    pure_steps. wp_bind (Rec _ _ _)%E. pure_steps.
+    wp_bind (Rec _ _ _)%E. pure_steps.
 
     wp_bind (_ = _)%E.
     iApply sswp_MU_wp; [done| ].
@@ -78,7 +125,7 @@ Section Decr.
 
     destruct N.
     { simpl. pure_steps. by iApply "POST". }
-    rewrite -{1}(Nat.add_1_r N). simpl. pure_steps.
+    rewrite -{2}(Nat.add_1_r N). simpl. pure_steps.
 
     wp_bind (_ - _)%E.
     iApply sswp_MU_wp; [done| ].
@@ -86,18 +133,25 @@ Section Decr.
     { simpl. tauto. }
     MU_by_burn_cp.
     iApply wp_value.
+    replace (Z.of_nat (S N) - 1)%Z with (Z.of_nat N) by lia. 
 
     wp_bind (_ <- _)%E.
+    iApply wp_atomic.
+    iInv "INV" as "inv" "CLOS". iModIntro.
+    rewrite {1}/decr_inv_inner. iDestruct "inv" as ">(%n & L & AUTH)".
+    iDestruct (cnt_agree with "[$] [$]") as %->.
     iApply sswp_MU_wp; [done| ]. iApply (wp_store with "[$]"). iIntros "!> L".
-    MU_by_burn_cp.
-    iApply wp_value.
+    MU_by_BOU.    
+    iMod (cnt_update _ _ N with "[$] [$]") as "[AUTH CNT]".
+    BOU_burn_cp. iApply wp_value. 
+    iMod ("CLOS" with "[AUTH L]") as "_".
+    { iExists _. iFrame. }
+    iModIntro. 
 
     wp_bind (Rec _ _ _)%E. do 1 pure_step_cases.
     iApply wp_value.
     pure_step.
 
-    (* Set Printing Coercions. *)
-    replace (Z.of_nat (S N) - 1)%Z with (Z.of_nat N) by lia. 
     iApply ("IH" with "[$] [$] [$] [$]").
   Qed.
 
@@ -113,21 +167,38 @@ Section Decr.
        !"l")
     .
 
+  Lemma alloc_decr_inv `{DecrPreG Σ} l (n: nat):
+    l ↦ #n ={∅}=∗ ∃ (D: DecrG Σ), decr_inv l ∗ cnt_frag n.
+  Proof using.
+    iIntros "L".
+    iMod (own_alloc ((● Excl' n ⋅ ◯ _): excl_authUR natO)) as (γ) "[AUTH ?]".
+    { apply auth_both_valid_2; [| reflexivity]. done. }
+    set (D := {| γ__decr := γ |}). 
+    iMod (inv_alloc decr_ns _ (decr_inv_inner l) with "[L AUTH]") as "#?".
+    { iExists _. iNext. iFrame. }
+    iModIntro. iExists _.  iFrame "#". 
+    rewrite /cnt_frag. simpl. subst D. iFrame.
+  Qed.
 
-  Lemma const_term_spec τ π d:
+  Lemma const_term_spec `{DecrPreG Σ} τ π d:
     {{{ th_phase_eq τ π ∗ cp_mul π d ((N + 2) * 10) ∗ obls τ ∅ }}}
-      const_term #()  @ τ
+      const_term #() @ τ
     {{{ v, RET v; obls τ ∅ }}}.
-  Proof using. 
+  Proof using OBLS_AMU__f OBLS_AMU NO_OBS_POST. 
     iIntros (Φ) "(PH & CPS & OB) POST".
+
+    replace (N + 2) with (N + 1 + 1) by lia.
     rewrite Nat.mul_add_distr_r. simpl. 
-    iDestruct (cp_mul_split with "CPS") as "[CPS' CPS]".
+    iDestruct (cp_mul_split with "CPS") as "[CPSd CPS]".
     rewrite /const_term.
 
     pure_steps.
 
     wp_bind (ref _)%E.
     iApply sswp_MU_wp; [done| ]. iApply wp_alloc. iIntros "!> %l L _".
+    (* TODO: why elimination takes so long? *)
+    iMod (alloc_decr_inv with "L") as (?) "[#INV CNT]". 
+    
 Ltac MU_by_BOU :=
   match goal with
   | [OB_AMU: AMU_lift_MU _ _ _ _ _ |- envs_entails _ (MU _ _ _) ] =>
@@ -147,12 +218,38 @@ Ltac MU_by_burn_cp := MU_by_BOU; BOU_burn_cp.
     wp_bind (Fork _)%E.
     iApply sswp_MUf_wp. iIntros (τ') "!>".
     (* MU_by_burn_cp.  *)
-    MU_by_BOU.
-    2: {
-      iApply BOU_AMU__f. 
+    split_cps "CPS" 1.
+    iApply (MU__f_wand with "[-CPS' PH OB]").
+    2: { iApply OBLS_AMU__f; [done| ].
+         iApply BOU_AMU__f.
+         iApply BOU_intro. iFrame.
+         iSplitR; [iAccu| ]. 
+         iExists _. rewrite cp_mul_1. by iFrame. }
+    iIntros "(_ & (%π1 & %π2 & PH1 & OB1 & PH2 & OB2 & [%PH_LT1 %PH_LT2]))".
 
+    iSplitL "CPSd PH2 CNT OB2".
+    - rewrite cp_mul_weaken; [..| reflexivity]. 
+      2: { apply PH_LT2. }
+      iApply (decr_spec with "[-OB2]").
+      { iFrame "#∗". }
+      iNext. iIntros. iApply NO_OBS_POST.
+      iApply (obls_proper with "[$]"). symmetry. apply intersection_idemp.
+    - rewrite difference_diag_L.
+      rewrite cp_mul_weaken; [.. | reflexivity].
+      2: { apply PH_LT1. }
+      iRename "PH1" into "PH".
+      wp_bind (Rec _ _ _)%E. pure_steps.
 
-    
-
+      iApply wp_atomic.
+      iInv "INV" as "inv" "CLOS". iModIntro.
+      rewrite {1}/decr_inv_inner. iDestruct "inv" as ">(%n & L & AUTH)".
+      (* iDestruct (cnt_agree with "[$] [$]") as %->. *)
+      iApply sswp_MU_wp; [done| ]. iApply (wp_load with "[$]"). iIntros "!> L".
+      MU_by_BOU.    
+      BOU_burn_cp. iApply wp_value. 
+      iMod ("CLOS" with "[AUTH L]") as "_".
+      { iExists _. iFrame. }
+      iModIntro. by iApply "POST".
+  Qed.
   
 End Decr.

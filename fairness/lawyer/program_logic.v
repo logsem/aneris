@@ -72,6 +72,57 @@ Section ProgramLogic.
     Definition MU := MU_impl None.
     Definition MU__f E ζ ζ' P := MU_impl (Some ζ') E ζ P.
 
+    (* For each proofmode typeclass, there are two instances (for MU with and without fork)
+       Both are proved with a single lemma *)
+
+    Lemma ElimModal_bupd_MU_impl p f E ζ P Q:
+      ElimModal True p false
+        (|==> P) P
+        (MU_impl f E ζ Q) (MU_impl f E ζ Q).
+    Proof using.
+      red. iIntros "_ [P IMPL]".
+      rewrite bi.intuitionistically_if_elim.
+      iMod "P". by iApply "IMPL".
+    Qed.
+
+    Global Instance ElimModal_bupd_MU p E ζ P Q:
+      ElimModal True p false
+        (|==> P) P
+        (MU E ζ Q) (MU E ζ Q).
+    Proof using. apply ElimModal_bupd_MU_impl. Qed. 
+
+    Global Instance ElimModal_bupd_MU__f p f E ζ P Q:
+      ElimModal True p false
+        (|==> P) P
+        (MU__f E f ζ Q) (MU__f E f ζ Q).
+    Proof using. apply ElimModal_bupd_MU_impl. Qed.
+
+    Lemma ElimModal_fupd_MU_impl p E' E ζ f P Q:
+      ElimModal (E' ⊆ E) p false
+        (|={E'}=> P) P
+        (MU_impl f E ζ Q) (MU_impl f E ζ Q).
+    Proof using.
+      red. simpl. iIntros "%SUB [P IMPL]".
+      rewrite bi.intuitionistically_if_elim.
+      rewrite /MU_impl.
+      iIntros (??) "TI'".
+      iMod (fupd_mask_subseteq E') as "CLOS"; [done| ]. iMod "P".
+      iMod "CLOS". iMod ("IMPL" with "[$] [$]").
+      by iModIntro. 
+    Qed.
+
+    Global Instance ElimModal_fupd_MU p E' E ζ P Q:
+      ElimModal (E' ⊆ E) p false
+        (|={E'}=> P) P
+        (MU E ζ Q) (MU E ζ Q).
+    Proof using. apply ElimModal_fupd_MU_impl. Qed. 
+
+    Global Instance ElimModal_fupd_MU__f p E' E ζ f P Q:
+      ElimModal (E' ⊆ E) p false
+        (|={E'}=> P) P
+        (MU__f E f ζ Q) (MU__f E f ζ Q).
+    Proof using. apply ElimModal_fupd_MU_impl. Qed.
+    
     Lemma fupd_MU_impl f E ζ P:
       (|={E, ∅}=> MU_impl f ∅ ζ (|={∅, E}=>P)) -∗ MU_impl f E ζ P.
     Proof using.
