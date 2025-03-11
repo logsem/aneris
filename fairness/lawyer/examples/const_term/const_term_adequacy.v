@@ -1,9 +1,9 @@
 From iris.algebra Require Import auth gmap gset excl excl_auth.
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import utils.
+From trillium.fairness Require Import utils utils_tactics trace_len utils_multisets.
 From trillium.fairness.heap_lang Require Import simulation_adequacy.
 From trillium.fairness.lawyer Require Import sub_action_em action_model.
-From trillium.fairness.lawyer.obligations Require Import obligations_adequacy obligations_logic obligations_em obligations_resources obligations_model obligations_am.
+From trillium.fairness.lawyer.obligations Require Import obligations_adequacy obligations_logic obligations_em obligations_resources obligations_model obligations_am unfair_termination.
 From trillium.fairness.lawyer.examples.const_term Require Import const_term.
 
 
@@ -59,21 +59,51 @@ Section ConstTermAdequacy.
     subG CTΣ Σ → DecrPreG Σ.
   Proof. solve_inG. Qed.
 
-  Lemma const_term_terminates N
+  (* TODO: move *)
+  Lemma mset_map_size `{Countable A, Countable B} (f: A -> B) (X: gmultiset A):
+    size (mset_map f X) = size X.
+  Proof using.
+    pattern X. apply gmultiset_ind; clear X. 
+    { mss. }
+    intros a X IH. rewrite /mset_map.
+    rewrite gmultiset_elements_disj_union. rewrite fmap_app.
+    rewrite list_to_set_disj_app.
+    rewrite !gmultiset_size_disj_union. rewrite IH. f_equal.
+    rewrite gmultiset_elements_singleton list_fmap_singleton.
+    rewrite list_to_set_disj_cons. rewrite list_to_set_disj_nil gmultiset_size_disj_union.
+    rewrite !gmultiset_size_singleton gmultiset_size_empty. lia.
+  Qed.
+
+  Theorem const_term_bound_termination N
     (prog := const_term N)
+    (bound := (N + 2) * 10)
     (extr : heap_lang_extrace)
-    (START: trfirst extr = ([prog #()], Build_state ∅ ∅)):
-    extrace_fairly_terminating extr.
+    (START: trfirst extr = ([prog #()], Build_state ∅ ∅))
+    (VALID: extrace_valid extr):
+    (* extrace_fairly_terminating extr. *)
+    trace_len_le extr (bound + 1). 
   Proof.
     assert (heapGpreS CTΣ EM) as HPreG.
     { apply _. }
 
-    eapply @obls_terminates_impl with
-      (cps_degs := ((N + 2) * 10) *: {[+ () +]})
+    forward eapply @obls_match_impl with
+      (cps_degs := bound *: {[+ () +]})
       (eb := 0); eauto.
     1-5: by apply _.
-    { apply empty_WF. }
-    { apply unit_WF. }
+    2: { intros (mtr & MATCH & OM_WF & FIRST).
+         (* TODO: extract lemma *)
+         enough (trace_len_le mtr (bound + 1)).
+         { destruct H as (len & LEN & LE). eexists. split; eauto.
+           destruct (trace_has_len extr) as [len' LEN'].
+           eapply traces_match_same_length in MATCH as <-; eauto. }
+         replace bound with (fuel_left (trfirst mtr)).
+         { apply always_terminates_within_bound.
+           - eapply traces_match_valid2; eauto.
+           - eauto. } 
+         subst bound. rewrite /fuel_left.
+         rewrite FIRST. simpl.
+         rewrite mset_map_size. rewrite gmultiset_size_scalar_mul.
+         rewrite gmultiset_size_singleton. lia. }           
 
     iIntros (?) "[HEAP INIT]".
 

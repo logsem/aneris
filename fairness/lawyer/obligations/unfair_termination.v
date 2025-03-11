@@ -133,12 +133,16 @@ Section ConstantTimeTermination.
     apply scalar_mul_singleton_ms_le in LE.
     apply Nat.le_lteq in LE as [? | ?]; [done| ].
     destruct NEQ. congruence.
-  Qed.     
+  Qed.
+
+  (* TODO: move *)
+  Definition trace_len_le {St L: Type} (tr: trace St L) (n: nat) :=
+    exists len, trace_len_is tr (NOnum len) /\ len <= n.     
 
   Lemma always_terminates_within_bound (tr: obls_trace)
     (VALID: obls_trace_valid tr)
     (TR_WF: ∀ i δ, tr S!! i = Some δ → om_st_wf δ):
-    exists len, trace_len_is tr (NOnum len) /\ len <= fuel_left (trfirst tr) + 1. 
+    trace_len_le tr (fuel_left (trfirst tr) + 1).
   Proof using.
     remember (fuel_left (trfirst tr)) as F.
     symmetry in HeqF. apply Nat.eq_le_incl in HeqF. 

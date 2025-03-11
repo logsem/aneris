@@ -1,5 +1,5 @@
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import locales_helpers comp_utils trace_lookup fairness fin_branch.
+From trillium.fairness Require Import locales_helpers comp_utils trace_lookup fairness fin_branch utils_tactics.
 From trillium.fairness.heap_lang Require Import simulation_adequacy.
 From trillium.fairness.lawyer Require Import sub_action_em action_model.
 From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_em obls_fairness_preservation obligations_am obligations_fin_branch obls_termination obligations_wf obligations_logic.
@@ -91,15 +91,34 @@ Section OblsAdequacy.
 
   Hypotheses (WF_LVL: wf (strict lvl_le)) (WF_DEG: wf (strict deg_le)).
 
-  Lemma obls_matching_traces_termination extr mtr
-    (VALID: extrace_valid extr)
-    (OM_WF0: om_st_wf (trfirst mtr))
-    (FAIR: ∀ tid, fair_ex tid extr)
+  Definition exec_OM_traces_match :=
+    out_om_traces_match locale_step Some
+      (fun oτ c => from_option (fun τ => locale_enabled τ c) False oτ).
+
+  Definition om_tr_wf (omtr: obls_trace) :=
+    ∀ i δ, omtr S!! i = Some δ → om_st_wf δ. 
+
+  Lemma om_st_wf_tr omtr
+    (VALID: trace_valid om_trans omtr)
+    (WF0: om_st_wf (trfirst omtr)):
+    om_tr_wf omtr.
+  Proof using. 
+    intros i δ ITH. eapply pres_by_valid_trace with (i := 0) (j := i) in VALID.
+    2: apply wf_preserved_by_loc_step.
+    2: apply wf_preserved_by_fork_step.
+    2: { by rewrite state_lookup_0. }
+    2: lia.
+    by rewrite ITH in VALID. 
+  Qed.
+
+  Lemma obls_matching_traces_OM extr mtr
     (MATCH: obls_om_traces_match extr mtr)
+    (WF0: om_st_wf (trfirst mtr))
     :
-    terminating_trace extr.
-  Proof using WF_LVL WF_DEG.
-    clear -MATCH FAIR VALID OM OM_WF0 WF_LVL WF_DEG.
+    ∃ (omtr: obls_trace), exec_OM_traces_match extr omtr ∧ om_tr_wf omtr /\
+            trfirst omtr = trfirst mtr.
+  Proof using.
+    clear -MATCH OM WF0.
     assert (exists omtr, traces_match (fun ℓ τ => ℓ.2 = Some τ) eq (@mtrans M) (@mtrans OM) mtr omtr) as [omtr MATCHo].
     { clear -MATCH mtr.
       exists (project_nested_trace id ((mbind Some) ∘ snd) mtr).
@@ -122,13 +141,32 @@ Section OblsAdequacy.
    
     pose proof (traces_match_compose _ _ _ MATCH MATCHo) as MATCH'.
 
-    (* TODO: extract these lemmas *)
     assert (out_om_traces_match locale_step Some
               (fun oτ c => from_option (fun τ => locale_enabled τ c) False oτ)
               extr omtr) as MATCH''.
     { eapply trace_utils.traces_match_impl; [..| apply MATCH'].
       - simpl. intros ?? ([??] & <- & ?). done.
       - simpl. intros ?? (? & ? & ?). subst. eauto. }
+
+    eexists. split; eauto. split.
+    - eapply om_st_wf_tr.
+      + eapply traces_match_valid2; eauto.
+      + apply traces_match_first in MATCHo.
+        by rewrite MATCHo in WF0.
+    - by apply traces_match_first in MATCHo.
+  Qed.
+
+  Lemma obls_matching_traces_termination extr mtr
+    (OM_WF0: om_st_wf (trfirst mtr))
+    (FAIR: ∀ tid, fair_ex tid extr)
+    (MATCH: obls_om_traces_match extr mtr)
+    :
+    terminating_trace extr.
+  Proof using WF_LVL WF_DEG.
+    clear -MATCH FAIR OM OM_WF0 WF_LVL WF_DEG.
+
+    pose proof (obls_matching_traces_OM _ _ MATCH OM_WF0) as (omtr & MATCH'' & OM_WF & FIRST''). 
+
     assert (∀ ζ, out_fair (λ oτ c,
                      from_option (λ τ, locale_enabled τ c) False oτ) ζ extr) as FAIR''.
     { intros oζ. red. simpl. clear -FAIR.
@@ -150,21 +188,19 @@ Section OblsAdequacy.
     pose proof (obls_fair_trace_terminate _ OM_VALID OM_FAIR) as OM_TERM.
 
     eapply (traces_match_preserves_termination _ _ _ _ _ _ MATCH'').
-    apply OM_TERM. 
-    2, 3: by eauto.
-    
-    intros. eapply pres_by_valid_trace with (i := 0) (j := i) in OM_VALID.
-    2: apply wf_preserved_by_loc_step.
-    2: apply wf_preserved_by_fork_step.
-    2: { rewrite state_lookup_0. simpl.
-         apply traces_match_first in MATCHo.
-         by rewrite -MATCHo. }
-    2: lia.
-    by rewrite H in OM_VALID. 
+    apply OM_TERM; eauto. 
   Qed.
 
   Let ASEM := ObligationsASEM.
   Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls τ ∅ (oGS := aGS)).
+
+  Lemma obls_init_wf e1 σ1 s1
+    (INIT: obls_is_init_st ([e1], σ1) s1):
+    om_st_wf s1.
+  Proof using.
+    clear -INIT. 
+    red in INIT. set_solver.
+  Qed. 
 
   Theorem simple_om_simulation_adequacy_terminate Σ
         `{hPre: !heapGpreS Σ EM} (s: stuckness)
@@ -184,8 +220,8 @@ Section OblsAdequacy.
                 Σ _ e1 _ s1 _ INIT _ VALID Hexfirst Hwp) as (omtr&MATCH&OM0).
 
     eapply obls_matching_traces_termination; eauto.
-    rewrite OM0.
-    simpl in INIT. red in INIT. set_solver.
+    rewrite OM0. simpl in INIT.
+    eapply obls_init_wf; eauto. 
   Qed.
 
   (* TODO: move *)
@@ -268,6 +304,34 @@ Section OblsAdequacy.
     simpl. rewrite /obls_st_rel.
 
     iApply (no_obls_live_tids with "[$] [$] [$]"). done.
+  Qed.
+
+  (* TODO: refactor these lemmas *)
+  Lemma obls_match_impl Σ
+    {HEAP: heapGpreS Σ EM}
+    (extr : heap_lang_extrace) (e: expr) (σ: state)
+    (cps_degs: gmultiset Degree) (eb: nat)
+    (s1 := init_om_state (trfirst extr) cps_degs eb (OP := OP))
+    (Hexfirst : trfirst extr = ([e], σ))
+    (WPe: forall (HEAP: heapGS Σ EM), ⊢ (([∗ map] l↦v ∈ heap σ, l ↦ v) ∗
+                                     (@em_init_resource heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) s1 tt))%I -∗
+            (WP e @locale_of [] e {{ _, @em_thread_post heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) 0 }})%I)
+    (VALID: extrace_valid extr)
+    :
+    ∃ omtr, exec_OM_traces_match extr omtr ∧ om_tr_wf omtr /\ trfirst omtr = s1. 
+  Proof.
+    forward eapply om_simulation_adequacy_model_trace; eauto.
+    - simpl. subst s1. rewrite Hexfirst. apply init_om_state_init. 
+    - red. intros ?. iStartProof. iIntros "[HEAP INIT] !>".
+      iSplitL.
+      + iApply WPe. subst s1.
+        rewrite -Hexfirst. iFrame.
+      + subst s1. iApply om_sim_RAH. 
+    - intros (?&?&?).
+      subst s1. rewrite Hexfirst -H3. 
+      eapply obls_matching_traces_OM; eauto.
+      rewrite H3. eapply obls_init_wf.
+      apply init_om_state_init. 
   Qed.
 
   Lemma obls_terminates_impl Σ
