@@ -58,14 +58,16 @@ Section NondetAdequacy.
       (d0 := d0) (d1 := d1).
     iApply (SPEC with "[-]"). 
     { exact tt. }
-    { apply ith_bn_lt; lia. } 
+    { apply ith_bn_lt; lia. }
+    { (* for nondet as the closed program, K is irrelevant *)
+      apply le_0_n. }
     { apply AMU_lift_top. }
     { intros. rewrite /AMU_lift_MU__f.
       rewrite -nclose_nroot.
       apply AMU_lift_top. }
     { simpl. iIntros (? _) "X". iApply "X". }
     { lia. }
-    2: { simpl. iNext. iIntros (?) "(% &?&?&?)". iFrame. }
+    2: { simpl. iNext. iIntros (?) "(%&% &?&?&?&?)". iFrame. }
 
     clear SPEC.
     rewrite START. simpl.
