@@ -200,7 +200,8 @@ Section Nondet.
   Theorem nondet_spec `{NondetPreG Σ} τ π:
     {{{ th_phase_eq τ π ∗ cp_mul π d1 2 ∗ obls τ ∅ }}}
       nondet #() @ τ
-    {{{ vn, RET vn; ∃ (n: nat), ⌜ vn = #n ⌝ ∗ exc_lb n ∗ obls τ ∅ }}}.
+    {{{ vn, RET vn; ∃ (n: nat) π', ⌜ vn = #n ⌝ ∗ exc_lb n ∗ 
+                                  obls τ ∅ ∗ th_phase_eq τ π' ∗ ⌜ phase_le π π' ⌝}}}.
   Proof.
     iIntros (Φ) "(PH & CPS1 & OB) POST". rewrite /nondet.
 
@@ -279,8 +280,9 @@ Section Nondet.
     { do 2 iExists _. iFrame "#∗". }
     iModIntro.
 
-    iApply "POST". iExists _. iFrame "#∗". iSplit; [done| ].
+    iApply "POST". do 2 iExists _. iFrame "#∗". iSplit; [done| ].
+    iSplit; [| iPureIntro; by apply PH_LT1]. 
     iApply (obls_proper with "[$]"). set_solver.
-  Qed.    
+  Qed.
   
 End Nondet.
