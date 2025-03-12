@@ -67,10 +67,13 @@ Section Nondet.
 
   Definition tok `{NondetG Σ} := own γ__tok (Excl tt). 
 
+  Context (K: nat).
+  Hypothesis (K_LB: K <= LIM_STEPS).
+
   Definition nondet_inv_inner `{NondetG Σ} (cnt flag: loc) (s__f: SignalId): iProp Σ :=
     ∃ (c: nat) (f: bool), cnt ↦ #c ∗ flag ↦ #f ∗
                       (⌜ f = false ⌝ ∗ sgn s__f l__f (Some false) ∨ ⌜ f = true ⌝ ∗ tok) ∗
-                      exc_lb c. 
+                      exc_lb (K * c). 
 
   Definition nondet_ns := nroot.@"nondet".
   Definition nondet_inv `{NondetG Σ} cnt flag s__f := inv nondet_ns (nondet_inv_inner cnt flag s__f).
@@ -88,7 +91,7 @@ Section Nondet.
         nondet_inv cnt flag s__f }}}
       incr_loop #cnt #flag @ τ
     {{{ v, RET v; obls τ ∅ }}}.
-  Proof using OBLS_AMU ODl LEl LS_LB.
+  Proof using OBLS_AMU ODl LEl LS_LB K_LB.
     iIntros (Φ) "(PH & CPS & OB & #EP & #INV) POST".
     iLöb as "IH". 
     rewrite /incr_loop.
@@ -103,64 +106,68 @@ Section Nondet.
     
 
     iDestruct "CASES" as "[[-> SGN]| [-> TOK]]".
-    - MU_by_BOU.
-      iApply BOU_lower; [apply LS_LB| ]. iApply OU_BOU_rep.
-      (* TODO: add proofmode class for OU_rep *)
-      iPoseProof (expect_sig_upd_rep with "EP [$] [$] [] [$]") as "OU'".
-      { iApply empty_sgns_levels_rel. }
-      iApply (OU_rep_wand with "[-OU'] [$]").
-      iIntros "(CPS' & SGN & OB & PH)".
-      iCombine "CPS CPS'" as "CPS". rewrite -cp_mul_split.
-      burn_cp_after_BOU.
-      iApply wp_value. 
-      iMod ("CLOS" with "[CNT FLAG SGN]") as "_".
-      { iNext. do 2 iExists _. iFrame "#∗". iLeft. by iFrame. }
-      iModIntro.
+    2: { MU_by_burn_cp. iApply wp_value.
+         iMod ("CLOS" with "[CNT FLAG TOK]") as "_".
+         { iNext. do 2 iExists _. iFrame "#∗". iRight. by iFrame. }
+         iModIntro.
+         
+         wp_bind (_ = _)%E.
+         iApply sswp_MU_wp; [done| ].
+         iApply sswp_pure_step.
+         { simpl. tauto. }
+         MU_by_burn_cp.
+         iApply wp_value. simpl. 
+         pure_steps.
+         by iApply "POST". }
 
-      wp_bind (_ = _)%E.
-      iApply sswp_MU_wp; [done| ].
-      iApply sswp_pure_step.
-      { simpl. tauto. }
-      MU_by_burn_cp.
-
-      pure_steps.
-
-      wp_bind (FAA _ _)%E.
-      iApply wp_atomic.
-      iInv "INV" as "inv" "CLOS". iModIntro.
-      iClear "EB". clear c. 
-      rewrite {1}/nondet_inv_inner. iDestruct "inv" as ">(%c & %f & CNT & FLAG & CASES & #EB)".
-      iApply sswp_MU_wp; [done| ]. iApply (wp_faa with "[$]"). iIntros "!> CNT".
-      
-      MU_by_BOU.
-      iMod (increase_eb_upd with "EB") as "#EB'".
-      { unfold nondet_LS_LB in LS_LB. lia. }
-      iModIntro. burn_cp_after_BOU.
-      iApply wp_value.
-
-      iMod ("CLOS" with "[CNT FLAG CASES]") as "_".
-      { iNext. do 2 iExists _.
-        replace (Z.of_nat c + 1)%Z with (Z.of_nat (S c)) by lia. 
-        iFrame "#∗". }        
-      iModIntro.
-
-      wp_bind (Rec _ _ _)%E. do 3 pure_step_cases.
-      iApply ("IH" with "[$] [CPS] [$] [$]").
-      iApply (cp_mul_weaken with "[$]"); [done| ].
-      rewrite /nondet_LS_LB. lia.       
-    - MU_by_burn_cp. iApply wp_value.
-      iMod ("CLOS" with "[CNT FLAG TOK]") as "_".
-      { iNext. do 2 iExists _. iFrame "#∗". iRight. by iFrame. }
-      iModIntro.
-
-      wp_bind (_ = _)%E.
-      iApply sswp_MU_wp; [done| ].
-      iApply sswp_pure_step.
-      { simpl. tauto. }
-      MU_by_burn_cp.
-      iApply wp_value. simpl. 
-      pure_steps.
-      by iApply "POST".    
+    MU_by_BOU.
+    iApply BOU_lower; [apply LS_LB| ]. iApply OU_BOU_rep.
+    (* TODO: add proofmode class for OU_rep *)
+    iPoseProof (expect_sig_upd_rep with "EP [$] [$] [] [$]") as "OU'".
+    { iApply empty_sgns_levels_rel. }
+    iApply (OU_rep_wand with "[-OU'] [$]").
+    iIntros "(CPS' & SGN & OB & PH)".
+    iCombine "CPS CPS'" as "CPS". rewrite -cp_mul_split.
+    burn_cp_after_BOU.
+    iApply wp_value. 
+    iMod ("CLOS" with "[CNT FLAG SGN]") as "_".
+    { iNext. do 2 iExists _. iFrame "#∗". iLeft. by iFrame. }
+    iModIntro.
+    
+    wp_bind (_ = _)%E.
+    iApply sswp_MU_wp; [done| ].
+    iApply sswp_pure_step.
+    { simpl. tauto. }
+    MU_by_burn_cp.
+    
+    pure_steps.
+    
+    wp_bind (FAA _ _)%E.
+    iApply wp_atomic.
+    iInv "INV" as "inv" "CLOS". iModIntro.
+    iClear "EB". clear c. 
+    rewrite {1}/nondet_inv_inner. iDestruct "inv" as ">(%c & %f & CNT & FLAG & CASES & #EB)".
+    iApply sswp_MU_wp; [done| ]. iApply (wp_faa with "[$]"). iIntros "!> CNT".
+    
+    MU_by_BOU.
+    iApply BOU_lower; [apply K_LB| ]. iApply OU_BOU_rep.
+    (* TODO: add proofmode instance *)
+    iApply (OU_rep_wand with "[-]").
+    2: { iApply (increase_eb_upd_rep with "EB"). }
+    iIntros "#EB'". 
+    burn_cp_after_BOU. iApply wp_value.
+    
+    iMod ("CLOS" with "[CNT FLAG CASES]") as "_".
+    { iNext. do 2 iExists _.
+      replace (K * c + K) with (K * (c + 1)) by lia. 
+      replace (Z.of_nat c + 1)%Z with (Z.of_nat (c + 1)) by lia.
+      iFrame "#∗". }        
+    iModIntro.
+    
+    wp_bind (Rec _ _ _)%E. do 3 pure_step_cases.
+    iApply ("IH" with "[$] [CPS] [$] [$]").
+    iApply (cp_mul_weaken with "[$]"); [done| ].
+    rewrite /nondet_LS_LB. lia.       
   Qed.
 
   Lemma alloc_nondet_inv `{NondetPreG Σ} τ cnt flag:
@@ -183,7 +190,8 @@ Section Nondet.
 
     set (ND := {| γ__tok := γ |}).
     iMod (inv_alloc nondet_ns _ (nondet_inv_inner _ _ _) with "[-OB TOK]") as "#?".
-    { do 2 iExists _. iNext. iFrame. iLeft. by iFrame. }
+    { do 2 iExists _. iNext. iFrame.
+      rewrite Nat.mul_0_r. iFrame. iLeft. by iFrame. }
 
     iModIntro. do 2 iExists _. rewrite union_empty_l_L. iFrame "#∗".
   Qed.
@@ -200,7 +208,7 @@ Section Nondet.
   Theorem nondet_spec `{NondetPreG Σ} τ π:
     {{{ th_phase_eq τ π ∗ cp_mul π d1 2 ∗ obls τ ∅ }}}
       nondet #() @ τ
-    {{{ vn, RET vn; ∃ (n: nat) π', ⌜ vn = #n ⌝ ∗ exc_lb n ∗ 
+    {{{ vn, RET vn; ∃ (n: nat) π', ⌜ vn = #n ⌝ ∗ exc_lb (K * n) ∗ 
                                   obls τ ∅ ∗ th_phase_eq τ π' ∗ ⌜ phase_le π π' ⌝}}}.
   Proof.
     iIntros (Φ) "(PH & CPS1 & OB) POST". rewrite /nondet.
