@@ -4,7 +4,7 @@ From iris.base_logic.lib Require Import invariants.
 From trillium.fairness Require Import locales_helpers utils.
 From trillium.fairness.lawyer Require Import program_logic sub_action_em.
 From trillium.fairness.lawyer.obligations Require Import obligations_model obls_utils obligations_resources obligations_logic obligations_em.
-From trillium.fairness.lawyer.examples Require Import bounded_nat signal_map obls_tactics.
+From trillium.fairness.lawyer.examples Require Import orders_lib signal_map obls_tactics.
 From trillium.fairness.heap_lang Require Export heap_lang_defs tactics notation sswp_logic locales_helpers_hl.
 
 

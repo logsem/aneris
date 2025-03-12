@@ -5,7 +5,7 @@ From trillium.fairness.heap_lang Require Import simulation_adequacy.
 From trillium.fairness.lawyer Require Import sub_action_em action_model.
 From trillium.fairness.lawyer.obligations Require Import obligations_adequacy obligations_logic obligations_em obligations_resources obligations_model obligations_am.
 From trillium.fairness.lawyer.examples.eo_fin Require Import eo_fin.
-From trillium.fairness.lawyer.examples Require Import bounded_nat signal_map.
+From trillium.fairness.lawyer.examples Require Import orders_lib signal_map.
 
 
 Section EOFinAdequacy.

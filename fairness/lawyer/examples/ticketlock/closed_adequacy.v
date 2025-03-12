@@ -6,7 +6,7 @@ From trillium.fairness.heap_lang Require Import simulation_adequacy.
 From trillium.fairness.lawyer Require Import sub_action_em action_model.
 From trillium.fairness.lawyer.obligations Require Import obligations_adequacy obligations_logic obligations_em obligations_resources obligations_model obligations_am.
 From trillium.fairness.lawyer.examples.ticketlock Require Import fair_lock ticketlock client.
-From trillium.fairness.lawyer.examples Require Import bounded_nat signal_map.
+From trillium.fairness.lawyer.examples Require Import orders_lib signal_map.
 
 
 Section Adequacy.
@@ -23,20 +23,6 @@ Section Adequacy.
   Definition sig_mapΣ := #[GFunctor $ authUR (gmapUR nat (agreeR SignalId))].
   Global Instance subG_sig_mapΣ {Σ}: subG sig_mapΣ Σ → SigMapPreG Σ.
   Proof. solve_inG. Qed.
-
-  (* TODO: move, use in eo_fin adequacy *)
-  Definition bn_ith N (i: nat): bounded_nat (S N) :=
-    match (le_lt_dec (S N) i) with
-    | left GE => ith_bn (S N) 0 ltac:(lia)                                      
-    | right LT => ith_bn (S N) i LT
-    end.
-
-  Lemma bn_ith_simpl N i (DOM: i < S N):
-    bn_ith N i = ith_bn (S N) i DOM.
-  Proof.      
-    rewrite /bn_ith. destruct le_lt_dec; [lia| ].
-    f_equal. eapply Nat.lt_pi.
-  Qed.
 
   Definition ClosedDegree := bounded_nat 6.
   Definition CD (i: nat): ClosedDegree := bn_ith 5 i.

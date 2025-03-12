@@ -4,39 +4,11 @@ From trillium.fairness Require Import utils utils_tactics trace_len utils_multis
 From trillium.fairness.heap_lang Require Import simulation_adequacy.
 From trillium.fairness.lawyer Require Import sub_action_em action_model.
 From trillium.fairness.lawyer.obligations Require Import obligations_adequacy obligations_logic obligations_em obligations_resources obligations_model obligations_am unfair_termination.
+From trillium.fairness.lawyer.examples Require Import orders_lib.
 From trillium.fairness.lawyer.examples.const_term Require Import const_term.
 
 
 Section ConstTermAdequacy.
-
-  (* TODO: move these relations to lib *)
-  Definition unit_rel (_: unit) (_: unit) := True. 
-
-  Global Instance unit_PO: PartialOrder unit_rel.
-  Proof using.
-    split.
-    - split; done.
-    - red. by intros [] [].
-  Qed.
-
-  Lemma unit_WF: wf (strict unit_rel).
-  Proof using.
-    red. intros x. constructor.
-    intros y NE. destruct x, y.
-    by apply strict_ne in NE.
-  Qed.
-
-  Definition empty_rel (_: Empty_set) (_: Empty_set) := True.
-
-  Global Instance empty_PO: PartialOrder empty_rel.
-  Proof using.
-    split. 
-    - split; done.
-    - red. done.
-  Qed.  
-
-  Lemma empty_WF: wf (strict empty_rel).
-  Proof using. done. Qed.
 
   Instance CTPre: ObligationsParamsPre unit Empty_set 0. 
     esplit; try by apply _.
