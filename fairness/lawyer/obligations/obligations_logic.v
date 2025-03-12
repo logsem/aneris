@@ -228,6 +228,17 @@ Section ProgramLogic.
   (*   iMod "OP". by iApply "PQ". *)
   (* Qed. *)
 
+  Global Instance ElimModal_BOU_split p E k n P Q:
+    ElimModal (k <= n) p false
+              (BOU E k P) P
+              (BOU E n Q) (BOU E (n - k) Q).
+  Proof using.
+    red. iIntros "%LE (BOU & IMPL)".
+    iDestruct (bi.intuitionistically_if_elim with "BOU") as "BOU".
+    apply Nat.le_sum in LE as [? ->]. rewrite Nat.sub_add'.
+    iApply BOU_split. iApply (BOU_wand with "[$] [$]").
+  Qed.
+
   Global Instance FromModal_BOU E n P:
     FromModal True modality_id (BOU E n P) (BOU E n P) P.
   Proof using.
