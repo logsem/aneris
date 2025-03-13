@@ -474,7 +474,7 @@ Section LFCounter.
     - iPureIntro. rewrite dom_singleton_L. set_solver.
   Qed.
 
-  Lemma alloc_cnt `{LFCPreG Σ} cnt π__cnt:
+  Lemma alloc_cnt_inv `{LFCPreG Σ} cnt π__cnt:
     cnt ↦ #0 -∗ BOU ∅ 0 (∃ (L: LFCG Σ), cnt_inv cnt π__cnt).
   Proof using.
     iIntros "CNT".
@@ -483,6 +483,60 @@ Section LFCounter.
     { iExists _. iNext. iFrame. }
     iModIntro. iExists _. iFrame "#∗".
   Qed.
+
+  Definition counter_client: val :=
+    λ: <>,
+       let: "cnt" := ref #0%nat in
+       Fork (incr "cnt") ;;
+       incr "cnt".
+
+  Theorem counter_client_spec `{LFCPreG Σ} τ π:
+    {{{ th_phase_eq τ π ∗ cp_mul π d1 5 ∗ obls τ ∅ }}}
+      counter_client #() @ τ
+    {{{ v, RET v; obls τ ∅ }}}.
+  Proof.
+    iIntros (Φ) "(PH & CPS1 & OB) POST". rewrite /counter_client.
+
+    split_cps "CPS1" 1. rewrite -cp_mul_1.
+    pure_step_hl. MU_by_BOU.
+    iMod (first_BOU with "[$]") as "[CPS #EB]".
+    { apply DEG01. }
+    BOU_burn_cp.
+
+    wp_bind (ref _)%E.
+    iApply sswp_MU_wp; [done| ]. iApply wp_alloc. iIntros "!> %cnt CNT _".
+    MU_by_BOU.
+    iApply (BOU_weaken ∅); [reflexivity| set_solver| ..].
+    { eauto. }
+    iMod (alloc_cnt_inv _ π with "[$]") as "(%ND & #INV)".
+    { lia. }
+    BOU_burn_cp. iApply wp_value.
+
+    wp_bind (Rec _ _ _)%E. pure_steps.
+
+    wp_bind (Fork _)%E.
+    iApply sswp_MUf_wp. iIntros (τ') "!>".
+    split_cps "CPS" 1.
+    MU__f_by_BOU (∅: gset SignalId). 
+    iModIntro. iSplitR "CPS' PH OB". 
+    2: { iExists _. rewrite cp_mul_1. by iFrame. }
+    iIntros "(%π1 & %π2 & PH1 & OB1 & PH2 & OB2 & [%PH_LT1 %PH_LT2])".
+    rewrite difference_diag_L intersection_idemp_L.
+
+    split_cps "CPS1" 2.
+    iSplitL "CPS1' PH2 OB2".
+    - iApply (incr_spec with "[$]").
+      { apply PH_LT2. }
+      iIntros "!> % _". simpl. by iApply NO_OBS_POST.
+      Unshelve. by eauto. 
+    - iRename "PH1" into "PH". rewrite cp_mul_weaken; [| apply PH_LT1| reflexivity].
+      wp_bind (Rec _ _ _)%E. pure_steps.
+
+      iApply (incr_spec with "[$]").
+      { apply PH_LT1. }
+      iIntros "!> % _". by iApply "POST".
+
+  Qed.    
 
 End LFCounter.
   
