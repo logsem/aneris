@@ -71,9 +71,9 @@ Section Nondet.
   Hypothesis (K_LB: K <= LIM_STEPS).
 
   Definition nondet_inv_inner `{NondetG Σ} (cnt flag: loc) (s__f: SignalId): iProp Σ :=
-    ∃ (c: nat) (f: bool), cnt ↦ #c ∗ flag ↦ #f ∗
-                      (⌜ f = false ⌝ ∗ sgn s__f l__f (Some false) ∨ ⌜ f = true ⌝ ∗ tok) ∗
-                      exc_lb (K * c). 
+    ∃ (c: nat) (f: bool), cnt ↦ #c ∗ flag ↦ #f ∗ sgn s__f l__f (Some f) ∗
+                      (⌜ f = true ⌝ → tok) ∗
+                       exc_lb (K * c). 
 
   Definition nondet_ns := nroot.@"nondet".
   Definition nondet_inv `{NondetG Σ} cnt flag s__f := inv nondet_ns (nondet_inv_inner cnt flag s__f).
@@ -101,14 +101,14 @@ Section Nondet.
     wp_bind (! _)%E.
     iApply wp_atomic.
     iInv "INV" as "inv" "CLOS". iModIntro.
-    rewrite {1}/nondet_inv_inner. iDestruct "inv" as ">(%c & %f & CNT & FLAG & CASES & #EB)".
-    iApply sswp_MU_wp; [done| ]. iApply (wp_load with "[$]"). iIntros "!> FLAG".
-    
+    rewrite {1}/nondet_inv_inner. iDestruct "inv" as ">(%c & %f & CNT & FLAG & SGN & TOK & #EB)".
+    iApply sswp_MU_wp; [done| ]. iApply (wp_load with "[$]"). iIntros "!> FLAG".    
 
-    iDestruct "CASES" as "[[-> SGN]| [-> TOK]]".
-    2: { MU_by_burn_cp. iApply wp_value.
-         iMod ("CLOS" with "[CNT FLAG TOK]") as "_".
-         { iNext. do 2 iExists _. iFrame "#∗". iRight. by iFrame. }
+    (* iDestruct "CASES" as "[[-> SGN]| [-> TOK]]". *)
+    destruct f. 
+    1: { MU_by_burn_cp. iApply wp_value.
+         iMod ("CLOS" with "[CNT SGN FLAG TOK]") as "_".
+         { iNext. do 2 iExists _. iFrame "#∗". }
          iModIntro.
          
          wp_bind (_ = _)%E.
@@ -130,8 +130,8 @@ Section Nondet.
     iCombine "CPS CPS'" as "CPS". rewrite -cp_mul_split.
     burn_cp_after_BOU.
     iApply wp_value. 
-    iMod ("CLOS" with "[CNT FLAG SGN]") as "_".
-    { iNext. do 2 iExists _. iFrame "#∗". iLeft. by iFrame. }
+    iMod ("CLOS" with "[CNT FLAG SGN TOK]") as "_".
+    { iNext. do 2 iExists _. iFrame "#∗". }
     iModIntro.
     
     wp_bind (_ = _)%E.
@@ -146,7 +146,7 @@ Section Nondet.
     iApply wp_atomic.
     iInv "INV" as "inv" "CLOS". iModIntro.
     iClear "EB". clear c. 
-    rewrite {1}/nondet_inv_inner. iDestruct "inv" as ">(%c & %f & CNT & FLAG & CASES & #EB)".
+    rewrite {1}/nondet_inv_inner. iDestruct "inv" as ">(%c & %f & CNT & FLAG & SGN & TOK & #EB)".
     iApply sswp_MU_wp; [done| ]. iApply (wp_faa with "[$]"). iIntros "!> CNT".
     
     MU_by_BOU.
@@ -157,7 +157,7 @@ Section Nondet.
     iIntros "#EB'". 
     burn_cp_after_BOU. iApply wp_value.
     
-    iMod ("CLOS" with "[CNT FLAG CASES]") as "_".
+    iMod ("CLOS" with "[CNT FLAG SGN TOK]") as "_".
     { iNext. do 2 iExists _.
       replace (K * c + K) with (K * (c + 1)) by lia. 
       replace (Z.of_nat c + 1)%Z with (Z.of_nat (c + 1)) by lia.
@@ -172,8 +172,8 @@ Section Nondet.
 
   Lemma alloc_nondet_inv `{NondetPreG Σ} τ cnt flag:
     cnt ↦ #(0%nat) -∗ flag ↦ #false -∗ obls τ ∅ -∗
-    BOU ∅ 1 (∃ s__f (ND: NondetG Σ), nondet_inv cnt flag s__f ∗ 
-                                    obls τ {[ s__f ]} ∗ sgn s__f l__f None ∗ tok).
+    BOU ∅ 1 (∃ s__f (ND: NondetG Σ), nondet_inv cnt flag s__f ∗ obls τ {[ s__f ]} ∗ 
+                                    sgn s__f l__f None ∗ tok).
   Proof using.
     iIntros "CNT FLAG OB".
     iMod (OU_create_sig _ _ l__f with "[$]") as "(%s__f & SGN & OB & _)".
@@ -191,7 +191,7 @@ Section Nondet.
     set (ND := {| γ__tok := γ |}).
     iMod (inv_alloc nondet_ns _ (nondet_inv_inner _ _ _) with "[-OB TOK]") as "#?".
     { do 2 iExists _. iNext. iFrame.
-      rewrite Nat.mul_0_r. iFrame. iLeft. by iFrame. }
+      rewrite Nat.mul_0_r. iFrame. by iIntros (?). } 
 
     iModIntro. do 2 iExists _. rewrite union_empty_l_L. iFrame "#∗".
   Qed.
@@ -254,28 +254,26 @@ Section Nondet.
     wp_bind (_ <- _)%E.
     iApply wp_atomic.
     iInv "INV" as "inv" "CLOS". iModIntro.
-    rewrite {1}/nondet_inv_inner. iDestruct "inv" as ">(%c & %f & CNT & FLAG & CASES & EXc)".
-    iDestruct "CASES" as "[[-> SGN] | [-> TOK']]".
-    2: { iCombine "TOK TOK'" as "TOK". by iDestruct (own_valid with "TOK") as %V. }
+    rewrite {1}/nondet_inv_inner. iDestruct "inv" as ">(%c & %f & CNT & FLAG & SGN & TOK' & EXc)".
     iApply sswp_MU_wp; [done| ]. iApply (wp_store with "[$]"). iIntros "!> FLAG".
     MU_by_BOU.
     iMod (OU_set_sig with "[$] [$]") as "[SGN OB]".
     { set_solver. }
     { unfold nondet_LS_LB in LS_LB. lia. }
     BOU_burn_cp. iApply wp_value.
-    iMod ("CLOS" with "[CNT FLAG TOK EXc]") as "_".
-    { do 2 iExists _. iFrame. iNext. iRight. by iFrame. }
+    iMod ("CLOS" with "[CNT FLAG SGN TOK TOK' EXc]") as "_".
+    { iExists _, true. iNext. iFrame. done. }
     iModIntro. 
     
     wp_bind (Rec _ _ _)%E. pure_steps.
     wp_bind (! _)%E. 
-    clear c. 
+    clear c f. 
     iApply wp_atomic.
     iInv "INV" as "inv" "CLOS". iModIntro.
-    rewrite {1}/nondet_inv_inner. iDestruct "inv" as ">(%c & %f & CNT & FLAG & CASES & #EXc)".
+    rewrite {1}/nondet_inv_inner. iDestruct "inv" as ">(%c & %f & CNT & FLAG & SGN & TOK & #EXc)".
     iApply sswp_MU_wp; [done| ]. iApply (wp_load with "CNT"). iIntros "!> CNT".
     MU_by_burn_cp. iApply wp_value. 
-    iMod ("CLOS" with "[CNT FLAG CASES]") as "_".
+    iMod ("CLOS" with "[CNT FLAG SGN TOK]") as "_".
     { do 2 iExists _. iFrame "#∗". }
     iModIntro.
 
