@@ -272,6 +272,25 @@ Section ProgramLogic.
     iApply fupd_mask_intro_subseteq; [set_solver | done].
   Qed.
 
+  Global Instance frame_BOU p E n R P Q:
+    (Frame p R P Q) →
+    Frame p R (BOU E n P) (BOU E n Q).
+  Proof using.
+    red. intros FRAME. iIntros "[R BOU]".
+    red in FRAME.
+    iMod "BOU" as "?". iModIntro.
+    iApply FRAME. iFrame.
+  Qed.
+
+  Global Instance FromExist_BOU {A: Type} E n P (Φ: A -> iProp Σ):
+    FromExist P Φ ->
+    FromExist (BOU E n P) (fun x => BOU E n (Φ x)).
+  Proof using.
+    rewrite /FromExist. iIntros (EX) "[%x BOU]".
+    iMod "BOU". iModIntro.
+    iApply EX. by iExists _.
+  Qed.
+
 End ProgramLogic.
 
 

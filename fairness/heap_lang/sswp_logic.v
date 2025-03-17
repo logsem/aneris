@@ -36,6 +36,18 @@ Section SSWP.
     iIntros "!>". iFrame. by iApply "HΦΨ".
   Qed.
 
+  Lemma sswp_fupd s (E E': coPset) e Φ
+    (NVAL: language.to_val e = None):
+    (|={E, E'}=> (sswp s E' e (fun k => |={E', E}=> Φ k))) -∗ (sswp s E e Φ).
+  Proof using.
+    iIntros "WP". rewrite /sswp.
+    simpl in *. rewrite NVAL. iIntros (?) "HEAP".
+    iMod ("WP" with "[$]") as "WP". iMod "WP" as "[? WP]". iModIntro.
+    iFrame. iIntros. iMod ("WP" with "[//]") as "X".
+    iModIntro. iNext. iMod "X". iModIntro. iMod "X" as "(X & Y & Z)". iFrame.
+    done.
+  Qed.
+
   Lemma sswp_pure_step s E e1 e2 (Φ : Prop) Ψ :
     PureExec Φ 1 e1 e2 → Φ → ▷ Ψ e2 -∗ sswp s E e1 Ψ%I.
   Proof.

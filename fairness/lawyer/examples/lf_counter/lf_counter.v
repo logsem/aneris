@@ -115,35 +115,6 @@ Section LFCounter.
     [∗ map] i ↦ n ∈ filter (gt c ∘ fst) wm, 
       (∃ r, cp_mul π__cnt d0 (r * INCR_ITER_LEN) ∗ val_toks i (n - r) ∗ ⌜ r <= n ⌝).
 
-  Definition set_max (X: gset nat): nat :=
-    list_max $ elements $ X.
-
-  Lemma set_max_spec X n:
-    set_max X ≤ n ↔ set_Forall (λ k, k ≤ n) X.
-  Proof using.
-    rewrite /set_max. rewrite list_max_le.
-    by rewrite set_Forall_elements.
-  Qed.
-
-  (* TODO: move, does it exist already? *)
-  Lemma list_max_elems X:
-    forall x, x ∈ X -> x <= list_max X.
-  Proof using.
-    clear. 
-    induction X.
-    { set_solver. }
-    intros x. rewrite elem_of_cons. intros [->|?]; simpl. 
-    - lia.
-    - etrans; [| apply Nat.le_max_r]. eauto.
-  Qed.
-
-  Lemma set_max_elems X:
-    forall x, x ∈ X -> x <= set_max X.
-  Proof using.
-    intros x IN. rewrite /set_max.
-    apply list_max_elems. by apply elem_of_elements.
-  Qed.
-
   Definition wm_eb (wm: gmap nat nat): iProp Σ :=
     exc_lb (set_max (map_img wm: gset nat) * INCR_ITER_LEN). 
 
@@ -160,16 +131,6 @@ Section LFCounter.
   Context {OBLS_AMU__f: forall τ, @AMU_lift_MU__f _ _ _ τ oGS' _ EM _ ⊤}.
   Context {NO_OBS_POST: ∀ τ v, obls τ ∅ -∗ fork_post τ v}.
 
-  (* TODO: move *)
-  Global Instance cp_mul_Timeless π d n: Timeless (cp_mul π d n).
-  Proof using.
-    rewrite obligations_resources.cp_mul_unseal.
-    rewrite /obligations_resources.cp_mul_def.
-    clear.
-    apply big_sepL_timeless_id.
-    induction n; apply _.
-  Qed.
-
   Definition incr_impl: val :=
     rec: "incr_impl" "c" :=
       let: "n" := !"c" in
@@ -179,27 +140,6 @@ Section LFCounter.
 
   Definition incr: val :=
     λ: "c", incr_impl "c".
-
-  (* TODO: move *)
-  Global Instance frame_BOU p E n R P Q:
-    (Frame p R P Q) →
-    Frame p R (BOU E n P) (BOU E n Q).
-  Proof using.
-    red. intros FRAME. iIntros "[R BOU]".
-    red in FRAME.
-    iMod "BOU" as "?". iModIntro.
-    iApply FRAME. iFrame.
-  Qed.
-
-  (* TODO: move *)
-  Global Instance FromExist_BOU {A: Type} E n P (Φ: A -> iProp Σ):
-    FromExist P Φ ->
-    FromExist (BOU E n P) (fun x => BOU E n (Φ x)).
-  Proof using.
-    rewrite /FromExist. iIntros (EX) "[%x BOU]".
-    iMod "BOU". iModIntro.
-    iApply EX. by iExists _.
-  Qed.
 
   Lemma eb_wm_incr wm c:
     wm_eb wm -∗ BOU ∅ INCR_ITER_LEN
@@ -443,14 +383,6 @@ Section LFCounter.
     { iFrame "#∗". }
     done.
   Qed.
-
-  (* TODO: move *)
-  Lemma set_max_singleton x:
-    set_max {[ x ]} = x.
-  Proof using.
-    clear.
-    rewrite /set_max. rewrite elements_singleton. simpl. lia.
-  Qed. 
 
   Lemma wmi_init `{LFCPreG Σ} π__cnt:
     ⊢ BOU ∅ 0 (∃ (L: LFCG Σ), wm_interp π__cnt 0).

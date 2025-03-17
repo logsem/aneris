@@ -175,6 +175,21 @@ Section ObligationsRepr.
       by apply gmultiset_included.
     Qed.
 
+    Global Instance cp_mul_Timeless π d n: Timeless (cp_mul π d n).
+    Proof using. 
+      rewrite cp_mul_unseal /cp_mul_def.
+      apply big_sepL_timeless_id.
+      induction n; apply _.
+    Qed.
+
+    Lemma ep_weaken s π1 π2 d
+      (PH_LE: phase_le π1 π2):
+      ep s π1 d -∗ ep s π2 d.
+    Proof using.
+      rewrite /ep. iIntros "(%&?&%)".
+      iExists _. iFrame. iPureIntro. etrans; eauto.
+    Qed.
+
     Lemma obls_msi_exact δ ζ R:
       ⊢ obls_msi δ -∗ obls ζ R -∗
         ⌜ ps_obls δ !! ζ = Some R ⌝.

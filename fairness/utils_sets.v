@@ -315,3 +315,42 @@ Lemma gset_to_gmap_singleton `{Countable K} {B: Type} (b: B) (k: K):
 Proof.
   rewrite /gset_to_gmap. simpl. rewrite map_fmap_singleton. done.
 Qed. 
+
+
+Section SetMax.
+
+  Definition set_max (X: gset nat): nat :=
+    list_max $ elements $ X.
+
+  Lemma set_max_spec X n:
+    set_max X ≤ n ↔ set_Forall (λ k, k ≤ n) X.
+  Proof using.
+    rewrite /set_max. rewrite list_max_le.
+    by rewrite set_Forall_elements.
+  Qed.
+
+  (* TODO: does it exist already? *)
+  Lemma list_max_elems X:
+    forall x, x ∈ X -> x <= list_max X.
+  Proof using.
+    induction X.
+    { set_solver. }
+    intros x. rewrite elem_of_cons. intros [->|?]; simpl. 
+    - lia.
+    - etrans; [| apply Nat.le_max_r]. eauto.
+  Qed.
+
+  Lemma set_max_elems X:
+    forall x, x ∈ X -> x <= set_max X.
+  Proof using.
+    intros x IN. rewrite /set_max.
+    apply list_max_elems. by apply elem_of_elements.
+  Qed.
+
+  Lemma set_max_singleton x:
+    set_max {[ x ]} = x.
+  Proof using.
+    rewrite /set_max. rewrite elements_singleton. simpl. lia.
+  Qed.   
+
+End SetMax.

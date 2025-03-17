@@ -196,15 +196,6 @@ Section Nondet.
     iModIntro. do 2 iExists _. rewrite union_empty_l_L. iFrame "#∗".
   Qed.
 
-  (* TODO: move *)
-  Lemma ep_weaken s π1 π2 d
-    (PH_LE: phase_le π1 π2):
-    ep s π1 d -∗ ep s π2 d.
-  Proof using.
-    rewrite /ep. iIntros "(%&?&%)".
-    iExists _. iFrame. iPureIntro. etrans; eauto.
-  Qed.     
-
   Theorem nondet_spec `{NondetPreG Σ} τ π:
     {{{ th_phase_eq τ π ∗ cp_mul π d1 2 ∗ obls τ ∅ }}}
       nondet #() @ τ

@@ -12,7 +12,6 @@ From trillium.fairness.lawyer Require Import program_logic.
 
 Ltac burn_cp_after_BOU :=
   iDestruct (cp_mul_take with "CPS") as "[CPS CP]";
-  (* iSplitR "CP PH"; [iIntros "PH" | iExists _; by iFrame].  *)
   (iSplitR "CP PH"; [iIntros "PH" | iExists _; by iFrame]) ||
   (iSplitR "CP"; [iIntros "PH" | iExists _; by iFrame])
 .
@@ -51,7 +50,6 @@ Ltac pure_step := pure_step_hl; MU_by_burn_cp.
 Ltac pure_step_cases := pure_step || (iApply wp_value; []) || wp_bind (RecV _ _ _ _)%V.
 Ltac pure_steps := repeat (pure_step_cases; []).
 
-(* TODO: move, remove duplicates *)
 Ltac split_cps cps_res n :=
   let fmt := constr:(("[" ++ cps_res ++ "' " ++ cps_res ++ "]")%string) in
   iDestruct (cp_mul_split' _ _ n with cps_res) as fmt; [lia| ].
