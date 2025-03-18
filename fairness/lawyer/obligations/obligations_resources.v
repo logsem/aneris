@@ -158,6 +158,17 @@ Section ObligationsRepr.
       Proper (equiv ==> equiv ==> equiv) (sgns_levels_rel rel).
     Proof using. solve_proper. Qed.
 
+    (* TODO: derive from generalized Proper instance(s) *)
+    Lemma sgns_levels_gt'_ge' R L:
+      sgns_levels_gt' R L -∗ sgns_levels_ge' R L.
+    Proof using.
+      iIntros "?". iApply (big_sepS_impl with "[$]").
+      iIntros "!> % %IN (%l & #SGN & %GT)".
+      iExists _. iFrame "SGN". iPureIntro.
+      eapply set_Forall_impl; eauto. 
+      rewrite /lvl_lt. intros ?. rewrite /flip. apply strict_include.
+    Qed.
+
     Lemma cp_msi_unfold δ ph deg:
       ⊢ obls_msi δ -∗ cp ph deg -∗
         obls_msi δ ∗ ∃ π0, own obls_cps (◯ ({[+ ((π0, deg)) +]})) ∗ ⌜ (π0, deg) ∈ ps_cps δ /\ phase_le π0 ph⌝.
