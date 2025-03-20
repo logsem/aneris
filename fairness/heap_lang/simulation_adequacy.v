@@ -99,6 +99,54 @@ Section adequacy.
     destruct il as [| [??]]; done.
   Qed. 
 
+  (* Theorem strong_simulation_adequacy_traces Σ *)
+  (*   `{hPre: @heapGpreS Σ M EM} (s: stuckness)  *)
+  (*   (e1 : expr) σ1 (s1: M) *)
+  (*   (R: execution_trace heap_lang → auxiliary_trace M → Prop) *)
+  (*   (p: em_init_param) *)
+
+  (*   (extr : heap_lang_extrace) *)
+  (*   (Hvex : extrace_valid extr) *)
+  (*   (Hexfirst : trfirst extr = ([e1], σ1)) *)
+
+  (*   (valid_step: cfg heap_lang -> olocale heap_lang → cfg heap_lang →  *)
+  (*                mstate M → mlabel M → mstate M -> Prop) *)
+  (*   (state_rel: cfg heap_lang -> mstate M -> Prop) *)
+  (*   (lbl_rel: olocale heap_lang -> mlabel M -> Prop) *)
+  (*   (STEP_LBL_REL: forall c1 oζ c2 δ1 ℓ δ2, *)
+  (*                valid_step c1 oζ c2 δ1 ℓ δ2 -> *)
+  (*                lbl_rel oζ ℓ) *)
+  (*   (STEP_MTRANS: forall c1 oζ c2 δ1 ℓ δ2, *)
+  (*                valid_step c1 oζ c2 δ1 ℓ δ2 -> *)
+  (*                mtrans δ1 ℓ δ2) *)
+  (*   (R_ST: forall extr mtr, R extr mtr -> state_rel (trace_last extr) (trace_last mtr)) *)
+  (*   (R_STEP: forall extr mtr, R extr mtr -> valid_state_evolution_fairness valid_step extr mtr) *)
+
+  (*   : *)
+  (*   rel_finitary R → *)
+  (*   em_is_init_st ([e1], σ1) s1 -> *)
+  (*   (wp_premise Σ s e1 σ1 s1 R p) -> *)
+  (*   ∃ (mtr : trace (mstate M) (mlabel M)),  *)
+  (*     traces_match lbl_rel state_rel locale_step (@mtrans M) extr mtr /\ *)
+  (*     trfirst mtr = s1.  *)
+  (* Proof. *)
+
+  (* (* a fact about lengths being equal mentioned in Lawyer paper *) *)
+  (* Lemma viss_same_length M R itr1 itr2 x y *)
+  (*   (VALID: @valid_inf_system_trace heap_lang M *)
+  (*             (@continued_simulation heap_lang M R) *)
+  (*             (trace_singleton x) *)
+  (*             (trace_singleton y) *)
+  (*             itr1 itr2): *)
+  (*   exists len, trace_len.trace_len_is (to_trace x itr1) len /\ trace_len.trace_len_is (to_trace y itr2) len. *)
+  (* Proof using. *)
+  (*   eapply valid_inf_system_trace_implies_traces_match with *)
+  (*     (state_rel := fun _ _ => True) (lbl_rel := fun _ _ => True) *)
+  (*     (evolution_pred := valid_step) *)
+  (*     in VALID. *)
+  (*   2-5: eauto. *)
+  
+
   Theorem strong_simulation_adequacy_traces Σ
     `{hPre: @heapGpreS Σ M EM} (s: stuckness) 
     (e1 : expr) σ1 (s1: M)
@@ -145,22 +193,39 @@ Section adequacy.
     { eapply (strong_simulation_adequacy_inftraces _ s); eauto.
       eapply from_trace_preserves_validity; eauto; first econstructor.
       all: by rewrite Hexfirst. }
+    rewrite Hexfirst in Hbig. simpl in *. 
     exists (to_trace s1 iatr).
+
     split.
     2: { by rewrite to_trace_trfirst. }
-    
-    unshelve eapply (valid_inf_system_trace_implies_traces_match
+
+    pose proof Hbig as INF_REF. (* see remark below *)
+    eapply (valid_inf_system_trace_implies_traces_match
                        valid_step                       
                        state_rel
                        lbl_rel
                        ltac:(idtac)
                        ltac:(idtac)
-                       (continued_simulation R)); eauto.
-    - intros ?? ?%continued_simulation_rel. eauto.
-    - intros ?? ?%continued_simulation_rel. eauto.
-    - apply from_trace_spec. simpl.
-      rewrite Hexfirst. done. 
-    - apply to_trace_spec. 
+                       (continued_simulation R)) in Hbig; cycle 1.  
+    { intros ?? ?%continued_simulation_rel. eauto. }
+    { intros ?? ?%continued_simulation_rel. eauto. }
+    { apply from_trace_spec. simpl.
+      rewrite Hexfirst. done. }
+    { apply to_trace_spec. }
+    Unshelve. 2,3: by eauto.
+    
+    assert (exists len, trace_len.trace_len_is extr len /\ trace_len.trace_len_is (to_trace s1 iatr) len) as LEN. (* see remark below *)
+    { simpl in Hbig.
+      pose proof (trace_len.trace_has_len extr) as [len LEN]. 
+      pose proof (trace_len.trace_has_len (to_trace s1 iatr)) as [len' LEN'].
+      eapply trace_len.traces_match_same_length in Hbig; eauto. subst.  
+      eauto. }
+
+    (* INF_REF and LEN together give the traces mentioned in Lawyer paper
+       (same length, related by infinite extension of refinement).       
+       However, our proofs proceed differency, using the notion of traces_match. *)
+
+    eauto. 
   Qed.
   
 End adequacy.
