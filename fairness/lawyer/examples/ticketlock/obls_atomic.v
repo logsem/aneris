@@ -119,11 +119,12 @@ Section TotalTriples.
       Qed.
 
       Lemma TAU_intro U V:
-        Absorbing U → Persistent U →
+        (* Absorbing U -> *)
+        Persistent U →
         (U ∧ V ⊢ TAU_acc V) → U ∧ V ⊢ TAU.
-      Proof.
+      Proof using.
         rewrite /TAU /TAU_def /=.
-        iIntros (?? HAU) "[#HP HQ]".
+        iIntros (? HAU) "[#HP HQ]".
         iApply (greatest_fixpoint_coiter _ (λ _, V)); last done.
         iIntros "!>" ([]) "HQ".
         iApply HAU. iSplit; by iFrame.

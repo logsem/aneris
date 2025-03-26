@@ -313,9 +313,9 @@ Section MotivatingClient.
       { rewrite /TLAT_pre. iFrame "#∗". }
 
       iApply (TAU_intro with "[]").
-      4: { iSplit; [| iAccu].
+      3: { iSplit; [| iAccu].
            iCombine "INV" as "X". iApply "X". }
-      1, 2: by apply _.
+      { by apply _. }
       iIntros "(#INV & _)".
       rewrite /TAU_acc.
       iInv "INV" as "inv" "CLOS".
@@ -485,9 +485,9 @@ Section MotivatingClient.
         - iApply big_sepS_singleton. iExists _. by iFrame "SGNo". }
 
       iApply (TAU_intro with "[-]").
-      4: { iSplit; [| iAccu].
+      3: { iSplit; [| iAccu].
            iCombine "INV" as "X". iApply "X". }
-      1, 2: by apply _.
+      { by apply _. }
       iIntros "(#INV & P & LOCKED & FIN_BOU)".
       iInv "INV" as "inv" "CLOS".
       iDestruct "inv" as (r b oo) "(LK & >LOCK_OW & >ST & >SR)".
@@ -724,9 +724,9 @@ Section MotivatingClient.
         iApply big_opS_singleton. iExists _. iFrame "SGNo". done. }
 
       iApply (TAU_intro with "[-]").
-      4: { iSplit; [| iAccu].
+      3: { iSplit; [| iAccu].
            iCombine "INV EPf" as "X". iApply "X". }
-      1, 2: by apply _.
+      { by apply _. }
       iIntros "([#INV #EPf] & P & LOCKED)".
       iInv "INV" as "inv" "CLOS".
       iDestruct "inv" as (r b oo) "(LK & >LOCK_OW & >ST & >SR)".
