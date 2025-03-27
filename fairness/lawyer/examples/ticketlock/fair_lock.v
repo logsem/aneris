@@ -51,25 +51,56 @@ Section FairLockSpec.
   Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
   
   Context {FLP: FairLockPre}.
+
+  Definition TAU_FL τ P Q L c π q Φ O fg: iProp Σ :=  
+    TAU τ P Q L c (⊤ ∖ ↑fl_ι) π q Φ O fg (ST := FL_st) (oGS' := oGS').
+
+  (* Definition TAU_FL τ P Q L (* TGT *) c π q *)
+  (*   Φ *)
+  (*   O *)
+  (*   fg: iProp Σ :=  *)
+  (*   TAU τ P Q L (* fl_round *) *)
+  (*     (* TGT *) *)
+  (*     (* (fl_d__h FLP) (fl_d__l FLP) *) *)
+  (*     c *)
+  (*     (⊤ ∖ ↑fl_ι) *)
+  (*     π q *)
+  (*     Φ *)
+  (*     O *)
+  (*     (* RR *) *)
+  (*     (* (fl_FG_RR RR π) *) *)
+  (*     fg *)
+  (*     (oGS' := oGS'). *)
   
-  Definition TAU_FL τ P Q L TGT c π q
-    Φ
-    O (RR: option nat -> iProp Σ): iProp Σ := 
-    TAU τ P Q L fl_round TGT (fl_d__h FLP) (fl_d__l FLP)
-      c
-      (⊤ ∖ ↑fl_ι)
-      π q
-      Φ
-      O RR
-      (oGS' := oGS'). 
+  Definition acq_FG_RR (RR: option nat -> iProp Σ) π: AbortClause (ST := FL_st) :=
+    AC_RR (fl_d__l FLP) π
+      (fun '(_, n, _) => n) (fun '(_, _, b) => (⌜ b = true ⌝)%I)
+      RR (fl_d__h FLP) (oGS' := oGS').
   
-  Definition TLAT_FL τ P Q L TGT (POST: FL_st -> FL_st -> option (iProp Σ))
+  Definition TLAT_FL τ P Q L (* TGT *) fg (POST: FL_st -> FL_st -> option (iProp Σ))
     get_ret c e : iProp Σ := 
-    TLAT τ P Q L          
-      fl_round TGT
-      (fl_d__h FLP) (fl_d__l FLP) (fl_d__m FLP)
+    TLAT τ P Q L
+      (* fl_round *)
+      (* TGT *)
+      (* (fl_d__h FLP) (fl_d__l FLP) (fl_d__m FLP) *)
+      (fl_d__m FLP)
       c (fl_B FLP)
       (↑ fl_ι) e NotStuck
+      (* (fl_d__h FLP) (fl_d__l FLP)  *)
+      fg
+      POST
+      get_ret
+      (oGS' := oGS').
+  
+  Definition TLAT_FL_RR τ P Q L TGT (POST: FL_st -> FL_st -> option (iProp Σ))
+    get_ret c e : iProp Σ := 
+    TLAT_RR τ P Q L
+      (fl_d__m FLP) 
+      c (fl_B FLP)
+      (↑ fl_ι) e NotStuck
+      (fl_d__h FLP) (fl_d__l FLP)
+      fl_round
+      TGT
       POST
       get_ret
       (oGS' := oGS').
@@ -96,11 +127,11 @@ Section FairLockSpec.
         {{{ lk, RET lk; ∃ FLG: fl_GS FLP Σ, fl_LK _ (lk, 0, false) (FLG := FLG) ∗ fl_is_lock lk c (FLG := FLG) ∗ th_phase_eq τ π }}};
 
     fl_acquire_spec {FLG: fl_GS FLP Σ} (lk: val) c τ: (fl_is_lock (FLG := FLG)) lk c ⊢
-        TLAT_FL τ 
+        TLAT_FL_RR τ 
         (acquire_at_pre lk (FLG := FLG))
         (acquire_at_post lk (FLG := FLG))
         (fl_acq_lvls FLP)
-        (fun '(_, _, b) => b = false)
+        (fun '(_, _, b) => ⌜ b = true ⌝)
         (fun _ _ => Some $ fl_release_token (FLG := FLG))
         (fun _ _ => #())
         c (fl_acquire FLP lk);
@@ -110,7 +141,8 @@ Section FairLockSpec.
         (release_at_pre lk (FLG := FLG))
         (release_at_post lk (FLG := FLG))
         ∅
-        (fun _ => True%type)
+        (* (fun _ => True%type) *)
+        AC_none
         (fun _ _ => None)
         (fun _ '(_, r, _) => #r)
         c (fl_release FLP lk);

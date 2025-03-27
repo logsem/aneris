@@ -333,8 +333,8 @@ Section MotivatingClient.
            2: { by iFrame "#∗". }
            iNext. rewrite /client_inv_inner. do 3 iExists _. iFrame. }
 
-      { iIntros (O' q') "(OB & #LVLS' & PH & %Q' & (%r' & #RR' & CASES) & %BB)".
-        apply not_false_is_true in BB as ->.
+      { iIntros (O' q') "(OB & #LVLS' & PH & %Q' & (-> & CASES))". simpl.
+
         (* TODO: don't unfold BOU *)
         remember_goal.
         iDestruct "ST" as "[>(_ & (%s__o & [-> #SMAP__o])) | [>% ?]]"; [| done].
@@ -343,7 +343,7 @@ Section MotivatingClient.
 
         iAssert (BOU ∅ 1 (RR__L π (Some r) ∗ th_phase_frag τ π q' ∗
                            smap_repr_cl r true))%I with "[CASES PH SR]" as "EXP".
-        { iDestruct "CASES" as "[-> | RR]".
+        { iDestruct "CASES" as "[RR | CP]".
           { iApply BOU_intro. iFrame "#∗". }
           iApply (BOU_wand with "[]").
           2: { iApply BOU_create_wait_owner; [..| iFrame "#∗"]. }
@@ -361,13 +361,16 @@ Section MotivatingClient.
         iNext. rewrite /client_inv_inner. do 3 iExists _. iFrame.
         iLeft. iSplit; [done| ]. iExists _. iFrame "#∗". done. }
 
-      { iIntros "%q' (-> & OB & PH & %Q')".
-        remember_goal.
-        iDestruct "ST" as "[[>% ?] | X]"; [done| ].
-        iDestruct "X" as "(_& >LOCKED & >[%f P])".
-        iMod "LOCK_OW".
-        iMod "SR".
+      { iIntros "%q' (OB & PH & %Q')". 
+        (* iDestruct "ST" as "[[>% ?] | X]"; [done| ]. *)
+        remember_goal. 
+        iMod "ST".
+        (* iDestruct "X" as "(_& >LOCKED & >[%f P])". *)
+        (* iMod "LOCK_OW". *)
+        (* iMod "SR". *)
         iApply "GOAL". iClear "GOAL".
+
+        simpl. rewrite /acquire_at_post. simpl.
 
         iApply (BOU_split _ _ 1).
         iApply (BOU_wand with "[-OB SR]").
