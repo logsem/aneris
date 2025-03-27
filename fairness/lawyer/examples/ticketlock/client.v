@@ -361,13 +361,14 @@ Section MotivatingClient.
         iNext. rewrite /client_inv_inner. do 3 iExists _. iFrame.
         iLeft. iSplit; [done| ]. iExists _. iFrame "#∗". done. }
 
-      { iIntros "%q' (OB & PH & %Q')". 
-        (* iDestruct "ST" as "[[>% ?] | X]"; [done| ]. *)
+      { iIntros "%q' (OB & PH & %Q') %st [LK (%X & %Y & %Z)]".
+        destruct st as ((?&?)&?). simpl in X, Y, Z. inversion_clear X. subst.
         remember_goal. 
         iMod "ST".
-        (* iDestruct "X" as "(_& >LOCKED & >[%f P])". *)
-        (* iMod "LOCK_OW". *)
-        (* iMod "SR". *)
+        iDestruct "ST" as "[[% ?] | X]"; [done| ].
+        iDestruct "X" as "(_& LOCKED & [%f P])".
+        iMod "LOCK_OW".
+        iMod "SR".
         iApply "GOAL". iClear "GOAL".
 
         simpl. rewrite /acquire_at_post. simpl.
@@ -377,8 +378,8 @@ Section MotivatingClient.
         2: { iApply (BOU_smap_cl_extend with "[$] [$]"). }
         iIntros "X". iMod "X" as "(%s' & SR & OB & %FRESH' & [#SGNo #RTH])".
         iApply BOU_intro. iFrame.
-        iIntros ([[??]?]) "[LK (%X & % & %)]".
-        simpl in *. inversion X. subst.
+        
+        simpl in *. 
         iMod "CLOS'" as "_".
         iMod (lock_owner_update _ _ (Some s') with "[$] [$]") as "[LOCK_OW LOCKED]".
         iMod ("CLOS" with "[LK SR LOCK_OW]").
@@ -473,8 +474,8 @@ Section MotivatingClient.
       { iModIntro. iNext. iModIntro. iApply "POST". }
 
       iPoseProof (fl_release_spec FL lk _ τ with "[$]") as "REL".
-      rewrite /TLAT.
-      iApply ("REL" $! _ _ _ _ (RR__L π) with "[] [OB PH CPm]").
+      rewrite /TLAT_FL /TLAT.
+      iApply ("REL" with "[] [OB PH CPm]").
       { done. }
       { iFrame.
         (* TODO: make a lemma *)
@@ -518,8 +519,9 @@ Section MotivatingClient.
            2: { by iFrame "#∗". }
            iNext. rewrite /client_inv_inner. do 3 iExists _. iFrame.
            iLeft. iSplit; [done| ]. eauto. }
-      { iIntros (??) "(?&?&?&?&?&%)". done. }
-      { iIntros "% (_ & OB & PH & %Q')".
+      { iIntros (??) "(?&?&?&?&?)". done. }
+      { iIntros "% (OB & PH & %Q') %st [LK (%X & %Y & %Z)]".
+        destruct st as ((?&?)&?). simpl in X, Y, Z. inversion_clear X. subst.
         iApply (BOU_split _ _ 1). 
         iApply (BOU_wand with "[-SR OB]").
         2: { by iApply (BOU_set_sig with "[$SR] [$] [$]"). }
@@ -530,9 +532,7 @@ Section MotivatingClient.
         iApply (BOU_wand with "[-FIN_BOU] [$]").
         iIntros "FIN".
         
-        iIntros (st). destruct st as ((?&?)&?).
         rewrite /release_at_post. simpl.
-        iIntros "(LK & (->&->&->))".
         iMod (lock_owner_update _ _ None with "[$] [$]") as "[UNL' UNL]".
         iMod "CLOS'" as "_".
         iMod ("CLOS" with "[-FIN]") as "_".
@@ -720,7 +720,7 @@ Section MotivatingClient.
 
       iPoseProof (fl_release_spec FL lk _ τ with "[$]") as "REL".
       rewrite /TLAT.
-      iApply ("REL" $! _ _ _ _ (RR__L π) with "[] [OB PH CPm]").
+      iApply ("REL" with "[] [OB PH CPm]").
       { done. }
       { iFrame.
         (* TODO: Make a lemma *)
@@ -757,8 +757,9 @@ Section MotivatingClient.
            2: { by iFrame "#∗". }
            iNext. rewrite /client_inv_inner. do 3 iExists _. iFrame.
            iLeft. iSplit; [done| ]. eauto. }
-      { iIntros (??) "(?&?&?&?&?&%)". done. }
-      { iIntros "%q' (_ & OB & PH & %Q')".
+      { iIntros (??) "(?&?&?&?&?)". done. }
+      { iIntros "% (OB & PH & %Q') %st [LK (%X & %Y & %Z)]".
+        destruct st as ((?&?)&?). simpl in X, Y, Z. inversion_clear X. subst.
         iApply (BOU_split _ _ 1). 
         iApply (BOU_wand with "[-SR OB]").
         2: { rewrite -(union_empty_l_L (singleton _)). 
@@ -778,9 +779,7 @@ Section MotivatingClient.
           rewrite bi.or_comm. iSplitL "CPSm"; iLeft; by iFrame "#∗". }
         
         iApply (BOU_wand with "[-FIN] [$]"). iIntros "(FIN & P & OB & PH)". 
-        iIntros (st). destruct st as ((?&?)&?).
         rewrite /release_at_post. simpl.
-        iIntros "(LK & (->&->&->))".
         iMod (lock_owner_update _ _ None with "[$] [$]") as "[UNL' UNL]".
         iMod "CLOS'" as "_".
         iMod ("CLOS" with "[-OB PH FIN]") as "_".

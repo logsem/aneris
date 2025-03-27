@@ -590,17 +590,18 @@ Section Ticketlock.
     iDestruct (held_agree with "[$] [$]") as "<-".
     rewrite /tl_LK.
 
-    iMod ("COMM" with "[OB PH']") as "COMM". 
+    iMod (held_update _ _ true with "[$] [$]") as "[HELD HELD']".
+
+    iMod ("COMM" with "[OB PH'] [HELD' OW']") as "COMM". 
     { iFrame. iPureIntro. by apply Qp.div_le. }
+    { Unshelve. 2: eapply (pair (pair _ _ ) _). 
+      rewrite /acquire_at_post. simpl. rewrite /tl_LK.
+      iFrame. iSplit; [| done]. do 2 iExists _. iFrame. done. }
     { simpl in LIM_STEPS'. lia. }
 
     BOU_burn_cp. iModIntro. iApply wp_value.
-
-    iMod (held_update _ _ true with "[$] [$]") as "[HELD HELD']".
-    iMod ("COMM" $! (_, _, _) with "[HELD' OW']") as "Φ".
-    { rewrite /acquire_at_post. simpl. rewrite /tl_LK.
-      iFrame. iSplit; [| done]. do 2 iExists _. iFrame. done. }
-    rewrite -{2}(Qp.div_2 q). rewrite Qp.add_sub. simpl.
+    iMod "COMM" as "Φ".
+    rewrite -{1}(Qp.div_2 q). rewrite Qp.add_sub. simpl.
 
     iSpecialize ("RTOK" with "[//]"). 
     iMod (TMI_extend_acquire _ _ _ _ (((((((_), _), _), _), _), _), _) with "[$] [$] [$]") as (?) "[TMI TK]"; eauto.
@@ -866,16 +867,17 @@ Section Ticketlock.
     iDestruct (mapsto_agree with "LOW LOW'") as %EQ.
     inversion EQ as [EQ'']. assert (r = ow + 1) as -> by lia. clear EQ'' EQ.
 
-    iMod ("COMM" with "[$OB' $PH']") as "CLOS'".
+    iMod (held_update _ _ true with "[$] [$]") as "[HELD HELD']".
+    iMod ("COMM" with "[$OB' $PH'] [HELD' LOW']") as "CLOS'".
     { iPureIntro. by apply Qp.div_le. }
+    { rewrite /acquire_at_post. simpl.
+      Unshelve. 2: eapply (pair (pair _ _) _). iFrame.  
+      iSplit; [| done].
+      rewrite Nat2Z.inj_add. do 2 iExists _. iFrame. eauto. }
     iModIntro. 
 
-    iMod (held_update _ _ true with "[$] [$]") as "[HELD HELD']".
     iFrame "HELD LOW TM".
-    iMod ("CLOS'" $! (_, ow + 1, true) with "[-RTOK]").
-    { rewrite /acquire_at_post. simpl. iSplit; [| done].
-      rewrite Nat2Z.inj_add. do 2 iExists _. iFrame. eauto. }
-    iModIntro.
+    iMod "CLOS'". iModIntro.
     rewrite /tau_interp. iSplitL.
     2: { by iIntros "%". }
     do 2 iExists _. iFrame "SP1 SP2". 
@@ -959,21 +961,21 @@ Section Ticketlock.
 
     iDestruct (th_phase_frag_halve with "PH") as "[PH PH']".    
 
-    iMod ("TAU" with "[$OB $PH']") as "CLOS'". 
-    { iPureIntro. apply Qp.div_le. done. }
-    { etrans; [| apply LIM_STEPS']. simpl. lia. }
-
-    iSpecialize ("CLOS'" $! (_, (ow + 1), false)).
     iMod (held_update _ _ false with "[$] [$]") as "[HELD HELD']".
-    iMod (ow_exact_increase _ (ow + 1) with "[$]") as "[EXACT OW_LB]"; [lia| ].
-    
+    iMod (ow_exact_increase _ (ow + 1) with "[$]") as "[EXACT OW_LB]"; [lia| ].    
     rewrite -{2}Qp.inv_half_half. rewrite mapsto_fractional. iDestruct "OW" as "[OW OW']".
-    iSpecialize ("CLOS'" with "[OW' HELD']").
-    { rewrite /release_at_post. simpl. iSplit; [| by eauto].
+
+    iSpecialize ("TAU" with "[$OB $PH']"). 
+    { iPureIntro. apply Qp.div_le. done. }
+
+    iMod ("TAU" $! (_, _, _) with "[HELD' OW']") as "CLOS'".
+    { rewrite /release_at_post. iFrame.
+      iSplit; [| by eauto].
       do 2 iExists _. iSplitR; [by eauto| ]. iFrame.
       Set Printing Coercions.
       by rewrite Nat2Z.inj_add. }
-
+    { etrans; [| apply LIM_STEPS']. simpl. lia. }
+   
     iApply BOU_proper.
     1, 2: reflexivity.
     { apply bi.sep_comm. }

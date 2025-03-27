@@ -96,8 +96,9 @@ Section TotalTriples.
                  obls τ O
                  ∗ PH q' ∗ ⌜ Qp.le q' q0 ⌝
                  -∗
+                 ∀ y, Q y x -∗
                BOU ∅ c (
-                 ∀ y, Q y x ={∅, ε}=∗ from_option PH ⌜ True ⌝ (Qp.sub q0 q') -∗ Φ y x)) ∧
+                  |={∅, ε}=> (from_option PH ⌜ True ⌝ (Qp.sub q0 q') -∗ Φ y x))) ∧
               abort
       ).
 
@@ -188,15 +189,15 @@ Section TotalTriples.
       iFrame.      
       iRewrite "EQ_V" in "VV". iFrame. 
     - iDestruct "T1" as "[_ [T1 _]]".
-      iIntros (?) "(?&?&%)".
+      iIntros (?) "(?&?&%)". iIntros (?) "Q".
       iApply (BOU_wand with "[]").
-      2: { iApply "T1". iFrame. done. }
-      iIntros "P". iFrame. iIntros (?) "?". iSpecialize ("P" with "[$]").
+      2: { iApply ("T1" with "[-Q] [$]"). iFrame. done. }
+      iIntros "P". 
       iMod "P". iModIntro. by iRewrite -("EQ_Φ" $! y x).
     - iRewrite -"EQ_V". 
       by iDestruct "T1" as "[_ [_ T1]]".
     Qed.
-
+   
     Lemma TAU_acc_proper' E π q Ob
       Φ1 Φ2 ac1 ac2 (V1 V2: iProp Σ):
       (∀ y x, Φ1 y x ≡ Φ2 y x) -∗ ⌜ ac_equiv ac1 ac2 ⌝ -∗ (V1 ≡ V2) -∗
