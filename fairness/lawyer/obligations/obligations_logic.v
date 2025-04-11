@@ -362,7 +362,7 @@ Section TestProg.
 
     wp_bind (ref _)%E. 
     iApply sswp_MU_wp; [done| ].
-    iApply wp_alloc. iIntros "!> %x L ?".
+    iApply wp_alloc. iIntros "!> %x L _".
     iApply OBLS_AMU; [by rewrite nclose_nroot| ].
     iApply BOU_AMU. 
     iMod (OU_create_sig _ _ l with "[$]") as "SIG"; [lia| ].
@@ -400,12 +400,13 @@ Section TestProg.
 
     simpl.
 
-    iApply sswp_MUf_wp. iIntros (τ'). iApply (MU__f_wand with "[]").
+    replace 6 with (4 + 2). iDestruct (cp_mul_split with "CPS") as "[CPS CP]". 
+    iApply sswp_MUf_wp. iIntros (τ'). iApply (MU__f_wand with "[CPS CPS' L SIG POST]").
     2: {
       iApply OBLS_AMU__f; [by rewrite nclose_nroot| ]. 
       iApply BOU_AMU__f.
       iNext. 
-      iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
+      iDestruct (cp_mul_take with "CP") as "[CPS CP]".
       iMod (burn_cp_upd with "CP [$]") as "PH"; [lia| ].
       iModIntro. iFrame "PH OBLS".
       iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
@@ -414,10 +415,11 @@ Section TestProg.
       iAccu.
     }
 
-    iIntros "[(POST & CPS' & L & MT & SIG & CPS) R']".
+    (* iIntros "[(POST & CPS' & L & SIG & CPS) R']". *)
+    iIntros "[_ R']".
     iDestruct "R'" as (π1 π2) "(PH1 & OB1 & PH3 & OB2 & [%LT1 %LT2])".
 
-    iSplitR "POST CPS MT OB1 PH1"; cycle 1.  
+    iSplitR "POST CPS OB1 PH1"; cycle 1.  
     - iApply "POST". 
       iApply (obls_proper with "[$]").
       symmetry. apply subseteq_empty_difference. reflexivity.

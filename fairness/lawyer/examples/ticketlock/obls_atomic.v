@@ -264,7 +264,7 @@ Section TotalTriples.
       ∀ Φ q π O (RR: option RO -> iProp Σ),
         let ac := AC_RR d__l π round cond RR d__h in
         ⌜ B c <= LIM_STEPS ⌝ -∗ TLAT_pre π q O -∗
-        TAU (⊤ ∖ ε__m) π q (fun y x => POST y x -∗? Φ (get_ret y x)) O ac -∗
+        TAU (⊤ ∖ ε__m) π q (fun y x => POST y x -∗? ▷ Φ (get_ret y x)) O ac -∗
         WP e @ s; τ; ⊤ {{ v, Φ v }}.
 
   End AtomicTriples.
