@@ -240,7 +240,7 @@ Section ReleaseObligations.
         iApply "POST". }
 
       iPoseProof (fl_acquire_spec FL _ _ τ with "[$]") as "ACQ".
-      rewrite /TLAT_FL_RR /TLAT_RR. /TLAT.
+      rewrite /TLAT_FL_RR /TLAT_RR. 
 
       iApply ("ACQ" $! _ _ _ _ (RR__L π) with "[] [OB PH CPm]").
       { simpl. done. }
@@ -307,8 +307,7 @@ Section ReleaseObligations.
         (* iDestruct "ST" as "[[% ?] | X]"; [done| ]. *)
         iDestruct "ST" as "[XX | YY]".
         { iDestruct "XX" as "[#YY VV]".
-          (* iModIntro. done.  *)
-          admit. }
+          iModIntro. by iMod "YY" as %?. }
 
         iDestruct "YY" as "(_& >LOCKED & P)".
         iMod "LOCK_OW".

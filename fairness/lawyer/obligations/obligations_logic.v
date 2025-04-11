@@ -441,6 +441,7 @@ Section TestProg.
       iApply NO_OBLS_POST. 
       iApply (obls_proper with "[$]").
       set_solver.
+    - lia.
   Qed.
 
 End TestProg.
