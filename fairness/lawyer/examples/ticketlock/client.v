@@ -215,7 +215,7 @@ Section ReleaseObligations.
       simpl. by rewrite union_empty_r_L. 
     Qed.
 
-    Lemma acquire_usage τ (lk: val) π Ob c__cl
+    Lemma acquire_usage' τ (lk: val) π Ob c__cl
       (LB_SB: fl_B FLP c__cl ≤ LIM_STEPS)
       (LB_CCL: 5 <= c__cl):
       {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ lock_inv lk ∗
@@ -226,7 +226,7 @@ Section ReleaseObligations.
         (fl_acquire FLP) lk @ τ
       {{{ v, RET v; ∃ s__o, obls τ (Ob ∪ {[ s__o ]}) ∗ 
                           th_phase_eq τ π ∗
-                          P__lock ∗ lock_owner_frag (Some s__o) ∗
+                          (▷ P__lock) ∗ lock_owner_frag (Some s__o) ∗
                           ⌜ s__o ∉ Ob ⌝ ∗ fl_release_token FL (FLG := FLG) ∗
                           sgn s__o l__o None }}}.
     Proof using All.
@@ -240,7 +240,7 @@ Section ReleaseObligations.
         iApply "POST". }
 
       iPoseProof (fl_acquire_spec FL _ _ τ with "[$]") as "ACQ".
-      rewrite /TLAT_FL_RR /TLAT_RR. 
+      rewrite /TLAT_FL_RR /TLAT_RR.
 
       iApply ("ACQ" $! _ _ _ _ (RR__L π) with "[] [OB PH CPm]").
       { simpl. done. }
@@ -255,6 +255,7 @@ Section ReleaseObligations.
       iInv "INV" as "inv" "CLOS".
       iApply fupd_mask_intro; [set_solver| ]. iIntros "CLOS'".
       rewrite {1}/lock_inv_inner.
+      
       iDestruct "inv" as (r b oo) "(LK & LOCK_OW & ST & SR)".
       iExists (lk, r, b).
       iFrame "LK". iSplit; [done| ].
@@ -320,6 +321,7 @@ Section ReleaseObligations.
         (* iApply (BOU_wand with "[-OB SR]"). *)
         (* 2: { iApply (BOU_smap_cl_extend with "[$] [$]"). } *)
         (* iIntros "X".  *)
+        
         iMod (BOU_smap_cl_extend with "[$] [$]") as "X".
         { lia. }
         iMod "X" as "(%s' & SR & OB & %FRESH' & [#SGNo #RTH])".
@@ -336,7 +338,7 @@ Section ReleaseObligations.
           iExists _. by iFrame "#∗". }
         
         iModIntro. iIntros "PH_CLOS RT POST !>". iApply "POST".
-        do 2 iExists _. iFrame "#∗".
+        do 1 iExists _. iFrame "#∗".
         iDestruct (th_phase_frag_combine' with "[$PH $PH_CLOS]") as "foo".
         { done. }
         by iFrame. }
