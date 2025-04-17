@@ -215,21 +215,27 @@ Section ReleaseObligations.
       simpl. by rewrite union_empty_r_L. 
     Qed.
 
-    Lemma acquire_usage' τ (lk: val) π Ob c__cl
+    Definition acquire_spec_gen (e: expr) (P: iProp Σ) (d: Degree) :=
+      forall τ (lk: val) π Ob c__cl
       (LB_SB: fl_B FLP c__cl ≤ LIM_STEPS)
-      (LB_CCL: 5 <= c__cl):
+      (LB_CCL: 5 <= c__cl)
+      (LB_SB': 7 <= LIM_STEPS),
       {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ lock_inv lk ∗
           obls τ Ob ∗ th_phase_eq τ π ∗
-          cp π (fl_d__m FLP) ∗
+          cp π d ∗
           sgns_levels_gt' Ob (fl_acq_lvls FLP)
       }}}
-        (fl_acquire FLP) lk @ τ
+        e lk @ τ
       {{{ v, RET v; ∃ s__o, obls τ (Ob ∪ {[ s__o ]}) ∗ 
                           th_phase_eq τ π ∗
-                          (▷ P__lock) ∗ lock_owner_frag (Some s__o) ∗
+                          P ∗ lock_owner_frag (Some s__o) ∗
                           ⌜ s__o ∉ Ob ⌝ ∗ fl_release_token FL (FLG := FLG) ∗
                           sgn s__o l__o None }}}.
-    Proof using All.
+
+    Lemma acquire_usage':
+      acquire_spec_gen (fl_acquire FLP) (▷ P__lock) (fl_d__m FLP).
+    Proof using ODl ODd L__FL LVL_ORDo LEl.
+      rewrite /acquire_spec_gen. intros τ lk π Ob c__cl LB_SB LB_CCL ?.
       iIntros (Φ).
       pose proof (fl_is_lock_pers FL lk c__cl (FLG := FLG)) as PERS. (* TODO: why Existing Instance doesn't work? *)
       iIntros "(#LOCK & #INV & OB & PH & CPm & #OB_GT) POST".
@@ -342,6 +348,37 @@ Section ReleaseObligations.
         iDestruct (th_phase_frag_combine' with "[$PH $PH_CLOS]") as "foo".
         { done. }
         by iFrame. }
+    Qed.
+
+    Context (d__m': Degree).
+    Hypothesis (LTmm': deg_lt (fl_d__m FLP) d__m').
+
+    Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS' _ EM hGS (↑ nroot)}.
+    
+    (* leading lambda to exchange fuel, trailing Skip to strip later *)
+    (* TODO: change the definition of (our counterpart of) atomic_wp,
+       so that it allows showing postcondition under later *)
+    Lemma acquire_usage:
+      acquire_spec_gen (λ: "lk", fl_acquire FLP "lk" ;; Skip) P__lock d__m'.
+    Proof using ODl ODd OBLS_AMU L__FL LVL_ORDo LTmm' LEl.
+      rewrite /acquire_spec_gen. intros τ lk π Ob c__cl ?? LB.
+      iIntros (Φ).
+      pose proof (fl_is_lock_pers FL lk c__cl (FLG := FLG)) as PERS. (* TODO: why Existing Instance doesn't work? *)
+      iIntros "(#LOCK & #INV & OB & PH & CPm & #OB_GT) POST".
+
+      wp_bind (Rec _ _ _)%E. pure_step_hl. MU_by_BOU.
+      iMod (first_BOU with "[$]") as "[CPS #EB]". 
+      { apply LTmm'. }
+      BOU_burn_cp.
+
+      pure_steps.
+      split_cps "CPS" 1. rewrite -cp_mul_1. 
+      wp_bind (fl_acquire _ _)%E. iApply (acquire_usage' with "[-POST CPS]"); eauto.
+      { iFrame "#∗". }
+      iIntros "!> %v (% & ?&PH&?&?&?&?&?)".
+
+      wp_bind (Rec _ _ _)%E. pure_steps.
+      iApply "POST". iExists _. iFrame.
     Qed.
   
 End ReleaseObligations.
