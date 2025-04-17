@@ -458,16 +458,16 @@ Section MotivatingClient.
           sgns_levels_gt' Ob (fl_acq_lvls FLP) ∗ sgn s__o l__o None ∗
           obls τ (Ob ∪ {[ s__o ]}) ∗ 
           th_phase_eq τ π ∗ cp π (fl_d__m FLP) ∗
-          P__lock flag s__f f ∗ fl_release_token FL (FLG := FLG) ∗ lock_owner_frag (Some s__o) ∗
+          fl_release_token FL (FLG := FLG) ∗ lock_owner_frag (Some s__o) ∗
           (∀ q, ⌜ Qp.le q 1 ⌝ -∗ th_phase_frag τ π q -∗ obls τ Ob -∗
-           BOU ∅ 4 (((Qp.sub 1%Qp q) ≫= Some ∘ th_phase_frag τ π) -∗? Q))
+           BOU ∅ 4 (P__lock flag s__f f ∗ (((Qp.sub 1%Qp q) ≫= Some ∘ th_phase_frag τ π) -∗? Q)))
       }}}
         (fl_release FLP) lk @ τ
       {{{ v, RET v; Q }}}.
     Proof using All.
       iIntros (Φ).
       pose proof (fl_is_lock_pers FL lk c__cl (FLG := FLG)) as PERS. (* TODO: why Existing Instance doesn't work? *)
-      iIntros "(#LOCK & #INV & #SGT & #SGNo & OB & PH & CPm & P & RT & LOCKED & FIN_BOU) POST".
+      iIntros "(#LOCK & #INV & #SGT & #SGNo & OB & PH & CPm & RT & LOCKED &  FIN_BOU) POST".
 
       iApply (wp_step_fupd _ _ ⊤ _ _ with "[POST]").
       { done. }
@@ -492,7 +492,7 @@ Section MotivatingClient.
       3: { iSplit; [| iAccu].
            iCombine "INV" as "X". iApply "X". }
       { by apply _. }
-      iIntros "(#INV & P & LOCKED & FIN_BOU)".
+      iIntros "(#INV & LOCKED & FIN_BOU)".
       iInv "INV" as "inv" "CLOS".
       iDestruct "inv" as (r b oo) "(LK & >LOCK_OW & >ST & >SR)".
 
@@ -507,9 +507,6 @@ Section MotivatingClient.
       iDestruct (lock_owner_agree with "[$] [$]") as "%EQ".
       inversion EQ. subst.
 
-      (* iDestruct "SR" as "[SR %DOM]". *)
-      (* iMod (ith_sig_retrieve with "[//] SR") as "[#RTH SR]". *)
-      
       iApply fupd_mask_intro; [set_solver| ]. iIntros "CLOS'".
       iSplit; [done| ].
       iSplit; [| iSplit].
@@ -526,11 +523,11 @@ Section MotivatingClient.
         iApply (BOU_wand with "[-SR OB]").
         2: { by iApply (BOU_set_sig with "[$SR] [$] [$]"). }
         iIntros "[SR OB]".
-        rewrite (difference_disjoint_L Ob); [| set_solver]. 
+        rewrite (difference_disjoint_L Ob); [| set_solver].
 
-        iSpecialize ("FIN_BOU" with "[//][$] [$]").
+        iSpecialize ("FIN_BOU" with "[//] [$] [$]").
         iApply (BOU_wand with "[-FIN_BOU] [$]").
-        iIntros "FIN".
+        iIntros "[P FIN]".
         
         rewrite /release_at_post. simpl.
         iMod (lock_owner_update _ _ None with "[$] [$]") as "[UNL' UNL]".
@@ -562,7 +559,6 @@ Section MotivatingClient.
           sgn s__o l__o None ∗
           flag_set ∗ obls τ {[ s__f; s__o ]} ∗
           th_phase_eq τ π ∗ cp π (fl_d__m FLP) ∗
-          (* P__lock flag s__f false ∗ *)
           flag ↦ #true ∗ sgn s__f l__f (Some false) ∗
           lock_owner_frag (Some s__o) ∗ fl_release_token FL (FLG := FLG) }}}
         (fl_release FLP) lk @ τ
@@ -579,18 +575,21 @@ Section MotivatingClient.
       { set_solver. }
       iSplitR.
       { iApply big_sepS_singleton. iExists _. iFrame "SGNf'". done. }
-      iSplitL "SET".
-      { iRight. by iFrame. }
+      (* iSplitL "SET". *)
+      (* { iRight. by iFrame. } *)
       iIntros (?) "%QQ PH OB".
       iApply OU_BOU. iApply (OU_wand with "[-OB SGNf]").
       2: { iApply (OU_set_sig with "[$] [$]"). set_solver. }
       iIntros "[SGNf OB]". rewrite difference_diag_L.
       iApply BOU_intro. simpl.
 
-      iIntros "PH'". iFrame.
+      iSplitL "SET".
+      { iRight. by iFrame. } 
+
+      iIntros "PH'". simpl.  
       iDestruct (th_phase_frag_combine'' with "[$PH $PH']") as "foo"; [done| ].
       iFrame.
-    Qed.      
+    Qed.
 
     Lemma first_step e1 τ π R n d d'
       (BOUND: n + 2 <= LIM_STEPS)
@@ -714,83 +713,32 @@ Section MotivatingClient.
       pose proof (fl_is_lock_pers FL lk c__cl (FLG := FLG)) as PERS. (* TODO: why Existing Instance doesn't work? *)
       iIntros "(#LOCK & #INV & #SGNo & #EPf & OB & PH & CPm & P & LOCKED & RT) POST".
 
-      iApply (wp_step_fupd _ _ ⊤ _ _ with "[POST]").
-      { done. }
-      { iModIntro. iNext. iModIntro. iApply "POST". }
-
-      iPoseProof (fl_release_spec FL lk _ τ with "[$]") as "REL".
-      rewrite /TLAT.
-      iApply ("REL" with "[] [OB PH CPm]").
-      { done. }
-      { iFrame.
-        (* TODO: Make a lemma *)
-        iApply big_opS_singleton. iExists _. iFrame "SGNo". done. }
-
-      iApply (TAU_intro with "[-]").
-      3: { iSplit; [| iAccu].
-           iCombine "INV EPf" as "X". iApply "X". }
-      { by apply _. }
-      iIntros "([#INV #EPf] & P & LOCKED)".
-      iInv "INV" as "inv" "CLOS".
-      iDestruct "inv" as (r b oo) "(LK & >LOCK_OW & >ST & >SR)".
-
-      iDestruct "ST" as "[[-> ST]| [? [UNLOCKED ?]]]".
-      2: { iExFalso. iCombine "LOCKED UNLOCKED" as "X".
-           iDestruct (own_valid with "X") as %V%auth_frag_valid_1.
-           rewrite Some_valid in V. done. }
-
-      iDestruct "ST" as "[%so_ [-> #SM__o]]".
-      iExists _.
-      iFrame "LK".
-      iDestruct (lock_owner_agree with "[$] [$]") as "%EQ".
-      inversion EQ. subst.
-
-      (* iDestruct "SR" as "[SR %DOM]". *)
-      (* iMod (ith_sig_retrieve with "[//] SR") as "[#RTH SR]". *)
+      iAssert (∀ q', obls τ ∅ -∗ th_phase_frag τ π q' -∗ BOU ∅ 4 ((⌜f = true⌝ ∗ flag_set ∨ ⌜f = false⌝ ∗ cp_mul π (fl_d__m FLP) 4) ∗ P__lock flag s__f f ∗ obls τ ∅ ∗ th_phase_frag τ π q'))%I with "[P]" as "FIN".
+      { iIntros (q') "OB PH". rewrite /P__lock. destruct f.
+        { iDestruct "P" as "[? [[% ?] | [_ #SET]]]"; [done| ].
+          iApply BOU_intro. iFrame.
+          rewrite bi.or_comm. iSplitL ""; iRight; by iFrame "#∗". }
+        iDestruct "P" as "[FLAG [[_ UNSET] | [% ?]]]"; [| done].
+        iApply OU_BOU_rep. iApply (OU_rep_wand with "[FLAG]").
+        2: { iApply (expect_sig_upd_rep with "EPf [$] [$] [] [$]").
+             iApply empty_sgns_levels_rel. }
+        iIntros "(CPSm & UNSET & OB & PH)". iFrame.
+        rewrite bi.or_comm. iSplitL "CPSm"; iLeft; by iFrame "#∗". }
       
-      iApply fupd_mask_intro; [set_solver| ]. iIntros "CLOS'".
-      iSplit; [done| ].
-      iSplit; [| iSplit].
-      3: { iIntros "[LK %]".
-           iMod "CLOS'" as "_". iFrame.
-           iMod ("CLOS" with "[-]") as "_".
-           2: { by iFrame "#∗". }
-           iNext. rewrite /client_inv_inner. do 3 iExists _. iFrame.
-           iLeft. iSplit; [done| ]. eauto. }
-      { iIntros (??) "(?&?&?&?&?)". done. }
-      { iIntros "% (OB & PH & %Q') %st [LK (%X & %Y & %Z)]".
-        destruct st as ((?&?)&?). simpl in X, Y, Z. inversion_clear X. subst.
-        iApply (BOU_split _ _ 1). 
-        iApply (BOU_wand with "[-SR OB]").
-        2: { rewrite -(union_empty_l_L (singleton _)). 
-             iApply (BOU_set_sig with "[$SR //] [$] [$]"). }
-        iIntros "[SR OB]". rewrite (subseteq_empty_difference_L ∅); [| done].
-        
-        iAssert (BOU ∅ 4 ((⌜f = true⌝ ∗ flag_set ∨ ⌜f = false⌝ ∗ cp_mul π (fl_d__m FLP) 4) ∗ P__lock flag s__f f ∗ obls τ ∅ ∗ th_phase_frag τ π q'))%I with "[P OB PH]" as "FIN".
-        { rewrite /P__lock. destruct f.
-          { iDestruct "P" as "[? [[% ?] | [_ #SET]]]"; [done| ].
-            iApply BOU_intro. iFrame.
-            rewrite bi.or_comm. iSplitL ""; iRight; by iFrame "#∗". }
-          iDestruct "P" as "[FLAG [[_ UNSET] | [% ?]]]"; [| done].
-          iApply OU_BOU_rep. iApply (OU_rep_wand with "[FLAG]").
-          2: { iApply (expect_sig_upd_rep with "EPf [$] [$] [] [$]").
-               iApply empty_sgns_levels_rel. }
-          iIntros "(CPSm & UNSET & OB & PH)". iFrame.
-          rewrite bi.or_comm. iSplitL "CPSm"; iLeft; by iFrame "#∗". }
-        
-        iApply (BOU_wand with "[-FIN] [$]"). iIntros "(FIN & P & OB & PH)". 
-        rewrite /release_at_post. simpl.
-        iMod (lock_owner_update _ _ None with "[$] [$]") as "[UNL' UNL]".
-        iMod "CLOS'" as "_".
-        iMod ("CLOS" with "[-OB PH FIN]") as "_".
-        2: { iModIntro. iIntros "PH_CLOS POST". iModIntro. iApply "POST". iFrame.
-             iDestruct (th_phase_frag_combine' with "[$PH $PH_CLOS]") as "foo".
-             all: done. }
-        iNext. rewrite /client_inv_inner. do 3 iExists _. iFrame.
-        iRight. iSplit; [done| ]. iFrame.
-        by iExists _. }
-    Qed.
+      rewrite -(union_empty_l_L {[ _ ]}).
+      iApply (release_usage with "[-POST] [$]").
+      2: iFrame "#∗".
+      { set_solver. }
+      iSplit.
+      { iApply empty_sgns_levels_rel. }
 
+      iIntros (q QQ) "PH OB".
+      iMod ("FIN" with "[$] [$]") as "(?&?&?&PH)".
+      iModIntro. iFrame. iIntros "PH'".
+      iDestruct (th_phase_frag_combine'' with "[$PH $PH']") as "foo"; [done| ].
+      iFrame.
+    Qed.
+    
     Lemma right_thread_iter_spec (lk: val) τ π flag s__f (c: loc):
       {{{ fl_is_lock FL lk c__cl (FLG := FLG) ∗ client_inv lk flag s__f ∗ 
           obls τ ∅ ∗ th_phase_eq τ π ∗
@@ -798,7 +746,6 @@ Section MotivatingClient.
           ep s__f π (fl_d__m FLP) ∗
           cp_mul π (fl_d__m FLP) 3 ∗
           c ↦ #false
-          (* ∗ cp_mul π d0 20 *)
       }}}
         right_thread_iter lk #flag #c @ τ
       {{{ v, RET v; obls τ ∅ ∗ th_phase_eq τ π ∗
@@ -849,7 +796,6 @@ Section MotivatingClient.
           ep s__f π (fl_d__m FLP) ∗
           cp_mul π (fl_d__m FLP) 4 ∗
           c ↦ #false
-          (* ∗ cp_mul π d0 30 *)
       }}}
         right_thread_rep lk #flag #c @ τ
       {{{ v, RET v; obls τ ∅ ∗ th_phase_eq τ π ∗
@@ -869,9 +815,7 @@ Section MotivatingClient.
       { apply LT0m. }
       iApply sswp_pure_step; [done| ].
       iIntros "!> CPS #EB PH". simpl.
-      (* pure_steps. *)
 
-      (* do 1 pure_step_cases. *)
       wp_bind (Rec _ _ _)%E.
       do 7 pure_step_cases.
       wp_bind (right_thread_iter _ _ _)%E.
@@ -931,12 +875,6 @@ Section MotivatingClient.
       2: { iApply (@create_ep_upd with "[$] [$] [$]").
            apply LThm. } (* TODO: rename that hypothesis *)
       iIntros "(EPf & _ & PH)".
-      (* iApply OU_BOU. *)
-      (* iApply (OU_wand with "[-CPSm']"). *)
-      (* 2: { iApply (exchange_cp_upd with "[$] [$]"). *)
-      (*      1: reflexivity. *)
-      (*      apply LThm. } *)
-      (* iIntros "CPSh". *)
       
       BOU_burn_cp.
 
@@ -959,16 +897,8 @@ Section MotivatingClient.
   Context {OBLS_AMU__f: forall τ, @AMU_lift_MU__f _ _ _ τ oGS' _ EM _ ⊤}.
   Context {NO_OBS_POST: ∀ τ v, obls τ ∅ -∗ fork_post τ v}. 
 
-(*   (* TODO: move *) *)
-(*   Lemma BOU_0 E P: *)    
-(* BOU ⊤ LIM_STEPS *)
   Context {CL_PRE: ClientPreG Σ} {FL_PRE: fl_GpreS FLP Σ}.
 
-  (* Lemma init_smap_repr_cl: *)
-  (*   ⊢ |==> ∃ (SMG: SigMapG Σ), smap_repr_cl 0 false. *)
-  (* Proof using.   *)
-  (*   iMod (init_smap_repr_empty (fun _ => l__o) _ _ (flip Nat.ltb 0) with "OB") as "SR". *)
-  
   Lemma alloc_client_inv {FLG: fl_GS FLP Σ} R s__f lk τ π flag:
     obls τ R -∗ sgn s__f l__f (Some false) -∗ fl_LK FLP (lk, 0, false) (FLG := FLG) -∗
     th_phase_eq τ π -∗ flag ↦ #false -∗
@@ -985,7 +915,6 @@ Section MotivatingClient.
     rewrite size_empty. simpl.
     iApply (BOU_wand with "[-SR]"); [| by iFrame].
     iIntros "(%smap & %SMG & SR & %DOM & OB & #SIGS)".
-    (* apply dom_empty_inv_L in DOM__SM as ->. rewrite map_img_empty_L union_empty_r_L. *)
 
     set (CG := {| cl_γ__ow := γ; cl_γ__os := γ0 |}).
     iMod (inv_alloc client_ns _ (client_inv_inner lk flag s__f) with "[LK FLAG OW_A OW_F SR SGNf]") as "#INV".
@@ -1065,7 +994,6 @@ Section MotivatingClient.
       iApply cp_mul_weaken; [| reflexivity| by iFrame]. done. }
 
     iRename "PH1" into "PH". rewrite difference_diag_L.
-    (* Unset Printing Notations. *)
     apply strict_include in PH_LT1. 
     wp_bind (Rec _ _ _)%E.
     iDestruct (cp_mul_weaken with "CPS") as "CPS".
