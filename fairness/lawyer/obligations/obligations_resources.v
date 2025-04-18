@@ -283,6 +283,17 @@ Section ObligationsRepr.
       rewrite -pair_op. rewrite op_None_right_id.
       rewrite agree_idemp. done.
     Qed.
+    
+    Lemma sgn_level_agree s l1 l2 v1 v2:
+      sgn s l1 v1 -∗ sgn s l2 v2 -∗ ⌜ l1 = l2 ⌝.
+    Proof using H1 H0.
+      iIntros "S1 S2". iCombine "S1 S2" as "S".
+      iDestruct (own_valid with "[$]")as %V.
+      apply auth_frag_valid, singleton_valid in V.
+      rewrite pair_valid in V. destruct V as [V _].
+      apply agree_op_inv, to_agree_inj in V. 
+      iPureIntro. by rewrite -leibniz_equiv_iff.
+    Qed.      
 
     Instance wrap_phase_inj: Inj eq eq wrap_phase.
     Proof using.

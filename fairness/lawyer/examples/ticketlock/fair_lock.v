@@ -113,30 +113,60 @@ Section FairLockSpec.
     ▷ fl_LK FLP x (FLG := FLG) ∗ ⌜ x.2 = true /\ x.1.1 = lk⌝. 
   Definition release_at_post {FLG: fl_GS FLP Σ} (lk: val) (y x: FL_st): iProp Σ :=
     fl_LK FLP y (FLG := FLG) ∗ ⌜ y.1.2 = (x.1.2 + 1)%nat /\ y.2 = false /\ y.1.1 = x.1.1 ⌝.
+    
+End FairLockSpec.
+
+
+Section FairLockDef.
+
+  Context `{OfeDiscrete DegO} `{OfeDiscrete LevelO}.
+  Context `{@LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}. 
   
+  Let Degree := ofe_car DegO.
+  Let Level := ofe_car LevelO.
+
+  Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}.
+  Let OP := LocaleOP (Locale := locale heap_lang).
+  Existing Instance OP.
+  Let OM := ObligationsModel.
+
+  Context {FLP: FairLockPre}.
+
   Record FairLock := {    
 
     fl_is_lock `{FLG: fl_GS FLP Σ} {HEAP: gen_heapGS loc val Σ}: val -> nat -> iProp Σ;
-    fl_is_lock_pers {FLG: fl_GS FLP Σ} lk c :> Persistent (fl_is_lock lk c (FLG := FLG));
+    fl_is_lock_pers {Σ} {FLG: fl_GS FLP Σ} {HEAP: gen_heapGS loc val Σ} lk c ::
+      Persistent (fl_is_lock lk c (FLG := FLG));
 
     fl_release_token `{FLG: fl_GS FLP Σ}: iProp Σ;
 
-    fl_create_spec {FLG_PRE: fl_GpreS FLP Σ}: ⊢ ⌜ fl_c__cr FLP <= LIM_STEPS ⌝ -∗ ∀ τ π c,
+    fl_create_spec {Σ} {FLG_PRE: fl_GpreS FLP Σ}
+        (ASEM := ObligationsASEM) {oGS': @asem_GS _ _ ASEM Σ} `{EM: ExecutionModel heap_lang M} {hGS : heapGS Σ EM}
+      (oGS: ObligationsGS (OP := OP) Σ := oGS'):
+      ⊢ ⌜ fl_c__cr FLP <= LIM_STEPS ⌝ -∗ ∀ τ π c,
         {{{ cp π (fl_d__m FLP) ∗ th_phase_eq τ π }}}
             fl_create FLP #() @ τ
         {{{ lk, RET lk; ∃ FLG: fl_GS FLP Σ, fl_LK _ (lk, 0, false) (FLG := FLG) ∗ fl_is_lock lk c (FLG := FLG) ∗ th_phase_eq τ π }}};
 
-    fl_acquire_spec {FLG: fl_GS FLP Σ} (lk: val) c τ: (fl_is_lock (FLG := FLG)) lk c ⊢
-        TLAT_FL_RR τ 
+    fl_acquire_spec {Σ} {FLG: fl_GS FLP Σ}
+        (ASEM := ObligationsASEM) {oGS': @asem_GS _ _ ASEM Σ} `{EM: ExecutionModel heap_lang M} {hGS : heapGS Σ EM}
+      (oGS: ObligationsGS (OP := OP) Σ := oGS')
+      (lk: val) c τ:
+      (fl_is_lock (FLG := FLG)) lk c ⊢
+        TLAT_FL_RR τ
         (acquire_at_pre lk (FLG := FLG))
         (acquire_at_post lk (FLG := FLG))
         (fl_acq_lvls FLP)
         (fun '(_, _, b) => ⌜ b = true ⌝)
         (fun _ _ => Some $ fl_release_token (FLG := FLG))
         (fun _ _ => #())
-        c (fl_acquire FLP lk);
+        c (fl_acquire FLP lk)
+        (oGS' := oGS') (FLP := FLP);
                                      
-    fl_release_spec {FLG: fl_GS FLP Σ} (lk: val) c τ: (fl_is_lock (FLG := FLG)) lk c ∗ fl_release_token (FLG := FLG) ⊢
+    fl_release_spec {Σ} {FLG: fl_GS FLP Σ}
+        (ASEM := ObligationsASEM) {oGS': @asem_GS _ _ ASEM Σ} `{EM: ExecutionModel heap_lang M} {hGS : heapGS Σ EM}
+      (oGS: ObligationsGS (OP := OP) Σ := oGS')
+      (lk: val) c τ: (fl_is_lock (FLG := FLG)) lk c ∗ fl_release_token (FLG := FLG) ⊢
         TLAT_FL τ
         (release_at_pre lk (FLG := FLG))
         (release_at_post lk (FLG := FLG))
@@ -145,7 +175,8 @@ Section FairLockSpec.
         AC_none
         (fun _ _ => None)
         (fun _ '(_, r, _) => #r)
-        c (fl_release FLP lk);
+        c (fl_release FLP lk)
+        (oGS' := oGS') (FLP := FLP);
   }.
-  
-End FairLockSpec.
+
+End FairLockDef.
