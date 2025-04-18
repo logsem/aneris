@@ -83,7 +83,10 @@ Section ReleasingLockSpec.
       }}}
         rfl_release lk @ τ
       {{{ v, RET v; Q }}} ;
-     
+
+      rfl_is_lock_pers `{PRE: rfl_G Σ} {HEAP: gen_heapGS loc val Σ} `{invGS_gen HasNoLc Σ}
+        (ASEM := ObligationsASEM) {oGS': asem_GS Σ}
+        lk u P: Persistent (rfl_is_lock lk u P (rfl_G0 := PRE) (oGS' := oGS'));
   }.
   
 End ReleasingLockSpec.
@@ -730,6 +733,9 @@ Section RFL2FL.
     rewrite cp_mul_1. iFrame. 
 
     iApply (sgns_levels_rel'_impl with "[$]"); set_solver.
-  Qed.    
+  Qed.
+  Next Obligation.
+    intros. simpl. apply _.
+  Qed.
 
 End RFL2FL.
