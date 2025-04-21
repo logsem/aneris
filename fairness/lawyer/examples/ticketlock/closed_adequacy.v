@@ -4,29 +4,22 @@ From iris.base_logic.lib Require Import saved_prop.
 From trillium.fairness Require Import utils.
 From trillium.fairness.heap_lang Require Import simulation_adequacy.
 From trillium.fairness.lawyer Require Import sub_action_em action_model.
-From trillium.fairness.lawyer.obligations Require Import obligations_adequacy obligations_logic obligations_em obligations_resources obligations_model obligations_am.
-From trillium.fairness.lawyer.examples.ticketlock Require Import fair_lock ticketlock client.
+From trillium.fairness.lawyer.obligations Require Import obligations_adequacy obligations_logic obligations_em obligations_resources obligations_model obligations_am env_helpers.
+From trillium.fairness.lawyer.examples.ticketlock Require Import fair_lock ticketlock client releasing_lock.
 From trillium.fairness.lawyer.examples Require Import orders_lib signal_map.
 
 
-Section Adequacy.
-  (* Context (B: nat). *)
-  (* Let OP := EO_OP B. *)
-  (* Existing Instance OP.  *)
-  (* Let ASEM := ObligationsASEM. *)
-  (* Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls τ ∅ (oGS := aGS)). *)
-  (* Let OM := ObligationsModel.  *)
-  (* Let M := AM2M ObligationsAM.  *)
-  
+Section Adequacy.  
 
   (* TODO: move *)
   Definition sig_mapΣ := #[GFunctor $ authUR (gmapUR nat (agreeR SignalId))].
   Global Instance subG_sig_mapΣ {Σ}: subG sig_mapΣ Σ → SigMapPreG Σ.
   Proof. solve_inG. Qed.
 
-  Definition ClosedDegree := bounded_nat 6.
-  Definition CD (i: nat): ClosedDegree := bn_ith 5 i.
-  Let d__r := CD 5.
+  Definition ClosedDegree := bounded_nat 7.
+  Definition CD (i: nat): ClosedDegree := bn_ith 6 i.
+  Let d__r := CD 6.
+  Let d__m' := CD 5.
   Let d__m := CD 4.
   Let d__e := CD 3.
   Let d__h := CD 2.
@@ -48,8 +41,13 @@ Section Adequacy.
     all: apply nat_bounded_PO. 
   Defined.
 
+  Instance Closed_OP_HL: OP_HL ClosedDegree ClosedLevel ClosedLim.
+  esplit; by apply _.
+  Defined. 
+  
+
   Definition TLΣ := #[
-    GFunctor $ authUR (gmapUR nat (exclR $ tau_codom_gn (OPRE := ClosedObligationsPre)));
+    GFunctor $ authUR (gmapUR nat (exclR $ tau_codom_gn));
     savedPredΣ (val heap_lang);
     savedPredΣ (option nat);
     GFunctor $ authUR (gset_disjUR natO);
@@ -57,7 +55,7 @@ Section Adequacy.
     GFunctor $ mono_natUR;
     GFunctor $ exclR unitO
   ].
-  Global Instance subG_TLΣ {Σ}: subG TLΣ Σ → TicketlockPreG Σ (OPRE := ClosedObligationsPre).
+  Global Instance subG_TLΣ {Σ}: subG TLΣ Σ → TicketlockPreG Σ.
   Proof. solve_inG. Qed.
 
   Definition ClientΣ := #[
@@ -69,24 +67,55 @@ Section Adequacy.
   Global Instance subG_clientΣ {Σ}: subG ClientΣ Σ → ClientPreG Σ.
   Proof. solve_inG. Qed.
 
-  Definition ClosedOP := LocaleOP (Locale := locale heap_lang). 
-  Existing Instance ClosedOP. 
-  Let ASEM := ObligationsASEM.
-  Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls τ ∅ (oGS := aGS)).
-  Let OM := ObligationsModel. 
-  Let M := AM2M ObligationsAM. 
+  Let EM := TopAM_EM ObligationsASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls τ ∅ (oGS := aGS)).
 
-  Definition ClosedΣ := #[ TLΣ; ClientΣ; heapΣ EM].
+  Program Definition TLPreInstance :=
+    TLPre d__l d__h d__e d__m _ _ _ l__acq (OP := Closed_OP_HL) (EM := EM).
+  Solve All Obligations with apply ith_bn_lt; lia.  
 
-  Program Definition TLPreInstance := TLPre d__l d__h d__e d__m _ _ _ l__acq (OPRE := ClosedObligationsPre).
-  Next Obligation. apply ith_bn_lt. lia. Qed. 
-  Next Obligation. apply ith_bn_lt. lia. Qed. 
-  Next Obligation. apply ith_bn_lt. lia. Qed.
+  Program Definition TLInstance :=
+    TL_FL d__w d__l d__h d__e d__m _ _ _ _ _ l__acq (OP := Closed_OP_HL) (EM := EM).
+  Solve Obligations with apply ith_bn_lt; lia. 
+  Next Obligation.
+    rewrite /ClosedLim. cbv. lia.
+  Qed.
+  Fail Next Obligation.
+
+  Program Definition RFLInstance := RFL_FL TLInstance l0 _ l__acq _ d__m' _.
+  Next Obligation.
+    simpl. intros ?. rewrite /lvls_acq elem_of_singleton. intros ->.
+    apply ith_bn_lt. lia.
+  Qed.
+  Next Obligation.
+    simpl. rewrite /lvls_acq elem_of_singleton. done.
+  Qed.
+  Next Obligation.
+    simpl. apply ith_bn_lt. lia.
+  Qed.
+  Fail Next Obligation.    
+
+  Definition RFLΣ := #[GFunctor $ excl_authUR (optionUR SignalId); sig_mapΣ; TLΣ].
+  Global Instance subG_RFLΣ {Σ}: subG RFLΣ Σ → RFL_FL_preG Σ (FLP := TLPreInstance).
+  Proof. intros. esplit; solve_inG. Qed. 
+
+  Definition ClosedΣ := #[ ClientΣ;
+                           heapΣ EM;
+                           RFLΣ
+                          ].
+
+  Instance Closed_OM_HL_Env
+    (HEAP: heapGS ClosedΣ (TopAM_EM ObligationsASEM (λ Σ (aGS : ObligationsGS Σ) τ, obls τ ∅))):
+    OM_HL_Env Closed_OP_HL EM ClosedΣ.
+  Proof.
+    unshelve esplit; try by apply _.
+    - apply (@heap_fairnessGS _ _ _ HEAP).
+    - apply AMU_lift_top.
+    - intros. rewrite -nclose_nroot. apply AMU_lift_top.
+  Defined.
 
   Lemma closed_program_terminates_impl
-    (prog := client_prog (FLP := TLPreInstance))
     (extr : heap_lang_extrace)
-    (START: trfirst extr = ([prog #()], Build_state ∅ ∅)):
+    (START: trfirst extr = ([client_prog RFLInstance #()], Build_state ∅ ∅)):
     extrace_fairly_terminating extr.
   Proof.
     assert (heapGpreS ClosedΣ EM) as HPreG.
@@ -100,33 +129,26 @@ Section Adequacy.
 
     iIntros (?) "[HEAP INIT]".
 
-    eset (tfl := TL_FL). specialize (tfl d__w d__l d__h d__e d__m).
-    specialize tfl with (lvl_acq := l__acq) (hGS := HEAP) (oGS' := (@heap_fairnessGS _ _ _ HEAP)).
+    simpl in *. 
 
-    pose proof @client_spec as SPEC. specialize SPEC with (OPRE := ClosedObligationsPre) (hGS := HEAP) (oGS' := (@heap_fairnessGS _ _ _ HEAP)).
-    specialize SPEC with (l__o := l0) (l__f := l__f) (l__fl := l__acq) (d0 := d0) (d__r := d__r).
+    pose proof @client_spec as SPEC.
+    specialize SPEC with (OP := Closed_OP_HL) (RFL := RFLInstance) (OHE := Closed_OM_HL_Env HEAP).
+    specialize SPEC with (l__f := l__f) (d0 := d0) (d__r := d__r).
+    simpl in *.
 
     iApply (SPEC with "[-]").
-    { apply tfl. 
-      - apply ith_bn_lt. lia.
-      - apply AMU_lift_top.
-      - rewrite /ClosedLim. etrans.
-        2: { apply max_list_elem_of_le, elem_of_list_here. }
-        lia. }
-    1, 2: simpl; rewrite /lvls_acq; intros ? ->%elem_of_singleton; apply ith_bn_lt; lia.
-    { apply ith_bn_lt; lia. }
-    { simpl. rewrite /lvls_acq. by apply elem_of_singleton. }
-    { apply AMU_lift_top. }
-    1, 2: apply ith_bn_lt; lia.
-    1, 2, 3: rewrite /ClosedLim; simpl; rewrite /tl_exc; lia.    
-    { intros. rewrite /AMU_lift_MU__f.
-      rewrite -nclose_nroot.
-      apply AMU_lift_top. }
-    { simpl. iIntros (? _) "X". iApply "X". }
-    { simpl. by apply _. }
-    2: { simpl. iNext. iIntros (_) "X". iApply "X". }
+    { simpl. intros ?. rewrite /rfl_fl_lvls. simpl. rewrite /lvls_acq.
+      rewrite elem_of_union !elem_of_singleton.
+      intros [-> | ->]; apply ith_bn_lt; lia. }
+    1, 2: apply ith_bn_lt; lia. 
+    1-3: cbv; lia.
+    { simpl. by iIntros (? _) "X". }
+    { (* TODO: why solve_inG doesn't solve it? *)
+      intros. split; try solve_inG || apply _.
+      simpl. apply _. }
+    2: { by iIntros "!> % ?". }
 
-    clear SPEC tfl.     
+    clear SPEC.
     rewrite START. simpl.
     rewrite /obls_init_resource /init_om_state.      
     rewrite init_phases_helper.
@@ -147,10 +169,10 @@ End Adequacy.
 
 Theorem closed_program_terminates:
   forall extr,
-    trfirst extr = ([client_prog (OPRE := ClosedObligationsPre) (FLP := TLPreInstance) #()], Build_state ∅ ∅) ->
+    trfirst extr = ([client_prog RFLInstance #()], Build_state ∅ ∅) ->
     extrace_fairly_terminating extr.
 Proof using.
   intros. eapply closed_program_terminates_impl; eauto.  
 Qed.
 
-(* Print Assumptions closed_program_terminates. *)
+Print Assumptions closed_program_terminates.

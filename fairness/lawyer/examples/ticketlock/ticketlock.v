@@ -8,22 +8,27 @@ From iris.base_logic.lib Require Import saved_prop.
 From trillium.program_logic Require Export weakestpre adequacy ectx_lifting.
 From trillium.fairness Require Import utils.
 From trillium.fairness.lawyer.examples Require Import obls_tactics.
-From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_am obligations_em obligations_logic.
+From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_am obligations_em obligations_logic env_helpers.
 From trillium.fairness.lawyer Require Import sub_action_em program_logic.
 From trillium.fairness.lawyer.examples.ticketlock Require Import obls_atomic fair_lock.
 
 
 Section Ticketlock.
-  Context `{ODd: OfeDiscrete DegO} `{ODl: OfeDiscrete LevelO}.
-  Context `{LEl: @LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}.
+  (* Context `{ODd: OfeDiscrete DegO} `{ODl: OfeDiscrete LevelO}. *)
+  (* Context `{LEl: @LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}. *)
   
-  Let Degree := ofe_car DegO.
-  Let Level := ofe_car LevelO.
+  (* Let Degree := ofe_car DegO. *)
+  (* Let Level := ofe_car LevelO. *)
 
-  Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}.
-  Let OP := LocaleOP (Locale := locale heap_lang).
-  Existing Instance OP.
-  Let OM := ObligationsModel.
+  (* Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}. *)
+  (* Let OP := LocaleOP (Locale := locale heap_lang). *)
+  (* Existing Instance OP. *)
+  (* Let OM := ObligationsModel. *)
+  Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
+  Context `{EM: ExecutionModel heap_lang M}.
+  Context {FLP: FairLockPre}.
+  Notation "'Degree'" := (om_hl_Degree). 
+  Notation "'Level'" := (om_hl_Level).
 
   Definition Tid := locale heap_lang.
 
@@ -83,7 +88,6 @@ Section Ticketlock.
   Lemma ticket_token_excl `{TicketlockG Σ} i:
     ticket_token i -∗ ticket_token i -∗ False.
   Proof using.
-    clear ODl ODd LEl.
     iApply bi.wand_curry. rewrite -own_op -auth_frag_op.
     iIntros "X". iDestruct (own_valid with "X") as %V.
     rewrite auth_frag_valid in V. apply gset_disj_valid_op in V. set_solver.
@@ -167,6 +171,9 @@ Section Ticketlock.
 
   Definition tl_exc := 20.
 
+  (* TODO: move, remove duplicates *)
+  Hypothesis (LS_LB: S tl_exc ≤ LIM_STEPS). 
+
   (* we need to have a non-empty set of "acquire levels" to verify the client. *)
   (* seemingly it's possible to get rid of this restriction by having an extra
      "lower bound" of levels in the definition of TLAT. *)
@@ -219,19 +226,21 @@ Section Ticketlock.
     etrans; eauto.
   Defined.
 
-  Let OAM := ObligationsAM.
-  Let ASEM := ObligationsASEM.
+  (* Let OAM := ObligationsAM. *)
+  (* Let ASEM := ObligationsASEM. *)
+
+  Section Proofs.
 
   Context {Σ: gFunctors}.
+  Context {OHE: OM_HL_Env OP EM Σ}.
+  (* (* Keeping the more general interface for future developments *) *)
+  (* Context `{oGS': @asem_GS _ _ ASEM Σ}. *)
+  (* Let oGS: ObligationsGS (OP := OP) Σ := oGS'. *)
+  (* Existing Instance oGS. *)
 
-  (* Keeping the more general interface for future developments *)
-  Context `{oGS': @asem_GS _ _ ASEM Σ}.
-  Let oGS: ObligationsGS (OP := OP) Σ := oGS'.
-  Existing Instance oGS.
-
-  Context `{EM: ExecutionModel heap_lang M}.
-  Context `{hGS: @heapGS Σ _ EM}.
-  Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
+  (* Context `{EM: ExecutionModel heap_lang M}. *)
+  (* Context `{hGS: @heapGS Σ _ EM}. *)
+  (* Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS). *)
            
   (* Let tl_TAU := TAU_FL (FLP := TLPre) (oGS' := oGS'). *)
 
@@ -249,8 +258,9 @@ Section Ticketlock.
         (fun _ _ => Φ #())
         Ob
         (* RR. *)
-        (acq_FG_RR RR π (oGS' := oGS') (FLP := TLPre))
-        (oGS' := oGS'). 
+        (acq_FG_RR RR π (FLP := TLPre))
+        (oGS' := ohe_oGS')
+        . 
 
   Definition tau_interp `{TicketlockG Σ} (lk: val) (c: nat) (ow: nat) (i: nat) (cd: tau_codom Σ): iProp Σ :=
       let '((((((τ, π), q), _), _), Φ), _) := cd in
@@ -280,8 +290,8 @@ Section Ticketlock.
     tau_map_interp lk c ow TM -∗
     tau_interp lk c ow n cd
     ==∗ ∃ cd_gn, tau_map_interp lk c ow (<[ n := cd_gn ]> TM) ∗ ticket_tau n cd.
-  Proof using.    
-    clear ODl ODd LEl fl_degs_wl0 d__w.
+  Proof using.
+    clear fl_degs_wl0 d__w LS_LB.
     iIntros "TMA TI". destruct_cd cd. 
     iMod (saved_pred_alloc Post DfracDiscarded) as (γ__p) "#POST"; [done| ].
     iMod (saved_pred_alloc RR DfracDiscarded) as (γ__r) "#RR"; [done| ].
@@ -331,7 +341,7 @@ Section Ticketlock.
       (tau_interp lk c ow i cd' -∗ tau_map_interp lk c ow TM) ∗
       (∀ v, ▷ (cd.1.2 v ≡ Φ' v)) ∗ (∀ r, ▷ (cd.2 r ≡ RR' r)). 
   Proof using.
-    clear fl_degs_wl0 d__w ODl ODd LEl.
+    clear fl_degs_wl0 d__w LS_LB.
     iIntros "T TMI".
     rewrite /tau_map_interp. iDestruct "TMI" as "[AUTH TMI]". 
     iDestruct (tau_map_ticket with "[$] [$]") as (? ITH EQ) "(#SP1 & #SP2)".
@@ -370,6 +380,7 @@ Section Ticketlock.
     (th_phase_frag τ π (q /2) -∗ cd.1.2 #()) ==∗
     ∃ cd_gn, tau_map_interp lk c ow (<[ ow := cd_gn ]> TM) ∗ ticket_tau ow cd.
   Proof using.
+    clear fl_degs_wl0 d__w LS_LB.
     destruct_cd cd. simpl. 
     iIntros "TMI RTOK TAU".    
     iMod (ticket_tau_alloc with "[$] [RTOK TAU]") as "FOO".
@@ -382,6 +393,7 @@ Section Ticketlock.
   Lemma tokens_alloc `{TicketlockG Σ} (N: nat):
     tokens_auth N ==∗ tokens_auth (S N) ∗ ticket_token N.
   Proof using.
+    clear LS_LB.
     iIntros. rewrite /tokens_auth /ticket_token.
     rewrite -own_op. iApply own_update; [| by iFrame].
     apply auth_update_alloc.
@@ -394,26 +406,30 @@ Section Ticketlock.
 
   Definition tl_is_lock `{TicketlockG Σ} lk c := inv fl_ι (tl_inv_inner lk c).
 
-  Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS' _ EM hGS (↑ nroot)}.
-
   Lemma tl_newlock_spec `{TicketlockPreG Σ} τ π c
     (BOUND: fl_c__cr TLPre <= LIM_STEPS):
       {{{ cp π d__m0 ∗ th_phase_eq τ π }}}
         tl_newlock #() @ τ
       {{{ lk, RET lk; ∃ TLG: TicketlockG Σ, tl_LK (lk, 0, false) ∗ tl_is_lock lk c ∗ th_phase_eq τ π }}}.
-  Proof using OBLS_AMU.
-    clear fl_degs_wl0 d__w ODl ODd LEl.
+  Proof using LS_LB.
+    clear fl_degs_wl0 d__w.
     iIntros (Φ) "(CP & PH) POST". rewrite /tl_newlock.
-    pure_step_hl. MU_by_BOU.
+    pure_step_hl.
+
+    (* pose proof @AMU_lift_top as AA. specialize AA with (hGS := ohe_hGS (OM_HL_Env := OHE)).  *)
+    (* iApply ohe_obls_AMU; [(try rewrite nclose_nroot); done| ]. *)
+    (* iApply BOU_AMU.     *)
+
+    MU_by_BOU.
 
     iMod (first_BOU with "[$]") as "[CPS #EB]".
     { apply fl_degs_em. }
-    { apply BOUND. }
     iModIntro. burn_cp_after_BOU. 
     
     wp_bind (ref _)%E. iApply sswp_MU_wp; [done| ].
     iApply wp_alloc. iIntros "!> %l__ow OW _". MU_by_burn_cp.
-    pure_steps. wp_bind (Rec _ _ _)%E. pure_steps.
+    pure_steps. wp_bind (Rec _ _ _)%E. pure_steps. 
+    
     wp_bind (ref _)%E. iApply sswp_MU_wp; [done| ].
     iApply wp_alloc. iIntros "!> %l__tk TK _". MU_by_burn_cp. pure_steps.
     
@@ -483,14 +499,12 @@ Section Ticketlock.
         {[lvl_acq]}
         c π q (fun _ _ => Φ #())
         Ob
-        (acq_FG_RR RR π (oGS' := oGS') (FLP := TLPre))
-        (oGS' := oGS')
+        (acq_FG_RR RR π (FLP := TLPre))        
         -∗
-        TLAT_pre τ {[lvl_acq]} d__e π q Ob (oGS' := oGS') -∗
+        TLAT_pre τ {[lvl_acq]} d__e π q Ob (oGS' := ohe_oGS') -∗
         cp_mul π d__w 10 -∗
         WP (get_ticket lk) @ s; τ; ⊤ {{ tv, ∃ (t o': nat), ⌜ tv = #t ⌝ ∗ wait_res o' t τ π q Ob Φ RR }}.
-  Proof using OBLS_AMU fl_degs_wl0.
-    clear ODl ODd LEl.
+  Proof using fl_degs_wl0 LS_LB.
     iIntros "[#INV #EB]". rewrite /TLAT_FL /TLAT.
     iIntros "TAU PRE CPS".
     rewrite /TLAT_pre. simpl. iDestruct "PRE" as "(OB & #SGT & PH & CPe)".
@@ -633,8 +647,8 @@ Section Ticketlock.
     (LIM_STEPS': fl_B TLPre c <= LIM_STEPS):
     tl_is_lock lk c ∗ exc_lb 20 ∗ wait_res o' t τ π q Ob Φ RR 
     ⊢ WP (wait lk #t) @ τ {{ v, Φ v ∗ rel_tok }}.
-  Proof using fl_degs_wl0 OBLS_AMU.
-    clear ODl ODd LEl.
+  Proof using fl_degs_wl0.
+    clear LS_LB.
     iLöb as "IH" forall (o').
     rewrite {2}/wait_res. iIntros "(#INV & #EXC & %LEo't & OW_LB & CPSh & RR & CPS & TOK & TAU & PH)".
     rewrite {2}/wait.
@@ -801,7 +815,7 @@ Section Ticketlock.
                         (⌜ next = false ⌝ → rel_tok) ∗
                         tau_map_interp lk c (ow + 1) TM).
   Proof using.
-    clear fl_degs_wl0 d__w ODl ODd LEl OBLS_AMU.
+    clear fl_degs_wl0 d__w LS_LB.
     iIntros "TMI AUTH LOW RTOK". rewrite /tau_map_interp.
 
     rewrite {2 4}(map_split TM ow).
@@ -886,9 +900,6 @@ Section Ticketlock.
     iSplit; [| done]. iLeft. iFrame.
   Qed.
 
-  (* TODO: move, remove duplicates *)
-  Hypothesis (LS_LB: S tl_exc ≤ LIM_STEPS). 
-
   (* TODO: move *)
   (* The old BOU_AMU rule looked like this and made easier to show certain lemmas:
      Lemma BOU_AMU E ζ b (P : iProp Σ) π q
@@ -909,11 +920,9 @@ Section Ticketlock.
         (fun _ _ => None)
         (fun _ '(_, r, _) => #r)
          c
-         (tl_release lk)
-        (oGS' := oGS')
+         (tl_release lk)        
         (FLP := TLPre).
-  Proof using fl_degs_wl0 OBLS_AMU LS_LB.
-    clear ODl ODd LEl.
+  Proof using fl_degs_wl0 LS_LB.
     iIntros "(#INV & RT)". rewrite /TLAT_FL /TLAT.
     iIntros (Φ q π Ob) "%LIM_STEPS' PRE TAU".
     rewrite /TLAT_pre. simpl. iDestruct "PRE" as "(OB & _ & PH & CP)".
@@ -1033,11 +1042,9 @@ Section Ticketlock.
         (fun _ _ => Some $ rel_tok)
         (fun _ _ => #())
         c (fl_acquire TLPre lk)
-        (oGS' := oGS')
         (FLP := TLPre)
         .
-  Proof using fl_degs_wl0 d__w OBLS_AMU LS_LB.
-    clear ODl ODd LEl. 
+  Proof using fl_degs_wl0 d__w LS_LB.
     iIntros "#INV". rewrite /TLAT_FL /TLAT.
     iIntros (Φ q π Ob RR) "%LIM_STEPS' PRE TAU".
     rewrite /TLAT_pre. simpl. iDestruct "PRE" as "(OB & #SGT & PH & CP)".
@@ -1090,29 +1097,28 @@ Section Ticketlock.
 
   End AfterInit.
 
-  (* Show Ltac Profile. *)
+  End Proofs.
 
-  (* TODO: move, remove duplicates *)
-  Hypothesis (LS_LB: S tl_exc ≤ LIM_STEPS). 
 
-  Program Definition TL_FL: FairLock (oGS' := oGS') (FLP := TLPre) := {|
-    fl_is_lock FLG hGS := @tl_is_lock FLG;
-    fl_release_token FLG := @rel_tok _ FLG;
-  |}.
+  Program Definition TL_FL: FairLock (FLP := TLPre) := {|
+    fl_is_lock {Σ} {TLG: TicketlockG Σ} {FLG: OM_HL_Env OP EM Σ} := @tl_is_lock _ FLG TLG;
+    fl_release_token _ FLG := @rel_tok _ FLG;
+  |}. 
   Next Obligation.
-    iIntros "%%%%% % !> (CP & PH) POST".
+    iIntros "%%% %%%% % !> (CP & PH) POST".
     unshelve iApply (tl_newlock_spec with "[-POST] [$]").
     { eauto. }
     { done. }
     iFrame.
   Qed.
   Next Obligation.
-    iIntros "%%%% #LOCK".
-    iApply (tl_acquire_spec with "[$]"). done.
+    iIntros "%%% %%% #LOCK".
+    iApply (tl_acquire_spec with "[$]").
   Qed.
   Next Obligation.
-    iIntros "%%%% (#LOCK & RT)".
-    iApply (tl_release_spec with "[$]"). done.
+    iIntros "%%% %%% (#LOCK & RT)".
+    iApply (tl_release_spec with "[$]").
   Qed.
-    
+  Fail Next Obligation. 
+
 End Ticketlock.

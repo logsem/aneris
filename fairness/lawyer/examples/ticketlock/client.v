@@ -4,7 +4,7 @@ From iris.bi.lib Require Import fixpoint.
 From trillium.program_logic Require Export weakestpre adequacy ectx_lifting.
 From trillium.fairness Require Import utils.
 From trillium.fairness.lawyer.examples Require Import obls_tactics.
-From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_am obligations_em obligations_logic.
+From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_am obligations_em obligations_logic env_helpers.
 From trillium.fairness.lawyer Require Import sub_action_em program_logic.
 From trillium.fairness.lawyer.examples.ticketlock Require Import obls_atomic releasing_lock.
 From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
@@ -63,30 +63,12 @@ Class ClientG Σ := {
 }.
 
 Section MotivatingClient.
-  Context `{ODd: OfeDiscrete DegO} `{ODl: OfeDiscrete LevelO}.
-  Context `{LEl: @LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}.
-  
-  Let Degree := ofe_car DegO.
-  Let Level := ofe_car LevelO.
-
-  Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}.
-  Let OP := LocaleOP (Locale := locale heap_lang).
-  Existing Instance OP.
-  Let OM := ObligationsModel.
-  
-  Let OAM := ObligationsAM.
-  Let ASEM := ObligationsASEM.
-
+  Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
   Context `{EM: ExecutionModel heap_lang M}.
+  Notation "'Degree'" := (om_hl_Degree). 
+  Notation "'Level'" := (om_hl_Level).  
 
-  Context {Σ: gFunctors}.
-  (* Keeping the more general interface for future developments *)
-  Context `{oGS': @asem_GS _ _ ASEM Σ}.
-  Let oGS: ObligationsGS (OP := OP) Σ := oGS'.
-  Existing Instance oGS.
-
-  Context `{hGS: @heapGS Σ _ EM}.
-  Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
+  Context {Σ} {OHE: OM_HL_Env OP EM Σ}. 
 
   Context (RFL: ReleasingFairLock).
 
@@ -94,8 +76,6 @@ Section MotivatingClient.
   Hypothesis
     (LVL_ORDf: forall l, l ∈ rfl_lvls RFL -> lvl_lt l l__f)
   .
-
-  Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS' _ EM hGS (↑ nroot)}.
 
   Definition left_thread: val :=
     λ: "lk" "flag",
@@ -155,7 +135,7 @@ Section MotivatingClient.
     Definition P__lock flag s__f (b: bool): iProp Σ := P__lock' cl_γ__os flag s__f b. 
 
     Definition client_inv lk flag sf: iProp Σ :=
-      rfl_is_lock RFL lk c__cl (∃ b, P__lock flag sf b) (rfl_G0 := RFLG) (oGS' := oGS').
+      rfl_is_lock RFL lk c__cl (∃ b, P__lock flag sf b) (rfl_G0 := RFLG).
 
     Global Instance client_inv_pers lk flag sf: Persistent (client_inv lk flag sf).
     Proof using. apply rfl_is_lock_pers. Qed. 
@@ -169,14 +149,13 @@ Section MotivatingClient.
         rfl_acquire RFL lk @ τ
       {{{ v, RET v; ∃ s__o l__o, obls τ {[ s__f; s__o ]} ∗ flag_unset ∗
                           th_phase_eq τ π ∗
-                          P__lock flag s__f false ∗ rfl_locked RFL s__o (rfl_G0 := RFLG) (oGS' := oGS') ∗ 
+                          P__lock flag s__f false ∗ rfl_locked RFL s__o (rfl_G0 := RFLG) ∗ 
                           ⌜ s__o ≠ s__f ⌝ ∗ ⌜ l__o ∈ rfl_lvls RFL ⌝ }}}.
     Proof using All.
       iIntros (Φ).
       iIntros "(#INV & UNSET & OB & PH & CPm & #SF') POST".
 
       iApply (rfl_acquire_spec with "[-UNSET POST]").
-      { apply OBLS_AMU. }
       3: { iFrame "#∗". 
            (* TODO: make a lemma? *)
            iApply big_opS_singleton. iExists _. iFrame "SF'".
@@ -209,7 +188,7 @@ Section MotivatingClient.
           flag_set ∗ obls τ {[ s__f; s__o ]} ∗
           th_phase_eq τ π ∗ cp π (rfl_d RFL) ∗
           flag ↦ #true ∗ sgn s__f l__f (Some false) ∗
-          rfl_locked RFL s__o (rfl_G0 := RFLG) (oGS' := oGS') }}}
+          rfl_locked RFL s__o (rfl_G0 := RFLG) }}}
         (rfl_release RFL) lk @ τ
       {{{ v, RET v; obls τ ∅ ∗ th_phase_eq τ π }}}.
     Proof using All.
@@ -218,7 +197,6 @@ Section MotivatingClient.
       iDestruct (sgn_get_ex with "[$]") as "[SGNf #SGNf']".
       
       iApply (rfl_release_spec with "[-POST]").
-      { apply OBLS_AMU. }
       3: iFrame "OB".
       4: by iApply "POST".
       all: try by eauto. 
@@ -229,7 +207,7 @@ Section MotivatingClient.
 
       iIntros (?) "%QQ PH OB".
       iApply OU_BOU. iApply (OU_wand with "[-OB SGNf]").
-      2: { iApply (OU_set_sig with "[$] [$]"). set_solver. }
+      2: { iApply (OU_set_sig with "OB [$]"). set_solver. }
       iIntros "[SGNf OB]". rewrite difference_diag_L.
       iApply BOU_intro. simpl.
 
@@ -248,8 +226,8 @@ Section MotivatingClient.
       th_phase_eq τ π -∗ cp π d -∗
       sswp NotStuck ⊤ e1 (fun e2 => cp_mul π d' n -∗ exc_lb (S n) -∗ th_phase_eq τ π -∗ WP e2 @τ {{ v, R v }}) -∗
       WP e1 @ τ {{ R }}.
-    Proof using OBLS_AMU.
-      clear -BOUND DEG_LT OBLS_AMU NVAL.
+    Proof using.
+      clear -BOUND DEG_LT NVAL.
       iIntros "PH CP FIN".
       iApply sswp_MU_wp; [done| ].
       iApply (sswp_wand with "[-FIN]"); [| by iFrame].
@@ -321,14 +299,14 @@ Section MotivatingClient.
       }}}
         rfl_acquire RFL lk @ τ
       {{{ v, RET v; ∃ s__o f, obls τ {[ s__o ]} ∗ th_phase_eq τ π ∗
-                          P__lock flag s__f f ∗ rfl_locked RFL s__o (rfl_G0 := RFLG) (oGS' := oGS')
+                          P__lock flag s__f f ∗ rfl_locked RFL s__o (rfl_G0 := RFLG)
       }}}.
     Proof using All.
       iIntros (Φ).
       iIntros "(#INV & OB & PH & CPm) POST".
 
       iApply (rfl_acquire_spec with "[-POST]").
-      4: iFrame "#∗"; by iApply empty_sgns_levels_rel.
+      3: iFrame "#∗"; by iApply empty_sgns_levels_rel.
       all: try by eauto.
 
       iNext. iIntros (?) "(%s__o & % & OB & PH & % & % & ? & (%f & P) & LOCKED)".
@@ -342,7 +320,7 @@ Section MotivatingClient.
           obls τ {[ s__o ]} ∗
           th_phase_eq τ π ∗ cp π (rfl_d RFL) ∗
           P__lock flag s__f f ∗          
-          rfl_locked RFL s__o (rfl_G0 := RFLG) (oGS' := oGS') }}}
+          rfl_locked RFL s__o (rfl_G0 := RFLG) }}}
         rfl_release RFL lk @ τ
       {{{ v, RET v; obls τ ∅ ∗ th_phase_eq τ π ∗ 
                          (⌜ f = true ⌝ ∗ flag_set ∨ ⌜ f = false ⌝ ∗ cp_mul π (rfl_d RFL) 4) }}}.
@@ -364,7 +342,7 @@ Section MotivatingClient.
       
       rewrite -(union_empty_l_L {[ _ ]}).
       iApply (rfl_release_spec with "[-POST] [$]").
-      4: iFrame "#∗".
+      3: iFrame "#∗".
       all: try by eauto.
       iSplit.
       { iApply empty_sgns_levels_rel. }
@@ -531,7 +509,6 @@ Section MotivatingClient.
 
   End AfterInit.
 
-  Context {OBLS_AMU__f: forall τ, @AMU_lift_MU__f _ _ _ τ oGS' _ EM _ ⊤}.
   Context {NO_OBS_POST: ∀ τ v, obls τ ∅ -∗ fork_post τ v}. 
 
   Context {CL_PRE: ClientPreG Σ} {FL_PRE: rfl_preG RFL Σ}.
@@ -584,7 +561,7 @@ Section MotivatingClient.
     iApply sswp_MUf_wp. iIntros "%τ' !>".
     iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
     iApply (MU__f_wand with "[-CP PH OB]").
-    2: { iApply OBLS_AMU__f; [done| ].
+    2: { iApply ohe_obls_AMU__f; [done| ].
          iApply BOU_AMU__f.
          iApply BOU_intro. iFrame.
          iSplitR; [iAccu| ]. 
@@ -610,7 +587,9 @@ Section MotivatingClient.
     iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
     iApply sswp_MUf_wp. iIntros "%τ2 !>". 
     iApply (MU__f_wand with "[-CP PH OB1]").
-    2: { iApply OBLS_AMU__f; [done| ].
+    2: {
+         (* iApply OBLS_AMU__f; [done| ]. *)
+         iApply ohe_obls_AMU__f; [done| ].
          iApply BOU_AMU__f. 
          iApply BOU_intro. iFrame.
          iSplitR; [iAccu| ]. 

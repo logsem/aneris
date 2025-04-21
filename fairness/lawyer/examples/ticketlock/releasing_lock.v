@@ -7,23 +7,16 @@ From trillium.fairness.lawyer.examples Require Import signal_map obls_tactics.
 From trillium.fairness.lawyer.examples.ticketlock Require Import fair_lock.
 From iris.base_logic.lib Require Import invariants.
 From iris.proofmode Require Import tactics coq_tactics.
-From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_am obligations_em obligations_logic.
+From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_am obligations_em obligations_logic env_helpers.
 From trillium.fairness.lawyer Require Import sub_action_em program_logic.
-
 
 
 Section ReleasingLockSpec.
 
-  Context `{OfeDiscrete DegO} `{OfeDiscrete LevelO}.
-  Context `{@LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}. 
-  
-  Let Degree := ofe_car DegO.
-  Let Level := ofe_car LevelO.
-
-  Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}.
-  Let OP := LocaleOP (Locale := locale heap_lang).
-  Existing Instance OP.
-  Let OM := ObligationsModel.
+  Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
+  Context `{EM: ExecutionModel heap_lang M}.
+  Notation "'Degree'" := (om_hl_Degree). 
+  Notation "'Level'" := (om_hl_Level).  
   
   Record ReleasingFairLock := {
       rfl_newlock: val;
@@ -31,62 +24,54 @@ Section ReleasingLockSpec.
       rfl_release: val;
       rfl_preG: gFunctors -> Set;
       rfl_G: gFunctors -> Set;
-      rfl_is_lock `{rfl_G Σ} {HEAP: gen_heapGS loc val Σ} `{invGS_gen HasNoLc Σ}
-                  (ASEM := ObligationsASEM) {oGS': asem_GS Σ}
+      rfl_is_lock `{rfl_G Σ} {OHE: OM_HL_Env OP EM Σ}
       : val -> nat -> iProp Σ -> iProp Σ;
       rfl_lb_sb: nat;
       rfl_sb_fun: nat -> nat;
       rfl_d: Degree;
       rfl_lvls: gset Level;
-      rfl_locked `{rfl_G Σ} (ASEM := ObligationsASEM) {oGS': asem_GS Σ}: SignalId -> iProp Σ;
+      rfl_locked `{rfl_G Σ} {OHE: OM_HL_Env OP EM Σ}: SignalId -> iProp Σ;
       
-      rfl_newlock_spec {Σ} {PRE: rfl_preG Σ}
-        (ASEM := ObligationsASEM) {oGS': asem_GS Σ} `{EM: ExecutionModel heap_lang M} {hGS : heapGS Σ EM}
-        {OBLS_AMU: @AMU_lift_MU _ _ _ oGS' _ EM hGS (↑ nroot)}
+      rfl_newlock_spec {Σ} {PRE: rfl_preG Σ} {OHE: OM_HL_Env OP EM Σ}        
         τ π u P
         (LB_SB: rfl_lb_sb <= LIM_STEPS):
-        {{{ cp π rfl_d (oGS := oGS') ∗ th_phase_eq τ π (oGS := oGS') ∗ P }}}
+        {{{ cp π rfl_d ∗ th_phase_eq τ π ∗ P }}}
             rfl_newlock #() @ τ
-        {{{ lk, RET lk; ∃ RFLG: rfl_G Σ, rfl_is_lock lk u P (rfl_G0 := RFLG) (oGS' := oGS') ∗ th_phase_eq τ π (oGS := oGS')}}};
+        {{{ lk, RET lk; ∃ RFLG: rfl_G Σ, rfl_is_lock lk u P (rfl_G0 := RFLG) ∗ th_phase_eq τ π }}};
 
-      rfl_acquire_spec {Σ} {RFLG: rfl_G Σ}
-        (ASEM := ObligationsASEM) {oGS': asem_GS Σ} `{EM: ExecutionModel heap_lang M} {hGS : heapGS Σ EM}
-        {OBLS_AMU: @AMU_lift_MU _ _ _ oGS' _ EM hGS (↑ nroot)}
+      rfl_acquire_spec `{RFLG: rfl_G Σ} {OHE: OM_HL_Env OP EM Σ}
         τ lk (π: Phase) (Ob: gset SignalId) u (P: iProp Σ)
         (LB_SB: rfl_lb_sb ≤ LIM_STEPS)
         (LB_SB': rfl_sb_fun u ≤ LIM_STEPS):
       {{{
-          rfl_is_lock lk u P (rfl_G0 := RFLG) (oGS' := oGS') ∗
-          obls τ Ob (oGS := oGS') ∗
-          th_phase_eq τ π (oGS := oGS') ∗
-          cp π rfl_d (oGS := oGS') ∗
-          sgns_levels_gt' Ob rfl_lvls (oGS := oGS')
+          rfl_is_lock lk u P (rfl_G0 := RFLG)  ∗
+          obls τ Ob ∗
+          th_phase_eq τ π ∗
+          cp π rfl_d ∗
+          sgns_levels_gt' Ob (rfl_lvls: gset LvlO)
       }}}
         rfl_acquire lk @ τ
       {{{ v, RET v; ∃ s__o l__o,
-              obls τ (Ob ∪ {[ s__o ]}) (oGS := oGS') ∗ sgn s__o l__o None (oGS := oGS') ∗
+              obls τ (Ob ∪ {[ s__o ]}) ∗ sgn s__o l__o None ∗
               ⌜ s__o ∉ Ob ⌝ ∗ ⌜ l__o ∈ rfl_lvls ⌝ ∗
-              th_phase_eq τ π (oGS := oGS') ∗ P ∗ rfl_locked s__o (rfl_G0 := RFLG) (oGS' := oGS') }}};
+              th_phase_eq τ π ∗ P ∗ rfl_locked s__o (rfl_G0 := RFLG) }}};
 
-      rfl_release_spec {Σ} {RFLG: rfl_G Σ}
-        (ASEM := ObligationsASEM) {oGS': asem_GS Σ} `{EM: ExecutionModel heap_lang M} {hGS : heapGS Σ EM}
-        {OBLS_AMU: @AMU_lift_MU _ _ _ oGS' _ EM hGS (↑ nroot)}
+      rfl_release_spec {Σ} {RFLG: rfl_G Σ} {OHE: OM_HL_Env OP EM Σ}
         τ lk (π: Phase) (Ob: gset SignalId) (u: nat) (P: iProp Σ) s__o Q
         (LB_SB: rfl_sb_fun u <= LIM_STEPS) (ADD: s__o ∉ Ob):
-      {{{ rfl_is_lock lk u P (rfl_G0 := RFLG) (oGS' := oGS') ∗
-          sgns_levels_gt' Ob rfl_lvls (oGS := oGS') ∗
-          obls τ (Ob ∪ {[ s__o ]}) (oGS := oGS') ∗ 
-          th_phase_eq τ π (oGS := oGS') ∗ cp π rfl_d (oGS := oGS') ∗
-          rfl_locked s__o (rfl_G0 := RFLG) (oGS' := oGS') ∗
-          (∀ q, ⌜ Qp.le q 1 ⌝ -∗ th_phase_frag τ π q (oGS := oGS') -∗ obls τ Ob (oGS := oGS') -∗
-           BOU ∅ u (P ∗ ((Qp.sub 1%Qp q ≫= Some ∘ th_phase_frag τ π (oGS := oGS')) -∗? Q)) (oGS := oGS'))
+      {{{ rfl_is_lock lk u P (rfl_G0 := RFLG) ∗
+          sgns_levels_gt' Ob rfl_lvls ∗
+          obls τ (Ob ∪ {[ s__o ]}) ∗ 
+          th_phase_eq τ π ∗ cp π rfl_d ∗
+          rfl_locked s__o (rfl_G0 := RFLG) ∗
+          (∀ q, ⌜ Qp.le q 1 ⌝ -∗ th_phase_frag τ π q -∗ obls τ Ob -∗
+           BOU ∅ u (P ∗ ((Qp.sub 1%Qp q ≫= Some ∘ th_phase_frag τ π) -∗? Q)))
       }}}
         rfl_release lk @ τ
       {{{ v, RET v; Q }}} ;
 
-      rfl_is_lock_pers `{PRE: rfl_G Σ} {HEAP: gen_heapGS loc val Σ} `{invGS_gen HasNoLc Σ}
-        (ASEM := ObligationsASEM) {oGS': asem_GS Σ}
-        lk u P: Persistent (rfl_is_lock lk u P (rfl_G0 := PRE) (oGS' := oGS'));
+      rfl_is_lock_pers `{PRE: rfl_G Σ} {OHE: OM_HL_Env OP EM Σ}
+        lk u P: Persistent (rfl_is_lock lk u P (rfl_G0 := PRE));
   }.
   
 End ReleasingLockSpec.
@@ -105,27 +90,12 @@ Section RFLFromFL.
       ro_sig_map :> SigMapG Σ;
   }.
 
-  Context `{ODd: OfeDiscrete DegO} `{ODl: OfeDiscrete LevelO}.
-  Context `{LEl: @LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}.
-  
-  Let Degree := ofe_car DegO.
-  Let Level := ofe_car LevelO.
-
-  Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}.
-  Let OP := LocaleOP (Locale := locale heap_lang).
-  Existing Instance OP.
-  Let OM := ObligationsModel.
-  
-  Let OAM := ObligationsAM.
-  Let ASEM := ObligationsASEM.
-
+  Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
   Context `{EM: ExecutionModel heap_lang M}.
+  Notation "'Degree'" := (om_hl_Degree). 
+  Notation "'Level'" := (om_hl_Level).  
 
-  Context {Σ: gFunctors}.
-  (* Keeping the more general interface for future developments *)
-  Context `{oGS': @asem_GS _ _ ASEM Σ}.
-  Let oGS: ObligationsGS (OP := OP) Σ := oGS'.
-  Existing Instance oGS.
+  Context {Σ} {OHE: OM_HL_Env OP EM Σ}. 
 
   Context
     {FLP: FairLockPre}
@@ -154,22 +124,19 @@ Section RFLFromFL.
   Definition lock_owner_frag (oo: option SignalId) :=
     own ro_γ__ow (◯ Excl' oo).
     
-  Definition lock_inv_inner {HEAP: gen_heapGS loc val Σ} lk: iProp Σ :=
-    ∃ r b oo, fl_LK FLP (lk, r, b) (FLG := FLG) (HEAP := HEAP) ∗ lock_owner_auth oo ∗
+  Definition lock_inv_inner lk: iProp Σ :=
+    ∃ r b oo, fl_LK FLP (lk, r, b) (FLG := FLG) ∗ lock_owner_auth oo ∗
                 (⌜ b = true ⌝ ∗ (∃ s__o, ⌜ oo = Some s__o ⌝ ∗ ith_sig r s__o)
                  ∨ ⌜ b = false ⌝ ∗ lock_owner_frag None ∗ P__lock) ∗ smap_repr_cl r b.
 
   Definition lock_ns := nroot .@ "lock".
-  Definition lock_inv {HEAP: gen_heapGS loc val Σ} `{invGS_gen HasNoLc Σ} lk: iProp Σ :=
+  Definition lock_inv lk: iProp Σ :=
     inv lock_ns (lock_inv_inner lk).
 
   Definition sb_add := 3.
 
-  Definition rfl_fl_is_lock {HEAP: gen_heapGS loc val Σ} `{invGS_gen HasNoLc Σ} lk u: iProp Σ :=
+  Definition rfl_fl_is_lock lk u: iProp Σ :=
     lock_inv lk ∗ fl_is_lock FL lk (u + sb_add) (FLG := FLG).
-
-  Context `{hGS: @heapGS Σ _ EM}.
-  Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
 
   (* need to assume at least one FL level *)
   (* TODO: can we change either TAU or levels order? *)
@@ -181,10 +148,7 @@ Section RFLFromFL.
       th_phase_frag τ π q ∗ RR__L π (Some r) ∗ smap_repr_cl r true ⊢
       BOU ∅ 1 (cp π (fl_d__l FLP) ∗ th_phase_frag τ π q ∗
                 obls τ O ∗ smap_repr_cl r true).
-    Proof using
-      LVL_ORDo L__FL
-      ODl LEl.
-      
+    Proof using L__FL LVL_ORDo. 
       iIntros "(OBLS & #LVLS & PH & #RR & SR)".
       rewrite /RR__L. iDestruct "RR" as (s) "(#ITH & #EP)".  (* & %PH__e *)
       iApply OU_BOU.
@@ -210,7 +174,7 @@ Section RFLFromFL.
     Lemma BOU_create_wait_owner τ π q r s:
       th_phase_frag τ π q ∗ cp π (fl_d__h FLP) ∗ smap_repr_cl r true ∗ ith_sig r s ⊢
       BOU ∅ 1 (th_phase_frag τ π q ∗ RR__L π (Some r) ∗ smap_repr_cl r true).
-    Proof using LVL_ORDo L__FL ODd ODl LEl.
+    Proof using LVL_ORDo L__FL.
       iIntros "(PH & CP & SR & #ITH)".
       rewrite /RR__L.
       iApply OU_BOU.
@@ -243,8 +207,7 @@ Section RFLFromFL.
     Lemma BOU_smap_cl_extend τ R r:
     ⊢ obls τ R -∗ smap_repr_cl r false -∗
       BOU ∅ 1 (|==> (∃ s', smap_repr_cl r true ∗ obls τ (R ∪ {[s']}) ∗ ⌜ s' ∉ R ⌝ ∗ sgn s' l__o None ∗ ith_sig r s')).
-    Proof using ODd ODl LEl.
-      clear -ODd ODl LEl.
+    Proof using.
       iIntros "OB SR".
       iApply (BOU_wand with "[]").
       2: { iApply (BOU_smap_extend (λ _, l__o) _ r with "[$] [$]").
@@ -284,8 +247,8 @@ Section RFLFromFL.
           sgns_levels_gt' Ob rfl_fl_lvls }}}
         e lk @ τ
       {{{ v, RET v; ∃ s__o,
-              obls τ (Ob ∪ {[ s__o ]}) (oGS := oGS') ∗ rfl_fl_locked s__o ∗
-              th_phase_eq τ π (oGS := oGS') ∗ R }}}. 
+              obls τ (Ob ∪ {[ s__o ]}) ∗ rfl_fl_locked s__o ∗
+              th_phase_eq τ π ∗ R }}}. 
 
 
     Ltac remember_goal :=
@@ -317,7 +280,7 @@ Section RFLFromFL.
 
     Lemma rfl_acquire_spec_later:
       rfl_acquire_spec_gen (fl_acquire FLP) (▷ P__lock) (fl_d__m FLP).
-    Proof using ODl ODd L__FL LVL_ORDo LEl.
+    Proof using L__FL LVL_ORDo.
       clear LTmm'.
       rewrite /rfl_acquire_spec_gen. intros τ lk π Ob u R LB LB'.
       iIntros (Φ).
@@ -425,8 +388,6 @@ Section RFLFromFL.
         by iFrame. }
     Qed.
 
-    Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS' _ EM hGS (↑ nroot)}.
-
     Definition acquire_aux: val :=
       λ: "lk", fl_acquire FLP "lk" ;; Skip
     .
@@ -435,7 +396,7 @@ Section RFLFromFL.
        so that it allows showing postcondition under later *)
     Lemma acquire_usage:
       rfl_acquire_spec_gen acquire_aux P__lock d__m'.
-    Proof using ODl ODd OBLS_AMU L__FL LVL_ORDo LTmm' LEl.
+    Proof using L__FL LVL_ORDo LTmm'.
       rewrite /rfl_acquire_spec_gen /acquire_aux. intros τ lk π Ob c__cl ?? LB.
       iIntros (Φ).
       iIntros "(#[LOCK INV] & OB & PH & CPm & #OB_GT) POST".
@@ -460,8 +421,8 @@ Section RFLFromFL.
     Lemma BOU_set_sig τ r s R:
       ⊢ smap_repr_cl r true -∗ ith_sig r s -∗ obls τ (R ∪ {[ s ]}) -∗
          BOU ∅ 1 (smap_repr_cl (r + 1) false ∗ obls τ (R ∖ {[ s ]})).
-    Proof using LEl ODl.
-      clear -LEl ODl.
+    Proof using.
+      clear. 
       iIntros "SR #SIG OB".
       iApply OU_BOU.
       iApply (OU_wand with "[-OB SR]").
@@ -576,12 +537,11 @@ Section RFLFromFL.
     End AfterInit.
 
   Lemma alloc_client_inv {FLG: fl_GS FLP Σ} {PRE: RelOblPreG Σ}
-    {hGS : heapGS Σ EM}
     lk:
     fl_LK FLP (lk, 0, false) (FLG := FLG) -∗
     P__lock ={∅}=∗
     ∃ (cG: RelOblG Σ), lock_inv lk (ROG := cG) (FLG := FLG).
-  Proof using ODl LEl.
+  Proof using.
     iIntros "LK P".
     rewrite -(plus_O_n 0).
     iMod (own_alloc (● Excl' None ⋅ ◯ _: excl_authUR (optionUR SignalId))) as (?) "[OW_A OW_F]".
@@ -604,16 +564,10 @@ End RFLFromFL.
 
 Section RFL2FL.
 
-  Context `{ODd: OfeDiscrete DegO} `{ODl: OfeDiscrete LevelO}.
-  Context `{LEl: @LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}.
-  
-  Let Degree := ofe_car DegO.
-  Let Level := ofe_car LevelO.
-
-  Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}.
-  Let OP := LocaleOP (Locale := locale heap_lang).
-  Existing Instance OP.
-  Let OM := ObligationsModel.
+  Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
+  Context `{EM: ExecutionModel heap_lang M}.
+  Notation "'Degree'" := (om_hl_Degree).
+  Notation "'Level'" := (om_hl_Level).
 
   Context
     {FLP: FairLockPre}
@@ -662,8 +616,7 @@ Section RFL2FL.
       (*   rfl_fl_locked FL l__o s__o (oGS' := oGS'); *)
   |}.
   Next Obligation.
-    intros ??????.
-    intros lk u P. unshelve eapply (rfl_fl_is_lock FL l__o P lk u); auto.
+    intros ??? lk u P. unshelve eapply (rfl_fl_is_lock FL l__o P lk u); auto.
     apply rfl_G0.
   Defined.
   Next Obligation.
@@ -682,7 +635,7 @@ Section RFL2FL.
 
     iApply wp_fupd. 
         
-    unshelve epose proof (fl_create_spec FL (oGS' := oGS')) as spec.
+    unshelve epose proof (fl_create_spec FL) as spec.
     { apply PRE. }
     simpl in spec. iApply (spec with "[] [-POST P]").
     { iPureIntro. etrans; [| apply LB_SB]. rewrite /rfl_fl_sb. lia. }
@@ -693,7 +646,6 @@ Section RFL2FL.
     Unshelve. 2: exact (u + sb_add).
     iApply fupd_mask_mono; [by apply empty_subseteq| ].
     iMod (alloc_client_inv l__o with "LK P") as "(%CG & #INV)".
-    Unshelve. 2: exact oGS'. 
 
     iModIntro.
     iExists {| rfl_fl_impl := CG ; rfl_fl_fl := FLG |}.
@@ -703,7 +655,7 @@ Section RFL2FL.
     intros **. simpl. 
     iIntros "(#[INV LOCK] & ?&?&?&#SGT) POST".
     iApply (acquire_usage with "[-POST]").
-    8: iFrame "#∗".
+    7: iFrame "#∗".
     all: try by eauto.
     iNext. iIntros "% (%&?&LOCKED&?&?)". iApply "POST".
     rewrite /rfl_fl_locked. iDestruct "LOCKED" as "(?&#SGNo&?)".
@@ -728,7 +680,7 @@ Section RFL2FL.
     iModIntro. burn_cp_after_BOU.
 
     iApply (release_usage with "[-POST] [$]").
-    7: iFrame "#∗".
+    6: iFrame "#∗".
     all: try by eauto.
     rewrite cp_mul_1. iFrame. 
 
@@ -737,5 +689,6 @@ Section RFL2FL.
   Next Obligation.
     intros. simpl. apply _.
   Qed.
+  Fail Next Obligation.
 
 End RFL2FL.
