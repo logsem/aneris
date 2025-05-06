@@ -116,7 +116,7 @@ Section MotivatingClient.
   Hypothesis (LT0m: deg_lt d0 (rfl_d RFL)).
 
   Hypothesis (CR_LIM: rfl_lb_sb RFL ≤ LIM_STEPS).
-  Definition c__cl: nat := 5.
+  Definition c__cl: nat := 4.
   Hypothesis (FL_STEPS: rfl_sb_fun RFL c__cl ≤ LIM_STEPS).
   (* TODO: make tactics more specific wrt. the lower bound on LIM_STEPS *)
   Definition MAX_EXC := 70.
@@ -349,7 +349,6 @@ Section MotivatingClient.
 
       iIntros (q QQ) "PH OB".
       iMod ("FIN" with "[$] [$]") as "(C&P&?&PH)".
-      { rewrite /c__cl. lia. }
       iModIntro.
       iSplitL "P"; [by iExists _| ].
       iIntros "PH'".
