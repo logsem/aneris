@@ -60,22 +60,24 @@ Section Adequacy.
 
   Definition ClientΣ := #[
     GFunctor $ excl_authUR (optionUR SignalId);
-    GFunctor $ @one_shotR unitO;
     sig_mapΣ
   ].
 
   Global Instance subG_clientΣ {Σ}: subG ClientΣ Σ → ClientPreG Σ.
-  Proof. solve_inG. Qed.
+  Proof.
+    (* solve_inG. *)
+  Qed.
 
   Let EM := TopAM_EM ObligationsASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls τ ∅ (oGS := aGS)).
 
   Program Definition TLPreInstance :=
     TLPre d__l d__h d__e d__m _ _ _ l__acq (OP := Closed_OP_HL) (EM := EM).
-  Solve All Obligations with apply ith_bn_lt; lia.  
+  Solve All Obligations with apply ith_bn_lt; lia.
+  Fail Next Obligation.
 
   Program Definition TLInstance :=
     TL_FL d__w d__l d__h d__e d__m _ _ _ _ _ l__acq (OP := Closed_OP_HL) (EM := EM).
-  Solve Obligations with apply ith_bn_lt; lia. 
+  Solve Obligations with apply ith_bn_lt; lia.
   Next Obligation.
     rewrite /ClosedLim. cbv. lia.
   Qed.
@@ -141,7 +143,8 @@ Section Adequacy.
       rewrite elem_of_union !elem_of_singleton.
       intros [-> | ->]; apply ith_bn_lt; lia. }
     1, 2: apply ith_bn_lt; lia. 
-    1-3: cbv; lia.
+    (* 1-3: cbv; lia. *)
+    { cbv; lia. }
     { simpl. by iIntros (? _) "X". }
     { (* TODO: why solve_inG doesn't solve it? *)
       intros. split; try solve_inG || apply _.
