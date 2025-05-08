@@ -11,6 +11,36 @@ From trillium.fairness.lawyer.obligations Require Import obligations_model oblig
 From trillium.fairness.lawyer Require Import sub_action_em program_logic.
 
 
+ (* Ltac try_solve_bounds := *)
+ (*    (try iPureIntro); *)
+ (*    match goal with  *)
+ (*    | BOUND: rfl_fl_sb_fun ?u ≤ LIM_STEPS |- ?n <= LIM_STEPS => *)
+ (*      etrans; [| apply BOUND]; *)
+ (*      try by (rewrite /rfl_fl_sb_fun; simpl; lia) *)
+ (*    end. *)
+
+Local Ltac try_solve_bounds :=
+  (try iPureIntro);
+  match goal with 
+  | BOUND: ?rfl_fl_sb_fun ?u ≤ ?LIM_STEPS |- ?n <= ?LIM_STEPS =>
+      etrans; [| apply BOUND];
+      try by (rewrite /rfl_fl_sb_fun; simpl; lia)
+  end.
+
+Local Ltac use_rfl_fl_sb :=
+  match goal with
+  | |- S ?n ≤ ?F _ =>
+      rewrite /F;
+      match goal with
+      | |- S n ≤ max_list (cons ?i ?l) =>
+          simpl;
+          trans i; [| lia];
+          (* rewrite /i; etrans; [| apply Nat.le_max_r]; reflexivity *)
+          reflexivity
+      end
+  end.
+
+
 Section ReleasingLockSpec.
 
   Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
@@ -26,7 +56,6 @@ Section ReleasingLockSpec.
       rfl_G: gFunctors -> Set;
       rfl_is_lock `{rfl_G Σ} {OHE: OM_HL_Env OP EM Σ}
       : val -> nat -> iProp Σ -> iProp Σ;
-      rfl_lb_sb: nat;
       rfl_sb_fun: nat -> nat;
       rfl_d: Degree;
       rfl_lvls: gset Level;
@@ -34,15 +63,13 @@ Section ReleasingLockSpec.
       
       rfl_newlock_spec {Σ} {PRE: rfl_preG Σ} {OHE: OM_HL_Env OP EM Σ}        
         τ π u P
-        (LB_SB: rfl_lb_sb <= LIM_STEPS):
+        (LB_SB': rfl_sb_fun u <= LIM_STEPS):
         {{{ cp π rfl_d ∗ th_phase_eq τ π ∗ P }}}
             rfl_newlock #() @ τ
         {{{ lk, RET lk; ∃ RFLG: rfl_G Σ, rfl_is_lock lk u P (rfl_G0 := RFLG) ∗ th_phase_eq τ π }}};
 
       rfl_acquire_spec `{RFLG: rfl_G Σ} {OHE: OM_HL_Env OP EM Σ}
-        τ lk (π: Phase) (Ob: gset SignalId) u (P: iProp Σ)
-        (LB_SB: rfl_lb_sb ≤ LIM_STEPS)
-        (LB_SB': rfl_sb_fun u ≤ LIM_STEPS):
+        τ lk (π: Phase) (Ob: gset SignalId) u (P: iProp Σ):
       {{{
           rfl_is_lock lk u P (rfl_G0 := RFLG)  ∗
           obls τ Ob ∗
@@ -58,7 +85,7 @@ Section ReleasingLockSpec.
 
       rfl_release_spec {Σ} {RFLG: rfl_G Σ} {OHE: OM_HL_Env OP EM Σ}
         τ lk (π: Phase) (Ob: gset SignalId) (u: nat) (P: iProp Σ) s__o Q
-        (LB_SB: rfl_sb_fun u <= LIM_STEPS) (ADD: s__o ∉ Ob):
+        (ADD: s__o ∉ Ob):
       {{{ rfl_is_lock lk u P (rfl_G0 := RFLG) ∗
           sgns_levels_gt' Ob rfl_lvls ∗
           obls τ (Ob ∪ {[ s__o ]}) ∗ 
@@ -134,16 +161,20 @@ Section RFLFromFL.
     inv lock_ns (lock_inv_inner lk).
 
   Definition sb_add := 3.
+  (* Definition rfl_fl_sb := max (fl_c__cr FLP) 10. *)
+  Definition rfl_fl_sb_fun :=
+    fun i => max_list [10; fl_c__cr FLP; fl_B FLP i + sb_add; fl_B FLP (i + sb_add)].
 
   Definition rfl_fl_is_lock lk u: iProp Σ :=
-    lock_inv lk ∗ fl_is_lock FL lk (u + sb_add) (FLG := FLG).
+    lock_inv lk ∗ fl_is_lock FL lk (u + sb_add) (FLG := FLG) ∗
+    ⌜ rfl_fl_sb_fun u <= LIM_STEPS ⌝.
 
   (* need to assume at least one FL level *)
   (* TODO: can we change either TAU or levels order? *)
   Context (l__fl: Level).
   Hypothesis (L__FL: l__fl ∈ fl_acq_lvls FLP).
 
-    Lemma BOU_wait_owner τ π q O r:
+  Lemma BOU_wait_owner τ π q O r:
       obls τ O ∗ sgns_levels_ge' O (fl_acq_lvls FLP)∗
       th_phase_frag τ π q ∗ RR__L π (Some r) ∗ smap_repr_cl r true ⊢
       BOU ∅ 1 (cp π (fl_d__l FLP) ∗ th_phase_frag τ π q ∗
@@ -221,13 +252,9 @@ Section RFLFromFL.
       simpl. by rewrite union_empty_r_L. 
     Qed.
 
-    Definition rfl_fl_sb := max (fl_c__cr FLP) 10.
-
     Definition rfl_fl_locked (s__o: SignalId): iProp Σ :=
       lock_owner_frag (Some s__o) ∗ sgn s__o l__o None ∗
       fl_release_token FL (FLG := FLG).
-
-    Definition rfl_fl_sb_fun := fun i => max (fl_B FLP i + sb_add) (fl_B FLP (i + sb_add)).
 
     Existing Instance fl_is_lock_pers. 
 
@@ -239,9 +266,7 @@ Section RFLFromFL.
     Definition rfl_acquire_spec_gen (e: expr) (R: iProp Σ) (d: Degree) :=
                                 
       forall (τ : locale heap_lang) (lk : val) (π : Phase) (Ob : gset SignalId) 
-      (u : nat) (P : iProp Σ)
-      (LS_LB: rfl_fl_sb ≤ LIM_STEPS)
-      (LS_LB': rfl_fl_sb_fun u <= LIM_STEPS),
+      (u : nat) (P : iProp Σ),
       {{{ rfl_fl_is_lock lk u ∗ obls τ Ob ∗
           th_phase_eq τ π ∗ cp π d ∗
           sgns_levels_gt' Ob rfl_fl_lvls }}}
@@ -282,9 +307,9 @@ Section RFLFromFL.
       rfl_acquire_spec_gen (fl_acquire FLP) (▷ P__lock) (fl_d__m FLP).
     Proof using L__FL LVL_ORDo.
       clear LTmm'.
-      rewrite /rfl_acquire_spec_gen. intros τ lk π Ob u R LB LB'.
+      rewrite /rfl_acquire_spec_gen. intros τ lk π Ob u R.
       iIntros (Φ).
-      iIntros "(#[INV LOCK] & OB & PH & CPm & #OB_GT) POST".
+      iIntros "(#(INV & LOCK & %BOUND) & OB & PH & CPm & #OB_GT) POST".
 
       iApply (wp_step_fupd _ _ ⊤ _ _ with "[POST]").
       { done. }
@@ -295,8 +320,7 @@ Section RFLFromFL.
       rewrite /TLAT_FL_RR /TLAT_RR.
 
       iApply ("ACQ" $! _ _ _ _ (RR__L π) with "[] [OB PH CPm]").
-      { simpl. iPureIntro. etrans; [| apply LB'].
-        rewrite /rfl_fl_sb_fun. lia. }
+      { try_solve_bounds. }
       { rewrite /TLAT_pre. iFrame "#∗".
         iApply (sgns_levels_rel'_impl with "[$]").
         1, 2: done.
@@ -391,27 +415,27 @@ Section RFLFromFL.
     Definition acquire_aux: val :=
       λ: "lk", fl_acquire FLP "lk" ;; Skip
     .
+
     (* leading lambda to exchange fuel, trailing Skip to strip later *)
     (* TODO: change the definition of (our counterpart of) atomic_wp,
        so that it allows showing postcondition under later *)
     Lemma acquire_usage:
       rfl_acquire_spec_gen acquire_aux P__lock d__m'.
     Proof using L__FL LVL_ORDo LTmm'.
-      rewrite /rfl_acquire_spec_gen /acquire_aux. intros τ lk π Ob c__cl ?? LB.
+      rewrite /rfl_acquire_spec_gen /acquire_aux. intros τ lk π Ob c__cl ?.
       iIntros (Φ).
-      iIntros "(#[LOCK INV] & OB & PH & CPm & #OB_GT) POST".
+      iIntros "(#(INV & LOCK & %BOUND) & OB & PH & CPm & #OB_GT) POST".
 
       pure_step_hl. MU_by_BOU.
       iMod (first_BOU with "[$]") as "[CPS #EB]". 
       { apply LTmm'. }
-      { etrans; [| apply LS_LB]. unfold rfl_fl_sb.
-        etrans; [| apply Nat.le_max_r]. reflexivity. }
+      { try_solve_bounds. use_rfl_fl_sb. }
       BOU_burn_cp.
 
       pure_steps.
       split_cps "CPS" 1. rewrite -cp_mul_1. 
       wp_bind (fl_acquire _ _)%E. iApply (rfl_acquire_spec_later with "[-POST CPS]"); eauto.
-      { iFrame "#∗". }
+      { iFrame "#∗". done. }
       iIntros "!> %v (% & ?&?&PH&?)".
 
       wp_bind (Rec _ _ _)%E. pure_steps.
@@ -446,8 +470,6 @@ Section RFLFromFL.
     (* TODO: remove sgns_levels_gt' restriction; probably need to change obls def *)
     Lemma release_usage u (lk: val) τ s__o Ob π Q
       (ADD: s__o ∉ Ob)
-      (LB_SB: rfl_fl_sb_fun u ≤ LIM_STEPS)
-      (* (LB_CCL: 5 <= c__cl) *)
       :
       {{{ rfl_fl_is_lock lk u ∗
           sgns_levels_gt' Ob (fl_acq_lvls FLP) ∗ obls τ (Ob ∪ {[ s__o ]}) ∗ 
@@ -460,7 +482,7 @@ Section RFLFromFL.
       {{{ v, RET v; Q }}}.
     Proof using All.
       iIntros (Φ).
-      iIntros "(#[INV LOCK] & #SGT & OB & PH & CPm & LOCKED & FIN_BOU) POST".
+      iIntros "(#(INV & LOCK & %BOUND) & #SGT & OB & PH & CPm & LOCKED & FIN_BOU) POST".
 
       iApply (wp_step_fupd _ _ ⊤ _ _ with "[POST]").
       { done. }
@@ -470,7 +492,7 @@ Section RFLFromFL.
       iPoseProof (fl_release_spec FL lk _ τ with "[$]") as "REL".
       rewrite /TLAT_FL /TLAT.
       iApply ("REL" with "[] [OB PH CPm]").
-      { iPureIntro. etrans; [| apply LB_SB]. rewrite /rfl_fl_sb_fun. lia. }
+      { try_solve_bounds. }
       { iFrame.
         (* TODO: make a lemma *)
         rewrite /sgns_levels_gt'.
@@ -603,17 +625,10 @@ Section RFL2FL.
       rfl_release := release_aux;
       rfl_preG := RFL_FL_preG;
       rfl_G := RFL_FL_G;
-      (* rfl_is_lock `{RFL_FL_G Σ, gen_heapGS loc val Σ, invGS_gen HasNoLc Σ} *)
-      (*             (ASEM := ObligationsASEM) {oGS': asem_GS Σ} := *)
-      (*             fun (lk: val) (u: nat) (P: iProp Σ) => *)
-      (*   rfl_fl_is_lock FL l__o P lk u (oGS' := oGS'); *)
   
-      rfl_lb_sb := rfl_fl_sb (FLP := FLP);
       rfl_sb_fun := rfl_fl_sb_fun (FLP := FLP);
       rfl_d := d__m';
       rfl_lvls := rfl_fl_lvls l__o (FLP := FLP);
-      (* rfl_locked `{RFL_FL_G Σ} (ASEM := ObligationsASEM) {oGS': asem_GS Σ} s__o :=  *)
-      (*   rfl_fl_locked FL l__o s__o (oGS' := oGS'); *)
   |}.
   Next Obligation.
     intros ??? lk u P. unshelve eapply (rfl_fl_is_lock FL l__o P lk u); auto.
@@ -629,8 +644,7 @@ Section RFL2FL.
     rewrite /newlock_aux. pure_step_hl. MU_by_BOU.
     iMod (first_BOU with "[$]") as "[CPS _]".
     { apply LTmm'. }
-    { etrans; [| apply LB_SB]. rewrite /rfl_fl_sb.
-      etrans; [| apply Nat.le_max_r]. reflexivity. }
+    { try_solve_bounds. use_rfl_fl_sb. }
     iModIntro. burn_cp_after_BOU.
 
     iApply wp_fupd. 
@@ -638,7 +652,7 @@ Section RFL2FL.
     unshelve epose proof (fl_create_spec FL) as spec.
     { apply PRE. }
     simpl in spec. iApply (spec with "[] [-POST P]").
-    { iPureIntro. etrans; [| apply LB_SB]. rewrite /rfl_fl_sb. lia. }
+    { try_solve_bounds. }
     { iDestruct (cp_mul_take with "CPS") as "[??]". iFrame. }
     iNext. iIntros (lk) "(%FLG & LK & #LOCK & PH)".
     iApply "POST".
@@ -650,12 +664,13 @@ Section RFL2FL.
     iModIntro.
     iExists {| rfl_fl_impl := CG ; rfl_fl_fl := FLG |}.
     iFrame "#∗".
+    try_solve_bounds. 
   Qed.
   Next Obligation.
     intros **. simpl. 
     iIntros "(#[INV LOCK] & ?&?&?&#SGT) POST".
     iApply (acquire_usage with "[-POST]").
-    7: iFrame "#∗".
+    5: iFrame "#∗".
     all: try by eauto.
     iNext. iIntros "% (%&?&LOCKED&?&?)". iApply "POST".
     rewrite /rfl_fl_locked. iDestruct "LOCKED" as "(?&#SGNo&?)".
@@ -671,20 +686,21 @@ Section RFL2FL.
   Qed.
   Next Obligation.
     intros **. simpl.
-    iIntros "(#[INV LOCK] & #SGT & OB & PH & CP & LOCKED & BOU) POST". 
+    iIntros "(#(INV & LOCK & %BOUND) & #SGT & OB & PH & CP & LOCKED & BOU) POST".
     rewrite /release_aux. pure_step_hl. MU_by_BOU.
     iMod (first_BOU with "[$]") as "[CPS _]".
     { apply LTmm'. }
-    { etrans; [| apply LB_SB]. simpl. rewrite /rfl_fl_sb_fun.
-      etrans; [| apply Nat.le_max_l]. rewrite /sb_add. trans 3; [reflexivity| lia]. }
+    { try_solve_bounds. use_rfl_fl_sb. }
     iModIntro. burn_cp_after_BOU.
 
     iApply (release_usage with "[-POST] [$]").
-    6: iFrame "#∗".
+    5: iFrame "#∗".
     all: try by eauto.
-    rewrite cp_mul_1. iFrame. 
-
-    iApply (sgns_levels_rel'_impl with "[$]"); set_solver.
+    rewrite bi.sep_assoc. iSplitR.
+    2: { rewrite cp_mul_1. iApply (cp_mul_weaken with "[$]"); done || lia. }
+    iSplit. 
+    - try_solve_bounds. 
+    - iApply (sgns_levels_rel'_impl with "[$]"); set_solver.
   Qed.
   Next Obligation.
     intros. simpl. apply _.

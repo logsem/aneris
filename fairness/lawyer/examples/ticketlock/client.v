@@ -11,55 +11,36 @@ From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From iris.base_logic.lib Require Import invariants.
 
 
-(* TODO: move *)
-Section OneShot.
-  Context {V: ofe}.
-  
-  Definition one_shotR := csumR (exclR unitO) (agreeR V).
-  Definition Pending : one_shotR := Cinl (Excl ()).
-  Definition Shot (v : V) : one_shotR := Cinr (to_agree v).
-  
-  Class one_shotG Σ := { one_shot_inG : inG Σ one_shotR }.
-  Global Existing Instance one_shot_inG.
-  
-  Definition one_shotΣ : gFunctors := #[GFunctor one_shotR].
-  Global Instance subG_one_shotΣ {Σ} : subG one_shotΣ Σ → one_shotG Σ.
-  Proof. solve_inG. Qed.
+(* TODO: move, remove duplicates *)
+Local Ltac try_solve_bounds :=
+  (try iPureIntro);
+  try (match goal with | |- ?x < ?y => red end);
+  match goal with
+  | BOUND: ?rfl_fl_sb_fun ?u ≤ ?LIM_STEPS |- ?n <= ?LIM_STEPS =>
+      etrans; [| apply BOUND];
+      try by (rewrite /rfl_fl_sb_fun; simpl; lia)
+  | BOUND: ?N ≤ ?LIM_STEPS |- ?n <= ?LIM_STEPS =>
+      etrans; [| apply BOUND];
+      try by (simpl; lia)
+  end.
 
-  Section Lemmas.
-    Context `{one_shotG}.
-    
-    Lemma os_shoot γ v: ⊢ own γ Pending ==∗ own γ $ Shot v.
-    Proof using.
-      iIntros "P".
-      iApply own_update; [| by iFrame].
-      by apply cmra_update_exclusive.
-    Qed.
+Local Ltac use_list_head :=
+  match goal with
+  | |- ?n ≤ max_list (cons ?i ?l) =>
+      trans i; [| simpl; lia];
+      (reflexivity || (rewrite Nat.add_comm; simpl; reflexivity))
+  end.
 
-    Lemma os_pending_excl `{OfeDiscrete V} γ (os': one_shotR):
-      ⊢ own γ Pending -∗ own γ os' -∗ False.
-    Proof using.
-      rewrite bi.wand_curry -own_op.
-      iIntros "P". eauto 10.
-      iDestruct (own_valid with "P") as "%X".
-      by apply exclusive_l in X; [| apply _].
-    Qed.
+Local Ltac use_rfl_fl_sb :=
+  use_list_head ||
+  match goal with | |- ?n ≤ ?F _ => rewrite /F; use_list_head end.
 
-  End Lemmas.
-
-End OneShot.
-
-
-Class ClientPreG Σ := {
-    (* cl_ow_sig_pre :> inG Σ (excl_authUR (optionUR SignalId)); *)
-    cl_one_shot_pre :> @one_shotG unitR Σ;
-    (* cl_rog_pre :: rfl_preG RFL Σ; *)
-}.
+(* With the current proof, we don't require anything from Σ before OM is instantiated.
+   However, we keep this preG/G pattern for uniformness. *)
+Class ClientPreG (Σ: gFunctors) := { }.
 
 Class ClientG Σ := {
     cl_PreG :> ClientPreG Σ;
-    (* cl_rog :: RelOblG Σ; *)
-    cl_γ__os: gname;
 }.
 
 Section MotivatingClient.
@@ -110,29 +91,24 @@ Section MotivatingClient.
       (Fork (left_thread "lk" "flag") ;;
        Fork (right_thread "lk" "flag")).
 
-  (* TODO: move, remove duplicate *)
   Context (d0 d__r: Degree).
   Hypothesis (LThm: deg_lt (rfl_d RFL) d__r).
   Hypothesis (LT0m: deg_lt d0 (rfl_d RFL)).
 
-  Hypothesis (CR_LIM: rfl_lb_sb RFL ≤ LIM_STEPS).
   Definition c__cl: nat := 4.
-  Hypothesis (FL_STEPS: rfl_sb_fun RFL c__cl ≤ LIM_STEPS).
+  (* Hypothesis (FL_STEPS: rfl_sb_fun RFL c__cl ≤ LIM_STEPS). *)
   (* TODO: make tactics more specific wrt. the lower bound on LIM_STEPS *)
   Definition MAX_EXC := 70.
-  Hypothesis (LS_LB: MAX_EXC + 2 <= LIM_STEPS).
+  Hypothesis (LS_LB: max_list [MAX_EXC + 2; rfl_sb_fun RFL c__cl] <= LIM_STEPS).
 
-  Definition P__lock' `{@one_shotG unitR Σ} (γ: gname) flag s__f (b: bool): iProp Σ :=
-      flag ↦ #b ∗ (⌜ b = false ⌝ ∗ sgn s__f l__f (Some false) ∨ ⌜ b = true ⌝ ∗ own γ (Shot ())).
+  Definition P__lock' flag s__f (b: bool): iProp Σ :=
+      flag ↦ #b ∗ sgn s__f l__f (Some b).
 
   Section AfterInit.
     Context {CL: ClientG Σ}.
     Context {RFLG: rfl_G RFL Σ}.
 
-    Definition flag_unset := own cl_γ__os Pending.
-    Definition flag_set := own cl_γ__os (Shot ()).
-
-    Definition P__lock flag s__f (b: bool): iProp Σ := P__lock' cl_γ__os flag s__f b. 
+    Definition P__lock flag s__f (b: bool): iProp Σ := P__lock' flag s__f b. 
 
     Definition client_inv lk flag sf: iProp Σ :=
       rfl_is_lock RFL lk c__cl (∃ b, P__lock flag sf b) (rfl_G0 := RFLG).
@@ -141,34 +117,32 @@ Section MotivatingClient.
     Proof using. apply rfl_is_lock_pers. Qed. 
 
     Lemma acquire_left τ (lk: val) flag s__f π:
-      {{{ client_inv lk flag s__f ∗ flag_unset ∗
+      {{{ client_inv lk flag s__f ∗
           obls τ {[ s__f ]} ∗ th_phase_eq τ π ∗
           cp π (rfl_d RFL) ∗
           sgn s__f l__f None
       }}}
         rfl_acquire RFL lk @ τ
-      {{{ v, RET v; ∃ s__o l__o, obls τ {[ s__f; s__o ]} ∗ flag_unset ∗
+      {{{ v, RET v; ∃ s__o l__o b, obls τ {[ s__f; s__o ]} ∗
                           th_phase_eq τ π ∗
-                          P__lock flag s__f false ∗ rfl_locked RFL s__o (rfl_G0 := RFLG) ∗ 
+                          P__lock flag s__f b ∗ rfl_locked RFL s__o (rfl_G0 := RFLG) ∗ 
                           ⌜ s__o ≠ s__f ⌝ ∗ ⌜ l__o ∈ rfl_lvls RFL ⌝ }}}.
     Proof using All.
       iIntros (Φ).
-      iIntros "(#INV & UNSET & OB & PH & CPm & #SF') POST".
+      iIntros "(#INV & OB & PH & CPm & #SF') POST".
 
-      iApply (rfl_acquire_spec with "[-UNSET POST]").
-      3: { iFrame "#∗". 
-           (* TODO: make a lemma? *)
-           iApply big_opS_singleton. iExists _. iFrame "SF'".
-           iPureIntro. set_solver. }
+      iApply (rfl_acquire_spec with "[-POST]").
+      { iFrame "#∗". 
+        (* TODO: make a lemma? *)
+        iApply big_opS_singleton. iExists _. iFrame "SF'".
+        iPureIntro. set_solver. }
       all: try by eauto.
       
       iNext. iIntros (?) "(%s__o & %l__o & OB & SGNo & %ADD & %LVLo & PH & (%f & P) & LOCKED)".
       
-      rewrite /P__lock. iDestruct "P" as "[FLAG [[-> ?] | [-> ?]]]". 
-      { iApply "POST". do 2 iExists _. iFrame.
-        iSplit; eauto. iPureIntro. split; [set_solver| ].
-        apply LVLo. }
-      by iDestruct (os_pending_excl with "[$] [$]") as "?".
+      rewrite /P__lock. iDestruct "P" as "[FLAG ?]". 
+      iApply "POST". do 3 iExists _. iFrame.
+      iPureIntro. split; [set_solver| ]. apply LVLo. 
     Qed.
 
     (* TODO: move, change the original lemma*)
@@ -183,36 +157,32 @@ Section MotivatingClient.
     Qed.
 
     Lemma release_left (lk: val) τ s__o flag s__f π
-      (SIGS_NEQ: s__o ≠ s__f):
+      :
       {{{ client_inv lk flag s__f ∗
-          flag_set ∗ obls τ {[ s__f; s__o ]} ∗
+          obls τ {[ s__o ]} ∗
           th_phase_eq τ π ∗ cp π (rfl_d RFL) ∗
-          flag ↦ #true ∗ sgn s__f l__f (Some false) ∗
+          flag ↦ #true ∗ sgn s__f l__f (Some true) ∗
           rfl_locked RFL s__o (rfl_G0 := RFLG) }}}
         (rfl_release RFL) lk @ τ
       {{{ v, RET v; obls τ ∅ ∗ th_phase_eq τ π }}}.
     Proof using All.
       iIntros (Φ).
-      iIntros "(#INV & SET & OB & PH & CPm & FLAG & SGNf & LOCKED) POST".
+      iIntros "(#INV & OB & PH & CPm & FLAG & SGNf & LOCKED) POST".
       iDestruct (sgn_get_ex with "[$]") as "[SGNf #SGNf']".
       
-      iApply (rfl_release_spec with "[-POST]").
-      3: iFrame "OB".
-      4: by iApply "POST".
+      rewrite -(union_empty_l_L {[ _ ]}). iApply (rfl_release_spec with "[-POST]").
+      2: iFrame "OB".
+      3: by iApply "POST".
       all: try by eauto. 
-      { set_solver. }
       iFrame "#∗".
       iSplitR.
-      { iApply big_sepS_singleton. iExists _. iFrame "SGNf'". done. }
+      { iApply empty_sgns_levels_rel. }
 
       iIntros (?) "%QQ PH OB".
-      iApply OU_BOU. iApply (OU_wand with "[-OB SGNf]").
-      2: { iApply (OU_set_sig with "OB [$]"). set_solver. }
-      iIntros "[SGNf OB]". rewrite difference_diag_L.
       iApply BOU_intro. simpl.
 
-      iSplitL "SET FLAG".
-      { iExists _. iFrame. iRight. by iFrame. } 
+      iSplitL "FLAG SGNf".
+      { iExists _. iFrame. } 
 
       iIntros "PH'". simpl.  
       iDestruct (th_phase_frag_combine'' with "[$PH $PH']") as "foo"; [done| ].
@@ -243,7 +213,7 @@ Section MotivatingClient.
     Qed.
 
     Theorem left_thread_spec (lk: val) τ flag s__f π:
-      {{{ client_inv lk flag s__f ∗ flag_unset ∗
+      {{{ client_inv lk flag s__f ∗ 
           obls τ {[ s__f ]} ∗ th_phase_eq τ π ∗
           cp_mul π (rfl_d RFL) 3 ∗
           sgn s__f l__f None
@@ -252,13 +222,13 @@ Section MotivatingClient.
       {{{ v, RET v; obls τ ∅ ∗ th_phase_eq τ π }}}.
     Proof using All.
       iIntros (Φ).
-      iIntros "(#LOCK & ?&?&PH&CPSm&?) POST".
+      iIntros "(#LOCK & ?&PH&CPSm&?) POST".
       rewrite /left_thread.
 
       pure_step_cases.
       split_cps "CPSm" 1. rewrite -cp_mul_1.
       iApply (first_step with "[$] [$]").
-      { apply LS_LB. }
+      { try_solve_bounds. use_rfl_fl_sb. }
       { done. }
       { eauto. }
       iApply sswp_pure_step; [done| ].
@@ -267,27 +237,27 @@ Section MotivatingClient.
 
       split_cps "CPSm" 1.
       wp_bind (rfl_acquire _ _)%E.
-      (* iDestruct (cp_mul_take with "CPSm") as "[CPSm CPm]". *)
       iApply (acquire_left with "[-CPS CPSm POST]").
       { iFrame "#∗". by rewrite cp_mul_1. }
-      iNext. iIntros (v) "(% & % & OB & UNSET & PH & P & LOCKED & % & %LVLo)".
-      rewrite /P__lock. iDestruct "P" as "[FLAG [[_ SGNf]| [% ?]]]".
-      2: done.
+      iNext. iIntros (v) "(% & % & % & OB & PH & P & LOCKED & % & %LVLo)".
+      rewrite /P__lock. iDestruct "P" as "[FLAG SGNf]".
 
       wp_bind (Rec _ _ _)%E. pure_steps.
       wp_bind (_ <- _)%E.
       iApply sswp_MU_wp.
       { done. }
       iApply (wp_store with "[$]"). iIntros "!> FLAG".
-      MU_by_burn_cp.
+      MU_by_BOU. iMod (OU_set_sig with "OB SGNf") as "[SGNf OB]".
+      { set_solver. }
+      { try_solve_bounds. }
+      BOU_burn_cp.
       pure_steps.
 
-      iMod (os_shoot _ () with "UNSET") as "SET". 
       wp_bind (Rec _ _ _)%E. pure_steps.
-      (* iDestruct (cp_mul_take with "CPSm") as "[CPSm CPm]". *)
+      replace ({[s__f; s__o]} ∖ {[s__f]}) with ({[ s__o ]}: gset _) by set_solver. 
       iApply (release_left with "[-POST]").
-      { done. }
-      { iFrame "#∗". iDestruct (cp_mul_take with "CPS") as "[??]".
+      { iFrame "#∗". 
+        iDestruct (cp_mul_take with "CPS") as "[??]".
         by iApply cp_mul_1. }
       iNext. done.
     Qed.
@@ -306,7 +276,7 @@ Section MotivatingClient.
       iIntros "(#INV & OB & PH & CPm) POST".
 
       iApply (rfl_acquire_spec with "[-POST]").
-      3: iFrame "#∗"; by iApply empty_sgns_levels_rel.
+      1: iFrame "#∗"; by iApply empty_sgns_levels_rel.
       all: try by eauto.
 
       iNext. iIntros (?) "(%s__o & % & OB & PH & % & % & ? & (%f & P) & LOCKED)".
@@ -323,26 +293,25 @@ Section MotivatingClient.
           rfl_locked RFL s__o (rfl_G0 := RFLG) }}}
         rfl_release RFL lk @ τ
       {{{ v, RET v; obls τ ∅ ∗ th_phase_eq τ π ∗ 
-                         (⌜ f = true ⌝ ∗ flag_set ∨ ⌜ f = false ⌝ ∗ cp_mul π (rfl_d RFL) 4) }}}.
+                         (⌜ f = true ⌝ ∨ ⌜ f = false ⌝ ∗ cp_mul π (rfl_d RFL) 4) }}}.
     Proof using All.
       iIntros (Φ).
       iIntros "(#INV & #EPf & OB & PH & CPm & P & LOCKED) POST".
 
-      iAssert (∀ q', obls τ ∅ -∗ th_phase_frag τ π q' -∗ BOU ∅ 4 ((⌜f = true⌝ ∗ flag_set ∨ ⌜f = false⌝ ∗ cp_mul π (rfl_d RFL) 4) ∗ P__lock flag s__f f ∗ obls τ ∅ ∗ th_phase_frag τ π q'))%I with "[P]" as "FIN".
+      iAssert (∀ q', obls τ ∅ -∗ th_phase_frag τ π q' -∗ BOU ∅ 4 ((⌜f = true⌝ ∨ ⌜f = false⌝ ∗ cp_mul π (rfl_d RFL) 4) ∗ P__lock flag s__f f ∗ obls τ ∅ ∗ th_phase_frag τ π q'))%I with "[P]" as "FIN".
       { iIntros (q') "OB PH". rewrite /P__lock. destruct f.
-        { iDestruct "P" as "[? [[% ?] | [_ #SET]]]"; [done| ].
-          iApply BOU_intro. iFrame.
-          rewrite bi.or_comm. iSplitL ""; iRight; by iFrame "#∗". }
-        iDestruct "P" as "[FLAG [[_ UNSET] | [% ?]]]"; [| done].
+        { iDestruct "P" as "[? SGNf]".          
+          iApply BOU_intro. iFrame. by iLeft. }
+        iDestruct "P" as "[FLAG SGNf]".
         iApply OU_BOU_rep. iApply (OU_rep_wand with "[FLAG]").
         2: { iApply (expect_sig_upd_rep with "EPf [$] [$] [] [$]").
              iApply empty_sgns_levels_rel. }
         iIntros "(CPSm & UNSET & OB & PH)". iFrame.
-        rewrite bi.or_comm. iSplitL "CPSm"; iLeft; by iFrame "#∗". }
+        iRight. by iFrame. }
       
       rewrite -(union_empty_l_L {[ _ ]}).
       iApply (rfl_release_spec with "[-POST] [$]").
-      3: iFrame "#∗".
+      2: iFrame "#∗".
       all: try by eauto.
       iSplit.
       { iApply empty_sgns_levels_rel. }
@@ -366,7 +335,7 @@ Section MotivatingClient.
       }}}
         right_thread_iter lk #flag #c @ τ
       {{{ v, RET v; obls τ ∅ ∗ th_phase_eq τ π ∗
-                    ∃ (v: bool), c ↦ #v ∗ (⌜ v = true ⌝ ∗ flag_set ∨ ⌜ v = false ⌝ ∗ cp_mul π (rfl_d RFL) 4)
+                    ∃ (v: bool), c ↦ #v ∗ (⌜ v = true ⌝  ∨ ⌜ v = false ⌝ ∗ cp_mul π (rfl_d RFL) 4)
                      }}}.
     Proof using All.
       iIntros (Φ).
@@ -376,7 +345,7 @@ Section MotivatingClient.
       pure_step_cases.
       split_cps "CPSm" 1. rewrite -cp_mul_1.
       iApply (first_step with "[$] [$]").
-      { apply LS_LB. }
+      { try_solve_bounds. use_rfl_fl_sb. }
       { done. }
       { apply LT0m. }
       iApply sswp_pure_step; [done| ].
@@ -415,7 +384,7 @@ Section MotivatingClient.
       }}}
         right_thread_rep lk #flag #c @ τ
       {{{ v, RET v; obls τ ∅ ∗ th_phase_eq τ π ∗
-                    flag_set ∗ c ↦ #true }}}.
+                    c ↦ #true }}}.
     Proof using All.
       iIntros (Φ).
       iLöb as "IH".
@@ -425,7 +394,7 @@ Section MotivatingClient.
       pure_step_cases.
       split_cps "CPSh" 1. rewrite -cp_mul_1.
       iApply (first_step with "[$] [$]").
-      { apply LS_LB. }
+      { try_solve_bounds. use_rfl_fl_sb. }
       { done. }
       { apply LT0m. }
       iApply sswp_pure_step; [done| ].
@@ -449,7 +418,7 @@ Section MotivatingClient.
       { simpl. tauto. }
       MU_by_burn_cp. pure_steps.
       
-      iDestruct "ITER" as "[[-> SET] | [-> CPh]]".
+      iDestruct "ITER" as "[-> | [-> CPh]]".
       - rewrite bool_decide_eq_true_2; [| tauto].
         pure_steps. iApply "POST". iFrame.
       - rewrite bool_decide_eq_false_2; [| done].
@@ -463,8 +432,7 @@ Section MotivatingClient.
           cp_mul π d__r 2
       }}}
         right_thread lk #flag @ τ
-      {{{ v, RET v; obls τ ∅ ∗ th_phase_eq τ π ∗
-                    flag_set }}}.
+      {{{ v, RET v; obls τ ∅ ∗ th_phase_eq τ π}}}.
     Proof using All.
       iIntros (Φ).
       iIntros "(#INV & OB & PH & #SGNf & CPSm) POST".
@@ -473,7 +441,7 @@ Section MotivatingClient.
       pure_step_cases.
       split_cps "CPSm" 1. rewrite -cp_mul_1.
       iApply (first_step with "[$] [$]").
-      { apply LS_LB. }
+      { try_solve_bounds. use_rfl_fl_sb. }
       { done. }
       { apply LThm. }
       iApply sswp_pure_step; [done| ].
@@ -483,7 +451,9 @@ Section MotivatingClient.
       wp_bind (ref _)%E.
       iApply sswp_MU_wp; [done| ]. iApply wp_alloc. iIntros "!> %c C _".
       MU_by_BOU.
-      iApply BOU_lower; [apply LS_LB| ]. iApply OU_BOU.
+      iApply BOU_lower.
+      { try_solve_bounds. use_rfl_fl_sb. }
+      iApply OU_BOU.
 
       iApply (OU_wand with "[-CPSm' PH]").
       2: { iApply (@create_ep_upd with "[$] [$] [$]").
@@ -520,7 +490,9 @@ Section MotivatingClient.
     iIntros (Φ) "(OB & PH & CPSr) POST". rewrite /client_prog.
 
     pure_step_hl. MU_by_BOU.
-    iApply BOU_lower; [apply LS_LB| ]. iApply BOU_split.
+    iApply BOU_lower.
+    { try_solve_bounds. use_rfl_fl_sb. } 
+    iApply BOU_split.
     split_cps "CPSr" 1. rewrite -cp_mul_1.
     iApply (BOU_wand with "[-CPSr']").
     2: { iApply (first_BOU with "[$]").
@@ -540,22 +512,20 @@ Section MotivatingClient.
     iNext. MU_by_burn_cp. iModIntro.
 
     iApply wp_value. wp_bind (Rec _ _ _)%E. pure_steps.
-
-    iMod (own_alloc (@Pending unitO)) as (?) "UNSET"; [done| ].
   
     wp_bind (rfl_newlock _ _)%E.
     iApply (rfl_newlock_spec RFL _ _ c__cl (∃ b, P__lock flag s__f b) with "[$CPS' $PH FLAG SGNf]").
     all: try by eauto.
-    { iExists _. iFrame. iLeft. by iFrame. }
+    { try_solve_bounds. }
+    { iExists _. iFrame. }
 
-    set (cG := {| cl_γ__os := γ |}). 
+    set (cG := {| cl_PreG := CL_PRE |}). 
     
     iIntros "!> %lk (%RFLG & RFL_INV & PH)".
     iAssert (client_inv lk flag s__f)%I with "RFL_INV" as "#INV".
     wp_bind (Rec _ _ _)%E. pure_steps.
 
     wp_bind (Fork _)%E. 
-    (* split_cps "CPS" 20. *)
     split_cps "CPS" 3.
     iApply sswp_MUf_wp. iIntros "%τ' !>".
     iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
@@ -567,7 +537,7 @@ Section MotivatingClient.
          iExists _. by iFrame. }
     iIntros "(_ & (%π1 & %π2 & PH1 & OB1 & PH2 & OB2 & [%PH_LT1 %PH_LT2]))".
 
-    iSplitL "CPS' OB2 PH2 UNSET".
+    iSplitL "CPS' OB2 PH2".
     { iApply (left_thread_spec with "[-]").
       2: { iIntros "!> % [OB PH]". by iApply NO_OBS_POST. }
       iFrame "#∗". iSplitL "OB2".
@@ -586,9 +556,7 @@ Section MotivatingClient.
     iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
     iApply sswp_MUf_wp. iIntros "%τ2 !>". 
     iApply (MU__f_wand with "[-CP PH OB1]").
-    2: {
-         (* iApply OBLS_AMU__f; [done| ]. *)
-         iApply ohe_obls_AMU__f; [done| ].
+    2: { iApply ohe_obls_AMU__f; [done| ].
          iApply BOU_AMU__f. 
          iApply BOU_intro. iFrame.
          iSplitR; [iAccu| ]. 
