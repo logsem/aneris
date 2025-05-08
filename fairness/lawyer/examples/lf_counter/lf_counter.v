@@ -3,7 +3,7 @@ From iris.proofmode Require Import tactics coq_tactics.
 From trillium.program_logic Require Export weakestpre ectx_lifting.
 From trillium.fairness Require Import utils.
 From trillium.fairness.lawyer.examples Require Import obls_tactics.
-From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_am obligations_em obligations_logic.
+From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_am obligations_em obligations_logic env_helpers.
 From trillium.fairness.lawyer Require Import sub_action_em program_logic.
 From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From iris.base_logic.lib Require Import invariants.
@@ -71,36 +71,15 @@ End WaitMap.
 
 
 Section LFCounter.
-  Context `{ODd: OfeDiscrete DegO} `{ODl: OfeDiscrete LevelO}.
-  Context `{LEl: @LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}.
-  
-  Let Degree := ofe_car DegO.
-  Let Level := ofe_car LevelO.
-
-  Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}.
-  Let OP := LocaleOP (Locale := locale heap_lang).
-  Existing Instance OP.
-  Let OM := ObligationsModel.
-  
-  Let OAM := ObligationsAM.
-  Let ASEM := ObligationsASEM.
-
+  Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
   Context `{EM: ExecutionModel heap_lang M}.
+  Notation "'Degree'" := (om_hl_Degree). 
+  Notation "'Level'" := (om_hl_Level).  
 
-  Context {Σ: gFunctors}.
-  (* Keeping the more general interface for future developments *)
-  Context `{oGS': @asem_GS _ _ ASEM Σ}.
-  Let oGS: ObligationsGS (OP := OP) Σ := oGS'.
-  Existing Instance oGS.
-
-  Context `{hGS: @heapGS Σ _ EM}.
-  Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
+  Context {Σ} {OHE: OM_HL_Env OP EM Σ}. 
 
   Context (d0 d1: Degree).
   Hypotheses (DEG01: deg_lt d0 d1). 
-
-  (* Context (K: nat). *)
-  (* Hypothesis (K_LB: K <= LIM_STEPS). *)
 
   Definition INCR_ITER_LEN := 10.
   Hypothesis (INCR_LS_LB: 2 + INCR_ITER_LEN <= LIM_STEPS).
@@ -127,8 +106,6 @@ Section LFCounter.
   Definition cnt_ns := nroot.@"cnt".
   Definition cnt_inv `{LFCG Σ} cnt π__cnt := inv cnt_ns (cnt_inv_inner cnt π__cnt).
 
-  Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS' _ EM _ (↑ nroot)}.
-  Context {OBLS_AMU__f: forall τ, @AMU_lift_MU__f _ _ _ τ oGS' _ EM _ ⊤}.
   Context {NO_OBS_POST: ∀ τ v, obls τ ∅ -∗ fork_post τ v}.
 
   Definition incr_impl: val :=
@@ -192,7 +169,7 @@ Section LFCounter.
   Lemma wm_incr `{LFCG Σ} π__cnt c:
     wm_interp π__cnt c -∗ cp π__cnt d1 -∗ BOU ∅ (INCR_ITER_LEN + 1) (wm_interp π__cnt (S c)).
   Proof using DEG01. 
-    clear ODl ODd OBLS_AMU__f OBLS_AMU NO_OBS_POST LEl INCR_LS_LB. 
+    clear NO_OBS_POST INCR_LS_LB. 
     iIntros "(%wm & AUTH & WAITS & #EB & %DOM) CP1".
     iMod (wm_alloc _ (S c) with "[$]") as "[AUTH TOK]".
     iMod (wm_get0 _ c with "[$]") as "[AUTH TOKS0]".
@@ -255,7 +232,7 @@ Section LFCounter.
     (NEQ: c ≠ c'):
     wm_interp π__cnt c' -∗ val_tok c -∗ wm_interp π__cnt c' ∗ cp_mul π__cnt d0 INCR_ITER_LEN.
   Proof using.
-    clear DEG01 ODl ODd OBLS_AMU__f OBLS_AMU NO_OBS_POST LEl INCR_LS_LB. 
+    clear DEG01 NO_OBS_POST INCR_LS_LB. 
     iIntros "(%wm & AUTH & WAITS & #EB & %DOM) TOK".
     rewrite /wm_interp.
     iApply bi.sep_exist_r. iExists _. iFrame "EB". iClear "EB".
@@ -297,8 +274,7 @@ Section LFCounter.
         th_phase_frag τ π 1 }}}
       incr_impl #cnt @τ
     {{{ v, RET v; ⌜ True ⌝ }}}.
-  Proof using OBLS_AMU INCR_LS_LB DEG01.
-    clear ODl ODd OBLS_AMU__f NO_OBS_POST LEl.     
+  Proof using INCR_LS_LB DEG01 NO_OBS_POST.
     iIntros (Φ) "(#INV & #EB & CP1 & CPS & PH) POST".
     iLöb as "IH".
     rewrite /incr_impl.
@@ -367,7 +343,7 @@ Section LFCounter.
         cnt_inv cnt π__cnt }}}
       incr #cnt @ τ
     {{{ v, RET v; ⌜ True ⌝ }}}.
-  Proof using OBLS_AMU INCR_LS_LB DEG01.
+  Proof using INCR_LS_LB DEG01 NO_OBS_POST.
     iIntros (Φ) "(PH & CPS1 & #INV) POST".
     rewrite /incr.
 
@@ -467,8 +443,6 @@ Section LFCounter.
       iApply (incr_spec with "[$]").
       { apply PH_LT1. }
       iIntros "!> % _". by iApply "POST".
-
-  Qed.    
+  Qed.
 
 End LFCounter.
-  

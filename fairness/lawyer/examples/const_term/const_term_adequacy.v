@@ -3,7 +3,7 @@ From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import utils utils_tactics trace_len utils_multisets.
 From trillium.fairness.heap_lang Require Import simulation_adequacy.
 From trillium.fairness.lawyer Require Import sub_action_em action_model.
-From trillium.fairness.lawyer.obligations Require Import obligations_adequacy obligations_logic obligations_em obligations_resources obligations_model obligations_am unfair_termination.
+From trillium.fairness.lawyer.obligations Require Import obligations_adequacy obligations_logic obligations_em obligations_resources obligations_model obligations_am unfair_termination env_helpers.
 From trillium.fairness.lawyer.examples Require Import orders_lib.
 From trillium.fairness.lawyer.examples.const_term Require Import const_term.
 
@@ -16,12 +16,10 @@ Section ConstTermAdequacy.
     - apply empty_PO. 
   Defined.
 
-  Definition CTOP := LocaleOP (Locale := locale heap_lang). 
-  Existing Instance CTOP.
-  Let ASEM := ObligationsASEM.
-  Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls τ ∅ (oGS := aGS)).
-  Let OM := ObligationsModel. 
-  Let M := AM2M ObligationsAM. 
+  Local Instance CT_OP_HL: OP_HL unit Empty_set 0.
+  Proof. esplit; try by apply _. Defined.
+
+  Let EM := TopAM_EM ObligationsASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls τ ∅ (oGS := aGS)).
 
   Definition CTΣ := #[
     GFunctor $ (excl_authUR natO); 
@@ -45,6 +43,18 @@ Section ConstTermAdequacy.
     rewrite list_to_set_disj_cons. rewrite list_to_set_disj_nil gmultiset_size_disj_union.
     rewrite !gmultiset_size_singleton gmultiset_size_empty. lia.
   Qed.
+
+  Local Instance OHE
+    (HEAP: heapGS CTΣ (TopAM_EM ObligationsASEM (λ Σ (aGS : ObligationsGS Σ) τ, obls τ ∅)))
+    : OM_HL_Env CT_OP_HL EM CTΣ.
+  Proof.
+    unshelve esplit; try by apply _. 
+    - apply (@heap_fairnessGS _ _ _ HEAP).
+    - apply AMU_lift_top. 
+    - intros. rewrite /AMU_lift_MU__f.
+      rewrite -nclose_nroot.
+      apply AMU_lift_top.
+  Defined.
 
   Theorem const_term_bound_termination N
     (prog := const_term N)
@@ -78,30 +88,15 @@ Section ConstTermAdequacy.
 
     iIntros (?) "[HEAP INIT]".
 
-    pose proof @const_term_spec as SPEC. specialize SPEC with (OPRE := CTPre) (hGS := HEAP) (oGS' := (@heap_fairnessGS _ _ _ HEAP)).
+    pose proof @const_term_spec as SPEC.
+    specialize SPEC with (OHE := OHE HEAP). 
 
     iApply (SPEC with "[-]").
-    { apply AMU_lift_top. }
-    { intros. rewrite /AMU_lift_MU__f.
-      rewrite -nclose_nroot.
-      apply AMU_lift_top. }
     { simpl. iIntros (? _) "X". iApply "X". }
     2: { simpl. iNext. iIntros (_) "X". iApply "X". }
-
+   
     clear SPEC.
-    rewrite START. simpl.
-    rewrite /obls_init_resource /init_om_state.      
-    rewrite init_phases_helper.
-    rewrite locales_of_cfg_simpl. simpl.
-    iDestruct "INIT" as "(CPS & SIGS & OB & EPS & PH & EB)".
-    rewrite union_empty_r_L !gset_to_gmap_singleton.
-    rewrite big_sepM_singleton. iFrame.  
-    rewrite /cps_repr /sig_map_repr /eps_repr /obls_map_repr.
-    rewrite !fmap_empty map_fmap_singleton.      
-    iFrame.
-    rewrite !mset_map_mul !mset_map_singleton.
-    rewrite -!(cp_mul_alt (oGS := (@heap_fairnessGS _ _ _ HEAP))).
-    iApply cp_mul_weaken; [..| by iFrame]; apply phase_lt_fork || lia. 
+    rewrite START. by iApply closed_pre_helper.
   Qed.
 
 End ConstTermAdequacy.

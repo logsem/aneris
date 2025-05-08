@@ -17,6 +17,9 @@ Class OP_HL (DegO LvlO: ofe) (LIM_STEPS: nat) := {
 }.
 Global Existing Instance om_hl_OPRE.
 Global Existing Instance om_hl_OP.
+Global Existing Instance om_hl_LvlO_discr.
+Global Existing Instance om_hl_DegO_discr.
+Global Existing Instance om_hl_LvlO_equiv.
 
 Class OM_HL_Env `(OP: OP_HL DegO LvlO LIM_STEPS)
   `(EM: ExecutionModel heap_lang M) (Σ: gFunctors):= {

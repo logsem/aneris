@@ -2,7 +2,7 @@ From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import locales_helpers comp_utils trace_lookup fairness fin_branch utils_tactics.
 From trillium.fairness.heap_lang Require Import simulation_adequacy.
 From trillium.fairness.lawyer Require Import sub_action_em action_model.
-From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_em obls_fairness_preservation obligations_am obligations_fin_branch obls_termination obligations_wf obligations_logic.
+From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_em obls_fairness_preservation obligations_am obligations_fin_branch obls_termination obligations_wf obligations_logic env_helpers.
 
 
 Section OblsAdequacy.
@@ -359,5 +359,28 @@ Section OblsAdequacy.
     - iApply WPe. iFrame. 
     - subst s1. rewrite Hexfirst. iApply om_sim_RAH.
   Qed.
+
+  Local Existing Instance OP. 
+
+  Lemma closed_pre_helper {Σ: gFunctors} {oGS: ObligationsGS Σ}
+          (e: expr) (k: nat) (d: Degree) (σ: state) (b: nat):
+    obls_init_resource (init_om_state ([e], σ) (k *: {[+ d +]}) b) ()  ⊢
+      th_phase_eq (locale_of [] e) (ext_phase π0 0)  ∗
+      cp_mul (ext_phase π0 0) d k ∗ obls (locale_of [] e) ∅.
+  Proof using.
+    iIntros "INIT". 
+    rewrite /obls_init_resource /init_om_state.
+    rewrite init_phases_helper. simpl.
+    rewrite locales_of_cfg_simpl. simpl.
+    iDestruct "INIT" as "(CPS & SIGS & OB & EPS & PH & EB)".
+    rewrite union_empty_r_L !gset_to_gmap_singleton.
+    rewrite big_sepM_singleton. iFrame.  
+    rewrite /cps_repr /sig_map_repr /eps_repr /obls_map_repr.
+    rewrite !fmap_empty map_fmap_singleton.      
+    iFrame.
+    rewrite !mset_map_mul !mset_map_singleton.
+    rewrite -!(cp_mul_alt (oGS := oGS)).
+    iApply cp_mul_weaken; [..| by iFrame]; apply phase_lt_fork || lia.
+  Qed. 
 
 End OblsAdequacy.

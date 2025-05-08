@@ -3,7 +3,7 @@ From iris.proofmode Require Import tactics coq_tactics.
 From trillium.program_logic Require Export weakestpre ectx_lifting.
 From trillium.fairness Require Import utils.
 From trillium.fairness.lawyer.examples Require Import obls_tactics.
-From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_am obligations_em obligations_logic.
+From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_am obligations_em obligations_logic env_helpers.
 From trillium.fairness.lawyer Require Import sub_action_em program_logic.
 From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From iris.base_logic.lib Require Import invariants.
@@ -19,30 +19,12 @@ Class DecrG Σ := {
 
 
 Section Decr.
-  Context `{ODd: OfeDiscrete DegO} `{ODl: OfeDiscrete LevelO}.
-  Context `{LEl: @LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}.
-  
-  Let Degree := ofe_car DegO.
-  Let Level := ofe_car LevelO.
-
-  Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}.
-  Let OP := LocaleOP (Locale := locale heap_lang).
-  Existing Instance OP.
-  Let OM := ObligationsModel.
-  
-  Let OAM := ObligationsAM.
-  Let ASEM := ObligationsASEM.
-
+  Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
   Context `{EM: ExecutionModel heap_lang M}.
+  Notation "'Degree'" := (om_hl_Degree). 
+  Notation "'Level'" := (om_hl_Level).  
 
-  Context {Σ: gFunctors}.
-  (* Keeping the more general interface for future developments *)
-  Context `{oGS': @asem_GS _ _ ASEM Σ}.
-  Let oGS: ObligationsGS (OP := OP) Σ := oGS'.
-  Existing Instance oGS.
-
-  Context `{hGS: @heapGS Σ _ EM}.
-  Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
+  Context {Σ} {OHE: OM_HL_Env OP EM Σ}. 
 
   Definition decr: val :=
     rec: "decr" "l" :=
@@ -82,8 +64,6 @@ Section Decr.
   Definition decr_ns := nroot.@"decr".
   Definition decr_inv `{DecrG Σ} l := inv decr_ns (decr_inv_inner l).
 
-  Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS' _ EM _ (↑ nroot)}.
-  Context {OBLS_AMU__f: forall τ, @AMU_lift_MU__f _ _ _ τ oGS' _ EM _ ⊤}.
   Context {NO_OBS_POST: ∀ τ v, obls τ ∅ -∗ fork_post τ v}. 
 
   Lemma decr_spec `{DecrG Σ} τ π d l (N: nat):
@@ -91,7 +71,7 @@ Section Decr.
         decr_inv l ∗ cnt_frag N }}}
       decr #l @ τ
     {{{ v, RET v; ⌜ True ⌝ }}}.
-  Proof using OBLS_AMU.
+  Proof using.
     iIntros (Φ) "(PH & CPS & #INV & CNT) POST".
     iLöb as "IH" forall (N). 
     rewrite /decr.
@@ -181,8 +161,7 @@ Section Decr.
     {{{ th_phase_eq τ π ∗ cp_mul π d ((N + 2) * 10) ∗ obls τ ∅ }}}
       const_term #() @ τ
     {{{ v, RET v; obls τ ∅ }}}.
-  Proof using OBLS_AMU__f OBLS_AMU NO_OBS_POST.
-    clear ODl ODd LEl.
+  Proof using NO_OBS_POST.
     iIntros (Φ) "(PH & CPS & OB) POST".
 
     replace (N + 2) with (N + 1 + 1) by lia.

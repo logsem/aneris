@@ -14,16 +14,6 @@ From trillium.fairness.lawyer.examples.ticketlock Require Import obls_atomic fai
 
 
 Section Ticketlock.
-  (* Context `{ODd: OfeDiscrete DegO} `{ODl: OfeDiscrete LevelO}. *)
-  (* Context `{LEl: @LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}. *)
-  
-  (* Let Degree := ofe_car DegO. *)
-  (* Let Level := ofe_car LevelO. *)
-
-  (* Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}. *)
-  (* Let OP := LocaleOP (Locale := locale heap_lang). *)
-  (* Existing Instance OP. *)
-  (* Let OM := ObligationsModel. *)
   Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
   Context `{EM: ExecutionModel heap_lang M}.
   Context {FLP: FairLockPre}.

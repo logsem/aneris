@@ -3,7 +3,7 @@ From iris.proofmode Require Import tactics coq_tactics.
 From trillium.program_logic Require Export weakestpre ectx_lifting.
 From trillium.fairness Require Import utils.
 From trillium.fairness.lawyer.examples Require Import obls_tactics.
-From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_am obligations_em obligations_logic.
+From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_am obligations_em obligations_logic env_helpers.
 From trillium.fairness.lawyer Require Import sub_action_em program_logic.
 From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From iris.base_logic.lib Require Import invariants.
@@ -19,30 +19,12 @@ Class NondetG Σ := {
 
 
 Section Nondet.
-  Context `{ODd: OfeDiscrete DegO} `{ODl: OfeDiscrete LevelO}.
-  Context `{LEl: @LeibnizEquiv (ofe_car LevelO) (ofe_equiv LevelO)}.
-  
-  Let Degree := ofe_car DegO.
-  Let Level := ofe_car LevelO.
-
-  Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}.
-  Let OP := LocaleOP (Locale := locale heap_lang).
-  Existing Instance OP.
-  Let OM := ObligationsModel.
-  
-  Let OAM := ObligationsAM.
-  Let ASEM := ObligationsASEM.
-
+  Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
   Context `{EM: ExecutionModel heap_lang M}.
+  Notation "'Degree'" := (om_hl_Degree). 
+  Notation "'Level'" := (om_hl_Level).  
 
-  Context {Σ: gFunctors}.
-  (* Keeping the more general interface for future developments *)
-  Context `{oGS': @asem_GS _ _ ASEM Σ}.
-  Let oGS: ObligationsGS (OP := OP) Σ := oGS'.
-  Existing Instance oGS.
-
-  Context `{hGS: @heapGS Σ _ EM}.
-  Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
+  Context {Σ} {OHE: OM_HL_Env OP EM Σ}. 
 
   Definition incr_loop: val :=
     rec: "loop" "c" "f" :=
@@ -78,8 +60,6 @@ Section Nondet.
   Definition nondet_ns := nroot.@"nondet".
   Definition nondet_inv `{NondetG Σ} cnt flag s__f := inv nondet_ns (nondet_inv_inner cnt flag s__f).
 
-  Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS' _ EM _ (↑ nroot)}.
-  Context {OBLS_AMU__f: forall τ, @AMU_lift_MU__f _ _ _ τ oGS' _ EM _ ⊤}.
   Context {NO_OBS_POST: ∀ τ v, obls τ ∅ -∗ fork_post τ v}.
 
   Definition nondet_LS_LB := 30. 
@@ -91,7 +71,7 @@ Section Nondet.
         nondet_inv cnt flag s__f }}}
       incr_loop #cnt #flag @ τ
     {{{ v, RET v; obls τ ∅ }}}.
-  Proof using OBLS_AMU ODl LEl LS_LB K_LB.
+  Proof using LS_LB K_LB.
     iIntros (Φ) "(PH & CPS & OB & #EP & #INV) POST".
     iLöb as "IH". 
     rewrite /incr_loop.
@@ -223,7 +203,10 @@ Section Nondet.
     { eauto. }
     iMod (alloc_nondet_inv with "[$] [$] [$]") as "(%s__f & %ND & #INV & OB & #SGN0 & TOK)".
     { unfold nondet_LS_LB in LS_LB. lia. }
-    iMod (create_ep_upd with "[$] [$] [$]") as "(#EP & _ & PH)".
+    pose proof (@create_ep_upd) as C.
+    specialize C with (oGS := ohe_oGS (OP := OP) (OM_HL_Env := OHE)).
+
+    iMod (create_ep_upd with "CPS1' SGN0 PH") as "(#EP & _ & PH)".
     { apply DEG01. }
     { unfold nondet_LS_LB in LS_LB. lia. }
     BOU_burn_cp. iApply wp_value.
@@ -257,7 +240,7 @@ Section Nondet.
     rewrite {1}/nondet_inv_inner. iDestruct "inv" as ">(%c & %f & CNT & FLAG & SGN & TOK' & EXc)".
     iApply sswp_MU_wp; [done| ]. iApply (wp_store with "[$]"). iIntros "!> FLAG".
     MU_by_BOU.
-    iMod (OU_set_sig with "[$] [$]") as "[SGN OB]".
+    iMod (OU_set_sig with "OB1 [$]") as "[SGN OB]".
     { set_solver. }
     { unfold nondet_LS_LB in LS_LB. lia. }
     BOU_burn_cp. iApply wp_value.

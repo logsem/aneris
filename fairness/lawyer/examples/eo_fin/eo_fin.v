@@ -3,7 +3,7 @@ From iris.algebra Require Import auth gmap gset excl excl_auth.
 From iris.base_logic.lib Require Import invariants.
 From trillium.fairness Require Import locales_helpers utils.
 From trillium.fairness.lawyer Require Import program_logic sub_action_em.
-From trillium.fairness.lawyer.obligations Require Import obligations_model obls_utils obligations_resources obligations_logic obligations_em.
+From trillium.fairness.lawyer.obligations Require Import obligations_model obls_utils obligations_resources obligations_logic obligations_em env_helpers.
 From trillium.fairness.lawyer.examples Require Import orders_lib signal_map obls_tactics.
 From trillium.fairness.heap_lang Require Export heap_lang_defs tactics notation sswp_logic locales_helpers_hl.
 
@@ -30,19 +30,26 @@ Section EoFin.
   Definition EO_OP := LocaleOP (Locale := locale heap_lang). 
   Existing Instance EO_OP. 
 
-  Let OM := ObligationsModel.
+  (* Let OM := ObligationsModel. *)
 
   Let EOLevelOfe := BNOfe LIM. 
   Let EODegreeOfe := BNOfe NUM_DEG.
 
-  Context `{EM: ExecutionModel heap_lang M}. 
-  Context `{hGS: @heapGS Σ _ EM}.
+  Instance EOFin_OP_HL: OP_HL EODegreeOfe EOLevelOfe MAX_OBL_STEPS.
+  Proof. esplit; by apply _. Defined.
+  Existing Instance EOFin_OP_HL. 
 
-  Let ASEM := ObligationsASEM.
-  (* Keeping the more general interface for future developments *)
-  Context `{oGS': @asem_GS _ _ ASEM Σ}.
-  Let oGS: ObligationsGS (OP := EO_OP) Σ := oGS'.
-  Existing Instance oGS.
+  (* Context `{EM: ExecutionModel heap_lang M}.  *)
+  (* Context `{hGS: @heapGS Σ _ EM}. *)
+
+  (* Let ASEM := ObligationsASEM. *)
+  (* (* Keeping the more general interface for future developments *) *)
+  (* Context `{oGS': @asem_GS _ _ ASEM Σ}. *)
+  (* Let oGS: ObligationsGS (OP := EO_OP) Σ := oGS'. *)
+  (* Existing Instance oGS. *)
+
+  Context `{EM: ExecutionModel heap_lang M}.
+  Context {Σ} {OHE: OM_HL_Env EOFin_OP_HL EM Σ}. 
   
   Let thread_prog: val :=
     rec: "thread_prog" "l" "n" "M" :=
@@ -79,7 +86,7 @@ Section EoFin.
   Lemma d01_lt: strict (bounded_nat_le _) d0 d1.
   Proof using. apply ith_bn_lt. lia. Qed.
     
-  Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS' _ EM _ (↑ nroot)}.
+  (* Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS' _ EM _ (↑ nroot)}. *)
   
   Section ThreadResources.
     Context {PRE: EoFinPreG Σ}.
@@ -162,7 +169,7 @@ Section EoFin.
 
     Lemma lt_B_LIM: B < LIM. lia. Qed. 
 
-    Existing Instance oGS.
+    (* Existing Instance oGS. *)
     
     Lemma BOU_update_SR τ m:
   obls τ ∅ -∗
@@ -172,7 +179,7 @@ Section EoFin.
                          obls τ R' ∗
           (⌜ B <= m + 2 /\ R' = ∅ ⌝ ∨
            ∃ s', ith_sig (m + 2) s' ∗ ⌜ m + 2 < B /\ R' = {[ s' ]} ⌝)).
-    Proof using OBLS_AMU.
+    Proof using.
       iIntros "OBLS SR".
       destruct (Nat.le_gt_cases B (m + 2)).
       { rewrite !PeanoNat.Nat.min_l; try lia.
@@ -222,7 +229,7 @@ Section EoFin.
             else obls τ ∅) }}}
         thread_prog #l #n #B @ τ
       {{{ v, RET v; obls τ ∅ }}}.       
-    Proof using OBLS_AMU. 
+    Proof using. 
       iIntros (Φ). iLöb as "IH" forall (n).
       iIntros "(#INV & #EB & TH & CPS2 & CPS & EXTRA & PH & SN_OB) POST".
       rewrite {2}/thread_prog.
@@ -465,7 +472,7 @@ Section EoFin.
             else obls τ ∅) }}}
         thread_prog #l #n #B @ τ
       {{{ v, RET v; obls τ ∅ }}}.
-    Proof using OBLS_AMU.
+    Proof using.
       iIntros (Φ). iIntros "(#INV & #EB & TH & CPS2 & CPS & PH & SN_OB) POST".
       iDestruct (cp_mul_take with "CPS2") as "[??]".
       iApply (thread_spec_holds with "[-POST] [$]").
@@ -535,7 +542,7 @@ Section EoFin.
                        ⌜ NoDup sigs ⌝ ∗
                        ([∗ list] k ↦ s ∈ sigs, ith_sig k s)
         ).
-    Proof using OBLS_AMU PRE.
+    Proof using PRE.
       iIntros "OB L".
       iMod (thread_res_alloc 0) as "(%γ & AUTH & FRAG)".
       iMod (thread_res_alloc 1) as "(%γ' & AUTH' & FRAG')".
@@ -667,7 +674,6 @@ Section EoFin.
 
     Close Scope Z. 
 
-    Context {OBLS_AMU__f: forall τ, @AMU_lift_MU__f _ _ _ τ oGS' _ EM _ ⊤}.
     Context {NO_OBS_POST: ∀ τ v, obls τ ∅ -∗ fork_post τ v}. 
 
     Theorem main_spec τ π:
@@ -678,7 +684,7 @@ Section EoFin.
            obls τ ∅ }}}
       start #(0%nat) #B @ τ
       {{{ v, RET v; obls τ ∅ }}}.
-    Proof using PRE OBLS_AMU__f OBLS_AMU NO_OBS_POST.
+    Proof using PRE NO_OBS_POST.
       iIntros (Φ). iIntros "(#EB & CPS2 & CPS_FORK & PH & OB) POST". rewrite /start.
       iDestruct (cp_mul_take with "CPS2") as "[CPS2 CP]". 
 
@@ -723,7 +729,7 @@ Section EoFin.
 
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
         iApply sswp_MUf_wp. iIntros (τ'). iApply (MU__f_wand with "[-CP PH OB]").
-        2: { iApply OBLS_AMU__f; [done| ]. 
+        2: { iApply ohe_obls_AMU__f; [done| ].
              iApply BOU_AMU__f.
              (* TODO: change BOU_burn_cp*)
              iApply BOU_intro. iFrame "PH OB".
@@ -756,7 +762,7 @@ Section EoFin.
 
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
         iApply sswp_MUf_wp. iIntros (τ''). iApply (MU__f_wand with "[-CP PH OB1]").
-        2: { iApply OBLS_AMU__f; [done| ]. 
+        2: { iApply ohe_obls_AMU__f; [done| ].
              iApply BOU_AMU__f. 
              iApply BOU_intro. iFrame "PH OB1".
              iSplitR "CP".
@@ -796,7 +802,7 @@ Section EoFin.
 
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]".
         iApply sswp_MUf_wp. iIntros (τ'). iApply (MU__f_wand with "[-CP PH OB]").
-        2: { iApply OBLS_AMU__f; [done| ]. 
+        2: { iApply ohe_obls_AMU__f; [done| ].
              iApply BOU_AMU__f. 
              iApply BOU_intro. iFrame "PH OB".
              iSplitR "CP".
@@ -825,7 +831,7 @@ Section EoFin.
 
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
         iApply sswp_MUf_wp. iIntros (τ''). iApply (MU__f_wand with "[-CP PH OB1]").
-        2: { iApply OBLS_AMU__f; [done| ]. 
+        2: { iApply ohe_obls_AMU__f; [done| ].
              iApply BOU_AMU__f.
              iApply BOU_intro. iFrame "PH OB1".
              iSplitR "CP".
@@ -863,7 +869,7 @@ Section EoFin.
 
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
         iApply sswp_MUf_wp. iIntros (τ'). iApply (MU__f_wand with "[-CP PH OB]").
-        2: { iApply OBLS_AMU__f; [done| ]. 
+        2: { iApply ohe_obls_AMU__f; [done| ].
              iApply BOU_AMU__f.
              (* TODO: change BOU_burn_cp*)
              iApply BOU_intro. iFrame "PH OB".
@@ -890,7 +896,7 @@ Section EoFin.
 
         iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
         iApply sswp_MUf_wp. iIntros (τ''). iApply (MU__f_wand with "[-CP PH OB1]").
-        2: { iApply OBLS_AMU__f; [done| ]. 
+        2: { iApply ohe_obls_AMU__f; [done| ].
              iApply BOU_AMU__f. 
              (* TODO: change BOU_burn_cp*)
              iApply BOU_intro. iFrame "PH OB1".

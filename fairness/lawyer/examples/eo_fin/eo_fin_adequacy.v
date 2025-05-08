@@ -3,20 +3,30 @@ From iris.proofmode Require Import tactics.
 From trillium.fairness Require Import utils.
 From trillium.fairness.heap_lang Require Import simulation_adequacy.
 From trillium.fairness.lawyer Require Import sub_action_em action_model.
-From trillium.fairness.lawyer.obligations Require Import obligations_adequacy obligations_logic obligations_em obligations_resources obligations_model obligations_am.
+From trillium.fairness.lawyer.obligations Require Import obligations_adequacy obligations_logic obligations_em obligations_resources obligations_model obligations_am env_helpers.
 From trillium.fairness.lawyer.examples.eo_fin Require Import eo_fin.
 From trillium.fairness.lawyer.examples Require Import orders_lib signal_map.
 
 
 Section EOFinAdequacy.
   Context (B: nat).
-  Let OP := EO_OP B.
-  Existing Instance OP. 
+  (* Let OP := EO_OP B. *)
+
+  (* Existing Instance OP. 
   Let ASEM := ObligationsASEM.
   Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls τ ∅ (oGS := aGS)).
   Let OM := ObligationsModel. 
-  Let M := AM2M ObligationsAM. 
-  
+  Let M := AM2M ObligationsAM.
+ *)
+  Existing Instance EO_OP'. 
+
+  Local Instance EOF_OP_HL: OP_HL (EODegree 5) (EOLevel (B + 1)) 10.
+  Proof.
+    esplit; try by apply _.
+  Defined.
+
+  Let EM := TopAM_EM ObligationsASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls τ ∅ (oGS := aGS)).
+
   (* TODO: move *)
   Definition sig_mapΣ := #[GFunctor $ authUR (gmapUR nat (agreeR SignalId))].
   Global Instance subG_sig_mapΣ {Σ}: subG sig_mapΣ Σ → SigMapPreG Σ.
@@ -31,6 +41,18 @@ Section EOFinAdequacy.
   Global Instance subG_eofinΣ {Σ}: subG eofinΣ Σ → EoFinPreG Σ.
   Proof. solve_inG. Qed.
 
+  Local Instance OHE
+    (HEAP: heapGS eofinΣ (TopAM_EM ObligationsASEM (λ Σ (aGS : ObligationsGS Σ) τ, obls τ ∅)))
+    : OM_HL_Env EOF_OP_HL EM eofinΣ.
+  Proof.
+    unshelve esplit; try by apply _. 
+    - apply (@heap_fairnessGS _ _ _ HEAP).
+    - apply AMU_lift_top. 
+    - intros. rewrite /AMU_lift_MU__f.
+      rewrite -nclose_nroot.
+      apply AMU_lift_top.
+  Defined.
+
   Lemma eofin_terminates_impl
     (extr : heap_lang_extrace)
     (START: trfirst extr = ([start #(0%nat) #B], Build_state ∅ ∅)):
@@ -44,16 +66,17 @@ Section EOFinAdequacy.
       (eb := 20); eauto.
     1-5: by apply _.
     1-2: by apply fin_wf.
-    Unshelve. 2-6: by apply _.
+    { apply _. }
 
     iIntros (?) "[HEAP INIT]".
-    iApply (main_spec with "[-]").
-    5: { simpl. iNext. iIntros (_) "X". iApply "X". }
-    3: { simpl. iIntros (? _) "X". iApply "X". }
-    { apply AMU_lift_top. }
-    { intros. rewrite /AMU_lift_MU__f.
-      rewrite -nclose_nroot.
-      apply AMU_lift_top. }
+    pose proof @main_spec as SPEC. 
+    specialize SPEC with 
+      (OHE := OHE HEAP)
+      .
+
+    iApply (SPEC with "[-]"). 
+    { simpl. iIntros (? _) "X". iApply "X". }
+    2: { simpl. iNext. iIntros (_) "X". iApply "X". }
     
     simpl. rewrite START.
     rewrite /obls_init_resource /init_om_state. 
