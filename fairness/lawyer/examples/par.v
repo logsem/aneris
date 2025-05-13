@@ -74,15 +74,15 @@ Section SpawnJoin.
   Context {PARΣ: parG Σ}.
   Context (N: namespace).  
 
-  Context (l2 l__h: Level).
-  Hypothesis (LT2h: lvl_lt l2 l__h).
+  Context (l__s l__w: Level).
+  Hypothesis (LT2h: lvl_lt l__s l__w).
 
   Context (d0 d1 d2: Degree).
   Hypothesis (LT01: deg_lt d0 d1). 
   Hypothesis (LT12: deg_lt d1 d2).
 
   Definition spawn_inv (γ : gname) (l : loc) (s__h: SignalId) (Ψ : val → iProp Σ) : iProp Σ :=
-    ∃ lv b, l ↦ lv ∗ sgn s__h l__h (Some b) ∗ (⌜lv = NONEV /\ b = false ⌝ ∨
+    ∃ lv b, l ↦ lv ∗ sgn s__h l__w (Some b) ∗ (⌜lv = NONEV /\ b = false ⌝ ∨
                       ∃ w, ⌜lv = SOMEV w /\ b = true⌝ ∗ (Ψ w ∨ own γ (Excl ()))).
   
   Definition join_handle (l : loc) s__h π (Ψ : val → iProp Σ) : iProp Σ :=
@@ -101,9 +101,9 @@ Section SpawnJoin.
   Context (LS_LB: fuels_spawn <= LIM_STEPS).
 
   (* TODO: move *)
-  Lemma sgns_levels_rel_singleton s l__s l (R: LvlO -> LvlO -> Prop) ov
-    (REL: R l__s l):
-    sgn s l__s ov ⊢ sgns_levels_rel R {[s]} {[ l ]}.
+  Lemma sgns_levels_rel_singleton s l l' (R: LvlO -> LvlO -> Prop) ov
+    (REL: R l l'):
+    sgn s l ov ⊢ sgns_levels_rel R {[s]} {[ l' ]}.
   Proof using.
     clear -REL.
     iIntros "SGN".
@@ -116,19 +116,19 @@ Section SpawnJoin.
   Context {NO_OBS_POST: ∀ τ v, obls τ ∅ -∗ fork_post τ v}.
 
   Definition spawnee_spec (e: expr) R d__s Q: iProp Σ :=
-    ∀ F τ π, obls τ (R ∪ F) -∗ sgns_level_gt F l2 -∗
+    ∀ F τ π, obls τ (R ∪ F) -∗ sgns_level_gt F l__s -∗
             th_phase_eq τ π -∗ cp π d__s -∗
             WP e @ τ {{ v, ∃ π', Q v ∗ obls τ F ∗ th_phase_eq τ π' ∗ ⌜ phase_le π π' ⌝ }}.
 
-  Lemma spawn_spec τ π (f : val) (R1 R2: gset SignalId) Q2 (d__s: Degree)
-    (DISJ12: R1 ## R2)
+  Lemma spawn_spec τ π (f : val) (R__w R__s: gset SignalId) Q__s (d__s: Degree)
+    (DISJws: R__w ## R__s)
     :
-    {{{ spawnee_spec (f #()) R2 d__s Q2 ∗
-        obls τ (R1 ∪ R2) ∗ th_phase_eq τ π ∗ cp_mul π d1 2 ∗
+    {{{ spawnee_spec (f #()) R__s d__s Q__s ∗
+        obls τ (R__w ∪ R__s) ∗ th_phase_eq τ π ∗ cp_mul π d1 2 ∗
         cp π d__s
     }}}
       spawn f @ τ
-    {{{ l, RET #l; ∃ s__h π1', join_handle l s__h π1' Q2 ∗ obls τ R1 ∗ th_phase_eq τ π1' ∗ ⌜ phase_le π π1' ⌝ }}}.
+    {{{ l, RET #l; ∃ s__h π', join_handle l s__h π' Q__s ∗ obls τ R__w ∗ th_phase_eq τ π' ∗ ⌜ phase_le π π' ⌝ }}}.
   Proof.
     iIntros (Φ) "(SPEC2 & OB & PH & CPS0 & CP2) POST".
     rewrite /spawn /=.
@@ -149,11 +149,11 @@ Section SpawnJoin.
     iApply wp_alloc. iIntros "!> %hnd HANDLE _".
     MU_by_BOU.
 
-    iMod (OU_create_sig _ _ l__h with "[$]") as "[%s__h (SGNh & OB & %FRESH)]".
+    iMod (OU_create_sig _ _ l__w with "[$]") as "[%s__h (SGNh & OB & %FRESH)]".
     { try_solve_bounds. }
     iDestruct (sgn_get_ex with "[$]") as "[SGNh #SGNh']". 
 
-    iMod (inv_alloc N _ (spawn_inv γ hnd _ Q2) with "[HANDLE SGNh]") as "#INV".
+    iMod (inv_alloc N _ (spawn_inv γ hnd _ Q__s) with "[HANDLE SGNh]") as "#INV".
     { iNext. iExists NONEV, _. iFrame; eauto. }
 
     BOU_burn_cp. iModIntro.
@@ -168,20 +168,20 @@ Section SpawnJoin.
          rewrite -cp_mul_1. 
          iSplitR; [iAccu| ].
          by iExists _. }
-    iIntros "(_ & (%π1 & %π2 & PH1 & OB1 & PH2 & OB2 & [%PH_LT1 %PH_LT2]))".
-    Unshelve. 2: exact (R2 ∪ {[s__h]}).
-    replace (_ ∖ _) with R1 by set_solver. replace (_ ∩ _) with (R2 ∪ {[s__h]}) by set_solver.
+    iIntros "(_ & (%π__w & %π__s & PHw & OBw & PHs & OBs & [%PH_LTw %PH_LTs]))".
+    Unshelve. 2: exact (R__s ∪ {[s__h]}).
+    replace (_ ∖ _) with R__w by set_solver. replace (_ ∩ _) with (R__s ∪ {[s__h]}) by set_solver.
 
     split_cps "CPS" 2.
-    iSplitL "SPEC2 CP2 CPS' OB2 PH2".
+    iSplitL "SPEC2 CP2 CPS' OBs PHs".
     - wp_bind (f _)%E. iApply (wp_wand with "[-CPS']"). 
-      { rewrite cp_weaken; [| apply PH_LT2]. 
+      { rewrite cp_weaken; [| apply PH_LTs]. 
         iApply ("SPEC2" with "[$] [] [$] [$]").
         iApply sgns_levels_rel_singleton; [| by iFrame]. done. }
-      simpl. iIntros "%v (%π2' & Q2 & OB & PH & %PH_LE2')".
+      simpl. iIntros "%v (%π__s' & Qs & OBs & PH & %PH_LEs')".
 
       rewrite cp_mul_weaken; [| | reflexivity].
-      2: { etrans; [apply PH_LT2 | apply PH_LE2']. }
+      2: { etrans; [apply PH_LTs | apply PH_LEs']. }
       iRename "CPS'" into "CPS".
       wp_bind (InjR _)%E. pure_steps.
 
@@ -190,39 +190,40 @@ Section SpawnJoin.
       iApply sswp_MU_wp_fupd; [done| ]. iModIntro.
       iApply (wp_store with "[$]"). iIntros "!> HANDLE".
       MU_by_BOU.
-      iMod (OU_set_sig with "OB SGN") as "[SGN OB]".
+      iMod (OU_set_sig with "OBs SGN") as "[SGN OBs]".
       { set_solver. }
       { try_solve_bounds. }
       rewrite difference_diag_L.
       BOU_burn_cp. iModIntro.
 
-      iApply wp_value. iMod ("CLOS" with "[HANDLE SGN Q2]") as "_".
+      iApply wp_value. iMod ("CLOS" with "[HANDLE SGN Qs]") as "_".
       { do 2 iExists _. iFrame. iRight. iExists _. by iFrame. }
       iModIntro. simpl. 
       by iApply NO_OBS_POST.
       Unshelve. exact #(). 
     - rewrite cp_mul_weaken; [| | reflexivity].
-      2: { apply PH_LT1. }
-      iRename "PH1" into "PH".
+      2: { apply PH_LTw. }
+      iRename "PHw" into "PH".
       wp_bind (Rec _ _ _)%E.
 
       pure_step_hl. MU_by_BOU.
-      rewrite cp_weaken; [| by apply PH_LT1].
+      rewrite cp_weaken; [| by apply PH_LTw].
       iMod (create_ep_upd with "CPS0 SGNh' PH") as "(#EP & _ & PH)".
       { eauto. }
       { try_solve_bounds. }
       BOU_burn_cp. 
       pure_steps.
       iApply "POST". do 2 iExists _. iFrame.
-      iSplitL; [| iPureIntro; by apply PH_LT1].
+      iSplitL; [| iPureIntro; by apply PH_LTw].
       rewrite /join_handle. iExists _. iFrame "#∗".
   Qed.
 
-  Lemma join_spec τ (Q2 : val → iProp Σ) h s__h R π:
-    {{{ join_handle h s__h π Q2 ∗ obls τ R ∗ th_phase_eq τ π ∗ cp_mul π d0 fuels_spawn ∗
-        sgns_level_gt R l__h }}}
+  Lemma join_spec τ (Q__s : val → iProp Σ) h s__h R π:
+    {{{ join_handle h s__h π Q__s ∗ obls τ R ∗
+        th_phase_eq τ π ∗ cp_mul π d0 fuels_spawn ∗
+        sgns_level_gt R l__w }}}
       join #h @ τ
-    {{{ v, RET v; Q2 v ∗ obls τ R ∗ th_phase_eq τ π }}}.
+    {{{ v, RET v; Q__s v ∗ obls τ R ∗ th_phase_eq τ π }}}.
   Proof.
     iIntros (Φ) "(HANDLE & OB & PH & CPS & #SGNS_GT) POST".
     rewrite /join_handle. iDestruct "HANDLE" as (γ) "(TOK & #INV & #EP)".
@@ -235,7 +236,7 @@ Section SpawnJoin.
     iApply (wp_load with "[$]"). iIntros "!> HANDLE".
 
     iDestruct "CASES" as "[%EQ | FIN]".
-    2: { iDestruct "FIN" as "(% & %EQ & [Q2 | TOK'])"; destruct EQ as [-> ->].
+    2: { iDestruct "FIN" as "(% & %EQ & [Q__s | TOK'])"; destruct EQ as [-> ->].
          2: { iCombine "TOK TOK'" gives %[]. }
          MU_by_burn_cp. iModIntro. pure_steps.
          iMod ("CLOS" with "[HANDLE SGN TOK]") as "_".
@@ -268,26 +269,26 @@ Section SpawnJoin.
   Proof using.
     rewrite /join_handle. iIntros "(% & ? & ? & EP)".
     iExists _. iFrame. by iApply ep_weaken.
-  Qed.    
-
+  Qed.
 
   (* Notice that this allows us to strip a later *after* the two Ψ have been
      brought together.  That is strictly stronger than first stripping a later
      and then merging them, as demonstrated by [tests/joining_existentials.v].
      This is why these are not Texan triples. *)
-  Lemma par_spec τ π (Q1 Q2 : val → iProp Σ) R1 R2 R2' (f1 f2 : val) (Φ : val → iProp Σ) d__w d__s
-    (DISJ12: R1 ## R2):
-      waiter_spec (f2 #()) R2 R2' d__w Q2 -∗
-      spawnee_spec (f1 #()) R1 d__s Q1 -∗
+  Lemma par_spec τ π (Q__w Q__s : val → iProp Σ) R__s R__w R__w'
+    (f__s f__w : val) (Φ : val → iProp Σ) d__w d__s
+    (DISJsw: R__s ## R__w):
+      waiter_spec (f__w #()) R__w R__w' d__w Q__w -∗
+      spawnee_spec (f__s #()) R__s d__s Q__s -∗
       (* TODO: is it possible to avoid mentioning phase specifically? *)
       (* tried to do so, but have problems with eliminating laters and/or phase disappearing *)
-      (▷ ∀ v1 v2, obls τ R2' -∗ Q1 v1 -∗ Q2 v2 -∗
+      (▷ ∀ vw vs, obls τ R__w' -∗ Q__w vw -∗ Q__s vs -∗
                         (* th_phase_eq τ π2' -∗ ⌜ phase_le π π2' ⌝ -∗ *)
-                        ▷ Φ (v1,v2)%V) -∗
-      obls τ (R2 ∪ R1) -∗ th_phase_eq τ π -∗
+                        ▷ Φ (vs, vw)%V) -∗
+      obls τ (R__w ∪ R__s) -∗ th_phase_eq τ π -∗
       cp π d2 -∗ cp π d__s -∗ cp π d__w -∗
-      sgns_level_gt R2' l__h -∗
-      WP par f1 f2 @ τ {{ v, Φ v ∗ ∃ π2', th_phase_eq τ π2' ∗ ⌜ phase_le π π2' ⌝ }}.
+      sgns_level_gt R__w' l__w -∗
+      WP par f__s f__w @ τ {{ v, Φ v ∗ ∃ π', th_phase_eq τ π' ∗ ⌜ phase_le π π' ⌝ }}.
   Proof.
     iIntros "WAITER SPAWNEE POST OB PH CP2 CPs CPw #SGNS_GT".
     rewrite /par.
@@ -305,16 +306,16 @@ Section SpawnJoin.
     iApply (spawn_spec with "[SPAWNEE OB PH CPS' CPs]").
     { symmetry. done. }
     { iFrame. }
-    iIntros "!> %h (%s__h & %π1' & HANDLE & OB1 & PH & %PH_LE1)".
+    iIntros "!> %h (%s__h & %π__w & HANDLE & OBw & PH & %PH_LEw)".
 
-    rewrite cp_mul_weaken; [| apply PH_LE1| reflexivity]. 
+    rewrite cp_mul_weaken; [| apply PH_LEw| reflexivity]. 
     wp_bind (Rec _ _ _)%E. pure_steps.
 
-    wp_bind (f2 _)%E.
+    wp_bind (f__w _)%E.
     iApply (wp_wand with "[-HANDLE CPS POST]").
     { iApply ("WAITER" with "[$] [$]").
       iApply cp_weaken; done. }
-    simpl. iIntros "%v2 (%π2' & Q2 & OB2 & PH & %PH_LE12)".
+    simpl. iIntros "%vw (%π__w' & Qw & OBw & PH & %PH_LEw')".
     rewrite cp_mul_weaken. 2, 3: by eauto.
 
     (* exchange bound is smaller than what we need,
@@ -331,14 +332,14 @@ Section SpawnJoin.
     BOU_burn_cp. 
 
     pure_steps.
-    iApply (join_spec with "[-POST Q2 CPS]").
+    iApply (join_spec with "[-POST Qw CPS]").
     { iFrame "#∗". iSplitL "HANDLE".
       { by iApply join_handle_weaken. }
       iApply (cp_mul_weaken with "[$]").
       { done. }
       rewrite /fuels_spawn. lia. }
 
-    iIntros "!> %v1 (Q1 & OB2 & PH)".
+    iIntros "!> %vs (Qs & OBw & PH)".
     iSpecialize ("POST" with "[$] [$] [$]").
     wp_bind (Rec _ _ _)%E. pure_steps.
     iFrame. iExists _. iFrame. iPureIntro. etrans; eauto.  
