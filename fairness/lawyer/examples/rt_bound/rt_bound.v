@@ -3,7 +3,7 @@ From iris.proofmode Require Import tactics coq_tactics.
 From trillium.program_logic Require Export weakestpre ectx_lifting.
 From trillium.fairness Require Import utils.
 From trillium.fairness.lawyer.examples Require Import obls_tactics.
-From trillium.fairness.lawyer.examples.nondet Require Import nondet.
+From trillium.fairness.lawyer.examples.nondet Require Import nondet_par.
 From trillium.fairness.lawyer.examples.const_term Require Import const_term.
 From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_am obligations_em obligations_logic env_helpers.
 From trillium.fairness.lawyer Require Import sub_action_em program_logic.
@@ -21,14 +21,15 @@ Section RTBound.
 
   Definition rt_bound: val :=
     λ: <>,
-      let: "n" := nondet #() in
+      let: "n" := nondet_par #() in
       let: "l" := ref "n" in
       decr "l"
   .
 
-  Context (l__f: Level).
-  Context (d0 d1: Degree).
-  Hypotheses (DEG01: deg_lt d0 d1). 
+  Context (l__f l__w : Level).
+  Hypothesis (LVLlt: lvl_lt l__f l__w). 
+  Context (d0 d1 d2: Degree).
+  Hypotheses (DEG01: deg_lt d0 d1) (DEG12: deg_lt d1 d2). 
 
   Context {NO_OBS_POST: ∀ τ v, obls τ ∅ -∗ fork_post τ v}.
 
@@ -38,8 +39,8 @@ Section RTBound.
 
   Hypothesis (DIL_LS: S DECR_ITER_LEN <= LIM_STEPS).
 
-  Lemma rt_bound_spec `{NondetPreG Σ, DecrPreG Σ} τ π:
-    {{{ th_phase_eq τ π ∗ cp_mul π d1 5 ∗ obls τ ∅ }}}
+  Lemma rt_bound_spec `{NondetPreG Σ, DecrPreG Σ, par.parG Σ} τ π:
+    {{{ th_phase_eq τ π ∗ cp_mul π d2 7 ∗ obls τ ∅ }}}
       rt_bound #() @ τ
     {{{ v, RET v; obls τ ∅ }}}.
   Proof.
@@ -48,17 +49,18 @@ Section RTBound.
     split_cps "CPS1" 1. rewrite -cp_mul_1.
     pure_step_hl. MU_by_BOU.
     iMod (first_BOU with "[$]") as "[CPS #EB]".
-    { apply DEG01. }
+    { apply DEG12. }
     BOU_burn_cp.
 
-    split_cps "CPS1" 2. 
-    wp_bind (nondet _)%E.
-    iApply (nondet_spec with "[$CPS1 $PH $OB]").
-    { exact l__f. }
+    split_cps "CPS1" 3. 
+    wp_bind (nondet_par _)%E.
+    iApply (nondet_par_spec with "[$CPS1 $PH $OB]").
     { apply DEG01. }
+    { apply DEG12. }
     { apply DIL_LS. }
+    { apply NO_OBS_POST. }    
     1-2: by eauto.
-    iIntros "!> %v (%n & %π' & -> & #EBn & OB & PH & %PH_LE)".
+    iIntros "!> %n (%π' & #EBn & OB & PH & %PH_LE)".
     rewrite cp_mul_weaken; [| apply PH_LE| reflexivity].
 
     wp_bind (Rec _ _ _)%E. rewrite Nat.mul_comm. pure_steps.
@@ -72,11 +74,13 @@ Section RTBound.
     split_cps "CPS1'" 1. rewrite -cp_mul_1.  
     wp_bind (Rec _ _ _)%E.
     pure_step_hl. MU_by_BOU.
-    iMod (exchange_cp_upd with "CPS1' EBn") as "CPS'".
+    split_cps "CPS" 1. rewrite -cp_mul_1. 
+    iMod (exchange_cp_upd with "CPS' EBn") as "CPS0".
     { reflexivity. }
     { apply DEG01. }
     { unfold DECR_ITER_LEN in DIL_LS. lia. }
-    iMod (exchange_cp_upd with "CPS1'' EB") as "CPS''".
+    split_cps "CPS" 1. rewrite -cp_mul_1. 
+    iMod (exchange_cp_upd with "CPS' EB") as "CPS0'".
     { reflexivity. }
     { apply DEG01. }
     { unfold DECR_ITER_LEN in DIL_LS. lia. }    
@@ -84,7 +88,7 @@ Section RTBound.
     
     pure_steps.
 
-    iCombine "CPS' CPS''" as "CPSd". rewrite -cp_mul_split.
+    iCombine "CPS0 CPS0'" as "CPSd". rewrite -cp_mul_split.
     iApply (decr_spec with "[$PH $DECR_INV $CNT CPSd]").
     { iApply (cp_mul_weaken with "[$]"); [done| ].
       rewrite /DECR_ITER_LEN. lia. }

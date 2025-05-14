@@ -6,21 +6,23 @@ From trillium.fairness.lawyer Require Import sub_action_em action_model.
 From trillium.fairness.lawyer.obligations Require Import obligations_adequacy obligations_logic obligations_em obligations_resources obligations_model obligations_am unfair_termination env_helpers.
 From trillium.fairness.lawyer.examples Require Import orders_lib.
 From trillium.fairness.lawyer.examples.rt_bound Require Import rt_bound.
-From trillium.fairness.lawyer.examples.nondet Require Import nondet nondet_adequacy.
+From trillium.fairness.lawyer.examples.nondet Require Import nondet_par nondet_par_adequacy.
 From trillium.fairness.lawyer.examples.const_term Require Import const_term const_term_adequacy.
 
 
 Section RTBAdequacy.
 
-  Definition LB := max_list [ nondet.nondet_LS_LB; S DECR_ITER_LEN]. 
+  Let RTB_Degree := bounded_nat 3.
+  Let RTB_Level := bounded_nat 2.
 
-  Instance RTBPre: ObligationsParamsPre (bounded_nat 2) unit LB. 
+  Definition LB := max_list [ nondet_par.nondet_LS_LB; S DECR_ITER_LEN]. 
+
+  Instance RTBPre: ObligationsParamsPre RTB_Degree RTB_Level LB. 
     esplit; try by apply _.
-    - apply nat_bounded_PO. 
-    - apply unit_PO. 
+    1, 2: by apply nat_bounded_PO. 
   Defined.
 
-  Local Instance RTB_OP_HL: OP_HL (bounded_nat 2) unit LB.
+  Local Instance RTB_OP_HL: OP_HL RTB_Degree RTB_Level LB.
   Proof. esplit; try by apply _. Defined.
 
   Let EM := TopAM_EM ObligationsASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls τ ∅ (oGS := aGS)).
@@ -28,7 +30,8 @@ Section RTBAdequacy.
   Definition RTBΣ := #[
     NDΣ;
     CTΣ;
-    heapΣ EM
+    heapΣ EM;
+    par.parΣ
   ].
   Global Instance subG_DecrΣ {Σ}: 
     subG RTBΣ Σ → DecrPreG Σ.
@@ -37,8 +40,12 @@ Section RTBAdequacy.
     subG RTBΣ Σ → NondetPreG Σ.
   Proof. solve_inG. Qed.
 
-  Let d1 := bn_ith 1 1.
-  Let d0 := bn_ith 1 0.
+  Let d2 := bn_ith 2 2.
+  Let d1 := bn_ith 2 1.
+  Let d0 := bn_ith 2 0.
+
+  Let l__w := bn_ith 1 1.
+  Let l__f := bn_ith 1 0.
 
   Local Instance OHE
     (HEAP: heapGS RTBΣ (TopAM_EM ObligationsASEM (λ Σ (aGS : ObligationsGS Σ) τ, obls τ ∅)))
@@ -62,21 +69,20 @@ Section RTBAdequacy.
     { apply _. }
 
     eapply @obls_terminates_impl with
-      (cps_degs := 5 *: {[+ d1 +]})
+      (cps_degs := 7 *: {[+ d2 +]})
       (eb := 0); eauto.
     1-5: by apply _.
-    { apply unit_WF. }
-    { apply fin_wf. } 
+    1, 2: by apply fin_wf.
 
     iIntros (?) "[HEAP INIT]".
 
     pose proof @rt_bound_spec as SPEC. 
     specialize SPEC with 
       (OHE := OHE HEAP)
-      (d0 := d0) (d1 := d1).
-    iApply (SPEC with "[-]"). 
-    { exact tt. }
-    { apply ith_bn_lt; lia. } 
+      (d0 := d0) (d1 := d1) (d2 := d2)
+      (l__f := l__f) (l__w := l__w). 
+    iApply (SPEC with "[-]").
+    1-3: apply ith_bn_lt; lia.
     { simpl. iIntros (? _) "X". iApply "X". }
     { unfold LB. apply max_list_elem_of_le. apply elem_of_list_here. }
     { unfold LB. apply max_list_elem_of_le. apply elem_of_list_further, elem_of_list_here. }
