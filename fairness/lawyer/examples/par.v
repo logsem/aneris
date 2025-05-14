@@ -1,11 +1,10 @@
-From iris.base_logic Require Export gen_heap.
 From iris.proofmode Require Import tactics coq_tactics.
-From trillium.program_logic Require Export weakestpre ectx_lifting.
+From trillium.program_logic Require Export weakestpre.
 From trillium.fairness Require Import utils.
 From trillium.fairness.lawyer.examples Require Import obls_tactics.
 From trillium.fairness.lawyer.obligations Require Import obligations_model obligations_resources obligations_am obligations_em obligations_logic env_helpers.
 From trillium.fairness.lawyer Require Import sub_action_em program_logic.
-From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
+From iris.algebra Require Import excl.
 From iris.base_logic.lib Require Import invariants.
 
 
@@ -41,8 +40,6 @@ Definition parΣ : gFunctors := #[GFunctor (exclR unitO)].
 
 Global Instance subG_parΣ {Σ} : subG parΣ Σ → parG Σ.
 Proof. solve_inG. Qed.
-
-Definition parN : namespace := nroot .@ "par".
   
 Definition spawn : val :=
   λ: "f",
@@ -72,7 +69,8 @@ Section SpawnJoin.
   Context {Σ} {OHE: OM_HL_Env OP EM Σ}. 
   
   Context {PARΣ: parG Σ}.
-  Context (N: namespace).  
+
+  Definition parN : namespace := nroot .@ "par".
 
   Context (l__s l__w: Level).
   Hypothesis (LT2h: lvl_lt l__s l__w).
@@ -86,7 +84,7 @@ Section SpawnJoin.
                       ∃ w, ⌜lv = SOMEV w /\ b = true⌝ ∗ (Ψ w ∨ own γ (Excl ()))).
   
   Definition join_handle (l : loc) s__h π (Ψ : val → iProp Σ) : iProp Σ :=
-    ∃ γ, own γ (Excl ()) ∗ inv N (spawn_inv γ l s__h Ψ) ∗ ep s__h π d0.
+    ∃ γ, own γ (Excl ()) ∗ inv parN (spawn_inv γ l s__h Ψ) ∗ ep s__h π d0.
 
   Global Instance spawn_inv_ne n γ l s__h :
     Proper (pointwise_relation val (dist n) ==> dist n) (spawn_inv γ l s__h).
@@ -153,7 +151,7 @@ Section SpawnJoin.
     { try_solve_bounds. }
     iDestruct (sgn_get_ex with "[$]") as "[SGNh #SGNh']". 
 
-    iMod (inv_alloc N _ (spawn_inv γ hnd _ Q__s) with "[HANDLE SGNh]") as "#INV".
+    iMod (inv_alloc parN _ (spawn_inv γ hnd _ Q__s) with "[HANDLE SGNh]") as "#INV".
     { iNext. iExists NONEV, _. iFrame; eauto. }
 
     BOU_burn_cp. iModIntro.
@@ -186,7 +184,7 @@ Section SpawnJoin.
       wp_bind (InjR _)%E. pure_steps.
 
       iApply wp_atomic.
-      iInv N as "(%t & %b & (>HND & >SGN & ?))" "CLOS". iModIntro.
+      iInv parN as "(%t & %b & (>HND & >SGN & ?))" "CLOS". iModIntro.
       iApply sswp_MU_wp_fupd; [done| ]. iModIntro.
       iApply (wp_store with "[$]"). iIntros "!> HANDLE".
       MU_by_BOU.
@@ -231,7 +229,7 @@ Section SpawnJoin.
 
     pure_steps.
     wp_bind (! _)%E. iApply wp_atomic.
-    iInv N as "(%t & %b & (>HND & >SGN & CASES))" "CLOS". iModIntro.
+    iInv parN as "(%t & %b & (>HND & >SGN & CASES))" "CLOS". iModIntro.
     iApply sswp_MU_wp_fupd; [done| ]. iModIntro.
     iApply (wp_load with "[$]"). iIntros "!> HANDLE".
 
