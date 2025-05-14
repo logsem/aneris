@@ -40,13 +40,6 @@ Section Nondet.
       !"c"
   .
   
-  Definition nondet_par: val :=
-    λ: <>,
-      let: "c" := ref #(0%nat) in
-      let: "f" := ref #false in
-      par (λ: <>, get_cnt "f" "c")%V (λ: <>, incr_loop "c" "f")%V
-  .
-
   Context (l__f: Level).
   Context (d0 d1 d2: Degree).
   Hypotheses (DEG01: deg_lt d0 d1) (DEG12: deg_lt d1 d2).
@@ -321,15 +314,22 @@ Section Nondet.
     iExists _. by iFrame.
   Qed.
 
-  Theorem nondet_par_spec `{NondetPreG Σ} τ π:
+  Definition nondet_par: val :=
+    λ: <>,
+      let: "c" := ref #(0%nat) in
+      let: "f" := ref #false in
+      Fst (par (λ: <>, get_cnt "f" "c") (λ: <>, incr_loop "c" "f"))      
+  .
+
+  Theorem nondet_par_spec `{NondetPreG Σ, parG Σ} τ π:
     {{{ th_phase_eq τ π ∗ cp_mul π d2 3 ∗ obls τ ∅ }}}
       nondet_par #() @ τ
     {{{ (n: nat), RET #n; ∃ π', exc_lb (K * n) ∗ obls τ ∅ ∗
                                 th_phase_eq τ π' ∗ ⌜ phase_le π π' ⌝}}}.
   Proof.
-    iIntros (Φ) "(PH & CPS1 & OB) POST". rewrite /nondet_par.
+    iIntros (Φ) "(PH & CPS2 & OB) POST". rewrite /nondet_par.
 
-    split_cps "CPS1" 1. rewrite -cp_mul_1.
+    split_cps "CPS2" 1. rewrite -cp_mul_1.
     pure_step_hl. MU_by_BOU.
     iMod (first_BOU with "[$]") as "[CPS #EB]".
     { eauto. }
@@ -360,60 +360,39 @@ Section Nondet.
     wp_bind (Rec _ _ _)%E.
     pure_step_cases. 
     pure_step_cases.
+    pure_step_cases.
 
-    iPoseProof par_spec as "PAR". 
-    { apply LTfw. }
-    { apply DEG01. }
-    { apply DEG12. }
-    { (* TODO: abstract *)
-      etrans; [| apply LS_LB].
-      rewrite /par.fuels_spawn /nondet_LS_LB. lia. }
-    { apply NO_OBS_POST. }
-    { admit. }
-    iSpecialize ("PAR" with "[]").
-    { iApply incr_loop_waiter_spec. iFrame "#∗". }
-    iSpecialize ("PAR" with "[TOK]").
-    { iApply get_cnt_spawnee_spec. iFrame "#∗". }
-    
-    
-    { 
-      
+    wp_bind (Rec _ _ _)%E.
+    do 2 pure_step_cases.
+    wp_bind (Rec _ _ _)%E.
+    do 2 pure_step_cases.
 
-    iApply wp_wand. 
-    { 
-                
+    wp_bind (par _ _)%E. 
+    iClear "EB".
+    split_cps "CPS" 1. 
+    iApply (wp_wand with "[-POST CPS]").
+    { split_cps "CPS2" 1. rewrite -!cp_mul_1.
+      iApply (par_spec with "[] [TOK] [] [OB] [$] CPS2 CPS' CPS2'"). 
+      { apply LTfw. }
+      { apply DEG01. }
+      { apply DEG12. }
+      { (* TODO: abstract *)
+        etrans; [| apply LS_LB].
+        rewrite /par.fuels_spawn /nondet_LS_LB. lia. }
+      { apply NO_OBS_POST. }
+      2: { iApply incr_loop_waiter_spec. iFrame "#∗". }
+      2: { iApply get_cnt_spawnee_spec. iFrame "#∗". }
+      { set_solver. }
+      all: cycle 1.
+      { iApply (obls_proper with "[$]"). set_solver. }
+      { iApply empty_sgns_levels_rel. }
+      simpl. iIntros "!> %vw %vs OB _ (% & -> & EB) !>".
+      Unshelve. 2: exact (fun (v: val) => (∃ (a: nat) (b: val), ⌜ v = PairV (#a) b⌝ ∗ obls τ ∅ ∗ exc_lb (K * a))%I).
+      simpl. iExists _, _. iFrame. iPureIntro. reflexivity. }
 
-    
-    
-
-    wp_bind (Fork _)%E.
-    iApply sswp_MUf_wp. iIntros (τ') "!>".
-    split_cps "CPS" 1.
-
-    MU__f_by_BOU (∅: gset SignalId). 
-    iModIntro. iSplitR "CPS' PH OB". 
-    2: { iExists _. rewrite cp_mul_1. by iFrame. }
-    iIntros "(%π1 & %π2 & PH1 & OB1 & PH2 & OB2 & [%PH_LT1 %PH_LT2])".
-
-    split_cps "CPS" 10. 
-    iSplitR "CPS PH1 OB1 POST TOK".
-    { erewrite ep_weaken; [| apply PH_LT2].
-      erewrite cp_mul_weaken; [| apply PH_LT2| reflexivity].
-      rewrite intersection_empty_r_L.
-      iApply (incr_loop_spec with "[-]").
-      { iFrame "#∗". }
-      iIntros "!> % OB". by iApply NO_OBS_POST. }
-
-    erewrite cp_mul_weaken; [| apply PH_LT1| reflexivity]. iRename "PH1" into "PH".
-    wp_bind (Rec _ _ _)%E. do 3 pure_step_cases.
-
-    rewrite difference_empty_L.
-    rewrite ep_weaken.
-    2: { apply PH_LT1. }
-    iApply (get_cnt_spec with "[-POST]").
-    { iFrame "#∗". }
-    iIntros "!> % (?&?&?)". iApply "POST".
-    iExists _. iFrame. iPureIntro. apply PH_LT1.
+    simpl. iIntros "% [(%n & % & -> & OB & EB) (% & PH & %PH_LE)]".
+    rewrite cp_mul_weaken; eauto. pure_steps.
+    iApply "POST". iExists _. iFrame "#∗". done.
   Qed.
   
 End Nondet.
