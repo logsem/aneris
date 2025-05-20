@@ -8,30 +8,6 @@ From iris.algebra Require Import excl.
 From iris.base_logic.lib Require Import invariants.
 
 
-(* TODO: move, remove duplicates *)
-Local Ltac try_solve_bounds :=
-  (try iPureIntro);
-  try (match goal with | |- ?x < ?y => red end);
-  match goal with
-  | BOUND: ?rfl_fl_sb_fun ?u ≤ ?LIM_STEPS |- ?n <= ?LIM_STEPS =>
-      etrans; [| apply BOUND];
-      try by (rewrite /rfl_fl_sb_fun; simpl; lia)
-  | BOUND: ?N ≤ ?LIM_STEPS |- ?n <= ?LIM_STEPS =>
-      etrans; [| apply BOUND];
-      try by (try unfold N; simpl; lia)
-  end.
-
-Local Ltac use_list_head :=
-  match goal with
-  | |- ?n ≤ max_list (cons ?i ?l) =>
-      trans i; [| simpl; lia];
-      (reflexivity || (rewrite Nat.add_comm; simpl; reflexivity))
-  end.
-
-Local Ltac use_rfl_fl_sb :=
-  use_list_head ||
-  match goal with | |- ?n ≤ ?F _ => rewrite /F; use_list_head end.
-
 (**** adapted from Iris' implementation of parallel composition *)
 
 Class parG Σ := SpawnG { #[local] spawn_tokG :: inG Σ (exclR unitO) }.

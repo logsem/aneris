@@ -11,36 +11,6 @@ From trillium.fairness.lawyer.obligations Require Import obligations_model oblig
 From trillium.fairness.lawyer Require Import sub_action_em program_logic.
 
 
- (* Ltac try_solve_bounds := *)
- (*    (try iPureIntro); *)
- (*    match goal with  *)
- (*    | BOUND: rfl_fl_sb_fun ?u ≤ LIM_STEPS |- ?n <= LIM_STEPS => *)
- (*      etrans; [| apply BOUND]; *)
- (*      try by (rewrite /rfl_fl_sb_fun; simpl; lia) *)
- (*    end. *)
-
-Local Ltac try_solve_bounds :=
-  (try iPureIntro);
-  match goal with 
-  | BOUND: ?rfl_fl_sb_fun ?u ≤ ?LIM_STEPS |- ?n <= ?LIM_STEPS =>
-      etrans; [| apply BOUND];
-      try by (rewrite /rfl_fl_sb_fun; simpl; lia)
-  end.
-
-Local Ltac use_rfl_fl_sb :=
-  match goal with
-  | |- S ?n ≤ ?F _ =>
-      rewrite /F;
-      match goal with
-      | |- S n ≤ max_list (cons ?i ?l) =>
-          simpl;
-          trans i; [| lia];
-          (* rewrite /i; etrans; [| apply Nat.le_max_r]; reflexivity *)
-          reflexivity
-      end
-  end.
-
-
 Section ReleasingLockSpec.
 
   Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.

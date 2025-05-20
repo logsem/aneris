@@ -48,3 +48,28 @@ Ltac pure_steps := repeat (pure_step_cases; []).
 Ltac split_cps cps_res n :=
   let fmt := constr:(("[" ++ cps_res ++ "' " ++ cps_res ++ "]")%string) in
   iDestruct (cp_mul_split' _ _ n with cps_res) as fmt; [lia| ].
+
+
+(* Tactics for solving goals related to SB *)
+Ltac try_solve_bounds :=
+  (try iPureIntro);
+  try (match goal with | |- ?x < ?y => red end);
+  match goal with
+  | BOUND: ?rfl_fl_sb_fun ?u ≤ ?LIM_STEPS |- ?n <= ?LIM_STEPS =>
+      etrans; [| apply BOUND];
+      try by (rewrite /rfl_fl_sb_fun; simpl; lia)
+  | BOUND: ?N ≤ ?LIM_STEPS |- ?n <= ?LIM_STEPS =>
+      etrans; [| apply BOUND];
+      try by (try unfold N; simpl; lia)
+  end.
+
+Ltac use_list_head :=
+  match goal with
+  | |- ?n ≤ max_list (cons ?i ?l) =>
+      trans i; [| simpl; lia];
+      (reflexivity || (rewrite Nat.add_comm; simpl; reflexivity))
+  end.
+
+Ltac use_rfl_fl_sb :=
+  use_list_head ||
+  match goal with | |- ?n ≤ ?F _ => rewrite /F; use_list_head end.

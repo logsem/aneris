@@ -11,30 +11,6 @@ From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From iris.base_logic.lib Require Import invariants.
 
 
-(* TODO: move, remove duplicates *)
-Local Ltac try_solve_bounds :=
-  (try iPureIntro);
-  try (match goal with | |- ?x < ?y => red end);
-  match goal with
-  | BOUND: ?rfl_fl_sb_fun ?u ≤ ?LIM_STEPS |- ?n <= ?LIM_STEPS =>
-      etrans; [| apply BOUND];
-      try by (rewrite /rfl_fl_sb_fun; simpl; lia)
-  | BOUND: ?N ≤ ?LIM_STEPS |- ?n <= ?LIM_STEPS =>
-      etrans; [| apply BOUND];
-      try by (simpl; lia)
-  end.
-
-Local Ltac use_list_head :=
-  match goal with
-  | |- ?n ≤ max_list (cons ?i ?l) =>
-      trans i; [| simpl; lia];
-      (reflexivity || (rewrite Nat.add_comm; simpl; reflexivity))
-  end.
-
-Local Ltac use_rfl_fl_sb :=
-  use_list_head ||
-  match goal with | |- ?n ≤ ?F _ => rewrite /F; use_list_head end.
-
 (* With the current proof, we don't require anything from Σ before OM is instantiated.
    However, we keep this preG/G pattern for uniformness. *)
 Class ClientPreG (Σ: gFunctors) := { }.
