@@ -47,7 +47,7 @@ Ltac pure_steps := repeat (pure_step_cases; []).
 
 Ltac split_cps cps_res n :=
   let fmt := constr:(("[" ++ cps_res ++ "' " ++ cps_res ++ "]")%string) in
-  iDestruct (cp_mul_split' _ _ n with cps_res) as fmt; [lia| ].
+  iDestruct (cp_mul_split' _ _ n with cps_res) as fmt; [try lia| ].
 
 
 (* Tactics for solving goals related to SB *)

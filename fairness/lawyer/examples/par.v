@@ -21,6 +21,7 @@ Definition spawn : val :=
   λ: "f",
     let: "c" := ref NONE in
     Fork ("c" <- SOME ("f" #())) ;; "c".
+
 Definition join : val :=
   rec: "join" "c" :=
     match: !"c" with
@@ -33,6 +34,14 @@ Definition par : val :=
     let: "handle" := spawn "e1" in
     let: "v2" := "e2" #() in
     let: "v1" := join "handle" in
+    ("v1", "v2").
+
+Definition par_sym : val :=
+  λ: "e1" "e2",
+    let: "h1" := spawn "e1" in
+    let: "h2" := spawn "e2" in
+    let: "v1" := join "h1" in
+    let: "v2" := join "h2" in
     ("v1", "v2").
 
 
@@ -318,5 +327,98 @@ Section SpawnJoin.
     wp_bind (Rec _ _ _)%E. pure_steps.
     iFrame. iExists _. iFrame. iPureIntro. etrans; eauto.  
   Qed.
+
+  (* Notice that this allows us to strip a later *after* the two Ψ have been
+     brought together.  That is strictly stronger than first stripping a later
+     and then merging them, as demonstrated by [tests/joining_existentials.v].
+     This is why these are not Texan triples. *)
+  Lemma par_sym_spec τ π (Q1 Q2 : val → iProp Σ) R1 R2 R'
+    (f1 f2 : val) (Φ : val → iProp Σ) (df1 df2: Degree)
+    (DISJ12: R1 ## R2) (DISJ': R' ## (R1 ∪ R2)):
+      spawnee_spec (f1 #()) R1 df1 Q1 -∗
+      spawnee_spec (f2 #()) R2 df2 Q2 -∗
+      (* TODO: is it possible to avoid mentioning phase specifically? *)
+      (* tried to do so, but have problems with eliminating laters and/or phase disappearing *)
+      (▷ ∀ v1 v2, obls τ R' -∗ Q1 v1 -∗ Q2 v2 -∗
+                        (* th_phase_eq τ π2' -∗ ⌜ phase_le π π2' ⌝ -∗ *)
+                        ▷ Φ (v1, v2)%V) -∗
+      obls τ (R1 ∪ R2 ∪ R') -∗ th_phase_eq τ π -∗
+      cp π d2 -∗ cp π df1 -∗ cp π df2 -∗
+      sgns_level_gt R' l__w -∗
+      WP par_sym f1 f2 @ τ {{ v, Φ v ∗ ∃ π', th_phase_eq τ π' ∗ ⌜ phase_le π π' ⌝ }}.
+  Proof.
+    iIntros "SPEC1 SPEC2 POST OB PH CPP CP1 CP2 #SGNS_GT".
+    rewrite /par_sym.
+
+    wp_bind (App _ _)%E.
+    pure_steps. pure_step_hl. MU_by_BOU.
+    iApply BOU_lower; [apply LS_LB| ].
+    iMod (first_BOU with "CPP") as "[CPS #EB]".
+    { apply LT12. }
+    { rewrite /fuels_spawn. reflexivity. }
+    BOU_burn_cp.
+    pure_steps.
+
+    split_cps "CPS" 2.
+    replace (R1 ∪ R2 ∪ R') with ((R2 ∪ R') ∪ R1) by set_solver.
+    iApply (spawn_spec with "[SPEC1 OB PH CPS' CP1]").
+    2: { iFrame. }
+    { set_solver. }
+    iIntros "!> %h1 (%s__h1 & %π__1 & HANDLE1 & OB & PH & %PH_LE1)".
+
+    rewrite cp_mul_weaken; [| apply PH_LE1| reflexivity]. 
+    wp_bind (Rec _ _ _)%E. pure_steps.
+
+    split_cps "CPS" 2.
+    rewrite union_comm_L.
+    rewrite cp_weaken; [| apply PH_LE1]. 
+    iApply (spawn_spec with "[SPEC2 OB PH CPS' CP2]").
+    2: { iFrame. }
+    { set_solver. }
+    iIntros "!> %h2 (%s__h2 & %π__2 & HANDLE2 & OB & PH & %PH_LE2)".
+
+    rewrite cp_mul_weaken; [| apply PH_LE2| reflexivity]. 
+    wp_bind (Rec _ _ _)%E.
+
+    (* do 2 pure_step_cases. *)
+
+    (* exchange bound is smaller than what we need,
+       but we can just do multiple exchanges *)
+    split_cps "CPS" 3.
+    iDestruct (cp_mul_take with "CPS'") as "[CP1 CP1']".
+    (* rewrite -cp_mul_1.  *)
+    wp_bind (Rec _ _ _)%E.
+    pure_step_hl. MU_by_BOU.
+    iMod (exchange_cp_upd with "CP1' [$]") as "CPS0"; eauto.
+    { try_solve_bounds. }
+    split_cps "CP1" 1. rewrite -cp_mul_1.
+    iMod (exchange_cp_upd with "CP1' [$]") as "CPS0'"; eauto.
+    { apply Nat.lt_add_lt_sub_l. try_solve_bounds. }
+    iMod (exchange_cp_upd with "CP1 [$]") as "CPS0''"; eauto.
+    { rewrite -Nat.sub_add_distr. 
+      apply Nat.lt_add_lt_sub_l. try_solve_bounds. }
+    iCombine "CPS0 CPS0' CPS0''" as "CPS0". rewrite -!cp_mul_split.
+    BOU_burn_cp. 
+    pure_steps.
+
+    split_cps "CPS0" fuels_spawn.
+    { rewrite /fuels_spawn. lia. }
+    iApply (join_spec with "[-POST HANDLE2 CPS CPS0]").
+    { iFrame "#∗". by iApply join_handle_weaken. }
+    iIntros "!> %v1 (Q1 & OB & PH)".
+    wp_bind (Rec _ _ _)%E. pure_steps. 
+    
+    split_cps "CPS0" fuels_spawn.
+    { rewrite /fuels_spawn. lia. }
+    iApply (join_spec with "[-POST CPS CPS0 Q1]").
+    { iFrame "#∗". }
+    iIntros "!> %v2 (Q2 & OB & PH)".
+    wp_bind (Rec _ _ _)%E.
+    (* pure_steps.  *)
+    
+    iSpecialize ("POST" with "[$] [$] [$]").
+    wp_bind (Rec _ _ _)%E. pure_steps.
+    iFrame. iExists _. iFrame. iPureIntro. etrans; eauto.
+  Qed.    
 
 End SpawnJoin.
