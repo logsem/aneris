@@ -1,9 +1,8 @@
-TRILLIUM_DIR := 'trillium'
 FAIRNESS_DIR := 'fairness'
 HL_DIR := 'heap_lang'
 LAWYER_DIR := 'lawyer'
-LOCAL_SRC_DIRS := $(TRILLIUM_DIR) $(FAIRNESS_DIR) $(HL_DIR) $(LAWYER_DIR)
-SRC_DIRS := $(LOCAL_SRC_DIRS) 'external'
+LOCAL_SRC_DIRS := $(FAIRNESS_DIR) $(HL_DIR) $(LAWYER_DIR)
+SRC_DIRS := $(LOCAL_SRC_DIRS)
 
 ALL_VFILES := $(shell find $(SRC_DIRS) -name "*.v")
 VFILES := $(shell find $(LOCAL_SRC_DIRS) -name "*.v")
@@ -47,7 +46,7 @@ clean:
 # project-specific targets
 .PHONY: build
 
-VPATH= $(TRILLIUM_DIR) $(FAIRNESS_DIR) $(HL_DIR) $(LAWYER_DIR)
+VPATH= $(FAIRNESS_DIR) $(HL_DIR) $(LAWYER_DIR)
 VPATH_FILES := $(shell find $(VPATH) -name "*.v")
 
 build: $(VPATH_FILES:.v=.vo)
