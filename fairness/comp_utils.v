@@ -1,4 +1,4 @@
-From stdpp Require Import finite.
+From stdpp Require Import finite ssreflect.
 From trillium.prelude Require Import classical_instances finitary.
 From fairness Require Import inftraces trace_lookup fairness trace_len my_omega subtrace utils_tactics.
 

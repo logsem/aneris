@@ -15,7 +15,7 @@ Section Termination.
   Hypothesis (VALID: obls_trace_valid tr). 
   Hypothesis (WF: forall i δ, tr S!! i = Some δ -> om_st_wf δ).
   
-  Hypothesis (LVL_WF: wf (strict lvl_le)).
+  Hypothesis (LVL_WF: well_founded (strict lvl_le)).
   
   Definition sig_val_at sid i := 
     from_option (fun δ => from_option snd true (ps_sigs δ !! sid)) true (tr S!! i). 
@@ -1432,7 +1432,7 @@ Section Termination.
   Qed.
 
 
-  Lemma tr_sig_lt_wf: wf tr_sig_lt.
+  Lemma tr_sig_lt_wf: well_founded tr_sig_lt.
   Proof using LVL_WF.
     apply measure_wf.
     assert (forall b, Acc lvl_opt_lt (Some b)) as ACC. 
@@ -1448,7 +1448,7 @@ Section Termination.
   
   Theorem signals_eventually_set
     (FAIR: forall τ, obls_trace_fair τ tr)
-    (DEG_WF: wf (strict deg_le)):
+    (DEG_WF: well_founded (strict deg_le)):
     (* ¬ exists sid c, never_set_after sid c.  *)
     forall sid,
       (* eventually_set sid.  *)
@@ -1664,7 +1664,7 @@ Section Termination.
 
   Theorem trace_terminates
     (FAIR: forall τ, obls_trace_fair τ tr)
-    (DEG_WF: wf (strict deg_le)):
+    (DEG_WF: well_founded (strict deg_le)):
     terminating_trace tr. 
   Proof using WF VALID SET_BEFORE_SPEC LVL_WF.
     set (R := MR (ms_lt deg_le) APF).    
@@ -1707,8 +1707,8 @@ Section TerminationFull.
 
   Theorem obls_fair_trace_terminate
     (TR_WF: ∀ i δ, tr S!! i = Some δ → om_st_wf δ)
-    (LVL_WF: wf (strict lvl_le))
-    (DEG_WF: wf (strict deg_le)):
+    (LVL_WF: well_founded (strict lvl_le))
+    (DEG_WF: well_founded (strict deg_le)):
     terminating_trace tr.
   Proof using VALID FAIR.
     Require Import Coq.Logic.ClassicalChoice.

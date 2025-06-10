@@ -185,7 +185,7 @@ Section GmultisetLtWf.
     intros. eapply t_trans; eauto.
   Qed. 
 
-  Lemma lt_ext_wf (WF: wf (strict R)): wf lt_ext.
+  Lemma lt_ext_wf (WF: well_founded (strict R)): well_founded lt_ext.
   Proof using ED.
     eapply Morphisms_Prop.well_founded_morphism.
     { red. red. red. intros ??. symmetry. apply clos_trans_tn1_t1n_iff. }
@@ -619,8 +619,8 @@ Section GmultisetLtWf.
     destruct NEQ'. eapply gmultiset_elements_equiv; eauto. 
   Qed.
 
-  Theorem ms_lt_wf (WF: wf (strict R)):
-    wf (ms_lt R).
+  Theorem ms_lt_wf (WF: well_founded (strict R)):
+    well_founded (ms_lt R).
   Proof using PO.
     eapply wf_projected with (f := elements); [| apply lt_ext_wf; done].
     intros. by apply ms_lt_ext.

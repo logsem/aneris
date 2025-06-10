@@ -1,5 +1,5 @@
 Require Import Relation_Operators.
-From stdpp Require Import namespaces. 
+From stdpp Require Import namespaces fin_maps ssreflect fin_map_dom gmultiset.
 From fairness Require Import fairness locales_helpers utils utils_tactics.
 From lawyer.obligations Require Import obligations_model obls_utils.
 
@@ -19,7 +19,7 @@ Section Wf.
     rewrite /obls_assigned. rewrite elem_of_subseteq.
     apply forall_proper. intros s.
     rewrite elem_of_dom.
-    rewrite map_filter_lookup. simpl. 
+    rewrite map_lookup_filter. simpl. 
     destruct (ps_sigs δ !! s) as [[??]| ] eqn:SIGS; rewrite SIGS; simpl. 
     2: { split; intros; try done. by destruct H0. }
     destruct b; simpl. 
@@ -222,11 +222,11 @@ Section Wf.
 
       apply elem_of_subseteq. intros s' DOM'. rewrite elem_of_union. 
       rewrite elem_of_dom in DOM'. destruct DOM' as [[l' b'] DOM'].
-      apply map_filter_lookup_Some in DOM' as [DOM' ->].
+      apply map_lookup_filter_Some in DOM' as [DOM' ->].
       apply lookup_delete_Some in DOM' as [NEQ DOM'].
       forward eapply (@ASG s').
       { simpl. apply elem_of_dom. eexists.
-        eapply map_filter_lookup_Some; eauto. split; done. }
+        eapply map_lookup_filter_Some; eauto. split; done. }
       simpl. intros ASG'.
       apply flatten_gset_spec in ASG'. destruct ASG' as (obls'&ASG'&IN').
       apply elem_of_map_img in ASG' as [τ' ASG'].

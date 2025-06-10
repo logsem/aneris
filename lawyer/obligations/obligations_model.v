@@ -1,23 +1,25 @@
 Require Import Relation_Operators.
 From fairness Require Import fairness.
 From fairness Require Import utils.
+From stdpp Require Import countable gmultiset gmap.
+From iris.algebra Require Import ofe.
 
 
 Class ObligationsParams (Degree Level Locale: Type) (LIM_STEPS: nat) := {
-  opar_deg_eqdec :> EqDecision Degree;
-  opar_deg_cnt :> Countable Degree;
+  opar_deg_eqdec :: EqDecision Degree;
+  opar_deg_cnt :: Countable Degree;
   (* opar_deg_lt: Degree -> Degree -> Prop; *)
   deg_le: relation Degree;
-  deg_PO :> PartialOrder deg_le;
+  deg_PO :: PartialOrder deg_le;
 
-  opar_lvl_eqdec :> EqDecision Level;
-  opar_lvl_cnt :> Countable Level;
+  opar_lvl_eqdec :: EqDecision Level;
+  opar_lvl_cnt :: Countable Level;
 
   lvl_le: relation Level;
-  lvl_PO :> PartialOrder lvl_le;
+  lvl_PO :: PartialOrder lvl_le;
 
-  loc_eqdec :> EqDecision Locale; 
-  loc_cnt :> Countable Locale; 
+  loc_eqdec :: EqDecision Locale; 
+  loc_cnt :: Countable Locale; 
 }. 
 
 
@@ -35,9 +37,8 @@ Section Model.
   Definition ExpectPermission: Type := SignalId * Phase * Degree.
 
   Definition deg_lt := strict deg_le. 
-  Definition lvl_lt := strict lvl_le. 
+  Definition lvl_lt := strict lvl_le.
 
-  (* TODO: can we merge obligations and signals? *)
   Record ProgressState := {
       ps_cps: gmultiset CallPermission;
       ps_sigs: gmap SignalId SignalState;

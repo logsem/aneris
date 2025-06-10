@@ -1,6 +1,8 @@
-From stdpp Require Import option.
+From stdpp Require Import option countable gmap ssreflect.
 From Paco Require Import paco1 paco2 pacotac.
 From fairness Require Export inftraces trace_lookup utils.
+From trillium.program_logic Require Export traces.
+From trillium.program_logic Require Import language adequacy.
 
 Record FairModel : Type := {
   fmstate:> Type;

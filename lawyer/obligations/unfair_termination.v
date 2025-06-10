@@ -184,7 +184,7 @@ Section UnfairTermination.
   Hypothesis 
     (VALID: obls_trace_valid tr)
     (TR_WF: ∀ i δ, tr S!! i = Some δ → om_st_wf δ)
-    (DEG_WF: wf (strict deg_le))
+    (DEG_WF: well_founded (strict deg_le))
   .
 
   Lemma no_obls_wo_lvls δ (WF: om_st_wf δ):

@@ -88,7 +88,8 @@ End gmap.
 Lemma map_img_insert_L :
   ∀ {K : Type} {M : Type → Type} {H : FMap M} {H0 : ∀ A : Type, Lookup K A (M A)} 
     {H1 : ∀ A : Type, Empty (M A)} {H2 : ∀ A : Type, PartialAlter K A (M A)} 
-    {H3 : OMap M} {H4 : Merge M} {H5 : ∀ A : Type, FinMapToList K A (M A)} 
+    {H3 : OMap M} {H4 : Merge M}
+    {H5 : ∀ A : Type, MapFold K A (M A)}
     {EqDecision0 : EqDecision K}
   ,
     FinMap K M
@@ -124,7 +125,7 @@ Lemma dom_filter_sub {K V: Type} `{Countable K} (m: gmap K V)
 Proof.
   apply elem_of_subseteq.
   intros ? IN. rewrite elem_of_dom in IN. destruct IN as [? IN].
-  apply map_filter_lookup_Some in IN. apply IN.
+  apply map_lookup_filter_Some in IN. apply IN.
 Qed. 
 
 (* TODO: generalize, upstream *)
@@ -161,17 +162,17 @@ Proof using.
   apply map_eq. intros k.
   destruct (m !! k) eqn:KTH.
   2: { etrans; [| symmetry].
-       { eapply map_filter_lookup_None. tauto. }
-       apply lookup_union_None_2; eapply map_filter_lookup_None; tauto. }
+       { eapply map_lookup_filter_None. tauto. }
+       apply lookup_union_None_2; eapply map_lookup_filter_None; tauto. }
   destruct (decide (P1 (k, a))).
-  { erewrite map_filter_lookup_Some_2; eauto.
-    erewrite lookup_union_Some_l; eauto. eapply map_filter_lookup_Some; eauto. }
+  { erewrite map_lookup_filter_Some_2; eauto.
+    erewrite lookup_union_Some_l; eauto. eapply map_lookup_filter_Some; eauto. }
   erewrite lookup_union_r; eauto.
-  2: { eapply map_filter_lookup_None. set_solver. }
+  2: { eapply map_lookup_filter_None. set_solver. }
   destruct (decide (P2 (k, a))).
-  { erewrite map_filter_lookup_Some_2; eauto.      
-    symmetry. apply map_filter_lookup_Some_2; eauto. }
-  etrans; [| symmetry]; eapply map_filter_lookup_None; set_solver.
+  { erewrite map_lookup_filter_Some_2; eauto.      
+    symmetry. apply map_lookup_filter_Some_2; eauto. }
+  etrans; [| symmetry]; eapply map_lookup_filter_None; set_solver.
 Qed.
 
 Section MapsInverseMatch.

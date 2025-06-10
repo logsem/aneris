@@ -2,6 +2,7 @@ From fairness Require Import inftraces fairness.
 From fairness Require Import my_omega trace_len trace_helpers trace_lookup.
 From fairness Require Import utils_tactics.
 Require Import Coq.Logic.Classical.
+From stdpp Require Import decidable ssreflect.
 
 Local Ltac gd t := generalize dependent t.
 

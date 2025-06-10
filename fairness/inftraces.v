@@ -1,6 +1,6 @@
 From stdpp Require Import option.
 From Paco Require Import paco1 paco2 pacotac.
-From trillium.program_logic Require Export adequacy.
+From trillium.program_logic Require Import adequacy.
 From fairness Require Import utils_logic.
 
 Require Import
@@ -438,7 +438,7 @@ Section execs_and_traces.
     revert fl il. cofix CH. intros s il.
     rewrite (trace_unfold_fold (to_trace _ il)). destruct il as [| [ℓ x]?]; simpl in *.
     - by econstructor.
-    - econstructor. have ->: x = trace_last (trace_extend s ℓ x) by done.
+    - econstructor.
       apply CH.
   Qed.
 

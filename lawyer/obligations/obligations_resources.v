@@ -36,17 +36,17 @@ Section ObligationsRepr.
   Proof using. by destruct p. Qed.
 
   Class ObligationsPreGS Σ := {
-      obls_pre_cps :> inG Σ (authUR (gmultisetUR cpO));
-      obls_pre_sigs :> inG Σ (authUR (gmapUR SignalId sstR));
-      obls_pre_obls :> inG Σ (authUR (gmapUR Locale (exclR (gsetUR natO))));
-      obls_pre_eps :> inG Σ (authUR (gsetUR epO)); (* allowing duplication of eps *)
-      (* obls_pre_phs :> inG Σ (authUR (gmapUR Locale (exclR phO))); *)
-      obls_pre_phs :> ghost_mapG Σ Locale phase_wrapped;
-      obls_pre_lb :> inG Σ mono_natUR;
+      obls_pre_cps :: inG Σ (authUR (gmultisetUR cpO));
+      obls_pre_sigs :: inG Σ (authUR (gmapUR SignalId sstR));
+      obls_pre_obls :: inG Σ (authUR (gmapUR Locale (exclR (gsetUR natO))));
+      obls_pre_eps :: inG Σ (authUR (gsetUR epO)); (* allowing duplication of eps *)
+      (* obls_pre_phs :: inG Σ (authUR (gmapUR Locale (exclR phO))); *)
+      obls_pre_phs :: ghost_mapG Σ Locale phase_wrapped;
+      obls_pre_lb :: inG Σ mono_natUR;
   }.
   
   Class ObligationsGS Σ := {
-      obls_pre :> ObligationsPreGS Σ;
+      obls_pre :: ObligationsPreGS Σ;
       obls_cps: gname;
       obls_sigs: gname;
       obls_obls: gname;
@@ -189,7 +189,7 @@ Section ObligationsRepr.
       iCombine "CPS CP" as "CPS". 
       iDestruct (own_valid with "[$]") as %V.
       iDestruct "CPS" as "[??]". iFrame. 
-      iExists _. iFrame. iPureIntro. split; [| done]. 
+      iPureIntro. split; [| done]. 
       apply auth_both_valid_discrete, proj1 in V. 
       rewrite /cps_repr in V. simpl in V.
       apply gmultiset_singleton_subseteq_l. 
@@ -472,7 +472,7 @@ Section ObligationsRepr.
       (LE: m <= n):
       cp_mul ph deg n ⊣⊢ cp_mul ph deg m ∗ cp_mul ph deg (n - m).
     Proof using.
-      apply Nat.le_sum in LE as [? ->]. rewrite Nat.sub_add'.
+      apply Nat.le_sum in LE as [? ->]. rewrite Nat.add_sub'.
       apply cp_mul_split.
     Qed.
 
@@ -1136,7 +1136,8 @@ Section ObligationsRepr.
       iFrame "P".
       rewrite /obls_msi_interim. iDestruct "MSI" as (?) "(MSI & %STEPS)".
       iDestruct (th_phase_msi_frag with "[$] [$]") as "%PH".
-      iFrame. iApply (obls_msi_interim_progress_impl with "[MSI] [$]").
+      iFrame "PH".
+      iApply (obls_msi_interim_progress_impl with "[MSI] [$]").
       3: { iExists _. by iFrame. }
       { lia. }
       erewrite lse_rep_phases_eq_helper; eauto.
@@ -1278,7 +1279,7 @@ Section ObligationsRepr.
       iSpecialize ("BOU" with "[$] [$]").
       iMod "BOU" as (?) "(?&?&?)".
       iApply fupd_mask_intro; [done| ].
-      iIntros "CLOS". iFrame. iExists _. iFrame.
+      iIntros "CLOS". iFrame. done. 
     Qed.
 
     Lemma BOU_mask_comm' E E' n Φ P Q
@@ -1291,7 +1292,7 @@ Section ObligationsRepr.
       iSpecialize ("BOU" with "[$] [$]").
       iMod "BOU" as (?) "(?&?&WAND)".
       iApply fupd_mask_intro; [done| ].
-      iIntros "CLOS". iFrame. iExists _. iFrame.
+      iIntros "CLOS". iFrame. iFrame.
       iIntros "?". iMod "CLOS". by iApply "WAND".
     Qed.
   
@@ -1328,7 +1329,7 @@ Section ObligationsRepr.
       ⊢ OU (BOU E (b - 1) P) -∗ BOU E b P.
     Proof using.
       red in NZ. apply Nat.le_sum in NZ as [? ->].
-      rewrite Nat.sub_add'. iApply OU_BOU.
+      rewrite Nat.add_sub'. iApply OU_BOU.
     Qed.
 
     Lemma OU_BOU_rep E P b:
@@ -1340,7 +1341,7 @@ Section ObligationsRepr.
         iDestruct "TI'" as "(%δ_ & MSI & %TRANS1)".
         iMod ("OUs" with "[$]") as "(% & ? & -> & ?)".
         iModIntro. iExists n. iFrame. iSplit; [| by rewrite Nat.sub_diag].        
-        iExists _. iFrame. eauto. }
+        iFrame. eauto. }
       iApply OU_BOU. iApply (OU_wand with "[-OUs] [$]"). done.
     Qed.
     

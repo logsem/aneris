@@ -10,7 +10,7 @@ Section WfSetMin.
     forall y, P y -> R y x -> False. 
   
   Context {R: relation A}.
-  Hypothesis (WF: wf R).
+  Hypothesis (WF: well_founded R).
 
   Theorem sets_have_min (P: A -> Prop)
     (NE: exists a, P a):

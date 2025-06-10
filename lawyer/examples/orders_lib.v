@@ -2,7 +2,6 @@ From iris.proofmode Require Import tactics coq_tactics.
 From iris.base_logic.lib Require Import invariants.
 From trillium.prelude Require Import finitary.
 
-
 Definition unit_rel (_: unit) (_: unit) := True. 
 
 Global Instance unit_PO: PartialOrder unit_rel.
@@ -12,7 +11,7 @@ Proof using.
   - red. by intros [] [].
 Qed.
 
-Lemma unit_WF: wf (strict unit_rel).
+Lemma unit_WF: well_founded (strict unit_rel).
 Proof using.
   red. intros x. constructor.
   intros y NE. destruct x, y.
@@ -28,7 +27,7 @@ Proof using.
   - red. done.
 Qed.  
 
-Lemma empty_WF: wf (strict empty_rel).
+Lemma empty_WF: well_founded (strict empty_rel).
 Proof using. done. Qed.
 
 
@@ -91,7 +90,7 @@ Section BoundedNat.
     intros. apply elem_of_seq. lia.
   Qed.  
 
-  Lemma fin_wf: wf (strict bounded_nat_le).
+  Lemma fin_wf: well_founded (strict bounded_nat_le).
   Proof using.
     eapply (well_founded_lt_compat _ proj1_sig).
     intros [??] [??]. rewrite strict_spec. rewrite /bounded_nat_le.

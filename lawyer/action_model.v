@@ -70,26 +70,28 @@ Section Actions.
 
 End Actions.
 
+Record ActionModel := {
+    amSt: Type;
+    amRole: Type;
+    amTrans: amSt -> Action * option amRole -> amSt -> Prop;
+    
+    am_role_eqdec :: EqDecision amRole;
+    am_role_cnt :: Countable amRole;
+    am_st_eqdec :: EqDecision amSt;
+    am_st_inh :: Inhabited amSt;
+    am_role_inh :: Inhabited amRole;
+}.
+
+Arguments amTrans {_}.
+
+
 Section ActionModel.
 
-  Record ActionModel := {
-      amSt: Type;
-      amRole: Type;
-      amTrans: amSt -> Action * option amRole -> amSt -> Prop;
-
-      am_role_eqdec :> EqDecision amRole;
-      am_role_cnt :> Countable amRole;
-      am_st_eqdec :> EqDecision amSt;
-      am_st_inh :> Inhabited amSt;
-      am_role_inh :> Inhabited amRole;
-  }.
-
-  Arguments amTrans {_}.
-  Global Existing Instance am_role_eqdec. 
-  Global Existing Instance am_role_cnt. 
-  Global Existing Instance am_st_eqdec.
-  Global Existing Instance am_st_inh.
-  Global Existing Instance am_role_inh.
+  (* Global Existing Instance am_role_eqdec.  *)
+  (* Global Existing Instance am_role_cnt.  *)
+  (* Global Existing Instance am_st_eqdec. *)
+  (* Global Existing Instance am_st_inh. *)
+  (* Global Existing Instance am_role_inh. *)
  
 
   (* Defining the properites below as typeclasses to allow automatic inference *)
@@ -392,8 +394,8 @@ Section MatchedBy.
     := 
     forall st__s st__s' a ρ st__m,
       R st__s st__m -> is_action_of M__m a ->
-      amTrans _ st__s (a, Some ρ) st__s' -> 
-    exists st__m', amTrans _ st__m (a, None) st__m' /\ R st__s' st__m'.
+      amTrans st__s (a, Some ρ) st__s' -> 
+    exists st__m', amTrans st__m (a, None) st__m' /\ R st__s' st__m'.
 
   Definition matched_by {M__s M__m} 
     (R: amSt M__s -> amSt M__m -> Prop)
@@ -401,14 +403,14 @@ Section MatchedBy.
     := 
     forall st__s st__s' a ρ st__m,
       R st__s st__m -> 
-      amTrans _ st__s (a, Some ρ) st__s' -> 
-    exists st__m', amTrans _ st__m (a, Some $ L ρ) st__m' /\ R st__s' st__m'.
+      amTrans st__s (a, Some ρ) st__s' -> 
+    exists st__m', amTrans st__m (a, Some $ L ρ) st__m' /\ R st__s' st__m'.
 
   Lemma matched_by_prod_l {M__s M__m} R
     {is_act_m_dec: forall a, Decision (is_action_of M__m a)}
     (SYNC: synced_by R)
     (PRIV_S_R: forall st__s st__s' a ρ st__m,
-        R st__s st__m -> amTrans _ st__s (a, Some ρ) st__s' -> ¬ (is_action_of M__m a) ->
+        R st__s st__m -> amTrans st__s (a, Some ρ) st__s' -> ¬ (is_action_of M__m a) ->
         R st__s' st__m)
     :
     @matched_by M__s (ProdAM M__s M__m)
@@ -418,8 +420,7 @@ Section MatchedBy.
   Proof using.
     red. intros st__s st__s' a ρ [? st__m]. intros [-> R1] STEP. 
     destruct (decide (is_action_of M__m a)).
-    - unshelve epose proof (SYNC st__s) as (st__m' & STEP__m & R2);  eauto. 
-      (* opose proof * SYNC as (st__m' & STEP__m & R2); eauto. *)
+    - opose proof * SYNC as (st__m' & STEP__m & R2); eauto.
       eexists (_, _). split; eauto. econstructor; eauto.
     - eexists (_, _). split; [| split]; [| reflexivity| eapply PRIV_S_R]; eauto.  
       econstructor; eauto.
@@ -429,7 +430,7 @@ Section MatchedBy.
     {is_act_m_dec: forall a, Decision (is_action_of M__m a)}
     (SYNC: synced_by R)
     (PRIV_S_R: forall st__s st__s' a ρ st__m,
-        R st__s st__m -> amTrans _ st__s (a, Some ρ) st__s' -> ¬ (is_action_of M__m a) ->
+        R st__s st__m -> amTrans st__s (a, Some ρ) st__s' -> ¬ (is_action_of M__m a) ->
         R st__s' st__m):
     @matched_by M__s (ProdAM M__m M__s)
       (fun st__s '(st__m, st__s') => st__s' = st__s /\ R st__s st__m)
@@ -439,7 +440,7 @@ Section MatchedBy.
     red. intros st__s st__s' a ρ [? st__m]. intros [-> R1] STEP. 
     destruct (decide (is_action_of M__m a)).
     -
-      epose proof (SYNC st__s) as (st__m' & STEP__m & R2); eauto.
+      opose proof * SYNC as (st__m' & STEP__m & R2); eauto.
       eexists (_, _). split; eauto. econstructor; eauto.
     - eexists (_, _). split; [| split]; [| reflexivity| eapply PRIV_S_R]; eauto.  
       econstructor; eauto.
@@ -512,4 +513,4 @@ Lemma UnitAM_actions a: is_action_of UnitAM a <-> False.
 Proof. split; [| done]. by intros (?&?&?&?). Qed. 
 
 
-Definition AM2M (AM: ActionModel): Model := {| mtrans := amTrans AM |}.
+Definition AM2M (AM: ActionModel): Model := {| mtrans := amTrans (a := AM) |}.

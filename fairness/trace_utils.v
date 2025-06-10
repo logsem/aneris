@@ -1,6 +1,8 @@
 From stdpp Require Import option.
 From Paco Require Import paco1 paco2 pacotac.
 From fairness Require Export inftraces.
+Import stdpp.ssreflect.
+From trillium Require Import traces.
 
 Definition trace_implies {S L} (P Q : S → option L → Prop) (tr : trace S L) : Prop :=
   ∀ n, pred_at tr n P → ∃ m, pred_at tr (n+m) Q.
@@ -10,8 +12,8 @@ Lemma trace_implies_after {S L : Type} (P Q : S → option L → Prop) tr tr' k 
   trace_implies P Q tr → trace_implies P Q tr'.
 Proof.
   intros Haf Hf n Hp.
-  have Hh:= Hf (k+n).
-  have Hp': pred_at tr (k + n) P.
+  set (Hh:= Hf (k+n)).
+  assert (Hp': pred_at tr (k + n) P).
   { rewrite (pred_at_sum _ k) Haf /= //. }
   have [m Hm] := Hh Hp'. exists m.
   by rewrite <- Nat.add_assoc, !(pred_at_sum _ k), Haf in Hm.
@@ -156,7 +158,7 @@ Qed.
 
 Fixpoint trace_take {S L} (n : nat) (tr : trace S L) : finite_trace S L :=
   match tr with
-  | ⟨s⟩ => {tr[s]}
+  | ⟨s⟩ => {tr[ s ]}
   | s -[ℓ]-> r => match n with
                   | 0 => {tr[s]}
                   | S n => (trace_take n r) :tr[ℓ]: s
@@ -292,4 +294,3 @@ Definition to_trace_trfirst {S L : Type}
 Proof. 
   destruct il as [| [??]]; done.
 Qed. 
-

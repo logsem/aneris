@@ -7,11 +7,11 @@ From lawyer.counter Require Import counter_model.
 
 
 Class CounterPreGS Σ := {
-    cnt_pre_st :> inG Σ (authUR (excl' natO));
+    cnt_pre_st :: inG Σ (authUR (excl' natO));
 }.
 
 Class CounterGS Σ := {
-    cnt_pre :> CounterPreGS Σ;
+    cnt_pre :: CounterPreGS Σ;
     cnt_val: gname;
 }.
 

@@ -9,18 +9,18 @@ From heap_lang Require Import tactics notation.
 (* TODO: the missing fact of em_GS etc. being typeclasses
    hardens automatic resolution of their instances *)
 Class heapGpreS Σ `(EM: ExecutionModel heap_lang M) := HeapPreG {
-  heapGpreS_inv :> invGpreS Σ;
-  heapGpreS_gen_heap :> gen_heapGpreS loc val Σ;
-  heapGpreS_em :> em_preGS Σ;
+  heapGpreS_inv :: invGpreS Σ;
+  heapGpreS_gen_heap :: gen_heapGpreS loc val Σ;
+  heapGpreS_em :: em_preGS Σ;
 }.
 
 Class heapGS Σ `(EM: ExecutionModel heap_lang M) := HeapG {
-  heap_inG :> heapGpreS Σ EM;
+  heap_inG :: heapGpreS Σ EM;
 
-  heap_invGS :> invGS_gen HasNoLc Σ;
-  heap_gen_heapGS :> gen_heapGS loc val Σ;
+  heap_invGS :: invGS_gen HasNoLc Σ;
+  heap_gen_heapGS :: gen_heapGS loc val Σ;
 
-  heap_fairnessGS :> em_GS Σ;
+  heap_fairnessGS :: em_GS Σ;
 }.
 
 Definition heapΣ `(EM: ExecutionModel heap_lang M) : gFunctors :=

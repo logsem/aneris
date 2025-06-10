@@ -1,6 +1,9 @@
 From fairness Require Import my_omega. 
 From fairness Require Import inftraces trace_utils utils.
 From fairness Require Import utils_tactics.
+From stdpp Require Import decidable option.
+From Stdlib Require Import Arith.
+Import numbers.
 
 Section TraceLen.
   Context {St L: Type}. 
