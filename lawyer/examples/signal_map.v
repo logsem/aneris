@@ -7,11 +7,11 @@ From lawyer.obligations Require Import obligations_model obligations_resources o
 Section SignalMap.
 
   Class SigMapPreG Σ := {
-      sm_sig_map :> inG Σ (authUR (gmapUR nat (agreeR SignalId)));
+      sm_sig_map :: inG Σ (authUR (gmapUR nat (agreeR SignalId)));
   }.
   
   Class SigMapG Σ := {
-      sm_PreG :> SigMapPreG Σ;
+      sm_PreG :: SigMapPreG Σ;
       sm_γ__smap: gname;
   }.
 
@@ -84,7 +84,7 @@ Section SignalMap.
           set_solver.
         - rewrite map_filter_insert_True; [| done].
           rewrite map_img_insert_L. rewrite delete_notin; [done| ].
-          apply map_filter_lookup_None_2. left.
+          apply map_lookup_filter_None_2. left.
           apply not_elem_of_dom. congruence. }
       rewrite big_opM_insert; [| apply not_elem_of_dom; congruence].
       iFrame. }
@@ -95,13 +95,11 @@ Section SignalMap.
     { apply auth_both_valid_2; [| reflexivity]. apply map_nat_agree_valid. }
     iApply BOU_intro.
     iExists _, {| sm_γ__smap := γ |}. iFrame.
-    iSplitL "SIGS A".
-    { iExists _. by iFrame. }
+    do 2 (iSplit; [done| ]). 
     rewrite /ith_sig.
     destruct (decide (smap = ∅)).
     { subst. set_solver. }
     rewrite -big_opM_own; [| done].
-    iSplit; [done| ]. 
     simpl. iApply own_proper; [| by iFrame]. 
     rewrite -big_opM_auth_frag. f_equiv.
     rewrite -(big_opM_singletons (_ <$> _)).
@@ -268,7 +266,7 @@ Section SignalMap.
     iIntros "(EP & SIG & PH)".
     iDestruct "X" as "[? ITH]". 
     iExists _. iFrame. iModIntro.
-    iExists _. iFrame. iSplitL; [| done].
+    iSplitL; [| done].
     rewrite {2}(map_split smap i) ITH /=.
     setoid_rewrite big_sepM_union.
     2: { apply map_disjoint_singleton_l_2. by apply lookup_delete. }
@@ -303,7 +301,7 @@ Section SignalMap.
            simpl. reflexivity. }
       apply _. }
     iApply (OU_wand with "[-OU]"); [| by iFrame].
-    iIntros "(EP & SIG & PH)". iFrame. 
+    iIntros "(EP & SIG & PH)". iFrame "EP PH". 
     iDestruct "X" as "[? ITH_]". 
     iExists _. iFrame. iModIntro. iSplit; [| done].
     rewrite {2}(map_split smap i) ITH /=.
@@ -366,7 +364,7 @@ Section SignalMap.
       iDestruct (sgn_get_ex with "[$]") as "[SG #SG0]".
       iExists s'.
       rewrite -fmap_insert. iFrame "#∗". iSplit; [| done].
-      iExists _. iFrame. iSplitL.
+      iSplitL.
       2: { iPureIntro. set_solver. }
       iApply (smap_sgns_extend with "[$]"); try done.
       1, 2: set_solver.

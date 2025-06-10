@@ -63,6 +63,7 @@ Section GeneralProperties.
     
     rewrite /cur_posts. 
     rewrite (big_sepL_elem_of (λ x, x.2 x.1) _ (v, (fun _ => em_thread_post tid)) _) //.
+    { eauto. } 
     apply elem_of_list_omap.
     exists (e, (fun _ => em_thread_post tid (em_GS0 := eGS))); split; last first.
     - simpl. apply fmap_Some. exists v. split; done.
@@ -74,7 +75,7 @@ Section GeneralProperties.
       rewrite list_lookup_fmap fmap_Some. simpl in Hsome.
       exists (e1 :: take tid tp, e). rewrite drop_0. split.
       + erewrite prefixes_from_lookup =>//.
-      + rewrite /locale_of /= take_length_le //.
+      + rewrite /locale_of /= length_take_le //.
         assert (tid < length tp)%nat; last lia. by eapply lookup_lt_Some.
   Qed.
 
@@ -114,10 +115,10 @@ Section GeneralProperties.
 End GeneralProperties.
 
 (** Override the notations so that scopes and coercions work out *)
-Notation "l ↦{ q } v" := (mapsto (L:=loc) (V:=val) l (DfracOwn q) v%V)
+Notation "l ↦{ q } v" := (pointsto (L:=loc) (V:=val) l (DfracOwn q) v%V)
   (at level 20, q at level 50, format "l  ↦{ q }  v") : bi_scope.
 Notation "l ↦ v" :=
-  (mapsto (L:=loc) (V:=val) l (DfracOwn 1) v%V) (at level 20) : bi_scope.
+  (pointsto (L:=loc) (V:=val) l (DfracOwn 1) v%V) (at level 20) : bi_scope.
 Notation "l ↦{ q } -" := (∃ v, l ↦{q} v)%I
   (at level 20, q at level 50, format "l  ↦{ q }  -") : bi_scope.
 Notation "l ↦ -" := (l ↦{1} -)%I (at level 20) : bi_scope.

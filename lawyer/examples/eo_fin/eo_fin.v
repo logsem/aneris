@@ -68,14 +68,14 @@ Section EoFin.
   .
 
   Class EoFinPreG Σ := {
-      eofin_threads_PreG :> inG Σ (excl_authR natO);
-      eofin_sigs :> SigMapPreG Σ;
+      eofin_threads_PreG :: inG Σ (excl_authR natO);
+      eofin_sigs :: SigMapPreG Σ;
   }.
   
   Class EoFinG Σ := {
-      eofin_PreG :> EoFinPreG Σ;
+      eofin_PreG :: EoFinPreG Σ;
       eofin_even: gname; eofin_odd: gname;
-      eofin_sm :> SigMapG Σ;
+      eofin_sm :: SigMapG Σ;
   }.
 
   Definition d0 := ith_bn NUM_DEG 0 ltac:(lia).
@@ -358,7 +358,6 @@ Section EoFin.
           replace (B - (m + 2)) with (m + 1 + x - m) by lia.
           replace (m + 2) with (S (m + 1)) by lia.
           iFrame. 
-          iExists _. iFrame.
       - iApply sswp_MU_wp; [done| ]. 
         iApply (wp_cmpxchg_fail with "[$]"); try done.
         { intros [=]. lia. }
@@ -415,11 +414,8 @@ Section EoFin.
           replace (B - (m + 1)) with (S (B - (m + 2))) by lia.
           rewrite Nat.add_sub.
           iFrame "#∗". 
-          iSplitR "OBLS".
-          2: { rewrite (proj2 (PeanoNat.Nat.ltb_lt _ _)); [ | lia].
-               iExists _. iFrame "#∗". }
-          iRight.
-          iExists _. iFrame "#∗". 
+          rewrite (proj2 (PeanoNat.Nat.ltb_lt _ _)); [ | lia].
+          iExists _. iFrame "#∗".
         + MU_by_BOU. 
           iDestruct "EXP" as "(%sw & #SW & #EP)".
           rewrite Nat.add_sub.
@@ -458,7 +454,7 @@ Section EoFin.
           2: { rewrite (proj2 (PeanoNat.Nat.ltb_lt _ _)); [ | lia].
                iExists _. iFrame "#∗". }
           iRight. rewrite Nat.add_sub.
-          iExists _. iFrame "#∗".
+          done. 
     Time Qed.
 
     Lemma thread_spec_wrapper τ l π n `(ThreadResource th_res cond):
@@ -581,7 +577,6 @@ Section EoFin.
           2: { subst smap0. iPureIntro. rewrite !dom_insert_L.
                subst m. rewrite EQ. simpl. set_solver. }
           subst smap0. rewrite /smap_repr. iFrame.
-          iExists _. iFrame.
           rewrite !big_sepM_insert. 2, 3: set_solver. rewrite big_sepM_empty. 
           rewrite /ex_ith_sig. rewrite !B__eo_simpl. iFrame.
           iPureIntro. subst m. rewrite EQ. set_solver. 
@@ -604,7 +599,7 @@ Section EoFin.
                - subst smap0 m. rewrite EQ. rewrite /sigs_block. set_solver.
                - by apply NoDup_singleton. }
 
-          subst smap0. rewrite /smap_repr. iExists _. iFrame. 
+          subst smap0. rewrite /smap_repr. 
           rewrite !big_sepM_insert; [| set_solver]. rewrite big_sepM_empty.
           rewrite /ex_ith_sig. simpl. subst m. rewrite EQ.
           rewrite !(proj2 (PeanoNat.Nat.ltb_ge _ _)); try lia.
@@ -625,7 +620,7 @@ Section EoFin.
           (* { subst smap0. iPureIntro.  *)
           (*   subst m. (* subst i. *) *)
           (*   rewrite H. set_solver. } *)
-          subst smap0. iExists _. iFrame. rewrite big_sepM_empty.
+          subst smap0. rewrite big_sepM_empty.
           subst m. rewrite H. iPureIntro. set_solver. } 
 
       iApply (BOU_wand with "[-SR] [$]"). 

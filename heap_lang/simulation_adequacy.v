@@ -17,7 +17,7 @@ Section adequacy.
     (p: em_init_param)
     := 
     (∀ `{Hinv : @heapGS Σ M EM} ,
-        ⊢ (([∗ map] l ↦ v ∈ heap σ1, mapsto l (DfracOwn 1) v) ∗
+        ⊢ (([∗ map] l ↦ v ∈ heap σ1, pointsto l (DfracOwn 1) v) ∗
              em_init_resource s1 p (em_GS0 := heap_fairnessGS)
            ={⊤}=∗
               WP e1 @ s; locale_of [] e1; ⊤ {{ _, em_thread_post 0%nat (em_GS0 := heap_fairnessGS)}} ∗

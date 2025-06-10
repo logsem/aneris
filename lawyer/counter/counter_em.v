@@ -1,7 +1,9 @@
 From iris.proofmode Require Import tactics.
-From stdpp Require Import namespaces.
+From stdpp Require Import namespaces base.
 From iris.algebra Require Import auth excl.
+From iris.base_logic.lib Require Import own. 
 From fairness Require Import fairness locales_helpers execution_model.
+From trillium.program_logic Require Import language.
 From lawyer.counter Require Import counter_model counter_resources.
 
 

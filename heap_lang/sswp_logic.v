@@ -108,14 +108,14 @@ Section SSWP.
     iMod (gen_heap_alloc_big _ (heap_array l (replicate (Z.to_nat n) v)) with "Hσ")
       as "(Hσ & Hl & Hm)".
     { apply heap_array_map_disjoint.
-      rewrite replicate_length Z2Nat.id ?Hexend; auto with lia. }
+      rewrite length_replicate Z2Nat.id ?Hexend; auto with lia. }
     iFrame.
     iModIntro.
     iSplit; [|done].
     iApply "HΦ".
     iApply big_sepL_sep. iSplitL "Hl".
     + by iApply heap_array_to_seq_mapsto.
-    + iApply (heap_array_to_seq_meta with "Hm"). by rewrite replicate_length.
+    + iApply (heap_array_to_seq_meta with "Hm"). by rewrite length_replicate.
   Qed.
   
   Lemma wp_alloc s E v (Φ : expr → iProp Σ) :

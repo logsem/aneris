@@ -1,5 +1,6 @@
 From iris.base_logic Require Export gen_heap.
 From iris.proofmode Require Import tactics coq_tactics.
+From stdpp Require Import ssreflect.
 From trillium.program_logic Require Export weakestpre ectx_lifting.
 From fairness Require Import utils.
 From lawyer.examples Require Import obls_tactics.
@@ -10,10 +11,10 @@ From iris.base_logic.lib Require Import invariants.
 
 
 Class DecrPreG Σ := {
-    decr_cnt :> inG Σ (excl_authUR natO);
+    decr_cnt :: inG Σ (excl_authUR natO);
 }.
 Class DecrG Σ := {
-    decr_pre :> DecrPreG Σ;
+    decr_pre :: DecrPreG Σ;
     γ__decr: gname;
 }.
 
@@ -187,7 +188,7 @@ Section Decr.
     iIntros "(%π1 & %π2 & PH1 & OB1 & PH2 & OB2 & [%PH_LT1 %PH_LT2])".
 
     iSplitL "CPSd PH2 CNT OB2".
-    - rewrite cp_mul_weaken; [..| reflexivity]. 
+    - rewrite cp_mul_weaken'; [..| reflexivity]. 
       2: { apply PH_LT2. }
       iApply (decr_spec with "[-OB2]").
       { iFrame "#∗". }

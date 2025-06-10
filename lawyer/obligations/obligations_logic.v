@@ -13,15 +13,15 @@ Close Scope Z.
 (* some lemmas about heap lang rely on concrete instances of EqDecision and Countable *)
 (* TODO: find better solution *)
 Class ObligationsParamsPre (Degree Level: Type) (LIM_STEPS: nat) := { 
-    opar_deg_eqdec' :> EqDecision Degree;
-    opar_deg_cnt' :> Countable Degree;
-    deg_le' :> relation Degree;
-    deg_PO' :> PartialOrder deg_le';
+    opar_deg_eqdec' :: EqDecision Degree;
+    opar_deg_cnt' :: Countable Degree;
+    deg_le' :: relation Degree;
+    deg_PO' :: PartialOrder deg_le';
 
-    opar_lvl_eqdec':> EqDecision Level;
-    opar_lvl_cnt':> Countable Level;
-    lvl_le':> relation Level;
-    lvl_PO':> PartialOrder lvl_le';
+    opar_lvl_eqdec' :: EqDecision Level;
+    opar_lvl_cnt' :: Countable Level;
+    lvl_le' :: relation Level;
+    lvl_PO' :: PartialOrder lvl_le';
   }.
 
 Global Instance LocaleOP
@@ -202,7 +202,7 @@ Section ProgramLogic.
     ElimModal (0 < n) p false (OU P) P (BOU E n Q) (BOU E (n - 1) Q).
   Proof using.
     red. simpl. iIntros "%NZ [OP PQ]".
-    apply Nat.le_sum in NZ as [? ->]. rewrite Nat.sub_add'. 
+    apply Nat.le_sum in NZ as [? ->]. rewrite Nat.add_sub'. 
     iApply OU_BOU. 
     iDestruct (bi.intuitionistically_if_elim with "OP") as "OP".
     iMod "OP". by iApply "PQ".
@@ -224,7 +224,7 @@ Section ProgramLogic.
   Proof using.
     red. iIntros "%LE (BOU & IMPL)".
     iDestruct (bi.intuitionistically_if_elim with "BOU") as "BOU".
-    apply Nat.le_sum in LE as [? ->]. rewrite Nat.sub_add'.
+    apply Nat.le_sum in LE as [? ->]. rewrite Nat.add_sub'.
     iApply BOU_split. iApply (BOU_wand with "[$] [$]").
   Qed.
 

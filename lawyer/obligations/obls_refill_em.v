@@ -1,5 +1,6 @@
 From iris.proofmode Require Import tactics.
 From stdpp Require Import namespaces.
+From trillium.program_logic Require Import language.
 From iris.algebra Require Import auth gmap gset excl gmultiset big_op mono_nat.
 From fairness Require Import fairness locales_helpers execution_model.
 From lawyer Require Import sub_action_em action_model.

@@ -1,5 +1,6 @@
 From iris.proofmode Require Import tactics.
 From stdpp Require Import namespaces.
+From trillium.program_logic Require Import language.
 From iris.base_logic Require Import ghost_map.
 From iris.algebra Require Import auth gmap gset excl gmultiset big_op mono_nat.
 From fairness Require Import fairness locales_helpers execution_model.
@@ -149,7 +150,7 @@ Section ObligationsEM.
     red. simpl. rewrite dom_list_to_map_L. simpl.
     rewrite fst_zip.
     { by rewrite list_to_set_elements_L dom_gset_to_gmap. }
-    rewrite /init_phases. rewrite fmap_length.
+    rewrite /init_phases. rewrite length_fmap.
     rewrite seq_length. rewrite length_size. lia.
   Qed. 
 
@@ -173,7 +174,8 @@ Section ObligationsEM.
    
     rewrite /init_om_state. split.
     - apply init_om_dpo.
-    - red. simpl. set_solver.
+    - red. simpl.
+      trans (∅: gset nat); set_solver. 
     - red. rewrite init_phases_helper. simpl.
       intros ?????. rewrite !lookup_singleton_Some. set_solver.
     - red. rewrite init_phases_helper. simpl.

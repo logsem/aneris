@@ -77,14 +77,14 @@ End ReleasingLockSpec.
 Section RFLFromFL.
 
   Class RelOblPreG Σ := {
-      ro_ow_sig_pre :> inG Σ (excl_authUR (optionUR SignalId));
-      ro_sig_map_pre :> SigMapPreG Σ;
+      ro_ow_sig_pre :: inG Σ (excl_authUR (optionUR SignalId));
+      ro_sig_map_pre :: SigMapPreG Σ;
   }.
   
   Class RelOblG Σ := {
-      ro_PreG :> RelOblPreG Σ;
+      ro_PreG :: RelOblPreG Σ;
       ro_γ__ow: gname;
-      ro_sig_map :> SigMapG Σ;
+      ro_sig_map :: SigMapG Σ;
   }.
 
   Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
@@ -183,7 +183,7 @@ Section RFLFromFL.
       2: { iApply (smap_create_ep (λ _, l__o) r with "[$] [$] [$] [$]").
            apply fl_degs_lh. }
       iIntros "X". iMod "X" as "(?&?&?)". iApply BOU_intro.
-      iFrame. iExists _. iFrame "#∗".
+      by iFrame.
     Qed.
 
     Lemma lock_owner_agree n1 n2:
@@ -307,7 +307,7 @@ Section RFLFromFL.
         iAssert (BOU ∅ 1 (RR__L π (Some r) ∗ th_phase_frag τ π q' ∗
                            smap_repr_cl r true))%I with "[CASES PH SR]" as "EXP".
         { iDestruct "CASES" as "[RR | CP]".
-          { iApply BOU_intro. iFrame "#∗". }
+          { iApply BOU_intro. iFrame "SR". iFrame. }
           iApply (BOU_wand with "[]").
           2: { iApply BOU_create_wait_owner; [..| iFrame "#∗"]. }
           iIntros "(?&?&?)". iFrame. }

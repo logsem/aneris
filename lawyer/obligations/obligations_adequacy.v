@@ -89,7 +89,7 @@ Section OblsAdequacy.
     all: done.
   Qed.
 
-  Hypotheses (WF_LVL: wf (strict lvl_le)) (WF_DEG: wf (strict deg_le)).
+  Hypotheses (WF_LVL: well_founded (strict lvl_le)) (WF_DEG: well_founded (strict deg_le)).
 
   Definition exec_OM_traces_match :=
     out_om_traces_match locale_step Some
@@ -371,13 +371,12 @@ Section OblsAdequacy.
     rewrite locales_of_cfg_simpl. simpl.
     iDestruct "INIT" as "(CPS & SIGS & OB & EPS & PH & EB)".
     rewrite union_empty_r_L !gset_to_gmap_singleton.
-    rewrite big_sepM_singleton. iFrame.  
-    rewrite /cps_repr /sig_map_repr /eps_repr /obls_map_repr.
-    rewrite !fmap_empty map_fmap_singleton.      
-    iFrame.
-    rewrite !mset_map_mul !mset_map_singleton.
-    rewrite -!(cp_mul_alt (oGS := oGS)).
-    iApply cp_mul_weaken; [..| by iFrame]; apply phase_lt_fork || lia.
-  Qed. 
+    rewrite big_sepM_singleton. iFrame.
+    rewrite mset_map_mul.
+    iApply cp_mul_weaken.
+    { apply phase_lt_fork. }
+    { reflexivity. }
+    rewrite cp_mul_alt mset_map_singleton. done.     
+  Qed.
 
 End OblsAdequacy.

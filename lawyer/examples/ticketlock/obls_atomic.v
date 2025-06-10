@@ -30,9 +30,10 @@ Section TotalTriples.
   Let Locale := locale heap_lang. 
 
   Section AtomicTriples. 
+
     Context
       {ST: Type}
-      (τ: Locale)(* TODO: should it be fixed? *)
+      (τ: Locale) (* TODO: should it be fixed? *)
       (P: ST -> iProp Σ) (Q: ST -> ST -> iProp Σ) (* second ST is the previous state *)
       (L: gset Level) (* TODO: only finite sets? *)
       (* (TGT: ST -> Prop) (* `{forall x, Decision (TGT x)} *) *)
