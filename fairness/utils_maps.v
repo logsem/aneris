@@ -1,7 +1,7 @@
 From stdpp Require Import base.
 From iris.proofmode Require Import tactics.
 From trillium.fairness Require Export utils_logic.
-From iris.algebra Require Import gmap gset.
+From iris.algebra Require Import gmap gset agree.
 From trillium.prelude Require Import finitary.
 
 Section gmap.
@@ -53,6 +53,34 @@ Section gmap.
     - apply lookup_singleton.
     - by apply lookup_singleton_ne.
   Qed. 
+
+  Lemma map_fold_union
+    {V B: Type}
+    (m1 m2: gmap K V)
+    (f: K → V → B → B)
+    (b0: B)
+    (DISJ: map_disjoint m1 m2)
+    (ASSOC: forall a b c d e, f a b (f c d e) = f c d (f a b e))
+    :
+    map_fold f b0 (m1 ∪ m2) = map_fold f (map_fold f b0 m1) m2.
+  Proof using.
+    clear -DISJ ASSOC.
+    revert DISJ. pattern m2. apply map_ind; clear m2.
+    { rewrite map_union_empty. rewrite map_fold_empty. done. }
+    intros ??? NOI IH DISJ. rewrite map_union_comm; [| set_solver].
+    rewrite -insert_union_l. simpl.
+    rewrite map_fold_insert_L.
+    3: { rewrite lookup_union_r; [| done].
+         apply not_elem_of_dom. intros IN.
+         apply map_disjoint_dom in DISJ.
+         set_solver. }
+    2: { done. }
+    apply map_disjoint_dom in DISJ. specialize (IH ltac:(apply map_disjoint_dom; set_solver)).
+    rewrite map_union_comm in IH.
+    2: { apply map_disjoint_dom. set_solver. }
+    rewrite IH.
+    rewrite map_fold_insert_L; done.
+  Qed.
     
 End gmap.
 
@@ -338,3 +366,14 @@ Section TmapDisj.
   Qed. 
 
 End TmapDisj.
+
+
+Lemma map_nat_agree_valid {A: ofe} (m: gmap nat A):
+  ✓ ((to_agree <$> m): gmapUR nat (agreeR A)).
+Proof using.
+  red. intros k.
+  destruct lookup eqn:LL; [| done].
+  apply lookup_fmap_Some in LL. 
+  destruct LL as (a&<-&?). 
+  done.
+Qed.

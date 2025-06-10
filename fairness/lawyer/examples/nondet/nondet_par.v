@@ -81,7 +81,6 @@ Section Nondet.
     rewrite {1}/nondet_inv_inner. iDestruct "inv" as ">(%c & %f & CNT & FLAG & SGN & TOK & #EB)".
     iApply sswp_MU_wp; [done| ]. iApply (wp_load with "[$]"). iIntros "!> FLAG".    
 
-    (* iDestruct "CASES" as "[[-> SGN]| [-> TOK]]". *)
     destruct f. 
     1: { MU_by_burn_cp. iApply wp_value.
          iMod ("CLOS" with "[CNT SGN FLAG TOK]") as "_".
@@ -180,21 +179,6 @@ Section Nondet.
     iApply (cp_mul_weaken with "CPS0"); [done| lia].
   Qed.
 
-  (* TODO: move *)
-  Lemma sgns_levels_rel_irrefl rel S L s l ov
-    (IRR: Irreflexive rel)
-    (INs: s ∈ S)
-    (INl: l ∈ L)
-    :
-    sgns_levels_rel rel S L -∗ sgn s l ov -∗ False. 
-  Proof using.
-    iIntros "REL SGN". iDestruct (sgn_get_ex with "[$]") as "[? #SGN0]".
-    rewrite /sgns_levels_rel.
-    iDestruct (big_sepS_elem_of with "[$]") as (l') "[#SGN0' %REL]"; eauto.
-    iDestruct (sgn_level_agree with "SGN0 SGN0'") as %<-.
-    specialize (REL _ INl). by edestruct IRR.
-  Qed.
-
   Lemma alloc_nondet_inv `{NondetPreG Σ} τ cnt flag:
     cnt ↦ #(0%nat) -∗ flag ↦ #false -∗ obls τ ∅ -∗
     BOU ∅ 1 (∃ s__f (ND: NondetG Σ), nondet_inv cnt flag s__f ∗ obls τ {[ s__f ]} ∗ 
@@ -261,7 +245,7 @@ Section Nondet.
     iApply "POST". iFrame "#∗".
     iAssert (⌜ s__f ∉ F ⌝)%I as %NIN.
     { destruct (decide (s__f ∈ F)); [| done].
-      iDestruct (sgns_levels_rel_irrefl with "[$] [$]") as %NIN; set_solver. }
+      iDestruct (sgns_levels_rel_irrefl with "SGNS_GT [$]") as %NIN; set_solver. }
     iApply (obls_proper with "[$]"). set_solver.
   Qed.
 
@@ -287,9 +271,6 @@ Section Nondet.
   Context (l__w: Level).
   Hypothesis (LTfw: lvl_lt l__f l__w).
   
-  (* Context (d': Degree). *)
-  (* Hypothesis (LT'd: deg_lt d' d0). *)
-
   Lemma get_cnt_spawnee_spec `{NondetG Σ} s__f flag cnt:
     nondet_inv cnt flag s__f ∗ tok ⊢
     spawnee_spec l__f (App (λ: <>, get_cnt #flag #cnt)%V #()) {[s__f]} d1
@@ -349,18 +330,10 @@ Section Nondet.
     iMod (alloc_nondet_inv with "[$] [$] [$]") as "(%s__f & %ND & #INV & OB & #SGN0 & TOK)".
     { unfold nondet_LS_LB in LS_LB. lia. }
 
-    (* pose proof (@create_ep_upd) as C. *)
-    (* specialize C with (oGS := ohe_oGS (OP := OP) (OM_HL_Env := OHE)). *)
-    (* split_cps "CPS1" 1. rewrite -cp_mul_1. *)
-    (* iMod (create_ep_upd with "CPS1' SGN0 PH") as "(#EP & _ & PH)". *)
-    (* { apply DEG01. } *)
-    (* { unfold nondet_LS_LB in LS_LB. lia. } *)
     BOU_burn_cp. iApply wp_value.
 
     wp_bind (Rec _ _ _)%E.
-    pure_step_cases. 
-    pure_step_cases.
-    pure_step_cases.
+    do 3 pure_step_cases. 
 
     wp_bind (Rec _ _ _)%E.
     do 2 pure_step_cases.

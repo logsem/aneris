@@ -2,7 +2,7 @@ From trillium.fairness.lawyer Require Import sub_action_em.
 From trillium.fairness.lawyer.obligations Require Import obligations_model  obligations_am obligations_em obligations_logic obligations_resources.
 
 
-(* TODO: move all that and use throughout development *)
+(* TODO: use all that throughout development *)
 
 Class OP_HL (DegO LvlO: ofe) (LIM_STEPS: nat) := {
     om_hl_DegO_discr :: OfeDiscrete DegO; 

@@ -115,14 +115,6 @@ Section Wf.
     red. intros. eapply pres_by_rel_implies_rep; eauto.
   Qed.
 
-  (* TODO: move *)
-  Lemma loc_step_with_ex δ1 τ δ2
-    (WITH: loc_step_with δ1 τ δ2):
-    loc_step_ex δ1 δ2.
-  Proof using.
-    destruct WITH as [?|?]; [left | right]; eauto.
-  Qed.
-
   Lemma pres_by_loc_step_implies_progress τ P
     (PPRES: preserved_by_loc_step_ex P)
     :

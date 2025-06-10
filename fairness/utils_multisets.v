@@ -7,6 +7,10 @@ Ltac mss := multiset_solver.
 
 Close Scope Z.
 
+Global Instance gmultiset_disj_union_Proper `{Countable K}:
+  Proper (equiv ==> equiv ==> equiv) (@disj_union (gmultiset K) _).
+Proof using. solve_proper. Qed.
+
 Section GmultisetUtils.
   Context `{Countable A}. 
   
@@ -217,6 +221,51 @@ Section GmultisetUtils.
 
   End MultisetFilter.
 
+  Lemma list_to_set_disj_elements (g: gmultiset A):
+    list_to_set_disj (elements g) = g.
+  Proof using.
+    clear.
+    pattern g. apply gmultiset_ind; clear g.
+    { simpl. done. }
+    intros a g EQ. rewrite gmultiset_elements_disj_union.
+    rewrite gmultiset_elements_singleton.
+    rewrite list_to_set_disj_app. mss.
+  Qed.
+
+  Section FlattenMset.
+
+    Definition flatten_mset  (ss: gmultiset (gmultiset A)): gmultiset A :=
+      list_to_set_disj (concat (map elements (elements ss))).
+
+    Lemma flatten_mset_spec ss:
+      forall (k: A), k ∈ flatten_mset ss <-> exists s, s ∈ ss /\ k ∈ s.
+    Proof.
+      intros. rewrite /flatten_mset.
+      rewrite elem_of_list_to_set_disj. 
+      rewrite elem_of_list_In in_concat.
+      setoid_rewrite in_map_iff. 
+      repeat setoid_rewrite <- elem_of_list_In.
+      split.
+      - intros (?&(l&<-&INls)&INkl).
+        apply gmultiset_elem_of_elements in INls, INkl. 
+        eauto. 
+      - intros (s&?&?). exists (elements s).
+        split; [eexists; split| ]; eauto; by apply gmultiset_elem_of_elements. 
+    Qed.
+    
+    Lemma flatten_mset_empty: flatten_mset (∅: gmultiset (gmultiset A)) = ∅.
+    Proof using. mss. Qed.
+
+    Lemma flatten_mset_singleton (S: gmultiset A):
+      flatten_mset {[+ S +]} = S. 
+    Proof.
+      rewrite /flatten_mset.
+      rewrite gmultiset_elements_singleton. simpl. rewrite app_nil_r.
+      apply list_to_set_disj_elements. 
+    Qed.
+
+  End FlattenMset.
+
 End GmultisetUtils.
 
 Section MultisetOrder.
@@ -272,7 +321,21 @@ Section MultisetOrder.
     { intros ??. by rewrite !gmultiset_disj_union_right_id. }
     intros. eapply H0. eapply (dominates_minus1 _ _ x).
     eapply dominates_over_Proper; [..| apply DOM']; mss.
-  Qed. 
+  Qed.
+
+  Lemma empty_dominates_over (L: gmultiset A)
+    (DOM: dominates_over ∅ L):
+    L = ∅.
+  Proof using.
+    clear PO. 
+    destruct (decide (L = ∅)) as [| NE]; [done| ].
+    apply gmultiset_choose in NE as [a IN].
+    specialize (DOM _ IN). set_solver.
+  Qed.
+
+  Lemma dominates_over_empty (X: gmultiset A):
+    dominates_over X ∅.
+  Proof using. clear. mss. Qed.
 
   Definition ms_le_dm (M N: gmultiset A) :=
     exists X Y, X ⊆ N /\ M = (N ∖ X) ⊎ Y /\ dominates_over X Y. 
@@ -702,8 +765,21 @@ Section MultisetDefs.
       by rewrite IHn.
     Qed. 
 
-  End MultisetMap.
+    Lemma mset_map_size (X: gmultiset A):
+      size (mset_map X) = size X.
+    Proof using.
+      pattern X. apply gmultiset_ind; clear X. 
+      { mss. }
+      intros a X IH. rewrite /mset_map.
+      rewrite gmultiset_elements_disj_union. rewrite fmap_app.
+      rewrite list_to_set_disj_app.
+      rewrite !gmultiset_size_disj_union. rewrite IH. f_equal.
+      rewrite gmultiset_elements_singleton list_fmap_singleton.
+      rewrite list_to_set_disj_cons. rewrite list_to_set_disj_nil gmultiset_size_disj_union.
+      rewrite !gmultiset_size_singleton gmultiset_size_empty. lia.
+    Qed.
 
+  End MultisetMap.
 
   Lemma mset_filter_disj_union_disj (P Q: A -> Prop) g
     `{∀ x, Decision (P x)} `{∀ x, Decision (Q x)}

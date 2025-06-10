@@ -133,8 +133,6 @@ Section Decr.
   Qed.
 
 
-  (* TODO: move? *)
-
   Context (N: nat).
       
   Definition const_term: val :=

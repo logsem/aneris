@@ -30,7 +30,6 @@ Section ObligationsRefillEM.
   Context `{Inhabited Locale}. 
   Let ORAM := ObligationsRefillAM.
 
-  (* TODO: move? *)
   Definition locale_of_orm_lbl (l: mlabel ORM) :=
     match l with | inl τ | inr τ => τ end. 
 

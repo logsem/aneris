@@ -29,21 +29,6 @@ Section ConstTermAdequacy.
     subG CTΣ Σ → DecrPreG Σ.
   Proof. solve_inG. Qed.
 
-  (* TODO: move *)
-  Lemma mset_map_size `{Countable A, Countable B} (f: A -> B) (X: gmultiset A):
-    size (mset_map f X) = size X.
-  Proof using.
-    pattern X. apply gmultiset_ind; clear X. 
-    { mss. }
-    intros a X IH. rewrite /mset_map.
-    rewrite gmultiset_elements_disj_union. rewrite fmap_app.
-    rewrite list_to_set_disj_app.
-    rewrite !gmultiset_size_disj_union. rewrite IH. f_equal.
-    rewrite gmultiset_elements_singleton list_fmap_singleton.
-    rewrite list_to_set_disj_cons. rewrite list_to_set_disj_nil gmultiset_size_disj_union.
-    rewrite !gmultiset_size_singleton gmultiset_size_empty. lia.
-  Qed.
-
   Local Instance OHE
     (HEAP: heapGS CTΣ (TopAM_EM ObligationsASEM (λ Σ (aGS : ObligationsGS Σ) τ, obls τ ∅)))
     : OM_HL_Env CT_OP_HL EM CTΣ.

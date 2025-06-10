@@ -516,17 +516,6 @@ Section EoFin.
   Section MainProof.
     Context {PRE: EoFinPreG Σ}.
 
-    (* TODO: move *)
-    Lemma map_nat_agree_valid {A: ofe} (m: gmap nat A):
-      ✓ ((to_agree <$> m): gmapUR nat (agreeR A)).
-    Proof using.
-      red. intros k.
-      destruct lookup eqn:L; [| done].
-      apply lookup_fmap_Some in L. 
-      destruct L as (a&<-&?). 
-      done.
-    Qed.
-
     (* TODO: parametrize smap_repr_eo with the lower bound *)
     (* TODO: try to use init_smap_repr for initialization *)
     Lemma alloc_inv l (* (i: nat) *) τ

@@ -1,4 +1,4 @@
-From trillium.fairness Require Import locales_helpers.
+From trillium.fairness Require Import locales_helpers utils_sets.
 From trillium.fairness.heap_lang Require Export lang tactics notation.
 
   
@@ -85,7 +85,6 @@ Proof.
   rewrite (length_upd_middle e1 e2). set_solver.
 Qed. 
 
-(* TODO: move *)
 Lemma locale_step_fresh_exact c1 c2 τ τ'
   (STEP: locale_step c1 (Some τ) c2)
   (FRESH: τ' ∈ locales_of_cfg c2 ∖ locales_of_cfg c1):
@@ -113,3 +112,12 @@ Proof.
   simpl in DOM2. rewrite union_empty_r in DOM2. apply elem_of_singleton in DOM2.
   simpl. set_solver.
 Qed.            
+
+Lemma locale_step_fork_Some c1 τ c2 τ'
+  (STEP: locale_step c1 (Some τ) c2)
+  (FORK: step_fork c1 c2 = Some τ'):
+  locales_of_cfg c2 = locales_of_cfg c1 ∪ {[τ']} ∧ τ' ∉ locales_of_cfg c1.
+Proof using.
+  apply gset_pick_Some in FORK.
+  eapply locale_step_fresh_exact in FORK; eauto.
+Qed.

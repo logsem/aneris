@@ -165,15 +165,6 @@ Section FiniteBranching.
     by apply elem_of_map_to_list. 
   Qed.
 
-  (* TODO: move *)
-  Lemma ex_and_comm' {T: Type} (A: Prop) (B: T -> Prop):
-    (exists t, B t /\ A) <-> (exists t, B t) /\ A.
-  Proof. 
-    split.
-    - intros (?&?&?); eauto.
-    - intros ((?&?)&?); eauto.
-  Qed.
-
   Section FinParams.
     Context (FINdeg: Finite Degree) (FINlvl: Finite Level).
 

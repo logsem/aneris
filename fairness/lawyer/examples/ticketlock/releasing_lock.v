@@ -251,28 +251,6 @@ Section RFLFromFL.
     iAssert (P -∗ P)%I as "GOAL"; [iIntros "X"; by iApply "X"| ]
   end.
 
-    (* TODO: move *)
-    Lemma set_Forall_subseteq
-      {A C : Type} `{ElemOf A C} (P: A → Prop) (x y: C)
-      (SUB: y ⊆ x):
-      set_Forall P x -> set_Forall P y.
-    Proof using. clear -SUB. set_solver. Qed.      
-
-    (* TODO: move *)
-    Lemma sgns_levels_rel'_impl:
-      Proper ((eq ==> eq ==> impl) ==> flip subseteq ==> flip subseteq ==> bi_entails) sgns_levels_rel.
-    Proof using.
-      intros ?? IMPL ?? SUBs ?? SUBl.
-      rewrite /sgns_levels_rel. iIntros "?".      
-      iApply big_sepS_subseteq; [done| ].
-      iApply (big_sepS_impl with "[$]").
-      iIntros (s IN). iModIntro.
-      iIntros "(% & SGN & %ALL)". iExists _. iFrame.
-      iPureIntro. eapply set_Forall_subseteq; eauto.
-      eapply set_Forall_impl; eauto.
-      intros ?. by apply IMPL.
-    Qed.
-
     Lemma rfl_acquire_spec_later:
       rfl_acquire_spec_gen (fl_acquire FLP) (▷ P__lock) (fl_d__m FLP).
     Proof using L__FL LVL_ORDo.
@@ -377,9 +355,10 @@ Section RFLFromFL.
         
         iModIntro. iIntros "PH_CLOS RT POST !>". iApply "POST".
         do 1 iExists _. iFrame "#∗".
-        iDestruct (th_phase_frag_combine' with "[$PH $PH_CLOS]") as "foo".
+        iDestruct (th_phase_frag_combine' with "[$PH PH_CLOS]") as "foo".
         { done. }
-        by iFrame. }
+        2: by iFrame.
+        destruct (1 - q')%Qp; done. }
     Qed.
 
     Definition acquire_aux: val :=

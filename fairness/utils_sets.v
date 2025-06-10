@@ -131,6 +131,15 @@ Lemma filter_singleton_if:
         filter P ({[x]} : C) ≡ if decide (P x) then {[x]} else ∅.
 Proof. intros. destruct decide; set_solver. Qed. 
 
+Lemma elements_list_to_set_disj `{Countable A} (l: list A):
+  elements $ (list_to_set_disj l: gmultiset A) ≡ₚ l.
+Proof using.
+  clear. induction l.
+  { done. }
+  simpl. rewrite gmultiset_elements_disj_union.
+  simpl. rewrite gmultiset_elements_singleton.
+  rewrite IHl. done.
+Qed. 
 
 Lemma gset_filter_subseteq_mono_strong `{Countable A} (P Q: A -> Prop)
   `{∀ x, Decision (P x)} `{∀ x, Decision (Q x)}
@@ -139,7 +148,6 @@ Lemma gset_filter_subseteq_mono_strong `{Countable A} (P Q: A -> Prop)
   filter P g ⊆ filter Q g.
 Proof using. clear -IMPL. set_solver. Qed. 
 
-(* TODO: move *)
 Lemma gset_filter_True `{Countable K} (g: gset K)
   (P: K -> Prop)
   `{∀ x, Decision (P x)}
@@ -169,6 +177,13 @@ Proof.
   - by apply set_choose_L.
   - set_solver. 
 Qed. 
+
+Lemma length_size `{Countable K} (g: gset K):
+  length (elements g) = size g.
+Proof.
+  rewrite -{2}(list_to_set_elements_L g).
+  rewrite size_list_to_set; [done| ]. apply NoDup_elements.
+Qed.
 
 
 Section FlattenGset.
@@ -315,6 +330,12 @@ Lemma gset_to_gmap_singleton `{Countable K} {B: Type} (b: B) (k: K):
 Proof.
   rewrite /gset_to_gmap. simpl. rewrite map_fmap_singleton. done.
 Qed. 
+
+Lemma set_Forall_subseteq {A C : Type} `{ElemOf A C}
+  (P: A → Prop) (x y: C)
+  (SUB: y ⊆ x):
+  set_Forall P x -> set_Forall P y.
+Proof using. clear -SUB. set_solver. Qed.      
 
 
 Section SetMax.

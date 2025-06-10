@@ -166,7 +166,7 @@ Require Import Relation_Operators.
 From stdpp Require Import gmultiset.
 From iris.proofmode Require Import tactics.
 Require Import Coq.Program.Wf.
-From trillium.fairness Require Import utils_multisets utils_relations.
+From trillium.fairness Require Import utils.
 
 Section GmultisetLtWf.
   Context `{ED: EqDecision A}. 
@@ -224,17 +224,6 @@ Section GmultisetLtWf.
     eapply t1n_trans; eauto.
   Qed.
 
-  (* TODO: move *)
-  Lemma empty_dominates_over (L: gmultiset A)
-    (DOM: dominates_over R ∅ L):
-    L = ∅.
-  Proof using.
-    clear PO. 
-    destruct (decide (L = ∅)) as [| NE]; [done| ].
-    apply gmultiset_choose in NE as [a IN].
-    specialize (DOM _ IN). set_solver.
-  Qed.
-
   Lemma lt_ext1_cons a l:
     llt l (a :: l).
   Proof using.
@@ -260,60 +249,6 @@ Section GmultisetLtWf.
       apply H1. apply elem_of_list_In. rewrite -H.
       by apply gmultiset_elem_of_elements.
   Qed. 
-
-  (* TODO: move *)
-  Definition flatten_mset `{Countable K} (ss: gmultiset (gmultiset K)): gmultiset K :=
-    list_to_set_disj (concat (map elements (elements ss))).
-
-  Lemma flatten_mset_spec `{Countable K} ss:
-    forall (k: K), k ∈ flatten_mset ss <-> exists s, s ∈ ss /\ k ∈ s.
-  Proof.
-    intros. rewrite /flatten_mset.
-    rewrite elem_of_list_to_set_disj. 
-    rewrite elem_of_list_In in_concat.
-    setoid_rewrite in_map_iff. 
-    repeat setoid_rewrite <- elem_of_list_In.
-    split.
-    - intros (?&(l&<-&INls)&INkl).
-      apply gmultiset_elem_of_elements in INls, INkl. 
-      eauto. 
-    - intros (s&?&?). exists (elements s).
-      split; [eexists; split| ]; eauto; by apply gmultiset_elem_of_elements. 
-  Qed.
-
-  Lemma flatten_mset_empty `{Countable K}: flatten_mset (∅: gmultiset (gmultiset K)) = ∅.
-  Proof using. mss. Qed. 
-
-  (* TODO: move*)
-  Lemma list_to_set_disj_elements `{Countable K} (g: gmultiset K):
-    list_to_set_disj (elements g) = g.
-  Proof using.
-    clear.
-    pattern g. apply gmultiset_ind; clear g.
-    { simpl. done. }
-    intros a g EQ. rewrite gmultiset_elements_disj_union.
-    rewrite gmultiset_elements_singleton.
-    rewrite list_to_set_disj_app. mss.
-  Qed.
-
-  (* TODO: move*)
-  Lemma elements_list_to_set_disj `{Countable K} (l: list K):
-    elements $ (list_to_set_disj l: gmultiset K) ≡ₚ l.
-  Proof using.
-    clear. induction l.
-    { done. }
-    simpl. rewrite gmultiset_elements_disj_union.
-    simpl. rewrite gmultiset_elements_singleton.
-    rewrite IHl. done.
-  Qed. 
-
-  Lemma flatten_mset_singleton `{Countable K} (S: gmultiset K):
-    flatten_mset {[+ S +]} = S. 
-  Proof.
-    rewrite /flatten_mset.
-    rewrite gmultiset_elements_singleton. simpl. rewrite app_nil_r.
-    apply list_to_set_disj_elements. 
-  Qed.
 
   Section MapImgMs.
     Context `{Countable K, Countable A}.
@@ -362,59 +297,10 @@ Section GmultisetLtWf.
       by rewrite list_to_set_disj_elements.
     Qed. 
 
-  (* TODO: move *)
-  Lemma map_split `{Countable K} {V: Type} (m: gmap K V) k:
-    m = from_option (singletonM k) ∅ (m !! k) ∪ delete k m.
-  Proof using.
-    apply map_eq. intros k'.
-    destruct (decide (k' = k)) as [->|?].
-    - destruct (m !! k) eqn:KTH.
-      + simpl. rewrite lookup_union_l'.
-        all: by rewrite lookup_singleton.
-      + simpl. rewrite lookup_union_r; [| done].
-        by rewrite lookup_delete.
-    - rewrite lookup_union_r.
-      2: { destruct (m !! k); [| set_solver]. 
-           by rewrite lookup_singleton_ne. } 
-      by rewrite lookup_delete_ne.
-  Qed.
-
     Lemma gmultiset_union_disj_union (X Y: gmultiset A)
       (DISJ: X ## Y):
       X ∪ Y = X ⊎ Y.
     Proof using. clear -DISJ. mss. Qed.
-
-    (* TODO: move *)
-    Lemma map_fold_union `{Countable K}
-      {V B: Type}
-      (m1 m2: gmap K V)
-      (f: K → V → B → B)
-      (b0: B)
-      (DISJ: map_disjoint m1 m2)
-      (ASSOC: forall a b c d e, f a b (f c d e) = f c d (f a b e))
-      :
-      map_fold f b0 (m1 ∪ m2) = map_fold f (map_fold f b0 m1) m2.
-    Proof using.
-      clear -DISJ ASSOC.
-      revert DISJ. pattern m2. apply map_ind; clear m2.
-      { rewrite map_union_empty. rewrite map_fold_empty. done. }
-      intros ??? NOI IH DISJ. rewrite map_union_comm; [| set_solver].
-      rewrite -insert_union_l. simpl.
-      rewrite map_fold_insert_L.
-      3: { rewrite lookup_union_r; [| done].
-           apply not_elem_of_dom. intros IN.
-           apply map_disjoint_dom in DISJ.
-           set_solver. }
-      2: { done. }
-      apply map_disjoint_dom in DISJ. specialize (IH ltac:(apply map_disjoint_dom; set_solver)).
-      rewrite map_union_comm in IH.
-      2: { apply map_disjoint_dom. set_solver. }
-      rewrite IH.
-      rewrite map_fold_insert_L.
-      3: { done. }
-      2: { done. }
-      done.
-    Qed. 
 
     Lemma map_img_ms_union m1 m2
       (DISJ: m1 ##ₘ m2):
@@ -471,18 +357,12 @@ Section GmultisetLtWf.
     rewrite /g2m. by rewrite elements_list_to_set_disj.
   Qed.     
 
-  (* TODO: move *)
-  Lemma dominates_over_empty (X: gmultiset A):
-    dominates_over R X ∅.
-  Proof using. clear. set_solver. Qed.
-
   Definition mmap_disj `{Countable K, Countable V} (tm: gmap K (gmultiset V)) :=
     forall (k1 k2: K) (S1 S2: gmultiset V) (NEQ: k1 ≠ k2),
       tm !! k1 = Some S1 -> tm !! k2 = Some S2 -> S1 ## S2.
 
   Definition clos_refl_perm R: relation (list A) :=
     (Relation_Operators.union _ R (@Permutation A)). 
-
 
   Lemma build_steps (U: gmap A (gmultiset A))
     (DOM1: forall b, dominates_over R {[+ b +]} (default ∅ (U !! b)))

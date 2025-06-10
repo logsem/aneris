@@ -89,6 +89,11 @@ Section LogicHelpers.
     apply (PP (a, b)).
   Qed.    
   
+  Lemma impl_iff_intro {A B C: Prop}
+    (PRE: A -> B <-> C):
+    (A -> B) <-> (A -> C).
+  Proof using. tauto. Qed.
+
 End LogicHelpers.
 
 

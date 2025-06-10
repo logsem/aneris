@@ -121,17 +121,6 @@ Section MotivatingClient.
       iPureIntro. split; [set_solver| ]. apply LVLo. 
     Qed.
 
-    (* TODO: move, change the original lemma*)
-    Lemma th_phase_frag_combine'' τ π q p
-      (LE: Qp.le p q):
-      th_phase_frag τ π q ⊣⊢ th_phase_frag τ π p∗
-        default emp ((q - p)%Qp ≫= Some ∘ th_phase_frag τ π).
-    Proof using.
-      rewrite th_phase_frag_combine'; [| eauto].
-      iApply bi.sep_proper; [done| ].
-      destruct (Qp.sub q p); simpl; done.
-    Qed.
-
     Lemma release_left (lk: val) τ s__o flag s__f π
       :
       {{{ client_inv lk flag s__f ∗
@@ -160,9 +149,8 @@ Section MotivatingClient.
       iSplitL "FLAG SGNf".
       { iExists _. iFrame. } 
 
-      iIntros "PH'". simpl.  
-      iDestruct (th_phase_frag_combine'' with "[$PH $PH']") as "foo"; [done| ].
-      iFrame.
+      iIntros "PH'". simpl.
+      iDestruct (th_phase_frag_combine' with "[$PH $PH']") as "foo"; [done| by iFrame].      
     Qed.
 
     Lemma first_step e1 τ π R n d d'
@@ -297,8 +285,7 @@ Section MotivatingClient.
       iModIntro.
       iSplitL "P"; [by iExists _| ].
       iIntros "PH'".
-      iDestruct (th_phase_frag_combine'' with "[$PH $PH']") as "foo"; [done| ].
-      iFrame.
+      iDestruct (th_phase_frag_combine' with "[$PH $PH']") as "foo"; [done| iFrame].
     Qed.
     
     Lemma right_thread_iter_spec (lk: val) τ π flag s__f (c: loc):

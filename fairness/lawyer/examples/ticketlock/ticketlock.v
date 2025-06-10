@@ -161,7 +161,6 @@ Section Ticketlock.
 
   Definition tl_exc := 20.
 
-  (* TODO: move, remove duplicates *)
   Hypothesis (LS_LB: S tl_exc ≤ LIM_STEPS). 
 
   (* we need to have a non-empty set of "acquire levels" to verify the client. *)
@@ -780,22 +779,6 @@ Section Ticketlock.
     iIntros "X". by iDestruct (own_valid with "[$]") as %V.
   Qed.
 
-  (* TODO: move, prove properly *)
-  Global Instance is_except_0_BOU E n P:
-    IsExcept0 (BOU E n P).
-  Proof using.
-    rewrite /IsExcept0.
-    iIntros "BOU".
-    rewrite /BOU. iIntros (??) "MSI".
-    repeat setoid_rewrite bi.except_0_forall.
-    iSpecialize ("BOU" $! δ k).
-    rewrite /bi_except_0.
-    iDestruct "BOU" as "[foo | bar]".
-    { iApply is_except_0.
-      rewrite /bi_except_0. by iLeft. }
-    by iApply "bar".
-  Qed.
-
   Lemma tau_map_interp_update (TM: gmap nat tau_codom_gn) (l__ow l__tk: loc) c (ow: nat)
     (lk := (#l__ow, #l__tk)%V)
     (next := bool_decide (ow + 1 ∈ dom TM)):
@@ -889,16 +872,6 @@ Section Ticketlock.
     rewrite -{1}(Qp.div_2 q). rewrite Qp.add_sub. simpl.
     iSplit; [| done]. iLeft. iFrame.
   Qed.
-
-  (* TODO: move *)
-  (* The old BOU_AMU rule looked like this and made easier to show certain lemmas:
-     Lemma BOU_AMU E ζ b (P : iProp Σ) π q
-     (BOUND: b <= LIM_STEPS)
-     :
-     ⊢ (th_phase_frag ζ π q -∗ BOU E b ((P) ∗ ∃ ph deg, cp ph deg ∗ ⌜ phase_le ph π ⌝) (oGS := oGS)) -∗
-        th_phase_frag ζ π q -∗
-        AMU E ζ obls_act P (aeGS := oGS').
-     Should we keep both variants? *)
 
   Lemma tl_release_spec (lk: val) c τ:
     tl_is_lock lk c ∗ rel_tok ⊢

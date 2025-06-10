@@ -42,17 +42,6 @@ Section SignalMap.
   Definition ith_sig `{SigMapG Σ} (i: nat) (s: SignalId): iProp Σ :=
     own sm_γ__smap (◯ {[ i := to_agree s ]}).
 
-  (* TODO: move, remove duplicates *)
-  Lemma map_nat_agree_valid {A: ofe} (m: gmap nat A):
-    ✓ ((to_agree <$> m): gmapUR nat (agreeR A)).
-  Proof using.
-    red. intros k.
-    destruct lookup eqn:LL; [| done].
-    apply lookup_fmap_Some in LL. 
-    destruct LL as (a&<-&?). 
-    done.
-  Qed.
-
   Lemma init_smap_repr `{SigMapPreG Σ, invGS_gen HasNoLc Σ} τ R B (D: gset nat):
     obls τ R -∗ BOU ∅ (2 * size D) (∃ (smap: gmap nat SignalId) (SMG: SigMapG Σ), 
           smap_repr B D ∗ ⌜ dom smap = D ⌝ ∗ obls τ (R ∪ map_img (filter (fun '(i, _) => B i = false) smap)) ∗ ([∗ map] i ↦ s ∈ smap, ith_sig i s)).
@@ -439,3 +428,8 @@ Section SignalsBlock.
   Qed. 
 
 End SignalsBlock.
+
+
+Definition sig_mapΣ := #[GFunctor $ authUR (gmapUR nat (agreeR SignalId))].
+Global Instance subG_sig_mapΣ {Σ}: subG sig_mapΣ Σ → SigMapPreG Σ.
+Proof. solve_inG. Qed.

@@ -10,11 +10,6 @@ Section ConstantTimeTermination.
   Context `{OP: ObligationsParams unit Empty_set Locale LIM_STEPS}.
   Let OM := ObligationsModel.
 
-  (* TODO: move *)
-  Global Instance gmultiset_disj_union_Proper `{Countable K}:
-    Proper (equiv ==> equiv ==> equiv) (@disj_union (gmultiset K) _).
-  Proof using. solve_proper. Qed.
-
   Definition fuel_left δ: nat := size (ps_cps δ).
 
   Let PF'0 := PF' (fun _ => 0) (fun _ => True). 
@@ -135,7 +130,6 @@ Section ConstantTimeTermination.
     destruct NEQ. congruence.
   Qed.
 
-  (* TODO: move *)
   Definition trace_len_le {St L: Type} (tr: trace St L) (n: nat) :=
     exists len, trace_len_is tr (NOnum len) /\ len <= n.     
 

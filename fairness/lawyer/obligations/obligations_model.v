@@ -210,8 +210,13 @@ Section Model.
 
   Definition π0: Phase := nil.
 
-  (* Definition phases_incompat π1 π2 := ¬ phase_le π1 π2 /\ ¬ phase_le π2 π1. *)
-  (* Definition phases_disj (π1 π2: Phase) := ↑ π1 ## (↑ π2: coPset). *)
+  Lemma loc_step_with_ex δ1 τ δ2
+    (WITH: loc_step_with δ1 τ δ2):
+    loc_step_ex δ1 δ2.
+  Proof using.
+    destruct WITH as [?|?]; [left | right]; eauto.
+  Qed.
+
   Definition phases_disj (π1 π2: Phase) := 
     ¬ phase_le π1 π2 /\ ¬ phase_le π2 π1.
 

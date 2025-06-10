@@ -199,12 +199,6 @@ Section LocaleFairness.
     destruct (otr S!! n); simpl; set_solver.
   Qed.
 
-  (* TODO: move *)
-  Lemma impl_iff_intro {A B C: Prop}
-    (PRE: A -> B <-> C):
-    (A -> B) <-> (A -> C).
-  Proof using. tauto. Qed.
-
   Global Instance fairness_sat_dec
     `{forall t s, Decision (locale_prop t s)}
     `{forall t l, Decision (does_step t l)}:

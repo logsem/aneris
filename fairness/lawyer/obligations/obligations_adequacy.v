@@ -207,9 +207,7 @@ Section OblsAdequacy.
         (e1: expr) σ1 (s1: mstate M) p
         (INIT: em_is_init_st ([e1], σ1) s1 (ExecutionModel := EM))
         (extr : heap_lang_extrace)
-        (* (Hvex : extrace_valid extr) *)
         (Hexfirst : trfirst extr = ([e1], σ1)):
-    (* rel_finitary (sim_rel LM) → *)
     wp_premise Σ s e1 σ1 s1 obls_sim_rel (p: @em_init_param _ _ EM) ->
     extrace_fairly_terminating extr.
   Proof.
@@ -224,9 +222,8 @@ Section OblsAdequacy.
     eapply obls_init_wf; eauto. 
   Qed.
 
-  (* TODO: move *)
   Lemma om_live_tids_init e σ ds eb:
-      om_live_tids id locale_enabled ([e], σ) (init_om_state ([e], σ) ds eb).
+    om_live_tids id locale_enabled ([e], σ) (init_om_state ([e], σ) ds eb).
   Proof using.
     red. intros ?.
     rewrite /has_obls. simpl.
@@ -262,7 +259,7 @@ Section OblsAdequacy.
     rewrite OB_ in OB. congruence.
   Qed.
 
-  (* TODO: generalize? move? *)
+  (* TODO: generalize? *)
   Lemma om_sim_RAH
           {Σ: gFunctors} {Hinv: @heapGS Σ M EM}
     σ1 e ds eb:

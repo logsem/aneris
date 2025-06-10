@@ -10,14 +10,7 @@ From trillium.fairness.lawyer.examples Require Import orders_lib signal_map.
 
 Section EOFinAdequacy.
   Context (B: nat).
-  (* Let OP := EO_OP B. *)
 
-  (* Existing Instance OP. 
-  Let ASEM := ObligationsASEM.
-  Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls τ ∅ (oGS := aGS)).
-  Let OM := ObligationsModel. 
-  Let M := AM2M ObligationsAM.
- *)
   Existing Instance EO_OP'. 
 
   Local Instance EOF_OP_HL: OP_HL (EODegree 5) (EOLevel (B + 1)) 10.
@@ -26,11 +19,6 @@ Section EOFinAdequacy.
   Defined.
 
   Let EM := TopAM_EM ObligationsASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls τ ∅ (oGS := aGS)).
-
-  (* TODO: move *)
-  Definition sig_mapΣ := #[GFunctor $ authUR (gmapUR nat (agreeR SignalId))].
-  Global Instance subG_sig_mapΣ {Σ}: subG sig_mapΣ Σ → SigMapPreG Σ.
-  Proof. solve_inG. Qed.
 
   Let eofinΣ: gFunctors := #[
       GFunctor (excl_authR natO); 

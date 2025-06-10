@@ -11,11 +11,6 @@ From trillium.fairness.lawyer.examples Require Import orders_lib signal_map.
 
 Section Adequacy.  
 
-  (* TODO: move *)
-  Definition sig_mapΣ := #[GFunctor $ authUR (gmapUR nat (agreeR SignalId))].
-  Global Instance subG_sig_mapΣ {Σ}: subG sig_mapΣ Σ → SigMapPreG Σ.
-  Proof. solve_inG. Qed.
-
   Definition ClosedDegree := bounded_nat 7.
   Definition CD (i: nat): ClosedDegree := bn_ith 6 i.
   Let d__r := CD 6.

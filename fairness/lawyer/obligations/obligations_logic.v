@@ -63,7 +63,6 @@ Section ProgramLogic.
   
   Section BOU.
 
-    (* TODO: move to _em ? *)
     Lemma occ_pres_by_progress δ1 τ δ2 c
       (OCC: obls_cfg_corr c δ1)
       (PSTEP: progress_step δ1 τ δ2):
@@ -112,16 +111,6 @@ Section ProgramLogic.
       split; auto. split; [| auto].
       red. repeat split; try by apply OCC' || done.
       simpl. eexists. split; eauto. by right.
-    Qed.
-
-    (* TODO: move *)
-    Lemma locale_step_fork_Some c1 τ c2 τ'
-      (STEP: locale_step c1 (Some τ) c2)
-      (FORK: step_fork c1 c2 = Some τ'):
-      locales_of_cfg c2 = locales_of_cfg c1 ∪ {[τ']} ∧ τ' ∉ locales_of_cfg c1.
-    Proof using.
-      apply gset_pick_Some in FORK.
-      eapply locale_step_fresh_exact in FORK; eauto.
     Qed.
 
     Lemma BOU_AMU__f E ζ ζ' π R0 R' P:

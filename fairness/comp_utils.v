@@ -6,7 +6,6 @@ From trillium.fairness Require Import inftraces trace_lookup fairness trace_len 
 Section StepLabelMatches.
   Context {St L: Type}.
 
-  (* TODO: move *)
   Definition trace_step: Type := St * option (L * St). 
 
   Definition step_label_matches (step: trace_step) (P: L -> Prop) :=
@@ -67,14 +66,9 @@ Section ProjectNestedTrace.
                          is_end_state res)
     (NESTED_TRANS: forall s1 ℓ s2 ℓ', trans s1 ℓ s2 -> proj_lbl ℓ = Some ℓ' ->
                                   trans' (proj_st s1) ℓ' (proj_st s2)):
-    (* True.  *)
     traces_match
-      (* (transA := @ext_trans _ ExtLibLM) *)
-      (* ((option_fmap _ _ inl): option (@ext_role _ ExtLibLM) -> option $ fmrole client_model_impl) *)
-      (* (fun c δ_lib => fst c = δ_lib) *)
-      (* tr *)
-      (* (project_lib_trace tr). *)
-      (fun ℓ ℓ' => proj_lbl ℓ = Some ℓ') (fun st st' => proj_st st = st')
+      (fun ℓ ℓ' => proj_lbl ℓ = Some ℓ')
+      (fun st st' => proj_st st = st')
       trans trans'
       tr (project_nested_trace tr).
   Proof.
@@ -97,91 +91,3 @@ Section ProjectNestedTrace.
   Qed.
 
 End ProjectNestedTrace.
-
-
-(* TODO: try to unify with 'kept_*' lemmas
-   in ticketlock proof *)
-(* TODO: move*)
-Lemma preserved_prop_kept (M: FairModel) (tr: mtrace M)
-  (Pst: fmstate M -> Prop)
-  (Pstep: model_trace_step M -> Prop)
-  (m1 m2 : nat) s
-  (VALID : mtrace_valid tr)
-  (L2: ∀ i step, m1 ≤ i → i < m2 → tr !! i = Some step → Pstep step)
-  (PRES: forall s1 ℓ s2, Pstep (s1, Some (ℓ, s2)) -> fmtrans M s1 ℓ s2 -> Pst s1 -> Pst s2)
-  (Sm1 : tr S!! m1 = Some s)
-  (P1: Pst s):
-  ∀ j s, m1 <= j <= m2 → tr S!! j = Some s → Pst s. 
-Proof. 
-  intros j s' [GE LE] ST.
-  apply Nat.le_sum in GE as [d ->].
-  generalize dependent s'. induction d.
-  { intros. rewrite Nat.add_0_r in LE ST.
-    assert (s' = s) as ->; congruence. }
-  intros s' ST'.
-  pose proof (trace_has_len tr) as [len LEN]. 
-  forward eapply (proj2 (trace_lookup_dom_strong _ _ LEN (m1 + d))).
-  { eapply mk_is_Some, state_lookup_dom in ST'; eauto.
-    lia_NO len. }
-  clear dependent s. 
-  intros (s & ? & s'_ & STEP'_). 
-  forward eapply (trace_valid_steps' _ _ VALID) as TRANS; [eauto| ].
-  pose proof STEP'_ as X%L2; try lia. 
-  (* destruct X as (?&?&?&[=]&[? <-]). subst.   *)
-  apply state_label_lookup in STEP'_ as (ST & ST'_ & LBL).
-  replace (m1 + S d) with (m1 + d + 1) in ST' by lia.
-  rewrite ST' in ST'_. inversion ST'_. subst s'_.
-  specialize_full IHd; eauto. lia. 
-Qed.
-
-
-Section FinitaryModels.
-  Context {M: FairModel}.  
-  
-  Definition model_step_helper
-    (st: fmstate M) (step: fmstate M * option (fmrole M)) :=
-    let '(s', ℓ) := step in
-    fmtrans M st ℓ s' \/ (s' = st /\ ℓ = None).
-
-  Instance model_trans'_PI st step: 
-    ProofIrrel (model_step_helper st step). 
-  Proof. apply make_proof_irrel. Qed.
-
-  Instance step'_eqdec: 
-    forall s1, EqDecision {step | model_step_helper s1 step}.
-  (* TODO: why it stopped being inferred automatically? *)
-  Proof. 
-    pose proof (fmstate_eqdec M).
-    solve_decision. 
-  (* Qed. *)
-  Defined.
-
-  Definition next_states (s1: fmstate M) :=
-    {l: list (fmstate M) | forall s2 oρ, fmtrans M s1 oρ s2 -> s2 ∈ l}. 
-
-  Lemma model_finitary_helper (s1: fmstate M)
-    (NEXTS: next_states s1)
-    :
-    Finite {step | model_step_helper s1 step }. 
-  Proof.
-    rewrite /model_step_helper.
-    destruct NEXTS as [nexts ?]. 
-    set (steps :=
-           let lr := None :: (Some <$> (elements $ live_roles _ s1)) in
-           (s1, None) :: (s ← nexts; ρ ← lr; mret (s, ρ))).
-   (* : list (lf * nat * option client_role) *)
-    eapply in_list_finite with (l := steps).
-    intros [s2 oρ] TRANS. destruct TRANS as [TRANS | [EQ ->]].
-    2: { set_solver. }
-    subst steps. simpl. apply elem_of_cons. right.
-    apply elem_of_list_bind. eexists. split; eauto.
-    destruct oρ.
-    2: { set_solver. }
-    apply elem_of_cons. right.
-    apply elem_of_list_bind. eexists. split. 
-    { apply elem_of_list_ret. reflexivity. }
-    apply elem_of_list_fmap_1, elem_of_elements.
-    eapply fm_live_spec; eauto.
-  Qed. 
-
-End FinitaryModels.

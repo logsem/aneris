@@ -143,14 +143,6 @@ Section ObligationsEM.
     red. simpl. by rewrite dom_gset_to_gmap.
   Qed.
 
-  (* TODO: move *)
-  Lemma length_size `{Countable K} (g: gset K):
-    length (elements g) = size g.
-  Proof.
-    rewrite -{2}(list_to_set_elements_L g).
-    rewrite size_list_to_set; [done| ]. apply NoDup_elements.
-  Qed.
-
   Lemma init_om_dpo (c: cfg Λ) ds eb:
     dom_phases_obls (init_om_state c ds eb).
   Proof.

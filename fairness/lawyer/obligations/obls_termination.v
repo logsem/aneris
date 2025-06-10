@@ -165,7 +165,6 @@ Section Termination.
     eapply WF; eauto.
   Qed.
 
-  (* TODO: move *)
   Section MoreWF.
 
     Definition sig_st_le (st1 st2: option $ @SignalState Level) :=
@@ -254,14 +253,6 @@ Section Termination.
       { rewrite P1 in P2. inversion P2. done. }
       edestruct (om_wf_ph_disj δ); eauto. tauto. 
     Qed.
-
-  (* TODO: move *)
-  Lemma loc_step_with_ex δ1 τ δ2
-    (WITH: loc_step_with δ1 τ δ2):
-    loc_step_ex δ1 δ2.
-  Proof using.
-    destruct WITH as [?|?]; [left | right]; eauto.
-  Qed.
 
     Lemma other_loc_step_pres_obls τ R τs
       (OTHER: τs ≠ τ):
@@ -592,7 +583,6 @@ Section Termination.
     simpl in *. destruct b, b0; tauto.
   Qed.
 
-  (* TODO: move *)
   Ltac by_classical_contradiction cname :=
     match goal with
     | |- ?goal => destruct (Classical_Prop.classic (goal)) as [| cname]; first done; exfalso
@@ -608,7 +598,6 @@ Section Termination.
     eapply elem_of_dom; eauto.
   Qed.
 
-  (* TODO: move *)
   Lemma update_cps_same_sigs δ cps':
     ps_sigs (update_cps cps' δ) = ps_sigs δ.
   Proof using. by destruct δ. Qed.
@@ -1015,60 +1004,6 @@ Section Termination.
     destruct SIG_LE. congruence.
   Qed. 
   
-  (* Lemma pres_by_valid_trace_strong (tr: obls_trace) i j (P: nat -> Prop) *)
-  (*   (LE: i <= j) *)
-  (*   (VALID: obls_trace_valid tr) *)
-  (*   (PRES: forall i τ, P i -> P (i + 1)) *)
-  (*   (Pi: P i) *)
-  (*   (Tij: forall k, i <= k < j -> exists τ, tr L!! k = Some τ /\ T τ) *)
-  (*   : *)
-  (*   P j. *)
-  (* Proof using. *)
-  (*   apply Nat.le_sum in LE as [d ->]. induction d. *)
-  (*   { rewrite Nat.add_0_r. done. } *)
-  (*   rewrite -plus_n_Sm. *)
-
-  (*   rewrite -Nat.add_1_r. *)
-  (*   specialize (Tij (i + d) ltac:(lia)). destruct Tij as (τid & Lid & Tid).  *)
-  (*   eapply PRES; eauto.  *)
-  (*   apply IHd. intros. *)
-  (*   eapply mk_is_Some, label_lookup_prev with (j := k) in Lid as [τk Tk]; [| lia]. *)
-  (*   eexists. split; eauto. eapply  *)
-    
-    
-  (*   eapply Tij; eauto. lia. *)
-  (*   - eapply Tij; eauto.   *)
-
-
-  (*   destruct (tr S!! S (i + d)) eqn:NEXT; [| done]. simpl. *)
-  (*   forward eapply (proj1 (next_state_lookup _ _)); eauto. *)
-  (*   intros [[? CUR] [? LBL]]. *)
-  (*   rewrite CUR in IHd. simpl in IHd. *)
-  (*   forward eapply trace_valid_steps''; eauto. *)
-  (*   { rewrite Nat.add_1_r. eauto. } *)
-  (*   intros STEP. *)
-  (*   pose proof (Tij (i + d) _ ltac:(lia) LBL). *)
-  (*   eapply pres_by_loc_fork_steps_implies_om_trans; eauto. *)
-  (*   2: { apply STEP. } *)
-  (*   apply IHd. intros. eapply Tij; eauto. lia.   *)
-  (* Qed. *)
-
-  (* (* TODO: move *) *)
-  (* Lemma pres_by_loc_fork_steps_implies_om_trans τ P *)
-  (*   (PPRES: preserved_by (loc_step_with τ) P) *)
-  (*   (FPRES: preserved_by_fork τ P) *)
-  (*   : *)
-  (*   preserved_by_om_trans τ P.  *)
-  (* Proof using. *)
-  (*   do 2 red. intros δ1 δ2 P1 STEP.  *)
-  (*   red in STEP. destruct STEP as (?&PSTEP&FSTEP). *)
-  (*   eapply pres_by_loc_step_implies_progress in PPRES.  *)
-  (*   do 2 red in PPRES. specialize_full PPRES; eauto. *)
-  (*   inversion FSTEP; subst; try done. *)
-  (*   eapply FPRES; eauto.  *)
-  (* Qed. *)
-
-
   Lemma next_step_rewind τ i δ0 j s δj
     (ITH: tr S!! i = Some δ0)
     (OBLS: s ∈ default ∅ (ps_obls δ0 !! τ))

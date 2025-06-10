@@ -158,15 +158,25 @@ Section ObligationsRepr.
       Proper (equiv ==> equiv ==> equiv) (sgns_levels_rel rel).
     Proof using. solve_proper. Qed.
 
-    (* TODO: derive from generalized Proper instance(s) *)
+    Lemma sgns_levels_rel'_impl:
+      Proper ((eq ==> eq ==> impl) ==> flip subseteq ==> flip subseteq ==> bi_entails) sgns_levels_rel.
+    Proof using.
+      intros ?? IMPL ?? SUBs ?? SUBl.
+      rewrite /sgns_levels_rel. iIntros "?".      
+      iApply big_sepS_subseteq; [done| ].
+      iApply (big_sepS_impl with "[$]").
+      iIntros (s IN). iModIntro.
+      iIntros "(% & SGN & %ALL)". iExists _. iFrame.
+      iPureIntro. eapply set_Forall_subseteq; eauto.
+      eapply set_Forall_impl; eauto.
+      intros ?. by apply IMPL.
+    Qed.
+
     Lemma sgns_levels_gt'_ge' R L:
       sgns_levels_gt' R L -∗ sgns_levels_ge' R L.
     Proof using.
-      iIntros "?". iApply (big_sepS_impl with "[$]").
-      iIntros "!> % %IN (%l & #SGN & %GT)".
-      iExists _. iFrame "SGN". iPureIntro.
-      eapply set_Forall_impl; eauto. 
-      rewrite /lvl_lt. intros ?. rewrite /flip. apply strict_include.
+      iApply sgns_levels_rel'_impl; try set_solver.
+      intros ?????? LT. subst. apply LT. 
     Qed.
 
     Lemma cp_msi_unfold δ ph deg:
@@ -295,6 +305,32 @@ Section ObligationsRepr.
       iPureIntro. by rewrite -leibniz_equiv_iff.
     Qed.      
 
+    Lemma sgns_levels_rel_singleton s l l' (R: Level -> Level -> Prop) ov
+      (REL: R l l'):
+      sgn s l ov ⊢ sgns_levels_rel R {[s]} {[ l' ]}.
+    Proof using.
+      clear -REL OM.
+      iIntros "SGN".
+      rewrite /sgns_levels_rel. rewrite big_sepS_singleton.
+      iDestruct (sgn_get_ex with "[$]") as "[? #SGN0]".
+      iExists _. iFrame "#".
+      iPureIntro. set_solver.
+    Qed.
+
+    Lemma sgns_levels_rel_irrefl rel S L s l ov
+      (IRR: Irreflexive rel)
+      (INs: s ∈ S)
+      (INl: l ∈ L)
+      :
+      sgns_levels_rel rel S L -∗ sgn s l ov -∗ False. 
+    Proof using H0 H1.
+      iIntros "REL SGN". iDestruct (sgn_get_ex with "[$]") as "[? #SGN0]".
+      rewrite /sgns_levels_rel.
+      iDestruct (big_sepS_elem_of with "[$]") as (l') "[#SGN0' %REL]"; eauto.
+      iDestruct (sgn_level_agree with "SGN0 SGN0'") as %<-.
+      specialize (REL _ INl). by edestruct IRR.
+    Qed.
+
     Instance wrap_phase_inj: Inj eq eq wrap_phase.
     Proof using.
       intros ?? EQ. apply (@f_equal _ _ unwrap_phase) in EQ.
@@ -378,15 +414,16 @@ Section ObligationsRepr.
 
     Lemma th_phase_frag_combine' τ π q p
       (LE: Qp.le p q):
-      th_phase_frag τ π q ⊣⊢ th_phase_frag τ π p ∗ from_option (fun d => th_phase_frag τ π d) ⌜ True ⌝ (Qp.sub q p). 
+      th_phase_frag τ π q ⊣⊢ th_phase_frag τ π p ∗
+        default emp ((q - p)%Qp ≫= Some ∘ th_phase_frag τ π).
     Proof using.
       destruct (q - p)%Qp eqn:D. 
       - simpl. rewrite th_phase_frag_combine.
         by apply Qp.sub_Some in D as ->.
       - simpl. apply Qp.sub_None in D.
         assert (p = q) as ->.
-        { eapply @partial_order_anti_symm; eauto. apply _. }
-        by rewrite bi.sep_True'.
+        2: { by rewrite bi.sep_emp. }
+        eapply @partial_order_anti_symm; eauto. apply _. 
     Qed.
 
     Lemma th_phase_frag_halve τ π q:
@@ -1040,6 +1077,21 @@ Section ObligationsRepr.
 
     Definition BOU E b (P: iProp Σ): iProp Σ :=
       ∀ δ k, obls_msi_interim δ k ={E}=∗ ∃ k', obls_msi_interim δ k' ∗ ⌜ k' - k <= b ⌝ ∗ P. 
+
+    Global Instance is_except_0_BOU E n P:
+      IsExcept0 (BOU E n P).
+    Proof using.
+      rewrite /IsExcept0.
+      iIntros "BOU".
+      rewrite /BOU. iIntros (??) "MSI".
+      repeat setoid_rewrite bi.except_0_forall.
+      iSpecialize ("BOU" $! δ k).
+      rewrite /bi_except_0.
+      iDestruct "BOU" as "[foo | bar]".
+      { iApply is_except_0.
+        rewrite /bi_except_0. by iLeft. }
+      by iApply "bar".
+    Qed.
 
     Lemma lse_rep_phases_eq_helper δ1 δ2 n
       (TRANSS: nsteps loc_step_ex n δ1 δ2):

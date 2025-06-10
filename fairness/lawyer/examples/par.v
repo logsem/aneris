@@ -83,19 +83,6 @@ Section SpawnJoin.
 
   Context (LS_LB: fuels_spawn <= LIM_STEPS).
 
-  (* TODO: move *)
-  Lemma sgns_levels_rel_singleton s l l' (R: LvlO -> LvlO -> Prop) ov
-    (REL: R l l'):
-    sgn s l ov ⊢ sgns_levels_rel R {[s]} {[ l' ]}.
-  Proof using.
-    clear -REL.
-    iIntros "SGN".
-    rewrite /sgns_levels_rel. rewrite big_sepS_singleton.
-    iDestruct (sgn_get_ex with "[$]") as "[? #SGN0]".
-    iExists _. iFrame "#".
-    iPureIntro. set_solver.
-  Qed.
-
   Context {NO_OBS_POST: ∀ τ v, obls τ ∅ -∗ fork_post τ v}.
 
   Definition spawnee_spec (e: expr) R d__s Q: iProp Σ :=

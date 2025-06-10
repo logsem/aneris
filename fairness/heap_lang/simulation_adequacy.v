@@ -1,7 +1,7 @@
 From stdpp Require Import fin_maps.
 From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export weakestpre adequacy.
-From trillium.fairness Require Export fairness traces_match.
+From trillium.fairness Require Export fairness traces_match trace_utils.
 From trillium.fairness.heap_lang Require Export lang heap_lang_defs.
 
 Definition heap_lang_extrace : Type := extrace heap_lang.
@@ -90,14 +90,6 @@ Section adequacy.
     - eapply (strong_simulation_adequacy_general s) => //.
     - done.
   Qed.
-
-  (* TODO: move *)
-  Definition to_trace_trfirst {S L : Type}
-    (s: S) (il: inflist (L * S)):
-    trfirst (to_trace s il) = s.
-  Proof. 
-    destruct il as [| [??]]; done.
-  Qed. 
 
   Theorem strong_simulation_adequacy_traces Σ
     `{hPre: @heapGpreS Σ M EM} (s: stuckness) 

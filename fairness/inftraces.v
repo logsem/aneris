@@ -395,7 +395,6 @@ Proof.
     by apply CH.
 Qed.
 
-(* TODO: move *)
 Lemma traces_match_compose {L1 L2 L3 S1 S2 S3: Type}
     {Rℓ12 Rs12 Rℓ23 Rs23 trans1 trans2 trans3}
     (tr1 : trace S1 L1) (tr2 : trace S2 L2) (tr3 : trace S3 L3):

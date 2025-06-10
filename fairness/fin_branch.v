@@ -1,10 +1,6 @@
 From stdpp Require Import base sets.
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import
-                         (* locales_helpers comp_utils trace_lookup fairness *)
-                       utils.
-(* TODO: move the needed lemmas *)
-From trillium.fairness.lawyer.obligations Require Import obls_utils.
+From trillium.fairness Require Import utils.
 
 
 Section ListApprox.
