@@ -1,6 +1,6 @@
 From iris.proofmode Require Import tactics.
 From iris.algebra Require Import gset gmultiset.
-From trillium.fairness Require Import utils_tactics.
+From fairness Require Import utils_tactics.
 
 Ltac mss := multiset_solver. 
 

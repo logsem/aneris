@@ -1,6 +1,6 @@
 From stdpp Require Import namespaces coPset. 
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import utils_logic.
+From fairness Require Import utils_logic.
 
 Section CoPsetOrdering.
   

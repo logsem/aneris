@@ -1,5 +1,5 @@
 From trillium.program_logic Require Import language adequacy.
-From trillium.fairness Require Import utils.
+From fairness Require Import utils.
 
 Section XX.
   Context `{Countable (locale Λ)}.

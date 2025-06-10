@@ -1,7 +1,7 @@
 From stdpp Require Import option.
 From Paco Require Import paco1 paco2 pacotac.
 From trillium.program_logic Require Export adequacy.
-From trillium.fairness Require Import utils_logic.
+From fairness Require Import utils_logic.
 
 Require Import
         Coq.Relations.Relation_Definitions

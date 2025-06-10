@@ -1,5 +1,7 @@
 -Q trillium trillium
--Q fairness trillium.fairness
+-Q fairness fairness
+-Q heap_lang heap_lang
+-Q lawyer lawyer
 
 -Q external/stdpp/stdpp stdpp
 -Q external/stdpp/stdpp_unstable stdpp.unstable

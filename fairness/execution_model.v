@@ -2,7 +2,7 @@ From stdpp Require Import fin_maps.
 From iris.proofmode Require Import tactics.
 From trillium Require Import language.
 From trillium.program_logic Require Import traces weakestpre.
-From trillium.fairness Require Import inftraces fairness. 
+From fairness Require Import inftraces fairness. 
 
 Class ExecutionModel (Λ: language) (M: Model) := {
 

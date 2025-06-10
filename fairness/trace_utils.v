@@ -1,6 +1,6 @@
 From stdpp Require Import option.
 From Paco Require Import paco1 paco2 pacotac.
-From trillium.fairness Require Export inftraces.
+From fairness Require Export inftraces.
 
 Definition trace_implies {S L} (P Q : S → option L → Prop) (tr : trace S L) : Prop :=
   ∀ n, pred_at tr n P → ∃ m, pred_at tr (n+m) Q.

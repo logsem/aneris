@@ -1,6 +1,6 @@
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import trace_len trace_lookup.
-From trillium.fairness Require Import inftraces fairness trace_utils utils_tactics.
+From fairness Require Import trace_len trace_lookup.
+From fairness Require Import inftraces fairness trace_utils utils_tactics.
 
 Close Scope Z_scope.
  

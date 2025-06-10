@@ -1,6 +1,8 @@
 TRILLIUM_DIR := 'trillium'
 FAIRNESS_DIR := 'fairness'
-LOCAL_SRC_DIRS := $(TRILLIUM_DIR) $(FAIRNESS_DIR)
+HL_DIR := 'heap_lang'
+LAWYER_DIR := 'lawyer'
+LOCAL_SRC_DIRS := $(TRILLIUM_DIR) $(FAIRNESS_DIR) $(HL_DIR) $(LAWYER_DIR)
 SRC_DIRS := $(LOCAL_SRC_DIRS) 'external'
 
 ALL_VFILES := $(shell find $(SRC_DIRS) -name "*.v")
@@ -43,26 +45,9 @@ clean:
 	rm -f .coqdeps.d
 
 # project-specific targets
-.PHONY: build clean-trillium clean-fairness trillium fairness
+.PHONY: build
 
-VPATH= $(TRILLIUM_DIR) $(FAIRNESS_DIR)
+VPATH= $(TRILLIUM_DIR) $(FAIRNESS_DIR) $(HL_DIR) $(LAWYER_DIR)
 VPATH_FILES := $(shell find $(VPATH) -name "*.v")
 
 build: $(VPATH_FILES:.v=.vo)
-
-fairness :
-	@$(MAKE) build VPATH=$(FAIRNESS_DIR)
-
-trillium :
-	@$(MAKE) build VPATH=$(TRILLIUM_DIR)
-
-clean-local:
-	@echo "CLEAN vo glob aux"
-	$(Q)find $(LOCAL_SRC_DIRS) \( -name "*.vo" -o -name "*.vo[sk]" \
-		-o -name ".*.aux" -o -name ".*.cache" -o -name "*.glob" \) -delete
-
-clean-trillium:
-	@$(MAKE) clean-local LOCAL_SRC_DIRS=$(TRILLIUM_DIR)
-
-clean-fairness:
-	@$(MAKE) clean-local LOCAL_SRC_DIRS=$(FAIRNESS_DIR)

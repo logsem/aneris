@@ -1,6 +1,6 @@
 From stdpp Require Import finite.
 From trillium.prelude Require Import classical_instances finitary.
-From trillium.fairness Require Import inftraces trace_lookup fairness trace_len my_omega subtrace utils_tactics.
+From fairness Require Import inftraces trace_lookup fairness trace_len my_omega subtrace utils_tactics.
 
 
 Section StepLabelMatches.

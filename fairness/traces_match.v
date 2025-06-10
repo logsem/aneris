@@ -1,6 +1,6 @@
 From iris.proofmode Require Import tactics.
 From trillium Require Import language.
-From trillium.fairness Require Import inftraces fairness. 
+From fairness Require Import inftraces fairness. 
 
 
 Section TracesMatch.

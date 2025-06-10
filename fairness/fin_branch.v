@@ -1,6 +1,6 @@
 From stdpp Require Import base sets.
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Import utils.
+From fairness Require Import utils.
 
 
 Section ListApprox.

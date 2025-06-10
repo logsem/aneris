@@ -1,6 +1,6 @@
 From stdpp Require Import base.
 From iris.proofmode Require Import tactics.
-From trillium.fairness Require Export utils_logic.
+From fairness Require Export utils_logic.
 From iris.algebra Require Import gmap gset agree.
 From trillium.prelude Require Import finitary.
 
