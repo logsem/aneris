@@ -233,6 +233,41 @@ Section LocaleFairness.
     - right. set_solver.
   Qed.
 
+  Definition weakly_fair (t: T) (tr: trace S L) :=
+    forall n,
+      is_Some (tr S!! n) ->
+      (* using True as default to support finite traces *)
+      (forall k, n <= k -> from_option (locale_prop t) True (tr S!! k)) ->
+    exists m ℓ, tr L!! (n + m) = Some ℓ /\ does_step t ℓ. 
+
+  Require Import Coq.Logic.Classical.
+  
+  Lemma fair_by'_weakly_fair τ tr:
+    fair_by' τ tr <-> weakly_fair τ tr.
+  Proof using.
+    rewrite /fair_by' /weakly_fair. apply forall_proper. intros n.
+    split.
+    - intros FAIR [δ NTH] ALW.
+      pose proof (ALW n ltac:(lia)) as ENn. rewrite NTH /= in ENn.
+      rewrite NTH in FAIR. ospecialize (FAIR ltac:(done)).
+      destruct FAIR as (d & δ' & MTH & SAT).
+      destruct SAT as [DIS | STEP]; [| by eauto].
+      specialize (ALW (n + d) ltac:(lia)). by rewrite MTH in ALW.
+    - intros FAIR.
+      destruct (tr S!! n) as [δ | ] eqn:NTH; [| done]. simpl in *.
+      intros ENn. specialize (FAIR ltac:(done)).
+      destruct (classic (∀ k, n ≤ k → from_option (locale_prop τ) True (tr S!! k))).
+      { specialize (FAIR H). destruct FAIR as (m & ℓ & MTHl & STEP).
+        pose proof MTHl as [[? MTH] _]%mk_is_Some%label_lookup_states.
+        do 2 eexists. split; eauto. right. eauto. }
+      apply not_forall_exists_not in H as [m DIS].
+      apply imply_to_and in DIS as [LE DIS].
+      destruct (tr S!! m) as [? | ] eqn:MTH; [| done]. simpl in *.
+      apply Nat.le_sum in LE as [? ->].
+      do 2 eexists. split; eauto.
+      by left.
+  Qed.
+
 End LocaleFairness.
 
 Definition extrace Λ := trace (cfg Λ) (olocale Λ).

@@ -232,6 +232,32 @@ Section FiniteBranching.
       red. intros ???????. subst. eauto.
     Qed.
 
+    (* Statement mentioned in the paper *)
+    Lemma om_trans_locale_approx δ τ (L: gset Locale):
+      list_approx (fun δ' => dom (ps_obls δ') ⊆ L /\ om_trans δ τ δ'). 
+    Proof using FINlvl FINdeg.
+      clear H1 H0 H.
+      set (approx1 := proj1_sig $ progress_step_approx δ).
+      set (approx2 :=
+             τ' ← elements $ L;
+             δ' ← approx1;
+             proj1_sig (forks_locale_next_states δ' τ')).              
+      exists (approx1 ++ approx2).
+      intros δ' [LOCS STEP].
+      red in STEP. destruct STEP as (δ_ & PSTEP & FSTEP).
+      rewrite elem_of_app. inversion FSTEP; subst. 
+      2: { left. subst approx1. destruct progress_step_approx. eauto. }
+      right. subst approx2. apply elem_of_list_bind.
+      setoid_rewrite elem_of_list_bind.
+      destruct H as (τ' & ? & FORK). 
+      eexists. split; [eexists; split| ].
+      - destruct forks_locale_next_states. eauto.
+      - subst approx1. destruct progress_step_approx. eauto.
+      - apply elem_of_elements. inversion FORK. subst.
+        apply LOCS. subst ps'. destruct δ_. simpl in *.
+        subst new_obls0. rewrite dom_insert. set_solver.
+    Qed.
+
     Lemma om_trans_approx δ (L: gset Locale):
       list_approx (fun δ' => dom (ps_obls δ') ⊆ L /\ exists τ, om_trans δ τ δ'). 
     Proof using FINlvl FINdeg.
