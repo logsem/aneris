@@ -185,7 +185,7 @@ Section SpawnJoin.
       pure_steps.
       iApply "POST". do 2 iExists _. iFrame.
       iSplitL; [| iPureIntro; by apply PH_LTw].
-      rewrite /join_handle. iExists _. iFrame "#∗".
+      rewrite /join_handle. iFrame "#∗".
   Qed.
 
   Lemma join_spec τ (Q__s : val → iProp Σ) h s__h R π:
@@ -312,7 +312,7 @@ Section SpawnJoin.
     iIntros "!> %vs (Qs & OBw & PH)".
     iSpecialize ("POST" with "[$] [$] [$]").
     wp_bind (Rec _ _ _)%E. pure_steps.
-    iFrame. iExists _. iFrame. iPureIntro. etrans; eauto.  
+    iFrame. iPureIntro. etrans; eauto.  
   Qed.
 
   (* Notice that this allows us to strip a later *after* the two Ψ have been
@@ -405,7 +405,7 @@ Section SpawnJoin.
     
     iSpecialize ("POST" with "[$] [$] [$]").
     wp_bind (Rec _ _ _)%E. pure_steps.
-    iFrame. iExists _. iFrame. iPureIntro. etrans; eauto.
+    iFrame. iPureIntro. etrans; eauto.
   Qed.    
 
 End SpawnJoin.

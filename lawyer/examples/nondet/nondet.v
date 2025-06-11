@@ -10,10 +10,10 @@ From iris.base_logic.lib Require Import invariants.
 
 
 Class NondetPreG Σ := {
-    nd_tok :> inG Σ (exclR unitO);
+    nd_tok :: inG Σ (exclR unitO);
 }.
 Class NondetG Σ := {
-    nd_pre :> NondetPreG Σ;
+    nd_pre :: NondetPreG Σ;
     γ__tok: gname;
 }.
 

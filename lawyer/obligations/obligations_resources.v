@@ -205,7 +205,7 @@ Section ObligationsRepr.
 
     Lemma ep_weaken s π1 π2 d
       (PH_LE: phase_le π1 π2):
-      ep s π1 d -∗ ep s π2 d.
+      ep s π1 d ⊢ ep s π2 d.
     Proof using.
       rewrite /ep. iIntros "(%&?&%)".
       iExists _. iFrame. iPureIntro. etrans; eauto.
@@ -435,7 +435,7 @@ Section ObligationsRepr.
 
     Lemma cp_weaken π1 π2 deg
       (PH_LE: phase_le π1 π2):
-      cp π1 deg -∗ cp π2 deg.
+      cp π1 deg ⊢ cp π2 deg.
     Proof using.
       rewrite /cp. iIntros "(%&?&%)".
       iExists _. iFrame. iPureIntro. etrans; eauto.
@@ -479,7 +479,7 @@ Section ObligationsRepr.
     Lemma cp_mul_weaken π1 π2 deg n1 n2
       (PH_LE: phase_le π1 π2)
       (LE: n2 <= n1):
-      cp_mul π1 deg n1 -∗ cp_mul π2 deg n2.
+      cp_mul π1 deg n1 ⊢ cp_mul π2 deg n2.
     Proof using.
       clear H1 H0 H.
       iIntros "CPS".

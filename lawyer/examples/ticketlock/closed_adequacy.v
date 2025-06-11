@@ -116,7 +116,7 @@ Section Adequacy.
     extrace_fairly_terminating extr.
   Proof.
     assert (heapGpreS ClosedΣ EM) as HPreG.
-    { apply _. }
+    { apply subG_heapPreG. apply _. }
 
     eapply @obls_terminates_impl with
       (cps_degs := 4 *: {[+ d__r +]})
@@ -155,8 +155,6 @@ Section Adequacy.
     rewrite union_empty_r_L !gset_to_gmap_singleton.
     rewrite big_sepM_singleton. iFrame.  
     rewrite /cps_repr /sig_map_repr /eps_repr /obls_map_repr.
-    rewrite !fmap_empty map_fmap_singleton.      
-    iFrame.
     rewrite !mset_map_mul !mset_map_singleton.
     rewrite -!(cp_mul_alt (oGS := (@heap_fairnessGS _ _ _ HEAP))).
     iApply cp_mul_weaken; [..| by iFrame]; apply phase_lt_fork || lia. 

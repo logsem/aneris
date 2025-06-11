@@ -51,7 +51,9 @@ Section NondetAdequacy.
     extrace_fairly_terminating extr.
   Proof.
     assert (heapGpreS NDΣ EM) as HPreG.
-    { apply _. }
+    { apply subG_heapPreG.
+      apply _.
+    }
 
     eapply @obls_terminates_impl with
       (cps_degs := 2 *: {[+ d1 +]})

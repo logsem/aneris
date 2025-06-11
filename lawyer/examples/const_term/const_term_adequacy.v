@@ -1,7 +1,7 @@
 From iris.algebra Require Import auth gmap gset excl excl_auth.
 From iris.proofmode Require Import tactics.
 From fairness Require Import utils utils_tactics trace_len utils_multisets.
-From heap_lang Require Import simulation_adequacy.
+From heap_lang Require Import simulation_adequacy heap_lang_defs.
 From lawyer Require Import sub_action_em action_model.
 From lawyer.obligations Require Import obligations_adequacy obligations_logic obligations_em obligations_resources obligations_model obligations_am unfair_termination env_helpers.
 From lawyer.examples Require Import orders_lib.
@@ -50,7 +50,8 @@ Section ConstTermAdequacy.
     trace_len_le extr (bound + 1). 
   Proof.
     assert (heapGpreS CTΣ EM) as HPreG.
-    { apply _. }
+    { apply subG_heapPreG. (* why it's not applied automatically now? *)
+      apply _. }
 
     forward eapply @obls_match_impl with
       (cps_degs := bound *: {[+ () +]})

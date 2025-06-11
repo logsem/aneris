@@ -188,7 +188,7 @@ Section Decr.
     iIntros "(%π1 & %π2 & PH1 & OB1 & PH2 & OB2 & [%PH_LT1 %PH_LT2])".
 
     iSplitL "CPSd PH2 CNT OB2".
-    - rewrite cp_mul_weaken'; [..| reflexivity]. 
+    - rewrite cp_mul_weaken; [..| reflexivity]. 
       2: { apply PH_LT2. }
       iApply (decr_spec with "[-OB2]").
       { iFrame "#∗". }

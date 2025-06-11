@@ -62,7 +62,7 @@ Section LFCAdequacy.
     terminating_trace extr.
   Proof.
     assert (heapGpreS LFCΣ EM) as HPreG.
-    { apply _. }
+    { apply subG_heapPreG. apply _. }
 
     forward eapply @obls_match_impl with
       (cps_degs := 5 *: {[+ d1 +]})

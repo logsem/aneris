@@ -16,7 +16,7 @@ From iris.base_logic.lib Require Import invariants.
 Class ClientPreG (Σ: gFunctors) := { }.
 
 Class ClientG Σ := {
-    cl_PreG :> ClientPreG Σ;
+    cl_PreG :: ClientPreG Σ;
 }.
 
 Section MotivatingClient.
@@ -334,7 +334,7 @@ Section MotivatingClient.
       iApply (release_right with "[OB PH P LOCKED FLAG CPSm']").
       { iFrame "#∗". }
       iNext. iIntros (?) "(OB & PH & FIN)".
-      iApply "POST". iFrame. iExists _. iFrame.
+      iApply "POST". iFrame. 
     Qed.
 
     Lemma right_thread_rep_spec (lk: val) τ π (flag c: loc) s__f:
@@ -496,8 +496,7 @@ Section MotivatingClient.
     2: { iApply ohe_obls_AMU__f; [done| ].
          iApply BOU_AMU__f.
          iApply BOU_intro. iFrame.
-         iSplitR; [iAccu| ]. 
-         iExists _. by iFrame. }
+         iAccu. }
     iIntros "(_ & (%π1 & %π2 & PH1 & OB1 & PH2 & OB2 & [%PH_LT1 %PH_LT2]))".
 
     iSplitL "CPS' OB2 PH2".
@@ -522,8 +521,7 @@ Section MotivatingClient.
     2: { iApply ohe_obls_AMU__f; [done| ].
          iApply BOU_AMU__f. 
          iApply BOU_intro. iFrame.
-         iSplitR; [iAccu| ]. 
-         iExists _. by iFrame. }
+         iAccu. }
     iIntros "(_ & (%π11 & %π12 & PH1 & OB1 & PH2 & OB2 & [%PH_LT11 %PH_LT12]))".
 
     iSplitR "POST OB1".

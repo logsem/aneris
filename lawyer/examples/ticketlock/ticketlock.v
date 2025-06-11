@@ -37,17 +37,17 @@ Section Ticketlock.
   Local Infix "**" := prodO (at level 10, left associativity).
 
   Class TicketlockPreG Σ := {
-      tl_tau_map_pre :> inG Σ (authUR (gmapUR nat (exclR $ tau_codom_gn)));
-      tl_tau_sp_post :> savedPredG Σ val;
-      tl_tau_sp_rr :> savedPredG Σ (option nat);
-      tl_tokens_pre :> inG Σ (authUR (gset_disjUR natO));
-      tl_held_pre :> inG Σ (excl_authUR boolO);
-      tl_ow_lb_pre :> inG Σ mono_natUR;
-      tl_rel_tok_pre :> inG Σ (exclR unitO);
+      tl_tau_map_pre :: inG Σ (authUR (gmapUR nat (exclR $ tau_codom_gn)));
+      tl_tau_sp_post :: savedPredG Σ val;
+      tl_tau_sp_rr :: savedPredG Σ (option nat);
+      tl_tokens_pre :: inG Σ (authUR (gset_disjUR natO));
+      tl_held_pre :: inG Σ (excl_authUR boolO);
+      tl_ow_lb_pre :: inG Σ mono_natUR;
+      tl_rel_tok_pre :: inG Σ (exclR unitO);
   }.
 
   Class TicketlockG Σ := {
-      tl_pre :> TicketlockPreG Σ;
+      tl_pre :: TicketlockPreG Σ;
       tl_γ_tau_map: gname; tl_γ_tokens: gname; tl_γ_held: gname;
       tl_γ_ow_lb: gname; tl_γ_rel_tok: gname;
   }.
@@ -449,7 +449,7 @@ Section Ticketlock.
     iModIntro. pure_steps.
     wp_bind (Rec _ _ _)%V. pure_steps.
     iApply "POST". iExists _. iFrame "#∗".
-    do 2 iExists _. iFrame. done.
+    iExists _. done.
   Qed.
 
   (* Set Ltac Profiling. *)
@@ -553,7 +553,7 @@ Section Ticketlock.
          iModIntro.
          pure_steps.
          do 2 iExists _.
-         iRevert "PH". iFrame. iIntros "PH". rewrite Nat.sub_add'.
+         iRevert "PH". iFrame. iIntros "PH". rewrite Nat.add_sub'.
          rewrite {1}cp_mul_take. iDestruct "CPSh" as "[CPSh CPh]".
          iFrame.
 
@@ -599,7 +599,7 @@ Section Ticketlock.
     { iFrame. iPureIntro. by apply Qp.div_le. }
     { Unshelve. 2: eapply (pair (pair _ _ ) _). 
       rewrite /acquire_at_post. simpl. rewrite /tl_LK.
-      iFrame. iSplit; [| done]. do 2 iExists _. iFrame. done. }
+      iFrame. iSplit; [| done]. iExists _. done. }
     { simpl in LIM_STEPS'. lia. }
 
     BOU_burn_cp. iModIntro. iApply wp_value.
@@ -624,7 +624,7 @@ Section Ticketlock.
     rewrite (proj2 (Nat.eqb_neq _ _)); [| lia]. iFrame.
     iFrame. rewrite !bi.sep_assoc. iSplit.
     2: { iIntros "%". lia. }
-    rewrite Nat.sub_diag Nat.sub_add'. iFrame "#∗".
+    rewrite Nat.sub_diag Nat.add_sub'. iFrame "#∗".
     iPureIntro. split.
     { split; [done| lia]. }
     rewrite dom_insert_L DOM__TM.
@@ -712,7 +712,7 @@ Section Ticketlock.
     rewrite /acquire_at_pre. simpl. iDestruct "PRE" as "[>(%&%&%EQ&OW'&HELD') ->]".
     inversion EQ. subst l__ow0 l__tk0. clear EQ.
     iDestruct (held_agree with "[$] [$]") as %<-.
-    iDestruct (mapsto_agree with "[$] [$]") as %EQ. inversion EQ as [EQ'].
+    iDestruct (pointsto_agree with "[$] [$]") as %EQ. inversion EQ as [EQ'].
     apply Nat2Z.inj' in EQ'. subst r. clear EQ.
     iDestruct (ow_lb_le_exact with "[$] [$]") as %LBow.
     replace (t - o') with (t - ow + (ow - o')) by lia.
@@ -726,7 +726,7 @@ Section Ticketlock.
       (* iDestruct "RR" as (r) "[RR RR']". iExists _. iFrame. *)
       iRewrite ("EQ2" $! (Some o')) in "RR".
       (* iDestruct "RR'" as "[-> | ?]"; [| by iFrame]. *)
-      apply Nat.le_sum in LBow as [d ->]. rewrite Nat.sub_add'.
+      apply Nat.le_sum in LBow as [d ->]. rewrite Nat.add_sub'.
       destruct d.
       - by rewrite Nat.add_0_r. 
       - rewrite cp_mul_take. iDestruct "CPSh'" as "[??]". iFrame. }
@@ -735,7 +735,7 @@ Section Ticketlock.
     iMod "WAIT" as "((RR & CP) & PH & OB & CLOS')".
     { etrans; [| apply LIM_STEPS']. simpl. lia. }
     iSpecialize ("CLOS'" with "[OW' HELD']").
-    { iFrame. iSplit; [| done]. iNext. do 2 iExists _. iFrame. eauto. }
+    { iFrame. iSplit; [| done]. iNext. iExists _. eauto. }
 
     iMod (exchange_cp_upd with "[$] EXC") as "CPS'". 
     { reflexivity. }
@@ -851,7 +851,7 @@ Section Ticketlock.
 
     subst lk. inversion_clear EQ.
     iDestruct (held_agree with "[$] [$]") as %<-.
-    iDestruct (mapsto_agree with "LOW LOW'") as %EQ.
+    iDestruct (pointsto_agree with "LOW LOW'") as %EQ.
     inversion EQ as [EQ'']. assert (r = ow + 1) as -> by lia. clear EQ'' EQ.
 
     iMod (held_update _ _ true with "[$] [$]") as "[HELD HELD']".
@@ -860,7 +860,7 @@ Section Ticketlock.
     { rewrite /acquire_at_post. simpl.
       Unshelve. 2: eapply (pair (pair _ _) _). iFrame.  
       iSplit; [| done].
-      rewrite Nat2Z.inj_add. do 2 iExists _. iFrame. eauto. }
+      iExists _. eauto. }
     iModIntro. 
 
     iFrame "HELD LOW TM".
@@ -922,7 +922,7 @@ Section Ticketlock.
     iDestruct "ST" as "(>(%&%&%&OW'&HELD')&[% %EQ])". subst.
     iApplyHyp "GOAL".
     inversion EQ. subst. clear EQ.
-    iDestruct (mapsto_agree with "OW OW'") as %EQ. inversion EQ as [EQ'].
+    iDestruct (pointsto_agree with "OW OW'") as %EQ. inversion EQ as [EQ'].
     apply Nat2Z.inj' in EQ'. subst n. clear EQ.
     iCombine "OW OW'" as "OW". rewrite Qp.inv_half_half.
     iDestruct (held_agree with "[$] [$]") as %EQ.
@@ -935,7 +935,7 @@ Section Ticketlock.
 
     iMod (held_update _ _ false with "[$] [$]") as "[HELD HELD']".
     iMod (ow_exact_increase _ (ow + 1) with "[$]") as "[EXACT OW_LB]"; [lia| ].    
-    rewrite -{2}Qp.inv_half_half. rewrite mapsto_fractional. iDestruct "OW" as "[OW OW']".
+    rewrite -{2}Qp.inv_half_half. rewrite pointsto_fractional. iDestruct "OW" as "[OW OW']".
 
     iSpecialize ("TAU" with "[$OB $PH']"). 
     { iPureIntro. apply Qp.div_le. done. }

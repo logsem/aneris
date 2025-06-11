@@ -47,7 +47,7 @@ Section EOFinAdequacy.
     extrace_fairly_terminating extr. 
   Proof.
     assert (heapGpreS eofinΣ EM) as HPreG.
-    { apply _. }
+    { apply subG_heapPreG. apply _. }
 
     eapply @obls_terminates_impl with
       (cps_degs := (2 * B + 5) *: {[+ d2 B +]} ⊎ 50 *: {[+ d0 B +]})

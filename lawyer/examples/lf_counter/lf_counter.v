@@ -10,12 +10,12 @@ From iris.base_logic.lib Require Import invariants.
 
 
 Class LFCPreG Σ := {
-    lfc_wm :> inG Σ (authUR (gmapUR nat natUR));
+    lfc_wm :: inG Σ (authUR (gmapUR nat natUR));
 }.
 
 
 Class LFCG Σ := {
-    lfc_pre :> LFCPreG Σ;
+    lfc_pre :: LFCPreG Σ;
     γ__wm: gname;
 }.
 
@@ -133,8 +133,8 @@ Section LFCounter.
     rewrite elem_of_map_img. setoid_rewrite lookup_insert_Some.
     rewrite -(Nat.add_1_r (set_max _)).
     intros [n [[<- <-] | [? ITH]]].
-    - destruct (wm !! c) eqn:CTH; simpl; [| lia].
-      apply Plus.plus_le_compat_r_stt.
+    - destruct (wm !! c) eqn:CTH; simpl; [| lia].      
+      apply add_le_mono_r_proj_l2r. 
       apply set_max_elems. eapply elem_of_map_img; eauto.
     - etrans; [apply set_max_elems| ].
       { eapply @elem_of_map_img.
@@ -207,7 +207,7 @@ Section LFCounter.
       2: { intros ????? EQ.
            erewrite leibniz_equiv_iff in EQ. by subst. }
       apply map_equiv_iff. intros i.
-      rewrite !map_filter_lookup.
+      rewrite !map_lookup_filter.
       destruct (delete c wm !! i) eqn:ITH.
       2: { done. }
       simpl. apply lookup_delete_Some in ITH as [? ITH].

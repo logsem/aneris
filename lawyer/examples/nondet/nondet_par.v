@@ -10,10 +10,10 @@ From iris.base_logic.lib Require Import invariants.
 
 
 Class NondetPreG Σ := {
-    nd_tok :> inG Σ (exclR unitO);
+    nd_tok :: inG Σ (exclR unitO);
 }.
 Class NondetG Σ := {
-    nd_pre :> NondetPreG Σ;
+    nd_pre :: NondetPreG Σ;
     γ__tok: gname;
 }.
 
@@ -280,8 +280,7 @@ Section Nondet.
     iApply (get_cnt_wrapper_spec with "[-]"). 
     { iFrame "#∗". }
     iIntros "!> %n (?&?&?)".
-    iExists _. iFrame. iSplitL; [| done].
-    iExists _. iSplit; done.
+    iExists _. iFrame. done. 
   Qed.
 
   Lemma incr_loop_waiter_spec `{NondetG Σ} s__f flag cnt:

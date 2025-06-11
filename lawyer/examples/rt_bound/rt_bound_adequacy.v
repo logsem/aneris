@@ -66,7 +66,7 @@ Section RTBAdequacy.
     extrace_fairly_terminating extr.
   Proof.
     assert (heapGpreS RTBΣ EM) as HPreG.
-    { apply _. }
+    { apply subG_heapPreG. apply _. }
 
     eapply @obls_terminates_impl with
       (cps_degs := 7 *: {[+ d2 +]})
