@@ -1,111 +1,90 @@
-# Aneris
-[![CI](https://github.com/logsem/aneris/workflows/CI/badge.svg?branch=master)](https://github.com/logsem/aneris/actions?query=workflow%3ACI)
+# Lawyer
 
-Aneris is a higher-order distributed concurrent separation logic for developing
-and verifying distributed systems with facilities for modular specification and
-verification of partial correctness properties and refinement. The logic is
-built using the [Iris](https://iris-project.org) program logic framework and
-mechanized in the [Coq proof assistant](https://coq.inria.fr/).
+## Structure of the technical development
 
-Recent documentation of Aneris is available [`here`](documentation.pdf). 
+trillium/ and lawyer/
 
-## Compiling
+## Installation
 
-The project maintains compatibility with Coq 8.17 and relies on `coqc` being
-available in your shell. Clone the external git submodule dependencies using
+## Correspondence between the paper and Rocq formalization
 
-    git submodule update --init --recursive
+### Section 2
 
-Alternatively, clone the repository using the `--recurse-submodules` flag.
+#### Section 2.1
+     - Definition of Obligations Model
+	   - parameters
+	   - state
+       - transitions
+	   - Trillium model
+	 - Example programs
+	   - Statically-determined Bound (Fig. 1): lawyer/lawyer/examples/const_term/
+	     const_term.v contains verification of the program from Fig. 1.
+		 const_term_adequacy.v shows that this program execution time is linear wrt. the value of N argument.
+	   - Runtime-determined Bound (Fig. 2): lawyer/lawyer/examples/rt_bound/
+	     rt_bound.v contains verification of the program from Fig. 2.
+		 rt_bound_adequacy.v shows that this program terminates under fair scheduler.
+	   - Blocking example (Fig. 3)
+	     We don't verify this exact example: it is a simplified version of Fig. 5, which is verified (see below).
+	   - Delaying example (Fig. 4)
+	     lf_counter.v contains verification of the program from Fig. 4.
+		 lf_counter_adequacy.v shows that this program terminates under any scheduler.
+	   - Fork example (Fig. 5)
+	     nondet.v contains verification of the program from Fig. 5.
+		 nondet_adequacy.v shows that this program terminates under fair scheduler.
+	 - Finite branching of OM (Lemma 2.1): lawyer/lawyer/obligations/obligations_fin_branch.v, lemma om_trans_locale_approx.
+	   Note that it restricts the domain of obligations mapping, instead of phases mapping. For well-formed states, these restrictions are equivalent.
 
-Run `make -jN` to build the full development, where `N` is the number of your
-CPU cores.
+#### Section 2.2
+     - Definition of traces: lawyer/fairness/inftraces.v, definition trace.
+	 - Definitions of trace state and label lookups: lawyer/fairness/trace_lookup.v, definitions state_lookup and label_lookup correspondingly.
+     - Definition of trace validity: lawyer/fairness/inftraces.v, definition trace_valid; also see lawyer/fairness/trace_lookup.v, lemma trace_valid_steps''.
+     - Operational semantics of Lambda: lawyer/heap_lang/lang.v
+     - Refinement relation (definitions 1 and 2).
+	   Our implementation of refinement proceeds slightly differently compared to the paper presentation.
+	   1. We maintain, in Iris, the fact that the thread represented on physical and model level are the same (sameThreads in Definition 1): lawyer/lawyer/obligations/obligations_em.v, definition threads_own_obls. 
+	   2. We define a notion of "valid evolution step" denoting a pair of physical and model taken by the same thread, ending in pair of states related by sameThreads (Definition 2, the part about states and labels correspondence).
+	   *********TODO************** + def 4
+	 - Relative image-finiteness of refinement relation (Lemma 2.2): lawyer/lawyer/obligations/obligations_adequacy.v, lemma obls_sim_rel_FB.
+	 - OM starting state (definition 3): lawyer/lawyer/obligations/obligations_em.v, definition obls_sim_rel_FB.
+	   Note that it applies to physical states with potentially more than one thread and therefore assigns distinct phases to each of them.
+     - General trace fairness (definition 5): lawyer/fairness/fairness.v, definition fair_by' (and its legacy equivalent fair_by). Also see the lemma fair_by'_weakly_fair in the same file for equivalence with more common notion of weak fairness.
+	   Then, notion of fair execution is given by fair_ex.
+	   "Obligations-fair" traces are defined in lawyer/lawyer/obligations/obligations_model.v, definition obls_trace_fair.
+	 - Transportation of execution fairness to the model trace (Lemma 2.4): lawyer/lawyer/obligations/obligations_adequacy.v, lemma exec_om_fairness_preserved
+	 - Terminationn of obligations-fair OM traces: lawyer/lawyer/obligations/obls_termination.v, theorem obls_fair_trace_terminate
 
-## Directory Structure
+### Section 3
+    - Verification of nondet example: lawyer/lawyer/examples/nondet/nondet.v
+	- Definitions of OM resources, OU (along with its iterated version) and related lemmas: lawyer/lawyer/obligations/obligations_resources.v
+    - Two-step program logic and model updates: lawyer/lawyer/program_logic.v (adapted from Fairneris).
+	  In particular, the rule trillium-step-nval-simpl corresponds to the lemma sswp_MU_wp. 
+    - sswp and rules for it: lawyer/lawyer/program_logic.v (adapted from Fairneris): lawyer/heap_lang/sswp_logic.v
 
-- [`trillium/`](trillium/): The Trillium program logic framework
+### Section 4
+	The case study is located in lawyer/lawyer/examples/ticketlock/.
+	Code for ticketlock implementation and top-level program can be found in ticketlock.v and client.v correspondingly.
+	The final result stating the termination of the closed program is located in closed_adequacy.v. 
 
-- [`aneris/`](aneris/): The Aneris instantiation of Trillium
-  * [`examples/`](aneris/examples/): examples and case studies
+#### Section 4.1
+	- BOU definition and related lemmas: see lawyer/lawyer/obligations/obligations_resources.v. 
+	- The rule MU-OM-nofork: lawyer/lawyer/obligations/obligations_logic.v, lemma BOU_AMU (see also BOU_AMU__f applicable to forking steps).
+	
+#### Section 4.2
+	- Sequential fair lock specification (Definition 6): lawyer/lawyer/examples/ticketlock/releasing_lock.v, record ReleasingFairLock.
+	- Logically atomic fair lock specification: lawyer/lawyer/examples/ticketlock/fair_lock.v, record FairLock.
+    - Verification of ticketlock implementation against the logically atomic specification: lawyer/lawyer/examples/ticketlock/ticketlock.v, see in particular TL_FL. 
+	- Derivation of the sequential specification for a wrapper over logically atomic implementation: lawyer/lawyer/examples/ticketlock/releasing_lock.v, see in particular RFL_FL. 
+	
+#### Section 4.3
+	Verification of the top-level program on top of the sequential lock specification: lawyer/lawyer/examples/ticketlock/client.v, theorem client_spec.
+	 
+## Additional stuff: case studies, appendix
+   - par
+   - eo_fin
+   - full rules
+   - tactics		
+   - ? remove everything actions-related
+   - TAUs
+     obls_atomic
 
-- [`fairness/`](fairness/): A HeapLang instantiation of Trillium for reasoning
-  about fair termination of concurrent programs.
-
-- [`ml_sources/`](ml_sources/): The Multicore OCaml source files
-  * [`aneris_lang/`](ml_sources/aneris_lang/): shim and aneris libraries
-  * [`examples/`](ml_sources/examples/): examples and case studies
-
-## Git submodule dependencies
-
-This project uses git submodules to manage dependencies with other Coq
-libraries. By default, when working with a repository that uses submodules, the
-submodules will *not* be populated and updated automatically, and it is often
-necessary to invoke `git submodule update --init --recursive` or use the
-`--recurse-submodules` flag. However, this can be automated by setting the
-`submodule.recurse` setting to `true` in your git config by running
-
-    git config --global submodule.recurse true
-
-This will make `git clone`, `git checkout`, `git pull`, etc. work as you would
-expect and it should rarely be necessary to invoke any `git submodule update`
-commands.
-
-A git submodule is pinned to a particular commit of an external (remote)
-repository. If new commits have been pushed to the remote repository and you
-wish to integrate these in to the development, invoke
-
-    git submodule update --remote
-
-to fetch the new commits and apply them to your local repository. This changes
-which commit your *local* submodule is pinned to. Remember to commit and push
-the submodule update to make it visible to other users of the repository.
-
-Read more about git submodules in [this
-tutorial](https://git-scm.com/book/en/v2/Git-Tools-Submodules).
-
-## Compiling from OCaml sources
-
-To generate AnerisLang programs from OCaml source files, pin the `ocaml2lang` package:
-
-    opam pin git+https://github.com/leon-gondelman/ocaml2lang#multicore
-
-This will produce an executable `o2a`. After installation succeeds, you can try `o2a` by doing
-
-    o2a --help
-
-You can now run
-
-    o2a --rewrite
-
-at the root of the repository to generate Coq files from the OCaml sources in
-[`ml_sources`](/ml_sources). To compile the source files, run
-
-    dune build
-
-at the root of the repository.
-
-## Publications
-
-Aneris was initially presented in the ESOP 2020 paper [Aneris: A Mechanised
-Logic for Modular Reasoning about Distributed
-Systems](https://iris-project.org/pdfs/2020-esop-aneris-final.pdf) by Morten
-Krogh-Jespersen, [Amin Timany](https://cs.au.dk/~timany/), Marit Edna
-Ohlenbusch, [Simon Oddershede Gregersen](https://cs.au.dk/~gregersen/), and
-[Lars Birkedal](https://cs.au.dk/~birke/). Since then, the duplicate protection
-assumption as described in the paper has been relaxed.
-
-At POPL 2022, a formal specification and verification of causally-consistent
-distributed key-values store using Aneris was presented in the paper
-[Distributed Causal Memory: Modular Specification and Verification in
-Higher-Order Distributed Separation
-Logic](https://iris-project.org/pdfs/2021-popl-ccddb-final.pdf) by [Leon
-Gondelman](https://cs.au.dk/~gondelman/), [Simon Oddershede
-Gregersen](https://cs.au.dk/~gregersen/), [Abel
-Nieto](https://abeln.github.io/), [Amin Timany](https://cs.au.dk/~timany/), and
-[Lars Birkedal](https://cs.au.dk/~birke/). This development is available in the
-[aneris/examples/ccddb](aneris/examples/ccddb) folder.
-
-A [preprint](https://iris-project.org/pdfs/2021-submitted-trillium.pdf) is
-available describing Trillium, a program logic framework for both proving
-partial correctness properties and trace properties; Aneris is now an
-instantiation of the Trillium framework.
+   

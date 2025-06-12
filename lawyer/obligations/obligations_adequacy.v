@@ -156,6 +156,29 @@ Section OblsAdequacy.
     - by apply traces_match_first in MATCHo.
   Qed.
 
+  Lemma exec_om_fairness_preserved extr omtr τ:
+      exec_OM_traces_match extr omtr ->
+      fair_ex τ extr → obls_trace_fair τ omtr.
+  Proof using.
+    intros MATCH FAIR.
+    eapply out_om_fairness_preserved_single.
+    2: apply MATCH.
+    { apply _. }
+
+    red. simpl. clear -FAIR.
+    apply fair_by_equiv. red. intros n EN. simpl in EN.
+    destruct (extr S!! n) eqn:NTH; rewrite NTH in EN; [| done].
+    simpl in EN. simpl.
+    apply fair_by_equiv in FAIR.
+    
+    ospecialize (FAIR n ltac:(by rewrite NTH)).
+    destruct FAIR as (?&?&?&FAIR).
+    do 2 eexists. split; eauto.
+    destruct FAIR as [| FAIR].
+    { left. done. }
+    right. destruct FAIR as (?&?&?). eauto.
+  Qed.
+
   Lemma obls_matching_traces_termination extr mtr
     (OM_WF0: om_st_wf (trfirst mtr))
     (FAIR: ∀ tid, fair_ex tid extr)
@@ -167,22 +190,8 @@ Section OblsAdequacy.
 
     pose proof (obls_matching_traces_OM _ _ MATCH OM_WF0) as (omtr & MATCH'' & OM_WF & FIRST''). 
 
-    assert (∀ ζ, out_fair (λ oτ c,
-                     from_option (λ τ, locale_enabled τ c) False oτ) ζ extr) as FAIR''.
-    { intros oζ. red. simpl. clear -FAIR.
-      apply fair_by_equiv. red. intros n EN. simpl in EN.
-      destruct (extr S!! n) eqn:NTH; rewrite NTH in EN; [| done].
-      simpl in EN.
-      destruct oζ as [ζ | ]; [| done].
-      simpl in EN. simpl.
-      specialize (FAIR ζ). apply fair_by_equiv in FAIR.
-      red in FAIR. specialize (FAIR n ltac:(by rewrite NTH)).
-      destruct FAIR as (?&?&?&FAIR).
-      do 2 eexists. split; eauto.
-      destruct FAIR as [| FAIR].
-      { left. done. }
-      right. destruct FAIR as (?&?&?). eauto. }
-    pose proof (out_om_fairness_preserved _ _ _ _ extr omtr MATCH'' FAIR'') as OM_FAIR.
+    assert (forall τ, obls_trace_fair τ omtr) as OM_FAIR.
+    { intros. eapply exec_om_fairness_preserved; eauto. } 
 
     pose proof (traces_match_valid2 _ _ _ _ _ _ MATCH'') as OM_VALID.
     pose proof (obls_fair_trace_terminate _ OM_VALID OM_FAIR) as OM_TERM.
