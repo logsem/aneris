@@ -170,5 +170,3 @@ Theorem closed_program_terminates:
 Proof using.
   intros. eapply closed_program_terminates_impl; eauto.  
 Qed.
-
-Print Assumptions closed_program_terminates.

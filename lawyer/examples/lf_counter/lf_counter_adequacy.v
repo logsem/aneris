@@ -53,7 +53,7 @@ Section LFCAdequacy.
       apply AMU_lift_top.
   Defined.
 
-  Theorem nondet_termination
+  Theorem lf_counter_termination
     (extr : heap_lang_extrace)
     (START: trfirst extr = ([counter_client #()], Build_state ∅ ∅))
     (VALID: extrace_valid extr):
