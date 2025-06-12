@@ -8,7 +8,6 @@ From iris.algebra Require Import ofe.
 Class ObligationsParams (Degree Level Locale: Type) (LIM_STEPS: nat) := {
   opar_deg_eqdec :: EqDecision Degree;
   opar_deg_cnt :: Countable Degree;
-  (* opar_deg_lt: Degree -> Degree -> Prop; *)
   deg_le: relation Degree;
   deg_PO :: PartialOrder deg_le;
 

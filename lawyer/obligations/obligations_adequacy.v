@@ -257,7 +257,7 @@ Section OblsAdequacy.
     red in OBτ.
     destruct (ps_obls δ' !! τ) as [V| ] eqn:OB_; [| done].
     simpl in OBτ.
-    red in TH_OWN. rewrite set_esq in TH_OWN. specialize (TH_OWN τ).
+    red in TH_OWN. rewrite set_eq in TH_OWN. specialize (TH_OWN τ).
     apply proj2 in TH_OWN. specialize (TH_OWN ltac:(eapply elem_of_dom; eauto)).
     apply locales_of_cfg_Some in TH_OWN as [e Ee]. simpl in Ee.
     iExists _. iSplit; [done| ].
