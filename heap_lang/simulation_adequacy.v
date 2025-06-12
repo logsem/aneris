@@ -123,7 +123,7 @@ Section adequacy.
       trfirst mtr = s1. 
   Proof.
     intros Hfin INIT Hwp.
-    have [iatr Hbig] : exists iatr,
+    have [iatr MATCH] : exists iatr,
         @valid_inf_system_trace
           heap_lang M
           (@continued_simulation
@@ -137,20 +137,20 @@ Section adequacy.
     { eapply (strong_simulation_adequacy_inftraces _ s); eauto.
       eapply from_trace_preserves_validity; eauto; first econstructor.
       all: by rewrite Hexfirst. }
-    rewrite Hexfirst in Hbig. simpl in *. 
+    rewrite Hexfirst in MATCH. simpl in *. 
     exists (to_trace s1 iatr).
 
     split.
     2: { by rewrite to_trace_trfirst. }
 
-    pose proof Hbig as INF_REF. (* see remark below *)
+    pose proof MATCH as INF_REF. (* see remark below *)
     eapply (valid_inf_system_trace_implies_traces_match
                        valid_step                       
                        state_rel
                        lbl_rel
                        ltac:(idtac)
                        ltac:(idtac)
-                       (continued_simulation R)) in Hbig; cycle 1.  
+                       (continued_simulation R)) in MATCH; cycle 1.  
     { intros ?? ?%continued_simulation_rel. eauto. }
     { intros ?? ?%continued_simulation_rel. eauto. }
     { apply from_trace_spec. simpl.
@@ -159,18 +159,19 @@ Section adequacy.
     Unshelve. 2,3: by eauto.
     
     assert (exists len, trace_len.trace_len_is extr len /\ trace_len.trace_len_is (to_trace s1 iatr) len) as LEN. (* see remark below *)
-    { simpl in Hbig.
+    { simpl in MATCH.
       pose proof (trace_len.trace_has_len extr) as [len LEN]. 
       pose proof (trace_len.trace_has_len (to_trace s1 iatr)) as [len' LEN'].
-      eapply trace_len.traces_match_same_length in Hbig; eauto. subst.  
+      eapply trace_len.traces_match_same_length in MATCH; eauto. subst.  
       eauto. }
 
     (* INF_REF and LEN together give the traces mentioned in
        the refinement section of Lawyer paper
        (same length, related by infinite extension of refinement).       
-       However, our proofs proceed differency, using the notion of traces_match. *)
+       However, our proofs proceed differency, 
+       using the notion of traces_match (MATCH hypothesis). *)
 
-    eauto. 
+    apply MATCH. 
   Qed.
   
 End adequacy.

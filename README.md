@@ -11,40 +11,46 @@ trillium/ and lawyer/
 ### Section 2
 
 #### Section 2.1
-     - Definition of Obligations Model
-	   - parameters
-	   - state
-       - transitions
-	   - Trillium model
+
+    - Definition of Obligations Model (Fig. 6): lawyer/lawyer/obligations/obligations_model.v
+	   - OM parameters: typeclass ObligationsParams
+	   - OM state: record ProgressState.
+	     Well-formedness condition is defined in lawyer/lawyer/obligations/obligations_wf.v, record om_st_wf.
+       - OM transitions: definition om_trans
+	   - OM as a Trillium model: definition ObligationsModel
 	 - Example programs
-	   - Statically-determined Bound (Fig. 1): lawyer/lawyer/examples/const_term/
-	     const_term.v contains verification of the program from Fig. 1.
-		 const_term_adequacy.v shows that this program execution time is linear wrt. the value of N argument.
-	   - Runtime-determined Bound (Fig. 2): lawyer/lawyer/examples/rt_bound/
-	     rt_bound.v contains verification of the program from Fig. 2.
-		 rt_bound_adequacy.v shows that this program terminates under fair scheduler.
+	   Each example program from Section 2.1 has a subfolder X in lawyer/lawyer/examples/.
+	   Inside of it, the X.v file contains the verification of the program, and X_adequacy.v proves the meta-level property about the execution of that program.
+	   Unless said otherwise, the property we prove is termination under fair scheduler.
+	   - Statically-determined Bound (Fig. 1): const_term/ subfolder
+		 The proved property is execution time being linear wrt. the value of N argument.
+	   - Runtime-determined Bound (Fig. 2): rt_bound/ subfolder
 	   - Blocking example (Fig. 3)
 	     We don't verify this exact example: it is a simplified version of Fig. 5, which is verified (see below).
-	   - Delaying example (Fig. 4)
-	     lf_counter.v contains verification of the program from Fig. 4.
-		 lf_counter_adequacy.v shows that this program terminates under any scheduler.
-	   - Fork example (Fig. 5)
-	     nondet.v contains verification of the program from Fig. 5.
-		 nondet_adequacy.v shows that this program terminates under fair scheduler.
+	   - Delaying example (Fig. 4): lf_counter/ subfolder
+	     The proved property is termination under any scheduler.
+	   - Fork example (Fig. 5): nondet/ folder
 	 - Finite branching of OM (Lemma 2.1): lawyer/lawyer/obligations/obligations_fin_branch.v, lemma om_trans_locale_approx.
 	   Note that it restricts the domain of obligations mapping, instead of phases mapping. For well-formed states, these restrictions are equivalent.
 
 #### Section 2.2
+
      - Definition of traces: lawyer/fairness/inftraces.v, definition trace.
 	 - Definitions of trace state and label lookups: lawyer/fairness/trace_lookup.v, definitions state_lookup and label_lookup correspondingly.
      - Definition of trace validity: lawyer/fairness/inftraces.v, definition trace_valid; also see lawyer/fairness/trace_lookup.v, lemma trace_valid_steps''.
      - Operational semantics of Lambda: lawyer/heap_lang/lang.v
-     - Refinement relation (definitions 1 and 2).
+     - Refinement relation (definitions 1, 2 and 4).
 	   Our implementation of refinement proceeds slightly differently compared to the paper presentation.
-	   1. We maintain, in Iris, the fact that the thread represented on physical and model level are the same (sameThreads in Definition 1): lawyer/lawyer/obligations/obligations_em.v, definition threads_own_obls. 
-	   2. We define a notion of "valid evolution step" denoting a pair of physical and model taken by the same thread, ending in pair of states related by sameThreads (Definition 2, the part about states and labels correspondence).
-	   *********TODO************** + def 4
-	 - Relative image-finiteness of refinement relation (Lemma 2.2): lawyer/lawyer/obligations/obligations_adequacy.v, lemma obls_sim_rel_FB.
+	   1. The state relation in paper (Definition 1) consists of two parts: sameThreads and liveThreads. Contrary, the Rocq version (lawyer/lawyer/obligations/obligations_adequacy.v, definition obls_st_rel) only includes the latter.
+	      Indeed, sameThreads is not explicitly used for proving termination, which is the main purpose of the refinement we establish. 
+	      However, sameThreads is used to /establish/ the refinement (lawyer/lawyer/obligations/obligations_adequacy.v, lemma no_obls_live_tids) as a part of proving AlwaysHolds. Therefore, we keep this condition as a part of trace interpretation (see lawyer/lawyer/obligations/obligations_em.v, definition threads_own_obls).
+	   2. The finite trace refinement in paper (Definition 2) is defined by placing restrictions on every transition in both traces.
+	      Contrary, the Rocq implementation proceeds in two steps.
+	      1. We start by defining the notion of "valid evolution step" (lawyer/lawyer/obligations/obligations_em.v, definition obls_valid_evolution_step) that intuitively captures the "lock-step" relation between physical and model steps.
+	      2. Then, we show that the proof of weakest precondition implies intensional refinement (see Trillium paper for definition) of the specific relation on pairs of physical and model traces. Namely, the last transitions of such traces must form a valid evolution step.
+		  3. Then, we show that this intensional refinement in fact implies the refinement from Definition 4 (minus the sameThreads part discussed above).
+		  See lawyer/heap_lang/simulation_adequacy.v, comment inside of strong_simulation_adequacy_traces lemma that discusses points 2 and 3 above.
+     - Relative image-finiteness of refinement relation (Lemma 2.2): lawyer/lawyer/obligations/obligations_adequacy.v, lemma obls_sim_rel_FB.
 	 - OM starting state (definition 3): lawyer/lawyer/obligations/obligations_em.v, definition obls_sim_rel_FB.
 	   Note that it applies to physical states with potentially more than one thread and therefore assigns distinct phases to each of them.
      - General trace fairness (definition 5): lawyer/fairness/fairness.v, definition fair_by' (and its legacy equivalent fair_by). Also see the lemma fair_by'_weakly_fair in the same file for equivalence with more common notion of weak fairness.
@@ -78,13 +84,23 @@ trillium/ and lawyer/
 #### Section 4.3
 	Verification of the top-level program on top of the sequential lock specification: lawyer/lawyer/examples/ticketlock/client.v, theorem client_spec.
 	 
-## Additional stuff: case studies, appendix
-   - par
-   - eo_fin
-   - full rules
-   - tactics		
-   - ? remove everything actions-related
-   - TAUs
-     obls_atomic
+### Appendix
 
-   
+#### Appendix A
+	 Well-formedness of obligations states: lawyer/lawyer/obligations/obligations_wf.v, record om_st_wf.
+	 
+#### Appendix B
+	 - Termination of all OM traces when Level is the empty set: lawyer/lawyer/obligations/unfair_termination.v, lemma always_term_wo_lvls.
+	 - Termination within constant time when Level is the empty set and Degree is singleton: lawyer/lawyer/obligations/unfair_termination.v, lemma always_terminates_within_bound.
+	 
+#### Appendix C
+	 Full form of Lawyer rules can be found in lawyer/lawyer/program_logic.v and lawyer/lawyer/obligations/obligations_logic.v. 
+	 
+#### Appendix D
+	 - "Total" atomic updates: lawyer/lawyer/examples/ticketlock/obls_atomic.v, definition TAU.
+	 - "Total" logically atomic triples: lawyer/lawyer/examples/ticketlock/obls_atomic.v, definitions TLAT and TLAT_RR for different kinds of wait clauses used in underlying TAU.
+
+### Additional case studies
+   - Two implementations of parallel composition operator and rules for them: lawyer/lawyer/examples/par.v, definitions par and par_sym, along with par_spec and par_sym_spec lemmas.
+     The case study in lawyer/lawyer/examples/nondet/(nondet_par.v, nondet_par_adequacy.v) is a version of nondet implementation that uses parallel composition. 
+   - A program consisting of two threads that increment the shared counter in turns up to a certain bound, waiting for each others' turn: lawyer/lawyer/examples/eo_fin/(eo_fin.v, eo_fin_adequacy.v)

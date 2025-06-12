@@ -54,7 +54,6 @@ Section ObligationsEM.
       locale_step σ1 oζ σ2 /\
       mtrans δ1 ℓ δ2 /\
       oζ = Some ℓ /\
-      (* obls_cfg_corr σ1 δ1 /\ *)
       obls_cfg_corr σ2 δ2
   .
 
