@@ -37,7 +37,7 @@
     The proved property is termination under any scheduler.
   - Fork example (Fig. 5): `nondet/` folder
 - Finite branching of OM (Lemma 2.1): `lawyer/lawyer/obligations/obligations_fin_branch.v`, lemma `om_trans_locale_approx`.
-  Note that it restricts the domain of obligations mapping, instead of phases mapping. For well-formed states, these restrictions are equivalent.p
+  Note that it restricts the domain of obligations mapping, instead of phases mapping. For well-formed states, these restrictions are equivalent.
 
 #### Section 2.2
 
@@ -61,10 +61,10 @@
 - Relative image-finiteness of refinement relation (Lemma 2.2): `lawyer/lawyer/obligations/obligations_adequacy.v`, lemma `obls_sim_rel_FB`.
 - OM starting state (definition 3): `lawyer/lawyer/obligations/obligations_em.v`, definition `obls_sim_rel_FB`.
   Note that it applies to physical states with potentially more than one thread, which requires assigning non-initial phases to each of them.
-- General trace fairness (definition 5): `lawyer/fairness/fairness.v`, definition `fair_by'`. Also see the `lemma fair_by'_weakly_fair` in the same file for equivalence with more common notion of weak fairness.
+- General trace fairness (definition 5): `lawyer/fairness/fairness.v`, definition `fair_by'`. Also see the lemma `fair_by'_weakly_fair` in the same file for equivalence with more common notion of weak fairness.
   Then, notion of fair execution is given by `fair_ex`.
   "Obligations-fair" traces are defined in `lawyer/lawyer/obligations/obligations_model.v`, definition `obls_trace_fair`.
-- Transportation of execution fairness to the model trace (Lemma 2.4): `lawyer/lawyer/obligations/obligations_adequacy.v`, lemma `exec_om_fairness_preserved`
+- Transporting of execution fairness to the model trace (Lemma 2.4): `lawyer/lawyer/obligations/obligations_adequacy.v`, lemma `exec_om_fairness_preserved`
 - Termination of obligations-fair OM traces: `lawyer/lawyer/obligations/obls_termination.v`, theorem `obls_fair_trace_terminate`
 
 ### Section 3
@@ -102,7 +102,7 @@ Well-formedness of obligations states: `lawyer/lawyer/obligations/obligations_wf
 - Termination within constant time when _Level_ is the empty set and _Degree_ is singleton: `lawyer/lawyer/obligations/unfair_termination.v`, lemma `always_terminates_within_bound`.
 	 
 #### Appendix C
-Full form of Lawyer rules can be found in `lawyer/lawyer/program_logic.v` (rules connecting _wp_ with _sswp_ and _MU_) and `lawyer/lawyer/obligations/obligations_logic.v` (rules connecting _MU_ and _BOU_).
+Full form of Lawyer rules can be found in `lawyer/lawyer/program_logic.v` (rules connecting _wp_ with _sswp_ and _MU_) and `lawyer/lawyer/obligations/obligations_logic.v` (rules connecting _MU_ with _BOU_).
 	 
 #### Appendix D
 - "Total" atomic updates: `lawyer/lawyer/examples/ticketlock/obls_atomic.v`, definition `TAU`.
