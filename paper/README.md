@@ -12,6 +12,28 @@
 	 
 ## Installation
 
+    # unpack the files (assuming the supplementary material is in lawyer_suppl.zip)
+    unzip -d lawyer_suppl lawyer_suppl.zip
+	# move into the working directory
+	cd lawyer_suppl
+	
+    # create a new opam environment
+    opam switch create lawyer-env 5.2.0
+	# switch into the new environment
+    eval $(opam env --switch=lawyer-env)
+	
+	# set up repository for Rocq packages
+    opam repo add coq-released https://coq.inria.fr/opam/released
+    # set up the local repository for Trillium
+    opam pin add trillium trillium/ --no-action
+
+	# move into the Lawyer directory
+    cd lawyer/
+    # install all dependencies of Lawyer
+    opam install . --deps-only
+    # build Lawyer; adjust the number of jobs as needed
+    make -j 5
+
 ## Correspondence between the paper and Rocq formalization
 
 ### Section 2
