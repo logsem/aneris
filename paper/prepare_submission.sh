@@ -2,7 +2,7 @@
 
 # this is a script that automatically prepares the supplementary material to be submitted with the Lawyer paper.
 # This is intended to be used by the paper authors, not by the end user/reviewers!
-# !!! This script expects that the Rocq sources are already anonymized
+# !!! This script doesn't change the Rocq sources, so they must already be anonymized
 
 TRILLIUM_GIT_URL=git@github.com:logsem/trillium.git
 TRILLIUM_BRANCH=opam_package
@@ -12,9 +12,7 @@ LAWYER_BRANCH=lawyer_paper
 WORKING_DIR=lawyer_suppl
 
 cleanup_current_dir () {
-   rm -rf .git
-   rm -rf .gitignore
-   for arg in "$@"; do
+   for arg in "$@" .git .gitignore .gitmodules .github; do
        rm -rf $arg
    done
 }
@@ -33,6 +31,10 @@ cd trillium
 cleanup_current_dir
 cd ..
 
+mv lawyer/paper/README.md .
 cd lawyer
 cleanup_current_dir paper
 cd ..
+
+zip -r lawyer_suppl.zip trillium lawyer README.md
+echo "Supplementary material is built in $(realpath lawyer_suppl.zip)"
