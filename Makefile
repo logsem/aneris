@@ -14,7 +14,7 @@ Q:=@
 # extract global arguments for Coq from _CoqProject
 COQPROJECT_ARGS := $(shell sed -E -e '/^\#/d' -e 's/-arg ([^ ]*)/\1/g' _CoqProject)
 
-all: $(VFILES:.v=.vo)
+all: $(ALL_VFILES:.v=.vo)
 
 .coqdeps.d: $(ALL_VFILES) _CoqProject
 	@echo "COQDEP $@"
