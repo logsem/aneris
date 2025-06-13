@@ -106,8 +106,8 @@ Section SignalMap.
     by rewrite big_opM_fmap.
   Qed.
 
-  (* Weaker version that doesn't require passing obligations; justifies the rule presented in the paper.
-     It can't be derived from the stronger one. *)
+  (** Weaker version that doesn't require passing obligations.
+      It can't be derived from the stronger one. *)
   Lemma init_smap_repr_empty `{SigMapPreG Σ} B:
     ⊢ |==> ∃ (SMG: SigMapG Σ), smap_repr B ∅.
   Proof using LEQUIV__l DISCR__l.
@@ -141,28 +141,6 @@ Section SignalMap.
     apply fmap_Some_equiv in ITH as (?&ITH&EQ).
     rewrite ITH. apply to_agree_inj in EQ. by rewrite EQ.
   Qed.
-
-  (* Lemma ith_sig_retrieve i s B (smap: gmap nat SignalId): *)
-  (*   ⊢ ⌜ smap !! i = Some s ⌝ -∗ smap_repr B smap ==∗ ith_sig i s ∗ smap_repr B smap.  *)
-  (* Proof using. *)
-  (*   clear LEQUIV__l DISCR__l DISCR__d.     *)
-  (*   iIntros "%ITH [S SR]". *)
-  (*   rewrite /smap_repr. iFrame "SR". *)
-  (*   rewrite /ith_sig -own_op cmra_comm.  *)
-  (*   iApply own_update.  *)
-  (*   1: eapply auth_update_alloc. *)
-  (*   2: by iFrame. *)
-  (*   etrans.  *)
-  (*   - eapply core_id_local_update. *)
-  (*     2: { apply singleton_included_l with (i := i). *)
-  (*          eexists. split; [| reflexivity]. *)
-  (*          rewrite lookup_fmap ITH. *)
-  (*          simpl. reflexivity. } *)
-  (*     apply _. *)
-  (*   - rewrite gmap_disj_op_union. *)
-  (*     { rewrite map_empty_union. reflexivity. } *)
-  (*     apply map_disjoint_dom. simpl. set_solver. *)
-  (* Qed. *)
 
   Lemma ith_sig_sgn i s B D:
     ⊢ ith_sig i s -∗ smap_repr B D -∗ sgn s (L i) None.
@@ -239,7 +217,6 @@ Section SignalMap.
   (* TODO: use bupd in definition of OU *)
   (* TODO: get rid of this version*)
   Lemma smap_create_ep' i B D π q τ d__h d__l
-    (* (PH_LE: phase_le π__cp π) *)
     (LT: i ∈ D)
     (DEG_LT: deg_lt d__l d__h):
     ⊢ smap_repr B D -∗ cp π d__h -∗ th_phase_frag τ π q -∗
@@ -272,11 +249,6 @@ Section SignalMap.
     2: { apply map_disjoint_singleton_l_2. by apply lookup_delete. }
     rewrite big_sepM_singleton. iFrame.  
   Qed.
-
-  (* Lemma ith_sig_agree i s s': *)
-  (*   ith_sig i s -∗ ith_sig i s' -∗ ⌜ s' = s ⌝. *)
-  (* Proof using. *)
-  (*   iIntros "S1 S2". iCombine "S1 S2" as "S". *)    
 
   Lemma smap_create_ep i s B D π q τ d__h d__l
     (DEG_LT: deg_lt d__l d__h):
@@ -318,7 +290,7 @@ Section SignalMap.
   Qed.
 
   Lemma smap_sgns_extend (B B': nat -> bool)
-    (smap: gmap nat SignalId) (s : SignalId) (m : nat) (* lm *)
+    (smap: gmap nat SignalId) (s : SignalId) (m : nat)
     (FRESH: m ∉ dom smap)
     (PRES: forall i, i ∈ dom smap -> B' i = B i)
     :

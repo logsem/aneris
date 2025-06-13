@@ -1,5 +1,5 @@
 
-(* copied from coq-hahn. Probably can be replaced by o* tactics of stdpp *)
+(** copied from coq-hahn. Probably can be replaced by o* tactics of stdpp *)
 
 Tactic Notation "forward" tactic1(tac) :=
   let foo := fresh in

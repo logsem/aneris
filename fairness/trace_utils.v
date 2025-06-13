@@ -23,27 +23,6 @@ Lemma trace_implies_cons {S L : Type} (P Q : S → option L → Prop) s l tr :
   trace_implies P Q (s -[l]-> tr) → trace_implies P Q tr.
 Proof. intros H. by eapply (trace_implies_after _ _ (s -[l]-> tr) tr 1). Qed.
 
-(* Lemma pred_at_or {S L : Type} (P1 P2 : S → option L → Prop) tr n : *)
-(*   pred_at tr n (λ s l, P1 s l ∨ P2 s l) ↔ *)
-(*   pred_at tr n P1 ∨ *)
-(*   pred_at tr n P2. *)
-(* Proof. *)
-(*   split. *)
-(*   - revert tr. *)
-(*     induction n as [|n IHn]; intros tr Htr. *)
-(*     + destruct tr; [done|]. *)
-(*       rewrite !pred_at_0. rewrite !pred_at_0 in Htr. *)
-(*       destruct Htr as [Htr | Htr]; [by left|by right]. *)
-(*     + destruct tr; [done|by apply IHn]. *)
-(*   - revert tr. *)
-(*     induction n as [|n IHn]; intros tr Htr. *)
-(*     + destruct tr; [done|]. *)
-(*       rewrite !pred_at_0 in Htr. rewrite !pred_at_0. *)
-(*       destruct Htr as [Htr | Htr]; [by left|by right]. *)
-(*     + by destruct tr; [by destruct Htr as [Htr|Htr]|apply IHn]. *)
-(* Qed. *)
-
-
 Lemma traces_match_impl {S1 S2 L1 L2}
       (Rℓ1: L1 -> L2 -> Prop) (Rs1: S1 -> S2 -> Prop)
       (Rℓ2: L1 -> L2 -> Prop) (Rs2: S1 -> S2 -> Prop)

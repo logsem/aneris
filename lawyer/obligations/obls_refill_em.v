@@ -20,7 +20,6 @@ Section ObligationsRefillEM.
   Let Degree := ofe_car DegO.
   Let Level := ofe_car LevelO.
 
-  (* Context {Locale: Type}. *)
   Context {Λ: language}.
   Let Locale := locale Λ.
 

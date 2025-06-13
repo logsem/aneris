@@ -61,7 +61,6 @@ Section ProjectNestedTrace.
     (trans: St -> L -> St -> Prop) (trans': St' -> L' -> St' -> Prop)
     (VALID: trace_valid trans tr)
     (NESTED_STEPS: ∀ i res, tr !! i = Some res → 
-                         (* is_lib_step res \/ *)
                          step_label_matches res (is_Some ∘ proj_lbl) \/
                          is_end_state res)
     (NESTED_TRANS: forall s1 ℓ s2 ℓ', trans s1 ℓ s2 -> proj_lbl ℓ = Some ℓ' ->
@@ -77,7 +76,6 @@ Section ProjectNestedTrace.
     rewrite (trace_unfold_fold (project_nested_trace tr)).
     destruct tr.
     { econstructor. done. }
-    (* do 2 red. *)
     pose proof (NESTED_STEPS 0 (s, Some (ℓ, (trfirst tr))) eq_refl) as STEP0.
     destruct STEP0 as [STEP0 | STEP0].
     2: { destruct STEP0. done. }

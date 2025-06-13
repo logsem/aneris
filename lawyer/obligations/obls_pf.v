@@ -27,10 +27,8 @@ Section PhaseFuel.
     (exists l, creates_signal δ1 τ δ2 l) \/
     (exists s, sets_signal δ1 τ δ2 s) \/
     (exists s π δ δ', creates_ep δ1 τ δ2 s π δ δ')
-    (* \/ (exists s π δ, expects_ep δ1 τ δ2 s π δ) *)
   .
 
-  (* Definition loc_step_no_exp_all δ1 τ δ2 := *)
   Definition loc_step_with_no_exp δ1 τ δ2 :=
     loc_step_of_no_exp δ1 τ δ2 \/ loc_step0 δ1 δ2.
 
@@ -220,7 +218,6 @@ Section PhaseFuel.
     ms_le deg_le (PF' (S k) δ2) (PF' k δ1).
   Proof using.
     clear -STEP OM.
-    (* destruct STEP as [T|[T|[T|[T|[T|T]]]]].  *)
     inv_loc_step0 STEP. 
     - eapply exchange_cp_ms_le; eauto. 
     - inversion T; subst. destruct δ1. simpl.
@@ -235,7 +232,6 @@ Section PhaseFuel.
     ms_le deg_le (PF' (S k) δ2) (PF' k δ1).
   Proof using.
     clear -STEP OM.
-    (* destruct STEP as [T|[T|[T|[T|[T|T]]]]].  *)
     inv_loc_step_with_no_exp STEP. 
     - destruct δ1. simpl in *.
       apply ms_le_disj_union; [apply _| ..].
@@ -275,7 +271,6 @@ Section PhaseFuel.
     forall δ δ' mb mf k
       (ITH: tr !! i = Some (δ, Some (τ, δ')))
       (BOUND : k ≤ LIM_STEPS)
-      (* (STEPS: nsteps (λ p1 p2, loc_step p1 τ p2) k δ mb) *)
       (STEPS: nsteps (λ p1 p2, loc_step_ex p1 p2) k δ mb)
       (BSTEP: (∃ π δ, burns_cp mb τ mf π δ))
       (FSTEP: clos_refl (ProgressState) (λ p1 p2, ∃ τ' R, forks_locale p1 τ p2 τ' R) mf δ'),
@@ -301,7 +296,6 @@ Section PhaseFuel.
       forall δ δ' τ mb mf k,
         tr !! i = Some (δ, Some (τ, δ')) ->
         k ≤ LIM_STEPS ->
-        (* nsteps (λ p1 p2, loc_step p1 τ p2) k δ mb -> *)
         nsteps (λ p1 p2, loc_step_ex p1 p2) k δ mb ->
         (∃ π δ, burns_cp mb τ mf π δ) ->
         clos_refl (ProgressState) (λ p1 p2, ∃ τ' R, forks_locale p1 τ p2 τ' R) mf δ' ->

@@ -71,7 +71,7 @@ Section NondetAdequacy.
     iApply (SPEC with "[-]"). 
     { exact tt. }
     { apply ith_bn_lt; lia. }
-    { (* for nondet as the closed program, K is irrelevant *)
+    { (** for nondet as the closed program, K is irrelevant *)
       apply le_0_n. }
     { simpl. iIntros (? _) "X". iApply "X". }
     { lia. }

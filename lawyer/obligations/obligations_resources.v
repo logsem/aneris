@@ -25,8 +25,8 @@ Section ObligationsRepr.
  
   Let epO := prodO (prodO natO phO) DegO.
 
-  (* used to avoid applying leibnizO directly to list nat.
-     See comment in ofe.v *)
+  (** Used to avoid applying leibnizO directly to list nat.
+      See comment in ofe.v *)
   Record phase_wrapped := PhWr { ph_wr_car: Phase }.
   Definition wrap_phase := PhWr.
   Definition unwrap_phase (p: phase_wrapped) := match p with | PhWr π => π end.
@@ -39,8 +39,7 @@ Section ObligationsRepr.
       obls_pre_cps :: inG Σ (authUR (gmultisetUR cpO));
       obls_pre_sigs :: inG Σ (authUR (gmapUR SignalId sstR));
       obls_pre_obls :: inG Σ (authUR (gmapUR Locale (exclR (gsetUR natO))));
-      obls_pre_eps :: inG Σ (authUR (gsetUR epO)); (* allowing duplication of eps *)
-      (* obls_pre_phs :: inG Σ (authUR (gmapUR Locale (exclR phO))); *)
+      obls_pre_eps :: inG Σ (authUR (gsetUR epO)); (** allowing duplication of eps *)
       obls_pre_phs :: ghost_mapG Σ Locale phase_wrapped;
       obls_pre_lb :: inG Σ mono_natUR;
   }.
@@ -62,12 +61,6 @@ Section ObligationsRepr.
     gmapUR Locale (exclR (gsetUR natO)) :=
     Excl <$> omap.
  
-  (* Definition phases_repr_auth (pmap: gmap Locale Phase): *)
-  (*   (* gmapUR Locale (exclR phO) := *) *)
-  (*   (* fmap Excl pmap (FMap := gmap_fmap). *) *)
-  (*   gmap_viewR Locale (leibnizO phase_wrapped) := *)
-  (*   gmap_view_auth (DfracOwn 1) (wrap_phase <$> pmap) (V:=leibnizO phase_wrapped). *)
-  
   Definition eps_repr (eps: gset ExpectPermission): gsetUR epO :=
     eps.
 
@@ -87,7 +80,6 @@ Section ObligationsRepr.
       GFunctor (authUR (gmapUR SignalId sstR));
       GFunctor (authUR (gmapUR Locale (exclR (gsetR natO))));
       GFunctor (authUR (gsetUR epO));
-      (* GFunctor (authUR (gmapUR Locale (exclR phO))); *)
       ghost_mapΣ Locale phase_wrapped;
       GFunctor (mono_natUR)
    ].
@@ -99,14 +91,13 @@ Section ObligationsRepr.
   Section Resources.
     Context `{oGS: ObligationsGS Σ}. 
 
-    (* Without phase weakening, the phase of initial cps would mismatch thread's phase after it performs a fork.
-       It'd lead to having "phase_le .." hypotheses to allow burning initial cps.
-       These hypotheses would have to be propagated in all specs. *)
+    (** Without phase weakening, the phase of initial cps would mismatch thread's phase after it performs a fork.
+        It'd lead to having "phase_le .." hypotheses to allow burning initial cps.
+        These hypotheses would have to be propagated in all specs. *)
     Definition cp (ph_ub: Phase) (deg: Degree): iProp Σ :=
       ∃ ph, own obls_cps (◯ (cps_repr ({[+ ((ph, deg)) +]}))) ∗ ⌜ phase_le ph ph_ub ⌝.
 
-    (* sealing this definition to avoid annoying unfolds (see Mattermost message) *)
-    (* TODO: find a better solution? *)
+    (** sealing this definition to avoid annoying unfolds. *)
     Local Definition cp_mul_def (ph_ub: Phase) deg n: iProp Σ :=
       [∗] replicate n (cp ph_ub deg).
     Local Definition cp_mul_aux : seal cp_mul_def. by eexists. Qed.
@@ -558,7 +549,7 @@ Section ObligationsRepr.
 
     Fixpoint OU_rep n P: iProp Σ :=
       match n with
-      | 0 => OU' eq P (* access obls_msi even on trivial case *)
+      | 0 => OU' eq P (** access obls_msi even on trivial case *)
       | S n => OU (OU_rep n P)
       end.
 
@@ -711,8 +702,6 @@ Section ObligationsRepr.
       clear H1 H0 H.
       rewrite /OU /OU'. iIntros "CP #LB %δ MSI".
       iDestruct (exc_lb_msi_bound with "[$] [$]") as %LB.
-      (* iDestruct (th_phase_msi_frag with "[$] [$]") as "%". *)
-      (* iDestruct "CP" as "(%π0 & CP & %PH_LE)".  *)
       iDestruct (cp_msi_unfold with "[$] [$]") as "(MSI & %π0 & CP & [%IN %PH_LE])".
       rewrite {1}/obls_msi. iDestruct "MSI" as "(CPS&?&?&?&?&?)".
       destruct δ. simpl in *.
@@ -819,7 +808,6 @@ Section ObligationsRepr.
     Proof using H1 H0.
       rewrite /OU /OU'. iIntros "#EP SIG OBLS #SIGS_LT PH %δ MSI".
       iDestruct (sigs_msi_exact with "[$] [$]") as %Sζ.
-      (* iDestruct (th_phase_msi_ge with "[$] [$]") as %(? & PH__ζ & LE__πx). *)
       iDestruct (th_phase_msi_frag with "[$] [$]") as "%PH".
       iDestruct (th_phase_msi_align with "[$] [$]") as "[MSI PH]".
       rewrite PH. simpl.
@@ -844,10 +832,6 @@ Section ObligationsRepr.
         done. }
 
       rewrite bi.sep_comm.
-      (* iApply bi.sep_exist_l. iExists x. rewrite bi.sep_assoc. *)
-      (* iSplitL "CPS".  *)
-      (* 2: { iFrame. iPureIntro. split; try done. *)
-      (*      etrans; eauto. }  *)
       iApply bi.sep_exist_l. iExists π.
       rewrite bi.sep_assoc. rewrite -own_op.
       iApply bupd_frame_r. iSplit; [| done].
@@ -884,7 +868,6 @@ Section ObligationsRepr.
       ⊢ obls_msi δ -∗ cp π deg ==∗ ∃ δ', obls_msi δ' ∗ ⌜ ∃ π__b, burns_cp δ ζ δ' π__b deg⌝.
     Proof using.
       iIntros "MSI CP".
-      (* iDestruct (cp_msi_dom with "[$] [$]") as "%IN".  *)
       iDestruct (cp_msi_unfold with "[$] [$]") as "(MSI & %π0 & CP & [%IN %PH_LE])".
       rewrite {1}/obls_msi. iDestruct "MSI" as "(CPS&?&?&?&?&?)".
       destruct δ. simpl in *. iApply bupd_exist. iExists (Build_ProgressState _ _ _ _ _ _). 
@@ -908,7 +891,6 @@ Section ObligationsRepr.
         OU' (fun δ1 δ2 => exists π__b, burns_cp δ1 ζ δ2 π__b deg) (th_phase_frag ζ π q).
     Proof using.
       rewrite /OU'. iIntros "CP PH % MSI".
-      (* iDestruct (th_phase_msi_ge with "[$] [$]") as %(? & ? & ?).  *)
       iDestruct (th_phase_msi_frag with "[$] [$]") as "%PH".
       iMod (burn_cp_upd_impl with "[$] [$]") as "R"; eauto.
       { eexists. split; eauto. done. }
@@ -926,9 +908,6 @@ Section ObligationsRepr.
       left. eexists. left. eauto. 
     Qed.
 
-    (* actually the locale doesn't matter here, but we need to provide some according to the definition of loc_step_ex.
-       In fact, the only place where it matters is last burning fuel step and fork.
-       TODO: remove locale parameter from the cases of loc_step_ex, rename it *)
     Lemma increase_eb_upd n:
       ⊢ exc_lb n -∗ OU (exc_lb (S n)).
     Proof using.
@@ -1013,7 +992,6 @@ Section ObligationsRepr.
     Proof using.
       clear H1 H0 H.
       iIntros "MSI PH OB".
-      (* iDestruct (th_phase_msi_ge_strong with "[$] [$]") as "(MSI & %π0 & (PH & %PH & %PLE))". *)
       iDestruct (th_phase_msi_frag with "[$] [$]") as "%PH".
       iDestruct (obls_msi_exact with "[$] [$]") as %OBLS. 
       rewrite {1}/obls_msi. iDestruct "MSI" as "(?&?&OBLS&?&PHASES&?)".
@@ -1024,7 +1002,6 @@ Section ObligationsRepr.
       iExists (fork_left π), (fork_right π).
       rewrite !bi.sep_assoc. iSplitL.
       2: { iPureIntro. split.
-           (* all: eapply strict_transitive_r; [eauto | apply phase_lt_fork].   *)
            all: by apply phase_lt_fork. }
 
       iSplitL.
@@ -1067,8 +1044,7 @@ Section ObligationsRepr.
         rewrite lookup_fmap. by rewrite not_elem_of_dom_1.  
     Qed.
 
-
-    (***** Bounded obligations update *****)
+    (** Bounded obligations update *)
     
     Definition obls_msi_interim δ (k: nat): iProp Σ :=
       ∃ δ__k, obls_msi δ__k ∗ ⌜ nsteps (fun p1 p2 => loc_step_ex p1 p2) k δ δ__k ⌝.
@@ -1345,7 +1321,7 @@ Section ObligationsRepr.
       iApply OU_BOU. iApply (OU_wand with "[-OUs] [$]"). done.
     Qed.
     
-    (* an example usage of OU+BOU *)
+    (** an example usage of OU+BOU *)
     Lemma BOU_step_create_signal E ζ P b l R:
       ⊢ (∀ sid, sgn sid l (Some false) -∗ obls ζ (R ∪ {[ sid ]}) -∗ BOU E b P) -∗ obls ζ R -∗ BOU E (S b) P.
     Proof using.
@@ -1358,7 +1334,7 @@ Section ObligationsRepr.
       iIntros "(%&?&?&?)". iExists _. iFrame. 
     Qed.
 
-    (* useful as the first step's BOU of a function call *)
+    (** useful as the first step's BOU of a function call *)
     Lemma first_BOU π d0 d n E
       (DEG_LT: deg_lt d d0):
       cp π d0 -∗ BOU E (S n) (cp_mul π d n ∗ exc_lb n).

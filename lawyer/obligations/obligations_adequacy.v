@@ -59,8 +59,7 @@ Section OblsAdequacy.
       obls_om_traces_match extr omtr ∧
       trfirst omtr = s1.
   Proof using FIN_LVL FIN_DEG.
-    (* clear H1 H0 H.  *)
-    intros (* FIN *) PREM.
+    intros PREM.
 
     unshelve epose proof (@strong_simulation_adequacy_traces _ _ _ hPre s e1 σ1
                 s1

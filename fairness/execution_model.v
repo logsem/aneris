@@ -15,18 +15,12 @@ Class ExecutionModel (Λ: language) (M: Model) := {
     em_valid_evolution_step:
     cfg Λ -> olocale Λ → cfg Λ → mstate M → mlabel M → mstate M → Prop;
 
-    (* em_fork_post {Σ} *)
-    em_thread_post {Σ} `{em_GS Σ}
-    : locale Λ ->
-      (* val -> *)
-      iProp Σ;
+    em_thread_post {Σ} `{em_GS Σ}: locale Λ -> iProp Σ;
     em_msi {Σ} `{em_GS Σ}: cfg Λ -> mstate M -> iProp Σ;
     
     (* TODO: is there a nicer way to allow parametrization of initial resource? *)
     em_init_param: Type; 
     em_init_resource {Σ: gFunctors} `{em_GS Σ}: mstate M → em_init_param -> iProp Σ;
-    (* TODO: currently we assume that postconditions of all threads coincide *)
-    (* em_init_thread_post {Σ}: locale Λ -> val -> iProp Σ; *)
     em_is_init_st: cfg Λ -> mstate M -> Prop;
     
     em_initialization Σ `{ePreGS: em_preGS Σ}: 
@@ -42,8 +36,6 @@ Section EMDefinitions.
     (extr : execution_trace Λ) (auxtr: auxiliary_trace M) :=
     match extr, auxtr with
     | (extr :tr[oζ]: σ), auxtr :tr[ℓ]: δ =>
-        (* labels_match (LM:=LM) oζ ℓ ∧ LM.(lm_ls_trans) (trace_last auxtr) ℓ δ ∧ *)
-        (* tids_smaller es δ *)
       em_valid_evolution_step (trace_last extr) oζ σ (trace_last auxtr) ℓ δ
     | _, _ => True
     end.

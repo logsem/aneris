@@ -50,7 +50,7 @@ Section ConstTermAdequacy.
     trace_len_le extr (bound + 1). 
   Proof.
     assert (heapGpreS CTΣ EM) as HPreG.
-    { apply subG_heapPreG. (* why it's not applied automatically now? *)
+    { apply subG_heapPreG. (* TODO: why it's not applied automatically now? *)
       apply _. }
 
     forward eapply @obls_match_impl with

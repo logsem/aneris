@@ -162,7 +162,6 @@ End TraceLen.
 
 
 Section TracesMatch.
-  (* Context {L1 L2 S1 S2 : Type}. *)
 
   Lemma traces_match_same_length_impl {L1 L2 S1 S2 : Type}
     R1 R2 step1 step2 tr1 tr2 len1 len2

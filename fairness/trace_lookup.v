@@ -5,7 +5,7 @@ From stdpp Require Import base ssreflect.
 Section TraceLookup.
   Context {St L: Type}. 
 
-  (* Postpone instantiation of Lookup to make the notations work properly after *)
+  (** Postpone instantiation of Lookup to make the notations work properly after *)
   Let trace_lookup_impl (tr: trace St L) i :=
         match (after i tr) with
         | None => None
@@ -612,35 +612,6 @@ Section UptoStutter.
     rewrite label_lookup_0. congruence.  
   Qed.
 
-  (* Lemma upto_stutter_trace_lookup' {btr : trace St L} {str : trace S' L'}  *)
-  (*   (n : nat) st st' l: *)
-  (*   upto_stutter Us Usls btr str → *)
-  (*   str !! n = Some (st, Some (l, st')) -> *)
-  (*   (* Usls st ℓ st' = Some l -> *) *)
-  (*     ∃ (n' : nat) δ1 ℓ δ2 , btr !! n' = Some (δ1, Some (ℓ, δ2)) /\ *)
-  (*                          Us δ1 = st /\ Us δ2 = st' /\ Usls δ1 ℓ δ2 = Some l. *)
-  (* Proof. *)
-  (*   intros UPTO NTH. *)
-  (*   pose proof (trace_has_len btr) as [? LEN]. *)
-  (*   apply trace_lookup_after_strong in NTH as (atr' & AFTER & A0).  *)
-  (*   forward eapply (upto_stutter_after _ _ n UPTO); eauto. *)
-  (*   intros (n' & str' & AFTER' & UPTOn). *)
-  (*   exists n'. *)
-  (*   rewrite -(Nat.add_0_r n'). erewrite <- trace_lookup_after; eauto. *)
-  (*   punfold UPTOn; [| by apply upto_stutter_mono]. *)
-  (*   inversion UPTOn; subst; try congruence. *)
-  (*   2: { rewrite trace_lookup_0_cons. simpl in *. *)
-  (*        do 3 eexists. split; [reflexivity| ..]. *)
-  (*        repeat split; eauto. *)
-  (*        pclearbot.  *)
-  (*        by eapply upto_stutter_trfirst in H5. }  *)
-  (*   rewrite trace_lookup_0_cons. *)
-  (*   simpl in *. subst. *)
-  (*   (* assume that dec_unless holds for btr, *)
-  (*      prove that eventually there will be a step. *)
-  (*      Try to reuse similar argument from inftraces.destutter_spec_ind ? *) *)
-  (* Abort.  *)
-
   Lemma upto_stutter_state_lookup {btr : trace St L} {str : trace S' L'} n' st':
     upto_stutter Us Usls btr str
     → str S!! n' = Some st' ->
@@ -682,27 +653,6 @@ Section UptoStutter.
     rewrite -state_lookup_0.
     erewrite state_lookup_after; eauto. by rewrite Nat.add_0_r.
   Qed. 
-
-  (* Lemma upto_stutter_state_lookup {btr : trace St L} {str : trace S' L'} n ℓ: *)
-  (*   upto_stutter Us Usls btr str *)
-  (*   → btr L!! n = Some ℓ -> *)
-  (*     ∃ n' l, str L!! n' = Some l /\ Ul ℓ = l. *)
-  (* Proof. *)
-  (*   intros UPTO NTH. *)
-  (*   pose proof (trace_has_len str) as [? LEN].  *)
-  (*   pose proof (proj1 (state_lookup_dom _ _ LEN n') (mk_is_Some _ _ NTH)) as BOUND. *)
-  (*   pose proof (proj2 (LEN _) BOUND) as [str_n AFTER]. *)
-  (*   forward eapply (upto_stutter_after _ _ n' UPTO); eauto. *)
-  (*   intros (n & btr' & AFTER' & UPTOn). *)
-  (*   exists n. *)
-  (*   rewrite -(Nat.add_0_r n). erewrite <- state_lookup_after; eauto. *)
-  (*   rewrite state_lookup_0. f_equal. *)
-  (*   eexists. split; [reflexivity| ]. *)
-  (*   etransitivity. *)
-  (*   { symmetry. eapply upto_stutter_trfirst; eauto. } *)
-  (*   apply Some_inj. rewrite -state_lookup_0. *)
-  (*   erewrite state_lookup_after; eauto. by rewrite Nat.add_0_r. *)
-  (* Qed.  *)
 
 End UptoStutter.
 

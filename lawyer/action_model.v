@@ -87,17 +87,10 @@ Arguments amTrans {_}.
 
 Section ActionModel.
 
-  (* Global Existing Instance am_role_eqdec.  *)
-  (* Global Existing Instance am_role_cnt.  *)
-  (* Global Existing Instance am_st_eqdec. *)
-  (* Global Existing Instance am_st_inh. *)
-  (* Global Existing Instance am_role_inh. *)
- 
-
-  (* Defining the properites below as typeclasses to allow automatic inference *)
+  (** Defining the properites below as typeclasses to allow automatic inference *)
   
-  (* similar to "live roles" of FairModel, but the roles are optional, 
-     and the list cannot contain anything non-stepping. *)
+  (** similar to "live roles" of FairModel, but the roles are optional, 
+      and the list cannot contain anything non-stepping. *)
   Class AM_strong_lr (AM: ActionModel) := {
       ams_lr: amSt AM -> gset (option (amRole AM));
       ams_lr_spec: forall st oρ, oρ ∈ ams_lr st <-> exists a st', amTrans st (a, oρ) st'
@@ -108,7 +101,7 @@ Section ActionModel.
       amfb_ns_spec: forall s1 s2 a oρ, amTrans s1 (a, oρ) s2 <-> (s2, a, oρ) ∈ amfb_ns s1
   }. 
 
-  (* a weaker version of AM_fin_branch that is easier to show *)
+  (** a weaker version of AM_fin_branch that is easier to show *)
   Class AM_fin_branch' (AM: ActionModel) := {
     amfb'_ns: amSt AM -> list (amSt AM * Action * option (amRole AM));
     amfb'_ns_spec: forall s1 s2 a oρ, amTrans s1 (a, oρ) s2 -> (s2, a, oρ) ∈ amfb'_ns s1
@@ -117,8 +110,8 @@ Section ActionModel.
   Class AM_step_dec (AM: ActionModel) :=
     amsd: forall s1 a oρ s2, Decision (@amTrans AM s1 (a, oρ) s2). 
 
-  (* derive the strong finite branching from weaker one
-     by filtering possible transitions *)
+  (** derive the strong finite branching from weaker one
+      by filtering possible transitions *)
   Global Instance AM_fin_branch_dec (AM: ActionModel)
     (FIN: AM_fin_branch' AM) (DEC: AM_step_dec AM):
     AM_fin_branch AM.
@@ -129,8 +122,8 @@ Section ActionModel.
     symmetry. apply iff_and_impl_helper. intuition.
   Qed.
 
-  (* (optional) live roles can be obtained by checking all possible transitions,
-     given that there is a finite number of them *)
+  (** (optional) live roles can be obtained by checking all possible transitions,
+      given that there is a finite number of them *)
   Global Instance fin_branch_strong (AM: ActionModel)
     (FIN: AM_fin_branch AM):
     AM_strong_lr AM.
@@ -144,7 +137,7 @@ Section ActionModel.
     rewrite FIN. tauto.
   Qed. 
 
-  (* useful for defining the set of _non-optional_ live_roles of AM *)
+  (** useful for defining the set of _non-optional_ live_roles of AM *)
   Definition extract_Somes {A: Type} (l: list (option A)): list A :=
     flat_map (from_option (fun a => [a]) []) l.
 
@@ -184,7 +177,7 @@ Section ActionModel.
     - destruct x; eauto. done.
   Qed. 
 
-  (* the counterpart of FairModel's "live_roles" *)
+  (** the counterpart of FairModel's "live_roles" *)
   Definition AM_live_roles `{AM_strong_lr AM}:
     amSt AM -> gset (amRole AM) :=
     extract_Somes_gset ∘ ams_lr. 
@@ -290,11 +283,6 @@ Section ActionModel.
       rewrite !ex_prod.
 
       (* TODO: shorten the following proof, rewrite under binders? *)
-      (* setoid_rewrite elem_of_list_bind.       *)
-
-      (* do 3 (eapply exist_proper; intros). *)
-      (* { pattern x1. match goal with |- ((fun y => ?F y <-> _) x1) => idtac "foo" end.  *)      
-
       inversion STEP; subst.
       { exists s1', a, (Some r1).
         split; [| set_solver]. 
@@ -327,8 +315,6 @@ Section ActionModel.
       Context (INDEP: models_independent).
 
       Lemma prod_indep_live_roles
-        (* `{AM_fin_branch' AM1} `{AM_step_dec AM1} `{EqDecision (amSt AM1)} *)
-        (* `{AM_fin_branch' AM2} `{AM_step_dec AM2} `{EqDecision (amSt AM2)} *)
         `{AM_strong_lr AM1} `{AM_strong_lr AM2} `{AM_strong_lr ProdAM}
         (st1: amSt AM1) (st2: amSt AM2):
         AM_live_roles ((st1, st2): amSt ProdAM) = 
@@ -358,7 +344,7 @@ Section ActionModel.
   Section AM2FM.
     Context (AM: ActionModel).
 
-    (* this requirement is not necessary, but allows to reuse the AM_strong_lr machinery *)
+    (** this requirement is not necessary, but allows to reuse the AM_strong_lr machinery *)
     Context (AM_S: AM_strong_lr AM). 
 
     Inductive am_fmtrans: amSt AM → option (amRole AM) → amSt AM → Prop :=
@@ -461,7 +447,7 @@ Section MatchedByFacts.
   Proof using MATCH.
     setoid_rewrite <- AM_live_roles_spec.
     apply AM_live_roles_spec in LIVE. destruct LIVE as (?&?&STEP).
-    (* intros (ρ__e & -> & (a__e & st__e' & STEP__e)). *)
+    (** intros (ρ__e & -> & (a__e & st__e' & STEP__e)). *)
     eapply MATCH in STEP; eauto. destruct STEP as (?&?&?). eauto. 
   Qed.
  

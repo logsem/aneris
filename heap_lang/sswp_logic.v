@@ -78,14 +78,6 @@ Section SSWP.
   #[global] Instance as_val_val v : AsVal (Val v).
   Proof. by eexists. Qed.
   
-  (* Local Ltac solve_atomic := *)
-  (*   apply strongly_atomic_atomic, ectx_language_atomic; *)
-  (*     [inversion 1; naive_solver *)
-  (*     |apply ectxi_language_sub_redexes_are_values; intros [] **; naive_solver]. *)
-  
-  (* #[global] Instance allocN_atomic s v w : Atomic s (AllocN (Val v) (Val w)). *)
-  (* Proof. solve_atomic. Qed. *)
-  
   Lemma wp_allocN_seq s E v n (Φ : expr → iProp Σ) :
     0 < n →
     ▷ (∀ (l:loc), ([∗ list] i ∈ seq 0 (Z.to_nat n),

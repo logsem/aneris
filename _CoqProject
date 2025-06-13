@@ -1,6 +1,7 @@
 -Q fairness fairness
 -Q heap_lang heap_lang
 -Q lawyer lawyer
+-Q check check
 
 -arg -w -arg -notation-overridden
 -arg -w -arg -redundant-canonical-projection

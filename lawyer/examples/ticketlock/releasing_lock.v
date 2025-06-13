@@ -131,7 +131,6 @@ Section RFLFromFL.
     inv lock_ns (lock_inv_inner lk).
 
   Definition sb_add := 3.
-  (* Definition rfl_fl_sb := max (fl_c__cr FLP) 10. *)
   Definition rfl_fl_sb_fun :=
     fun i => max_list [10; fl_c__cr FLP; fl_B FLP i + sb_add; fl_B FLP (i + sb_add)].
 
@@ -139,7 +138,7 @@ Section RFLFromFL.
     lock_inv lk ∗ fl_is_lock FL lk (u + sb_add) (FLG := FLG) ∗
     ⌜ rfl_fl_sb_fun u <= LIM_STEPS ⌝.
 
-  (* need to assume at least one FL level *)
+  (** need to assume at least one FL level to prove that client's obligations are "above" that of lock *)
   (* TODO: can we change either TAU or levels order? *)
   Context (l__fl: Level).
   Hypothesis (L__FL: l__fl ∈ fl_acq_lvls FLP).
@@ -151,15 +150,13 @@ Section RFLFromFL.
                 obls τ O ∗ smap_repr_cl r true).
     Proof using L__FL LVL_ORDo. 
       iIntros "(OBLS & #LVLS & PH & #RR & SR)".
-      rewrite /RR__L. iDestruct "RR" as (s) "(#ITH & #EP)".  (* & %PH__e *)
+      rewrite /RR__L. iDestruct "RR" as (s) "(#ITH & #EP)".
       iApply OU_BOU.
       iApply (OU_wand with "[]").
       2: { rewrite /smap_repr_cl.
            iApply (ith_sig_expect (λ _, l__o) with "[$] [$] [$] [$] [$] []").
            { simpl. apply Nat.ltb_nlt. lia. }
            rewrite /sgns_levels_ge'.
-           (* iDestruct (big_sepS_forall with "LVLS") as "LVLS'". *)
-           (* iSpecialize ("LVLS'" $! l__fl with "[//]"). *)
            rewrite /sgns_level_gt /sgns_levels_gt'. rewrite /sgns_levels_rel. 
            iApply big_sepS_impl; [by iFrame| ].
            iModIntro. iIntros (??) "(%l & ? & %LE)".
@@ -297,7 +294,6 @@ Section RFLFromFL.
            iNext. rewrite /lock_inv_inner. do 3 iExists _. iFrame. }
 
       { iIntros (O' q') "(OB & #LVLS' & PH & %Q' & (-> & CASES))". simpl.
-
         (* TODO: don't unfold BOU *)
         remember_goal.
         iDestruct "ST" as "[>(_ & (%s__o & [-> #SMAP__o])) | [>% ?]]"; [| done].
@@ -365,7 +361,7 @@ Section RFLFromFL.
       λ: "lk", fl_acquire FLP "lk" ;; Skip
     .
 
-    (* leading lambda to exchange fuel, trailing Skip to strip later *)
+    (** leading lambda to exchange fuel, trailing Skip to strip later *)
     (* TODO: change the definition of (our counterpart of) atomic_wp,
        so that it allows showing postcondition under later *)
     Lemma acquire_usage:
@@ -562,7 +558,7 @@ Section RFL2FL.
   Context (d__m': Degree).
   Hypothesis (LTmm': deg_lt (fl_d__m FLP) d__m').
 
-  (* extra steps to exchange fuel that has to align with that of acquire_aux*)
+  (** extra steps to exchange fuel that has to align with that of acquire_aux *)
   Definition release_aux: val :=
     λ: "lk", (fl_release FLP) "lk". 
   Definition newlock_aux: val :=

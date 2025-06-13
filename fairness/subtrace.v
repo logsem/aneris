@@ -12,8 +12,8 @@ Section Subtrace.
 
   CoFixpoint trace_prefix_inf (tr: trace St L) (max_len: nat_omega): trace St L :=
     match tr, max_len with
-    | tr, NOnum 0 => ⟨ trfirst tr ⟩ (* shouldn't be reached if max_len > 0*)
-    | tr, NOnum 1 => ⟨ trfirst tr ⟩ (* actual base case *)
+    | tr, NOnum 0 => ⟨ trfirst tr ⟩ (** shouldn't be reached if max_len > 0*)
+    | tr, NOnum 1 => ⟨ trfirst tr ⟩ (** actual base case *)
     | ⟨ s ⟩, _ => ⟨ s ⟩
     | s -[ l ]-> tr', ml => s -[l]-> (trace_prefix_inf tr' (NOmega.pred ml))
     end. 
@@ -69,19 +69,6 @@ Section Subtrace.
     apply (trace_len_cons s ℓ) in IHn. done.
   Qed. 
 
-  (* Lemma trace_prefix_inf_over tr len max_len *)
-  (*   (LEN: trace_len_is tr len) *)
-  (*   (GE: NOmega.le len max_len): *)
-  (*   trace_prefix_inf tr max_len = trace_prefix_inf tr len. *)
-  (* Proof.  *)
-
-  (* Lemma subtrace_over tr start fin len *)
-  (*   (LEN: trace_len_is tr len) *)
-  (*   (GE: NOmega.le len fin): *)
-  (*   subtrace tr start fin = subtrace tr start len. *)
-  (* Proof.  *)
-
-
   Lemma subtrace_len (tr: trace St L) (len: nat_omega)
     (start: nat) (fin: nat_omega)
     (LEN: trace_len_is tr len)
@@ -106,7 +93,6 @@ Section Subtrace.
   Lemma trace_prefix_inf_head (tr: trace St L) d:
     trfirst (trace_prefix_inf tr d) = trfirst tr.
   Proof.
-    (* rewrite (trace_unfold_fold (trace_prefix_inf tr d)).  *)
     rewrite (trace_unfold_fold tr).
     destruct tr, d; simpl; try done.
     all: by destruct n; [| destruct n]. 
@@ -241,13 +227,6 @@ Section Subtrace.
     eapply trace_prefix_inf_lookup_bounded; eauto.
   Qed. 
     
-  (* Lemma subtrace_lookup_after (tr: trace St L) str atr *)
-  (*   (start: nat) (fin: nat_omega) *)
-  (*   (SUB: subtrace tr start fin = Some str) *)
-  (*   (AFTER: after start tr = Some atr): *)
-  (*   forall k, str !! k = atr !! k.  *)
-  (* Proof.  *)
-
   Lemma subtrace_lookup (tr: trace St L) str
     (start: nat) (fin: nat_omega)
     (SUB: subtrace tr start fin = Some str):
@@ -382,8 +361,7 @@ Section Subtrace.
     destruct n. f_equal. lia.
   Qed. 
 
-  (* TODO: is it possible to show their equality? *)
-  (* also possible to generalize to any max_len >= len(tr) *)
+  (** also possible to generalize to any max_len >= len(tr) *)
   Lemma inf_subtrace_after_lookup (tr str atr: trace St L) k
     (SUB: subtrace tr k NOinfinity = Some str)
     (AFTER: after k tr = Some atr):
@@ -410,7 +388,6 @@ Section ModelSubtrace.
     pose proof (trace_has_len tr) as [len LEN]. 
     forward eapply subtrace_inv as [_ BOUND]; eauto.
     apply LEN in BOUND as [atr AFTER]. 
-    (* eapply (fair_by_after P ρ tr atr) in FAIR; eauto. *)
     eapply fair_by_after in FAIR; [| apply AFTER]. 
     red. intros.
     apply pred_at_trace_lookup' in H as (s & step & NTH & Ps).
@@ -423,10 +400,8 @@ Section ModelSubtrace.
     erewrite inf_subtrace_after_lookup; eauto.
   Qed.
   
-
-  (* TODO: are these lemmas even needed? *)
-
   From Paco Require Import paco1 paco2 pacotac.
+
   (* TODO: merge with mtrace_valid_steps'*)
   Lemma trace_valid_equiv `{M: FairModel} (tr: mtrace M)
     (VALID': forall i s1 ℓ s2, tr !! i = Some (s1, Some (ℓ, s2)) ->
@@ -449,7 +424,7 @@ Section ModelSubtrace.
     str start max_len
     (LEN: trace_len_is tr len)
     (VALID: mtrace_valid tr)
-    (BOUND: NOmega.le max_len len) (* TODO: relax? *)
+    (BOUND: NOmega.le max_len len)
     (SUB2: subtrace tr start max_len = Some str):
     mtrace_valid str.
   Proof.
@@ -466,64 +441,3 @@ Section ModelSubtrace.
   Qed. 
 
 End ModelSubtrace.
-
-
-Section UptoStutter.
-  Context {St S' L L' : Type}.
-  Context {Us : St → S'}.
-  Context {Usls: St -> L -> St → option L'}.  
-
-  (* Lemma trace_prefix_inf_upto_stutter tr ltr ml *)
-  (*   (UPTO: upto_stutter Us Usls ltr tr): *)
-  (* ∃ (ml' : nat_omega), *)
-  (*   upto_stutter Us Usls  *)
-  (*     (trace_prefix_inf ltr ml') *)
-  (*     (trace_prefix_inf tr ml) /\ *)
-  (*   trace_len_is (trace_prefix_inf ltr ml') ml'.  *)
-  (* Proof. *)
-    (* destruct ml. *)
-    (* { exists NOinfinity. simpl. *)
-    (*   gd atr. gd latr. gd i'. induction i. *)
-    (*   { intros. rewrite after_0_id in AFTER. *)
-    (*     inversion AFTER. subst tr. *)
-    (*     revert UPTO. *)
-    (*     From Paco Require Import paco1 paco2 pacotac. *)
-    (*     pcofix UPTOOO.  *)
-    (*     intros; pfold. *)
-    (*     (* rewrite (trace_unfold_fold latr) (trace_unfold_fold atr). *) *)
-    (*     rewrite !trace_prefix_inf_step_equiv. rewrite /trace_prefix_inf_step_alt. *)
-    (*     punfold UPTO; [| ???????? ]. *)
-    (*     inversion UPTO; subst.  *)
-    (*     - simpl. do 2 (rewrite decide_False; [| tauto]). econstructor. *)
-    (*     - simpl. do 2 (rewrite decide_False; [| tauto]). econstructor; eauto. *)
-    (*       3: { specialize_full UPTOOO. *)
-    (*            { pfold. eauto. } *)
-
-  (* Lemma subtrace_upto_stutter ltr tr i ml tr' *)
-  (*   (UPTO: upto_stutter Us Usls ltr tr) *)
-  (*   (SUB: subtrace tr i ml = Some tr'): *)
-  (*   exists i' ml' ltr', subtrace ltr i' ml' = Some ltr' /\ upto_stutter Us Usls ltr' tr' /\ *)
-  (*                  trace_len_is ltr' (NOmega.sub ml' (NOnum i')).  *)
-  (* Proof. *)
-  (*   pose proof (trace_has_len tr) as [len LEN]. *)
-  (*   forward eapply subtrace_inv as [LT1 LT2]; eauto. *)
-  (*   rewrite /subtrace in SUB. *)
-  (*   destruct after eqn:AFTER; [| congruence]. *)
-  (*   rewrite decide_False in SUB. *)
-  (*   2: { lia_NO' ml. intros [=]. lia. } *)
-  (*   inversion SUB. subst tr'. clear SUB. rename t into atr.  *)
-  (*   forward eapply upto_stutter_after as (i' & latr & LAFTER & UPTOi); eauto. *)
-  (*   exists i'. rewrite /subtrace LAFTER. *)
-
-  (*   forward eapply trace_prefix_inf_upto_stutter with (ml := (NOmega.sub ml (NOnum i))); eauto. *)
-  (*   intros (ml' & UPTO' & LEN'). exists (NOmega.add (NOnum i') ml'). *)
-  (*   eexists. split; [| split]; eauto. *)
-  (*   2: { lia_NO' ml'. by rewrite Nat.sub_add'. }   *)
-  (*   rewrite decide_False; eauto. *)
-  (*   - lia_NO' ml'. do 3 f_equal. lia. *)
-  (*   - lia_NO' ml'. do 3 f_equal. intros [=]. *)
-  (*     assert (n = 0) as -> by lia. *)
-  (*     eapply trace_len_0_inv; eauto.  *)
-  (* Qed. *)
-
-End UptoStutter.

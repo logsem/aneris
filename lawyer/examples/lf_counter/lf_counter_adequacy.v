@@ -18,13 +18,6 @@ Section LFCAdequacy.
     - apply empty_PO. 
   Defined.
 
-  (* Definition LFCOP := LocaleOP (Locale := locale heap_lang).  *)
-  (* Existing Instance LFCOP. *)
-  (* Let ASEM := ObligationsASEM. *)
-  (* Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls τ ∅ (oGS := aGS)). *)
-  (* Let OM := ObligationsModel.  *)
-  (* Let M := AM2M ObligationsAM.  *)
-
   Local Instance LFC_OP_HL: OP_HL (bounded_nat 2) Empty_set LS.
   Proof. esplit; try by apply _. Defined.
 
@@ -57,8 +50,6 @@ Section LFCAdequacy.
     (extr : heap_lang_extrace)
     (START: trfirst extr = ([counter_client #()], Build_state ∅ ∅))
     (VALID: extrace_valid extr):
-
-    (* extrace_fairly_terminating extr. *)
     terminating_trace extr.
   Proof.
     assert (heapGpreS LFCΣ EM) as HPreG.

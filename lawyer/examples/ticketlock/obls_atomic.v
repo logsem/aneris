@@ -21,8 +21,7 @@ Section TotalTriples.
 
   Let OAM := ObligationsAM. 
   Let ASEM := ObligationsASEM.
-  (* Context {oGS: @asem_GS _ _ ASEM Σ}. *)
-  (* Keeping the more general interface for future developments *)
+
   Context `{oGS': @asem_GS _ _ ASEM Σ}.
   Let oGS: ObligationsGS (OP := OP) Σ := oGS'.
   Existing Instance oGS.
@@ -34,10 +33,9 @@ Section TotalTriples.
     Context
       {ST: Type}
       (τ: Locale) (* TODO: should it be fixed? *)
-      (P: ST -> iProp Σ) (Q: ST -> ST -> iProp Σ) (* second ST is the previous state *)
+      (P: ST -> iProp Σ)
+      (Q: ST -> ST -> iProp Σ) (** second ST is the previous state *)
       (L: gset Level) (* TODO: only finite sets? *)
-      (* (TGT: ST -> Prop) (* `{forall x, Decision (TGT x)} *) *)
-      (* (d__h d__l d__m: Degree) *)
       (d__m: Degree)
       (c: nat) (B: nat -> nat)
       (ε__m: coPset)
@@ -46,13 +44,11 @@ Section TotalTriples.
     Record AbortClause := {
         ac_pre: ST -> iProp Σ;
         ac_post: ST -> iProp Σ;
-        (* ac_d__l: Degree; *)
     }.
 
     Definition AC_RR {RO: Type} d__l π
       (round: ST -> RO) (cond: ST -> iProp Σ)
       (RR: option RO -> iProp Σ) (d__h: Degree): AbortClause := {|
-        (* ac_pre := fun x => (cond x ∗ ∃ r__p, RR r__p ∗ (⌜ r__p = Some (round x) ⌝ ∨ cp π d__h))%I; *)
         ac_pre := fun x => (cond x ∗ (RR (Some $ round x) ∨ cp π d__h))%I;
         ac_post := fun x => (RR (Some $ round x) ∗ cp π d__l)%I;
     |}.
@@ -81,11 +77,8 @@ Section TotalTriples.
               let PH q := th_phase_frag τ π q in
               (∀ O' q', obls τ O' ∗ sgns_levels_ge' O' L ∗ 
                         PH q' ∗ ⌜ Qp.le q' q0 ⌝ ∗
-                        (* (∃ r__p, RR r__p ∗ (⌜ r__p = Some r ⌝ ∨ cp π d__h)) ∗ *)
-                        (* ⌜ ¬ TGT x ⌝ -∗ *)
                         ac_pre ac x -∗
                       BOU ∅ c (
-                        (* RR (Some r) ∗ cp π d__l ∗ *)
                         ac_post ac x ∗ 
                         PH q' ∗
                         obls τ O' ∗
@@ -93,7 +86,6 @@ Section TotalTriples.
                       )
               ) ∧
               (∀ q',
-               (* ⌜ TGT x ⌝ ∗ *)
                  obls τ O
                  ∗ PH q' ∗ ⌜ Qp.le q' q0 ⌝
                  -∗
@@ -144,7 +136,6 @@ Section TotalTriples.
       Qed.
 
       Lemma TAU_intro U V:
-        (* Absorbing U -> *)
         Persistent U →
         (U ∧ V ⊢ TAU_acc V) → U ∧ V ⊢ TAU.
       Proof using.
@@ -157,9 +148,6 @@ Section TotalTriples.
 
     End AtomicUpdates.
 
-    (* Definition ac_equiv ac1 ac2: iProp Σ := *)
-    (*   (∀ r, ac_pre ac1 r ≡ ac_pre ac2 r) ∗ (∀ r, ac_post ac1 r ≡ ac_post ac2 r) ∗ *)
-    (*   ⌜ ac_d__l ac1 = ac_d__l ac2 ⌝. *)
     Definition ac_equiv ac1 ac2: Prop :=
       (∀ r, ac_pre ac1 r ≡ ac_pre ac2 r) /\ (∀ r, ac_post ac1 r ≡ ac_post ac2 r).
 
@@ -181,11 +169,8 @@ Section TotalTriples.
     - iIntros (??) "X". iDestruct "T1" as "[T1 _]".
       iApply (BOU_wand with "[]").
       2: { iApply "T1". iDestruct "X" as "(?&?&?&?&X)". iFrame.
-           by rewrite EQ_WPRE. 
-           (* by iRewrite (EQ_WPRE (round x)). *)
-      }
+           by rewrite EQ_WPRE. }
       iIntros "(C&?&?& VV)".
-      (* iRewrite -("EQ_WPOST" $! (round x)). *)
       rewrite EQ_WPOST. 
       iFrame.      
       iRewrite "EQ_V" in "VV". iFrame. 
@@ -234,24 +219,19 @@ Section TotalTriples.
     Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS).
 
     Definition TLAT_pre
-      (* (RR: option RO -> iProp Σ) *)
       π q (O: gset SignalId): iProp Σ :=
-      (* RR None ∗ *)
       obls τ O ∗ sgns_levels_gt' O L ∗
       th_phase_frag τ π q ∗ cp π d__m.
 
-    (* we have to use a separate definition for rounds-based TLAT,
-       since the round resource is quantified over and chosen by the client *)
+    (** we have to use a separate definition for rounds-based TLAT,
+        since the round resource is quantified over and chosen by the client *)
 
     Definition TLAT e s
-      (* d__h d__l *)
-      (* round cond *)
       ac
       (POST: ST -> ST -> option (iProp Σ))
       (get_ret: ST -> ST -> val)
       : iProp Σ :=
-      ∀ Φ q π O (* (RR: option RO -> iProp Σ) *),
-        (* let ac := AC_RR d__l π round cond RR d__h in *)
+      ∀ Φ q π O,
         ⌜ B c <= LIM_STEPS ⌝ -∗ TLAT_pre π q O -∗
         TAU (⊤ ∖ ε__m) π q (fun y x => POST y x -∗? Φ (get_ret y x)) O ac -∗
         WP e @ s; τ; ⊤ {{ v, Φ v }}.
@@ -281,9 +261,7 @@ Section TotalTriples.
     red.
     rewrite /respectful.
     intros ?? -> ?? EQUIV_P ?? EQUIV_Q ?? ->%leibniz_equiv_iff.
-    intros
-      (* ?? EQUIV_POST *)
-      ?? -> ?? -> ?? -> ?? -> ?? EQ' ?? ->%leibniz_equiv_iff.
+    intros ?? -> ?? -> ?? -> ?? -> ?? EQ' ?? ->%leibniz_equiv_iff.
     intros ?? (EQ_WPRE & EQ_WPOST) ?? EQUIV_V.    
     rewrite /TAU_acc.
     iApply fupd_proper. 
@@ -292,44 +270,21 @@ Section TotalTriples.
     iApply bi.and_proper.
     { do 2 (iApply bi.forall_proper; iIntros (?)).
       iApply bi.wand_proper.
-      { repeat iApply bi.sep_proper; try done.
-
-        (* Unset Printing Notations. *)
-        (* Set Printing Implicit. *)
-
-        (* rewrite EQ_WPRE.  *)
-        (* erewrite EQUIV_POST; eauto.   *)
-
-        (* apply PAC_EQ.  *)
-        (* 2: { iApply bi.pure_proper. apply not_iff_compat. eauto. } *)
-        (* iApply bi.exist_proper. iIntros (?). *)
-        (* iApply bi.sep_proper; eauto. *)
-        (* iApply bi.or_proper; eauto. *)
-        (* iApply bi.pure_proper. split; intros ->; subst; f_equal; [| symmetry]; eauto. *)
-      }
-      (* rewrite -(H5 a); [| done]. rewrite -(H2 a); [| done]. rewrite H16. *)
-      (* rewrite -(H15 _); reflexivity. *)
+      { repeat iApply bi.sep_proper; try done. }
       rewrite EQ_WPOST.
-      (* erewrite EQUIV_POST; [| reflexivity]. *)
       erewrite EQUIV_P; [| reflexivity]. rewrite EQUIV_V. reflexivity.  
     }
     rewrite EQUIV_P; [| done]. 
     iApply bi.and_proper.
     2: { solve_proper. }
     iApply bi.forall_proper; iIntros (?).
-    (* erewrite -(EQUIV_Q _ _).  *)
     setoid_rewrite EQUIV_Q. 2, 3: reflexivity. 
-    (* rewrite -(H6 a); [| done]. *)
-    (* rewrite H16. *)
     setoid_rewrite EQ'. 2, 3: reflexivity.
     reflexivity. 
   Qed.
 
   Global Instance TAU_Proper {ST: Type}:
     Proper
-      (* (eq ==> (eq ==> equiv) ==> (eq ==> eq ==> equiv) ==> equiv ==>  *)
-      (*  (eq ==> eq) ==> (eq ==> iff) ==> eq ==> eq ==> eq ==> equiv ==>  *)
-      (*  eq ==> eq ==> (eq ==> eq ==> equiv ) ==> equiv ==> (eq ==> equiv) ==> equiv) *)
       (eq ==> (eq ==> equiv) ==> (eq ==> eq ==> equiv) ==> equiv ==> 
        eq ==> eq ==> eq ==> eq ==>
        (eq ==> eq ==> equiv ) ==> equiv ==> ac_equiv ==> equiv)

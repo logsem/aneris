@@ -84,7 +84,6 @@ Section Nondet.
     rewrite {1}/nondet_inv_inner. iDestruct "inv" as ">(%c & %f & CNT & FLAG & SGN & TOK & #EB)".
     iApply sswp_MU_wp; [done| ]. iApply (wp_load with "[$]"). iIntros "!> FLAG".    
 
-    (* iDestruct "CASES" as "[[-> SGN]| [-> TOK]]". *)
     destruct f. 
     1: { MU_by_burn_cp. iApply wp_value.
          iMod ("CLOS" with "[CNT SGN FLAG TOK]") as "_".
@@ -161,7 +160,7 @@ Section Nondet.
     iMod (own_alloc (Excl tt: exclR unitO)) as (γ) "TOK".
     { done. }
 
-    (* workaround to get exc_lb 0*)
+    (** workaround to get exc_lb 0*)
     rewrite Nat.sub_diag. rewrite {2}(plus_n_O 0). iApply BOU_split.
     iApply OU_BOU_rep.
     iApply (OU_rep_wand with "[-]").

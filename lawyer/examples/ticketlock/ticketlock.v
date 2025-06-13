@@ -150,7 +150,7 @@ Section Ticketlock.
       ⌜ lk = (#l__ow, #l__tk)%V ⌝ ∗ l__ow ↦{/ 2} #r ∗
       held_frag b.
 
-  (* Right now we just assume that the resulting OM has all needed degrees and levels *)
+  (** Assume that the resulting OM has all needed degrees and levels *)
   Context (d__w d__l0 d__h0 d__e d__m0: Degree).
   Hypothesis
     (fl_degs_wl0: deg_lt d__w d__l0)
@@ -163,10 +163,11 @@ Section Ticketlock.
 
   Hypothesis (LS_LB: S tl_exc ≤ LIM_STEPS). 
 
-  (* we need to have a non-empty set of "acquire levels" to verify the client. *)
-  (* seemingly it's possible to get rid of this restriction by having an extra
-     "lower bound" of levels in the definition of TLAT. *)
-  (* TODO: clarify if it's possible *)
+  (** we need to have a non-empty set of "acquire levels" 
+      to eventually verify the sequential lock spec. *)
+  (* TODO: seemingly it's possible to get rid of this restriction 
+     by having an extra "lower bound" of levels in the definition of TLAT. 
+     clarify if it's possible *)
   Context (lvl_acq: Level).
 
   Definition lvls_acq: gset Level := {[ lvl_acq ]}. 
@@ -215,23 +216,10 @@ Section Ticketlock.
     etrans; eauto.
   Defined.
 
-  (* Let OAM := ObligationsAM. *)
-  (* Let ASEM := ObligationsASEM. *)
-
   Section Proofs.
 
   Context {Σ: gFunctors}.
   Context {OHE: OM_HL_Env OP EM Σ}.
-  (* (* Keeping the more general interface for future developments *) *)
-  (* Context `{oGS': @asem_GS _ _ ASEM Σ}. *)
-  (* Let oGS: ObligationsGS (OP := OP) Σ := oGS'. *)
-  (* Existing Instance oGS. *)
-
-  (* Context `{EM: ExecutionModel heap_lang M}. *)
-  (* Context `{hGS: @heapGS Σ _ EM}. *)
-  (* Let eGS: em_GS Σ := heap_fairnessGS (heapGS := hGS). *)
-           
-  (* Let tl_TAU := TAU_FL (FLP := TLPre) (oGS' := oGS'). *)
 
   Definition TAU_stored `{TLG: TicketlockG Σ} (lk: val) (c: nat) (cd: tau_codom Σ): iProp Σ :=
     let '(τ, π, q, Ob, L, Φ, RR) := cd in
@@ -239,14 +227,12 @@ Section Ticketlock.
     th_phase_frag τ π (q /2) ∗
     TAU τ (acquire_at_pre lk (FLP := TLPre) (FLG := TLG)) (acquire_at_post lk (FLP := TLPre) (FLG := TLG))
         L
-        (* (fun '(_, _, b) => b = false) *)
         c
         (⊤ ∖ ↑fl_ι)
         π
         q
         (fun _ _ => Φ #())
         Ob
-        (* RR. *)
         (acq_FG_RR RR π (FLP := TLPre))
         (oGS' := ohe_oGS')
         . 
@@ -405,10 +391,6 @@ Section Ticketlock.
     iIntros (Φ) "(CP & PH) POST". rewrite /tl_newlock.
     pure_step_hl.
 
-    (* pose proof @AMU_lift_top as AA. specialize AA with (hGS := ohe_hGS (OM_HL_Env := OHE)).  *)
-    (* iApply ohe_obls_AMU; [(try rewrite nclose_nroot); done| ]. *)
-    (* iApply BOU_AMU.     *)
-
     MU_by_BOU.
 
     iMod (first_BOU with "[$]") as "[CPS #EB]".
@@ -452,8 +434,6 @@ Section Ticketlock.
     iExists _. done.
   Qed.
 
-  (* Set Ltac Profiling. *)
-
   Section AfterInit.
         
   Context {TLG: TicketlockG Σ}.
@@ -468,7 +448,6 @@ Section Ticketlock.
   Definition wait_res o' t τ π q Ob Φ RR: iProp Σ :=
     ⌜ o' <= t ⌝ ∗
     ow_lb o' ∗ cp_mul π d__h0 (t - o') ∗
-    (* (∃ r__p, RR r__p ∗ (⌜ r__p = Some o' ⌝ ∨ cp π d__h0)) ∗ *)
     (RR (Some o') ∨ cp π d__h0) ∗
     cp_mul π d__w 10 ∗
     let cd: tau_codom Σ := (τ, π, q, Ob, lvls_acq, Φ, RR) in
@@ -501,8 +480,8 @@ Section Ticketlock.
 
     pure_steps.
 
-    (* TODO: ??? worked fine when get_ticket was inlined into tl_acquire *)
-    (* wp_bind (Snd _)%E. *)
+    (* TODO: ??? worked fine when get_ticket was inlined into tl_acquire:
+       wp_bind (Snd _)%E. *)
     assert (FAA (Snd lk) #1 = fill_item (FaaLCtx #(LitInt 1)) (Snd lk)) as CTX by done.
     iApply (wp_bind [(FaaLCtx #1)] s ⊤ τ (Snd lk) (Λ := heap_lang)). simpl.
     
@@ -723,9 +702,7 @@ Section Ticketlock.
       iSplit.
       { iPureIntro. by apply Qp.div_le. }
       iSplit; [done| ].
-      (* iDestruct "RR" as (r) "[RR RR']". iExists _. iFrame. *)
       iRewrite ("EQ2" $! (Some o')) in "RR".
-      (* iDestruct "RR'" as "[-> | ?]"; [| by iFrame]. *)
       apply Nat.le_sum in LBow as [d ->]. rewrite Nat.add_sub'.
       destruct d.
       - by rewrite Nat.add_0_r. 
@@ -841,7 +818,8 @@ Section Ticketlock.
 
     rewrite /acquire_at_pre. simpl.
 
-    (* iMod "foo". *) (* TODO: why does this unfold BOU? *)
+    (* TODO: why does this unfold BOU?
+       iMod "foo". *)
     iDestruct "PRE" as "[foo ->]".
     iApply (class_instances_later.elim_modal_timeless false). 
     2: done.
@@ -987,16 +965,6 @@ Section Ticketlock.
 
   Lemma tl_acquire_spec (lk: val) c τ:
     tl_is_lock lk c ⊢
-        (* TLAT_FL τ *)
-        (* (acquire_at_pre lk (FLP := TLPre) (FLG := TLG)) *)
-        (* (acquire_at_post lk (FLP := TLPre) (FLG := TLG)) *)
-        (* {[ lvl_acq ]} *)
-        (* (fun '(_, _, b) => b = false) *)
-        (* (fun _ _ => Some rel_tok) *)
-        (* (fun _ _ => #()) *)
-        (* c (tl_acquire lk) *)
-        (* (oGS' := oGS') *)
-        (* (FLP := TLPre). *)
         TLAT_FL_RR τ 
         (acquire_at_pre lk (FLP := TLPre) (FLG := TLG))
         (acquire_at_post lk (FLP := TLPre) (FLG := TLG))

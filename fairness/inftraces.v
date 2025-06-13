@@ -493,7 +493,6 @@ Qed.
 Section dec_unless.
   Context {St S' L L': Type}.
   Context (Us: St -> S').
-  (* Context (Ul: L -> option L'). *)
   Context (Usls: St -> L -> St -> option L').
 
   Definition dec_unless Ψ (tr: trace St L) :=
@@ -514,7 +513,6 @@ End dec_unless.
 Section destuttering.
   Context {St S' L L': Type}.
   Context (Us: St -> S').
-  (* Context (Ul: L -> option L'). *)
   Context (Usls: St -> L -> St -> option L').
 
   Inductive upto_stutter_ind (upto_stutter_coind: trace St L -> trace S' L' -> Prop):
@@ -522,8 +520,6 @@ Section destuttering.
   | upto_stutter_singleton s:
       upto_stutter_ind upto_stutter_coind ⟨s⟩ ⟨Us s⟩
   | upto_stutter_stutter btr str s ℓ:
-      (* Ul ℓ = None -> *)
-      (* (forall ℓ', ¬ inner_step ℓ' s ℓ (trfirst btr)) -> *)
       (Usls s ℓ (trfirst btr) = None) ->
       Us s = Us (trfirst btr) ->
       Us s = trfirst str ->
@@ -531,8 +527,6 @@ Section destuttering.
       upto_stutter_ind upto_stutter_coind (s -[ℓ]-> btr) str
   | upto_stutter_step btr str s ℓ s' ℓ':
       Us s = s' ->
-      (* Ul ℓ = Some ℓ' -> *)
-      (* inner_step ℓ' s ℓ (trfirst btr) -> *)
       Usls s ℓ (trfirst btr) = Some ℓ' ->
       upto_stutter_coind btr str ->
       upto_stutter_ind upto_stutter_coind (s -[ℓ]-> btr) (s' -[ℓ']-> str).
@@ -647,8 +641,7 @@ Section destuttering.
     - simpl in Hafter. rename btr0 into btr. rename str0 into str.
       specialize (IH btr' str btr).
       assert (upto_stutter btr str) as UPTO'.
-      { (* TODO: proper way of doing it? *)
-        inversion H1; eauto. done. }
+      { inversion H1; eauto. done. }
       specialize (IH UPTO' Hafter) as (?&?&?&?). 
       eauto. 
   Qed. 
@@ -712,9 +705,7 @@ Section destuttering.
     rewrite -Nat.add_1_r after_sum' H. done. 
   Qed.  
  
-  Program Fixpoint destutter_once_step N Ψ (btr: trace St L)
-                   (* {DEC: forall ℓ' s1 ℓ s2, Decision (inner_step ℓ' s1 ℓ s2)} *)
-    :
+  Program Fixpoint destutter_once_step N Ψ (btr: trace St L):
     Ψ (trfirst btr) < N →
     dec_unless Us Usls Ψ btr →
     S' + (S' * L' * { btr' : trace St L | dec_unless Us Usls Ψ btr'}) :=
@@ -730,10 +721,6 @@ Section destuttering.
       | tr_singl s => λ _, inl (Us s)
       | tr_cons s l btr' =>
         λ Hbtreq,
-        (* match inner_step l as z return Ul l = z → S' + (S' * L' * { btr' : trace St L | dec_unless Us Ul Ψ btr'}) with *)
-        (* | Some l' => λ _, inr (Us s, l', exist _ btr' _) *)
-        (* | None => λ HUll, destutter_once_step N' Ψ btr' _ _ *)
-        (* end *)
         match Usls s l (trfirst btr') as z return Usls s l (trfirst btr') = z → S' + (S' * L' * { btr' : trace St L | dec_unless Us Usls Ψ btr'}) with
         | Some l' => λ _, inr (Us s, l', exist _ btr' _)
         | None => λ HUll, destutter_once_step N' Ψ btr' _ _
@@ -839,7 +826,7 @@ Section destuttering.
 End destuttering.
 
 (* TODO: Does this belong here? *)
-(* Adapted from Arthur Azevedo De Amorim *)
+(** Adapted from Arthur Azevedo De Amorim *)
 Section lex_ind.
   Section Lexicographic.
 
@@ -940,7 +927,7 @@ Section addition_monoid.
   Qed.
 End addition_monoid.
 
-(* Classical *)
+(** Classical *)
 
 Require Import Coq.Logic.Classical.
 Section infinite_or_finite.

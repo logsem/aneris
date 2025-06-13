@@ -50,7 +50,7 @@ Ltac split_cps cps_res n :=
   iDestruct (cp_mul_split' _ _ n with cps_res) as fmt; [try lia| ].
 
 
-(* Tactics for solving goals related to SB *)
+(** Tactics for solving goals related to SB *)
 Ltac try_solve_bounds :=
   (try iPureIntro);
   try (match goal with | |- ?x < ?y => red end);

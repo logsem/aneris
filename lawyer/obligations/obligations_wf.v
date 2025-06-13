@@ -80,13 +80,10 @@ Section Wf.
     (R: ProgressState -> ProgressState -> Prop) (P: ProgressState -> Prop) :=
     ∀ δ1 δ2, P δ1 -> R δ1 δ2 -> P δ2.
   
-  (* Definition preserved_by_loc_step τ := preserved_by (loc_step_of τ). *)
   Definition preserved_by_loc_step_ex := preserved_by loc_step_ex. 
 
   Definition preserved_by_fork τ := preserved_by (fork_step_of τ).
 
-  (* Definition preserved_by_rep_loc_step τ := *)
-  (*   fun P => forall n, preserved_by (relations.nsteps (loc_step_of τ) n) P.  *)
   Definition preserved_by_rep_loc_step_ex :=
     fun P => forall n, preserved_by (relations.nsteps loc_step_ex n) P. 
 
@@ -156,7 +153,6 @@ Section Wf.
   Lemma pres_by_valid_trace_strong (tr: obls_trace) i j P (T: Locale -> Prop)
     (LE: i <= j)
     (VALID: obls_trace_valid tr)
-    (* (PPRES: forall τ, T τ -> preserved_by_loc_step τ P) *)
     (PPRES: preserved_by_loc_step_ex P)
     (FPRES: forall τ, T τ -> preserved_by_fork τ P)
     (Pi: from_option P True (tr S!! i))
@@ -182,7 +178,6 @@ Section Wf.
 
   Lemma pres_by_valid_trace (tr: obls_trace) i P
     (VALID: obls_trace_valid tr)
-    (* (PPRES: forall τ, preserved_by_loc_step τ P) *)
     (PPRES: preserved_by_loc_step_ex P)
     (FPRES: forall τ, preserved_by_fork τ P)
     (Pi: from_option P True (tr S!! i)):
@@ -269,7 +264,7 @@ Section Wf.
     subst new_ps new_eps0. simpl in IN.
     apply elem_of_union in IN as [IN | IN].
     { edestruct EPB; eauto. set_solver. }
-    apply elem_of_singleton in IN as ->. (* simpl in *. *)
+    apply elem_of_singleton in IN as ->.
     simpl in *.
     assert (phase_lt π' π__max) as LE'.
     { eapply strict_transitive_l; eauto. } 
@@ -577,25 +572,6 @@ subst new_obls0.
     - eapply disjoint_subseteq; eauto. apply _. 
   Qed.     
 
-  (* Lemma fork_step_cps_anc_pres τ: *)
-  (*   preserved_by (fork_step_of τ) cps_phases_ancestors. *)
-  (* Proof using. *)
-  (*   do 2 red. intros δ1 δ2 OS STEP.  *)
-  (*   red in STEP. destruct STEP as (?&?&STEP).     *)
-  (*   inversion STEP; subst. *)
-  (*   destruct δ1; simpl in *. subst new_obls0. *)
-  (*   subst new_phases0. rewrite map_img_insert_L. *)
-  (*   rewrite delete_notin. *)
-  (*   2: { apply not_elem_of_dom. rewrite dom_insert. *)
-  (*        apply not_elem_of_union. split; auto. *)
-  (*        apply not_elem_of_singleton. intros ->. *)
-  (*        destruct FRESH'. eapply elem_of_dom. eauto. } *)
-  (*   rewrite map_img_insert_L. *)
-  (*   intros ???.  *)
-  (*   rewrite !elem_of_union !elem_of_singleton. intros [->|[-> | OLD]] LE. *)
-  (*   -  *)
-
-    
   Lemma wf_preserved_by_fork_step τ: preserved_by (fork_step_of τ) om_st_wf.
   Proof using.
     red. intros ?? WF1 STEP. 

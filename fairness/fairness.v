@@ -32,14 +32,8 @@ Definition fair_model_model `(FM : FairModel) : Model := {|
 #[global] Existing Instance fmrole_inhabited.
 #[global] Existing Instance fmstate_inhabited.
 
-(* Basically, soundness of the logic and the lemmas above tell us that we have a program
-   trace and a model trace which are related by traces_match labels_math!
 
-   We now prove that this relation transports the properties we care about; the first
-   place of which is fairness.
- *)
-
-(* Definition of fairness for all kinds of traces *)
+(** Definition of fairness for all kinds of traces *)
 Section GeneralizedFairness.
   Context {S L T: Type}.
   Context (locale_prop: T -> S -> Prop).
@@ -147,9 +141,8 @@ Qed.
 
 
 Section LocaleFairness.
-  (* This is in fact a case of fair_by_gen with a simpler does_step relation,
-     but formalizing it would require some routine work to adjust all the proofs.
-     TODO: actually do it *)
+  (** TODO: this is in fact a case of fair_by_gen with a simpler does_step relation,
+      but formalizing it would require some routine work to adjust all the proofs. *)
   Context {S L T: Type}.
   Context (locale_prop: T -> S -> Prop).
   Context (does_step: T -> L -> Prop).
@@ -236,7 +229,7 @@ Section LocaleFairness.
   Definition weakly_fair (t: T) (tr: trace S L) :=
     forall n,
       is_Some (tr S!! n) ->
-      (* using True as default to support finite traces *)
+      (** using True as default to support finite traces *)
       (forall k, n <= k -> from_option (locale_prop t) True (tr S!! k)) ->
     exists m ℓ, tr L!! (n + m) = Some ℓ /\ does_step t ℓ. 
 

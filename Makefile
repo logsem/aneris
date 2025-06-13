@@ -1,11 +1,12 @@
 FAIRNESS_DIR := 'fairness'
 HL_DIR := 'heap_lang'
 LAWYER_DIR := 'lawyer'
-LOCAL_SRC_DIRS := $(FAIRNESS_DIR) $(HL_DIR) $(LAWYER_DIR)
-SRC_DIRS := $(LOCAL_SRC_DIRS)
+CHECK_DIR := 'check'
+MAIN_SRC_DIRS := $(FAIRNESS_DIR) $(HL_DIR) $(LAWYER_DIR)
+SRC_DIRS := $(MAIN_SRC_DIRS) $(CHECK_DIR)
 
 ALL_VFILES := $(shell find $(SRC_DIRS) -name "*.v")
-VFILES := $(shell find $(LOCAL_SRC_DIRS) -name "*.v")
+VFILES := $(shell find $(MAIN_SRC_DIRS) -name "*.v")
 
 COQC := coqc
 Q:=@
@@ -43,7 +44,6 @@ clean:
 	$(Q)rm -f .lia.cache
 	rm -f .coqdeps.d
 
-# project-specific targets
 .PHONY: build
 
 VPATH= $(FAIRNESS_DIR) $(HL_DIR) $(LAWYER_DIR)

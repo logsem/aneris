@@ -82,11 +82,8 @@ Section TracesMatch.
     valid_state_evolution_fairness extr auxtr ∧ φ extr auxtr.
 
   (* TODO: this should already be covered by .._strong' lemma above *)
-  (* Lemma valid_inf_system_trace_implies_traces_match_strong *)
-
   Lemma valid_inf_system_trace_implies_traces_match
         (φ : execution_trace Λ -> auxiliary_trace M -> Prop)
-        (* (ψ : _ → _ → Prop) *)
         ex atr iex iatr progtr (auxtr : model_trace):
     (forall (ex: execution_trace Λ) (atr: auxiliary_trace M),
         φ ex atr -> state_rel (trace_last ex) (trace_last atr)) ->

@@ -36,18 +36,14 @@ Section adequacy.
     continued_simulation R (trace_singleton ([e1], σ1)) (trace_singleton s1).
   Proof.
     intros Hfin INIT VALID1 H.
-
-    (* apply (wp_strong_adequacy heap_lang M Σ s); first by eauto. *)
     intros. apply (wp_strong_adequacy heap_lang M Σ s); [done| ]. 
     iIntros (?) "".
 
     iMod (gen_heap_init (heap σ1)) as (genheap)" [Hgen [Hσ _]]".  
-    (* iMod (init_fairnessGS_LM _ _ s1 e1) as (fGS) "GEN".    *)
     iMod (em_initialization _ s1 ([e1], σ1) p) as (fGS) "[LM_INIT MSI]"; [done| ].
     Unshelve. 2: by apply hPre. 
 
     set (distG := {| heap_fairnessGS := (fGS: (em_GS Σ (ExecutionModel := EM))) |}).
-    (* iMod (H distG) as "Hwp". clear H. *)
     iPoseProof (H distG) as "Hwp". clear H.
     
     iExists state_interp, (fun _ => em_thread_post 0%nat), fork_post.
@@ -143,7 +139,7 @@ Section adequacy.
     split.
     2: { by rewrite to_trace_trfirst. }
 
-    pose proof MATCH as INF_REF. (* see remark below *)
+    pose proof MATCH as INF_REF. (** see remark below *)
     eapply (valid_inf_system_trace_implies_traces_match
                        valid_step                       
                        state_rel
@@ -158,18 +154,18 @@ Section adequacy.
     { apply to_trace_spec. }
     Unshelve. 2,3: by eauto.
     
-    assert (exists len, trace_len.trace_len_is extr len /\ trace_len.trace_len_is (to_trace s1 iatr) len) as LEN. (* see remark below *)
+    assert (exists len, trace_len.trace_len_is extr len /\ trace_len.trace_len_is (to_trace s1 iatr) len) as LEN. (** see remark below *)
     { simpl in MATCH.
       pose proof (trace_len.trace_has_len extr) as [len LEN]. 
       pose proof (trace_len.trace_has_len (to_trace s1 iatr)) as [len' LEN'].
       eapply trace_len.traces_match_same_length in MATCH; eauto. subst.  
       eauto. }
 
-    (* INF_REF and LEN together give the traces mentioned in
-       the refinement section of Lawyer paper
-       (same length, related by infinite extension of refinement).       
-       However, our proofs proceed differency, 
-       using the notion of traces_match (MATCH hypothesis). *)
+    (** INF_REF and LEN together give the traces mentioned in
+        the refinement section of Lawyer paper
+        (same length, related by infinite extension of refinement).       
+        However, our proofs proceed differency, 
+        using the notion of traces_match (MATCH hypothesis). *)
 
     apply MATCH. 
   Qed.

@@ -102,7 +102,6 @@ Section FMTraceHelpers.
     
     Lemma steps_keep_state_gen i (P: St -> Prop) Pstep j
       (Pi: exists st, tr S!! i = Some st /\ P st)    
-      (* (P_KEPT: label_kept_state P Pl) *)
       (P_KEPT: label_kept_state_gen P Pstep)
       (NOρ: forall (k: nat) st1 oℓ' st2 (IKJ: i <= k < j), tr !! k = Some (st1, Some (oℓ', st2)) -> Pstep st1 oℓ' st2):
       forall k st' (IKJ: i <= k <= j) (KTH: tr S!! k = Some st'), P st'.
@@ -123,8 +122,6 @@ Section FMTraceHelpers.
       - eapply trace_valid_steps'; eauto. 
     Qed.
     
-
-    (* TODO: unify with general case *)
     Definition label_kept_state (Ps: St -> Prop) (Pl: option L -> Prop) :=
       forall st oℓ' st' (Pst: Ps st) (Poℓ: Pl oℓ') (STEP: fmtrans _ st oℓ' st'), 
         Ps st'.
@@ -163,44 +160,6 @@ Section FMTraceHelpers.
       intros p **. eapply (NOρ p); eauto. lia.  
     Qed.
 
-    (* (* TODO: rename *) *)
-    (* Lemma kept_state_fair_step' (ρ: L) (P: St -> Prop) *)
-    (*   (KEPT: label_kept_state P (other_step ρ)) *)
-    (*   (* (P_EN: forall st (Pst: P st), @role_enabled_model M ρ st) *) *)
-    (*   (FAIRρ: fair_model_trace ρ tr): *)
-    (*   forall i st (ITH: tr S!! i = Some st) (Pst: P st), *)
-    (*   exists j st', ClassicalFacts.Minimal (fun j => i <= j /\ tr L!! j = Some $ Some ρ \/ ¬ role_enabled_model ρ st') j /\ *)
-    (*              tr S!! j = Some st' /\ P st'. *)
-    (* Proof using VALID. *)
-    (*   intros.  *)
-    (*   apply fair_model_trace_defs_equiv, strong_fair_model_trace_alt_defs_equiv in FAIRρ.          *)
-    (*   red in FAIRρ. edestruct FAIRρ as [d [STEP MIN]]; [eauto| ..]. *)
-    (*   { apply P_EN. eauto. } *)
-    (*   clear FAIRρ.  *)
-
-    (*   pose proof (trace_has_len tr) as [len LEN]. *)
-    (*   assert (my_omega.NOmega.lt_nat_l (i + d) len) as DOMid. *)
-    (*   { destruct STEP as [(?&?&?) | STEP].  *)
-    (*     - eapply state_lookup_dom; eauto. *)
-    (*     - apply my_omega.NOmega.lt_lt_nat with (m := i + d + 1); [lia| ]. *)
-    (*       eapply label_lookup_dom; eauto. } *)
-    (*   pose proof (proj2 (state_lookup_dom _ _ LEN (i + d)) DOMid) as [st' IDTH]. *)
-      
-    (*   forward eapply steps_keep_state with (i := i) (j := i + d) (k := i + d) as NEXT_EN; eauto.  *)
-    (*   { intros. destruct IKJ as [[v ->]%Nat.le_sum KJ].  *)
-    (*     intros ->. enough (d <= v); [lia| ]. apply MIN. eauto. } *)
-    (*   { lia. } *)
-      
-    (*   destruct STEP as [(st'_ & ST' & DIS') | STEP]. *)
-    (*   { assert (st'_ = st') as -> by congruence.  *)
-    (*     destruct DIS'. apply P_EN. eauto. } *)
-    (*   exists (i + d), st'. split; eauto. *)
-    (*   red. split; [split; [lia| eauto]| ]. *)
-    (*   intros k [LE' STEP']. apply Nat.le_sum in LE' as [d' ->]. *)
-    (*   enough (d <= d'); [lia| ]. apply MIN. eauto. *)
-    (* Qed. *)
-
-    (* TODO: rename *)
     Lemma kept_state_fair_step (ρ: L) (P: St -> Prop)
       (KEPT: label_kept_state P (other_step ρ))
       (P_EN: forall st (Pst: P st), @role_enabled_model M ρ st)

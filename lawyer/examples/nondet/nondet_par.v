@@ -190,7 +190,7 @@ Section Nondet.
     iMod (own_alloc (Excl tt: exclR unitO)) as (γ) "TOK".
     { done. }
 
-    (* workaround to get exc_lb 0*)
+    (** workaround to get exc_lb 0*)
     rewrite Nat.sub_diag. rewrite {2}(plus_n_O 0). iApply BOU_split.
     iApply OU_BOU_rep.
     iApply (OU_rep_wand with "[-]").

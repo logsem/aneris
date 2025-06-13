@@ -33,7 +33,7 @@ Section Powerset.
   Context {K: Type}.
   Context `{Countable K}. 
   
-  (* it's easier to perform recursion on lists *)
+  (** it's easier to perform recursion on lists *)
   (* TODO: another name? *)
   Fixpoint powerlist (l: list K): gset (gset K) :=
     match l with
@@ -163,12 +163,6 @@ Lemma GSet_Proper:
   ∀ `{Countable K}, Proper (equiv ==> equiv) (@GSet K _ _).
 Proof using. solve_proper. Qed.
 
-(* TODO: upstream *)
-(* Lemma not_elem_of_equiv_not_empty_L: *)
-(* ∀ {A C : Type} {H : ElemOf A C} {H0 : Empty C} {H1 : Singleton A C} *)
-(*   {H2 : Union C}, *)
-(*   SemiSet A C → LeibnizEquiv C → *)
-(*   ∀ X : C, X ≠ ∅ ↔ (exists x : A, x ∈ X). *)
 Lemma gset_not_elem_of_equiv_not_empty_L:
   ∀ {A : Type} `{Countable A},
   ∀ (X : gset A), X ≠ ∅ ↔ (exists x : A, x ∈ X).

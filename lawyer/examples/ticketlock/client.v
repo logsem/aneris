@@ -11,8 +11,8 @@ From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From iris.base_logic.lib Require Import invariants.
 
 
-(* With the current proof, we don't require anything from Σ before OM is instantiated.
-   However, we keep this preG/G pattern for uniformness. *)
+(** With the current proof, we don't require anything from Σ before OM is instantiated.
+    However, we keep this preG/G pattern for uniformness. *)
 Class ClientPreG (Σ: gFunctors) := { }.
 
 Class ClientG Σ := {
@@ -72,8 +72,6 @@ Section MotivatingClient.
   Hypothesis (LT0m: deg_lt d0 (rfl_d RFL)).
 
   Definition c__cl: nat := 4.
-  (* Hypothesis (FL_STEPS: rfl_sb_fun RFL c__cl ≤ LIM_STEPS). *)
-  (* TODO: make tactics more specific wrt. the lower bound on LIM_STEPS *)
   Definition MAX_EXC := 70.
   Hypothesis (LS_LB: max_list [MAX_EXC + 2; rfl_sb_fun RFL c__cl] <= LIM_STEPS).
 

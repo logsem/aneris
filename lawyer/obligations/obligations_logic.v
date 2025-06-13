@@ -10,7 +10,8 @@ From heap_lang Require Export heap_lang_defs tactics notation sswp_logic locales
 
 Close Scope Z.
 
-(* some lemmas about heap lang rely on concrete instances of EqDecision and Countable *)
+(** Some lemmas about HeapLang rely on concrete instances of EqDecision and Countable.
+    Therefore we construct ObligationsParams instance with these concrete instances using LocaleOP. *)
 (* TODO: find better solution *)
 Class ObligationsParamsPre (Degree Level: Type) (LIM_STEPS: nat) := { 
     opar_deg_eqdec' :: EqDecision Degree;
@@ -40,7 +41,6 @@ Section ProgramLogic.
   Let Degree := ofe_car DegO.
   Let Level := ofe_car LevelO.
   
-  (* Context `{OP: ObligationsParams Degree Level (locale heap_lang) LIM_STEPS}. *)
   Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}.
   Let OP := LocaleOP (Locale := locale heap_lang).
   Existing Instance OP. 
@@ -56,7 +56,6 @@ Section ProgramLogic.
     reflexivity.
   Abort. 
 
-  (* Keeping the more general interface for future developments *)
   Context {oGS': @asem_GS _ _ ASEM Σ}.
   Let oGS: ObligationsGS (OP := OP) Σ := oGS'.
   Existing Instance oGS. 
@@ -207,15 +206,6 @@ Section ProgramLogic.
     iDestruct (bi.intuitionistically_if_elim with "OP") as "OP".
     iMod "OP". by iApply "PQ".
   Qed.
-  (* Global Instance ElimOU_BOU p P Q E n m: *)
-  (*   S m <= n -> ElimModal True p false (OU P) P (BOU E n Q) (BOU E (n - 1) Q). *)
-  (* Proof using. *)
-  (*   clear LIM_STEPS_LB.  *)
-  (*   intros. red. simpl. iIntros "%NZ [OP PQ]". *)
-  (*   iApply OU_BOU'; [lia| ]. *)
-  (*   iDestruct (bi.intuitionistically_if_elim with "OP") as "OP". *)
-  (*   iMod "OP". by iApply "PQ". *)
-  (* Qed. *)
 
   Global Instance ElimModal_BOU_split p E k n P Q:
     ElimModal (k <= n) p false
@@ -296,8 +286,6 @@ Section TestProg.
   Let Degree := ofe_car DegO.
   Let Level := ofe_car LevelO.
   
-  (* Context `{OP: ObligationsParams Degree Level (locale heap_lang) LIM_STEPS}. *)
-  (* Let OM := ObligationsModel. *)
   Context `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}.
   Let OP := LocaleOP (Locale := locale heap_lang).
   Existing Instance OP. 
@@ -305,7 +293,7 @@ Section TestProg.
 
   Let OAM := ObligationsAM. 
   Let ASEM := ObligationsASEM.
-  (* Keeping the more general interface for future developments *)
+
   Context `{oGS': @asem_GS _ _ ASEM Σ}.
   Let oGS: ObligationsGS (OP := OP) Σ := oGS'.
   Existing Instance oGS.
@@ -404,7 +392,6 @@ Section TestProg.
       iAccu.
     }
 
-    (* iIntros "[(POST & CPS' & L & SIG & CPS) R']". *)
     iIntros "[_ R']".
     iDestruct "R'" as (π1 π2) "(PH1 & OB1 & PH3 & OB2 & [%LT1 %LT2])".
 

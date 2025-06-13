@@ -54,10 +54,7 @@ Section ProgramLogic.
           let c := trace_last extr' in
           let δ := trace_last mtr in
           gen_heap_interp c'.2.(heap) ∗
-
-          (* obls_si OP c δ (ObligationsGS0 := oGS) ∗   *)
           em_msi c δ (em_GS0 := eGS) ∗ 
-
           ⌜ oζ = Some τ ⌝ ∗
           ⌜ locale_step c (Some τ) c' ⌝ ∗
           ⌜ extr_last_fork $ extr' :tr[oζ]: c' = oτ' ⌝
@@ -72,8 +69,8 @@ Section ProgramLogic.
     Definition MU := MU_impl None.
     Definition MU__f E ζ ζ' P := MU_impl (Some ζ') E ζ P.
 
-    (* For each proofmode typeclass, there are two instances (for MU with and without fork)
-       Both are proved with a single lemma *)
+    (** For each proofmode typeclass, there are two instances (for MU with and without fork).
+        Both are proved with a single lemma *)
 
     Lemma ElimModal_bupd_MU_impl p f E ζ P Q:
       ElimModal True p false
@@ -169,7 +166,6 @@ Section ProgramLogic.
              - repeat rewrite -and_assoc. repeat split; eauto.  
                simpl in Hζ. 
                rewrite -Hζ. simpl.
-               (* rewrite locale_fill'.  *)
                eapply locale_step_atomic.
                3: { eapply @fill_step. apply Hstep. } 
                { rewrite -Heqxx Hextr. simpl. reflexivity. }
@@ -237,12 +233,10 @@ Section ProgramLogic.
 
       iSpecialize ("MU" $! _ (extr :tr[Some τ]: (_, _)) mtr with "[HEAP MSI]").
       { rewrite /trace_interp_interim. simpl.
-        (* rewrite /obls_si. iDestruct "MSI" as "(M & %TS & %DPO)". *)
         remember (trace_last extr) as xx. destruct xx as [tp h].
         inversion Hexend as [[TP HH]].
         rewrite TP. simpl. iFrame. 
         iPureIntro. repeat split; try done. 
-        (* - by rewrite -TP. *)
         - erewrite <- language.locale_fill with (K := K) in Hloc.  
           rewrite -Hloc. simpl.
           eapply locale_step_atomic.

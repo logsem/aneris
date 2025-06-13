@@ -273,14 +273,14 @@ Section MultisetOrder.
   Context (R: relation A).
   Context {PO: PartialOrder R}.
 
-  (* reflexive version of Huet and Oppen definition *)
+  (** reflexive version of Huet and Oppen definition *)
   Definition ms_le (X Y: gmultiset A) :=
     forall a, multiplicity a X > multiplicity a Y ->
     exists b, R a b /\ multiplicity b X < multiplicity b Y.
 
   Definition ms_lt := strict ms_le. 
   
-  (* original Huet and Oppen definition *)
+  (** original Huet and Oppen definition *)
   Definition ms_lt' (X Y: gmultiset A) :=
     forall a, multiplicity a X > multiplicity a Y ->
     exists b, strict R a b /\ multiplicity b X < multiplicity b Y.
@@ -450,15 +450,6 @@ Section MultisetOrder.
     exists z. split; [mss| ]. etrans; eauto.
   Qed.
 
-  (* Lemma ms_le_minus (X Y D: gmultiset A) *)
-  (*   (DOM': ms_le (X ⊎ D) (Y ⊎ D)): *)
-  (*   ms_le X Y. *)
-  (* Proof using PO. *)
-  (*   apply ms_le_equiv' in DOM'. *)
-  (*   destruct DOM' as (B1&L1&SUB1&EQ&DOM1).  *)
-    
-  
-
   Lemma empty_ms_le X: ms_le ∅ X.
   Proof using.
     red. intros ?. rewrite multiplicity_empty. lia.
@@ -590,7 +581,6 @@ Section MultisetOrder.
     
     assert (h2 ∈ mset_filter (not ∘ same_muls) (X ⊎ Y)) as IN2.
     { by apply mset_filter_spec. }
-    (* apply gmultiset_disj_union_difference' in IN2. *)
 
     assert (h2 ∉ B) as NINh2.
     { intros INh. specialize (LTd _ INh).

@@ -35,10 +35,4 @@ Section ObligationsAM.
     
   Definition ObligationsAM: ActionModel := {| amTrans := obls_AM_trans |}.
 
-  (* Global Instance is_act_of_obls_dec: forall a, Decision (is_action_of ObligationsAM a). *)
-  (* Proof using. *)
-  (*   intros. destruct (decide (a = obls_act)) as [-> | ?]. *)
-  (*   { left. red. *)
-  (*     destruct OM_st_inh as [δ], INH_LOC as [τ].  *)
-
 End ObligationsAM.

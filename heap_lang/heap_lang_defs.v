@@ -1,7 +1,6 @@
 From iris.base_logic Require Export gen_heap.
 From iris.proofmode Require Import tactics.
 From trillium.program_logic Require Export weakestpre.
-(* From fairness Require Export resources fuel. *)
 From heap_lang Require Export lang.
 From fairness Require Export execution_model.
 From heap_lang Require Import tactics notation.
@@ -52,12 +51,8 @@ Section GeneralProperties.
   Lemma posts_of_empty_mapping  (e1 e: expr) v (tid : nat) (tp : list expr):
     tp !! tid = Some e ->
     to_val e = Some v ->
-    (* posts_of tp ( *)
-    (*     (fun _ => em_thread_post 0%nat (em_GS0 := eGS)) *)
-    (*                ::  (map (λ '(tnew, e), fork_post (locale_of tnew e)) (prefixes_from [e1] (drop (length [e1]) tp)))) *)
-    cur_posts tp e1 (fun _ => em_thread_post 0%nat (em_GS0 := eGS))
-      -∗
-      em_thread_post tid (em_GS0 := eGS).
+    cur_posts tp e1 (fun _ => em_thread_post 0%nat (em_GS0 := eGS)) -∗
+    em_thread_post tid (em_GS0 := eGS).
   Proof.
     intros Hsome Hval. simpl.
     
@@ -139,7 +134,6 @@ Ltac inv_head_step :=
   end.
 
 Local Hint Extern 0 (head_reducible _ _) => eexists _, _, _; simpl : core.
-(* Local Hint Extern 0 (head_reducible_no_obs _ _) => eexists _, _, _; simpl : core. *)
 
 (* [simpl apply] is too stupid, so we need extern hints here. *)
 Local Hint Extern 1 (head_step _ _ _ _ _) => econstructor : core.

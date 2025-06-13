@@ -21,11 +21,11 @@ Definition equ (L1 L2 : list A) :=
 Infix "≡" := (Permutation) (at level 80).
 Infix "=?" := (eq_dec) (at level 80).
 
-(** We extend [lt] to a binary relation on lists *)
-(*     Intuitively [lt_ext1 L1 L2] iff L1 is obtained  *)
-(*     from L2 by removing an element and *)
-(*     replacing it by a list of smaller ones *)
-(* *)
+(** We extend [lt] to a binary relation on lists.
+    Intuitively [lt_ext1 L1 L2] iff L1 is obtained 
+    from L2 by removing an element and
+    replacing it by a list of smaller ones *)
+
 Inductive lt_ext1 (L1 L2 : list A) : Prop :=
   | lt_ext1_intro x X Y :
     L1 ≡ Y ++ X ->
@@ -479,7 +479,6 @@ Section GmultisetLtWf.
   Proof using. clear llt R PO. mss. Qed.
 
   Lemma dominates_over_lt_ext_crt L B
-    (* (DISJ: L ## B) *)
     (DOM: dominates_over R B L):
     clos_refl_perm lt_ext (elements L) (elements B).
   Proof using.

@@ -63,7 +63,6 @@ Section AM_UPD.
       ∀ c c' δ, 
         AM_st_interp_interim c c' δ ζ f ={E}=∗
         ∃ δ' oρ, asem_msi c' δ' (asem_GS0 := aeGS) ∗
-                 (* ⌜ amTrans _ δ (a, oρ) δ' ⌝ ∗ P *)
                  ⌜ asem_valid_evolution_step c (Some ζ) c' δ (a, oρ) δ' ⌝ ∗
                  P
     .

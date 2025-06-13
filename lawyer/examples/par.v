@@ -8,7 +8,7 @@ From iris.algebra Require Import excl.
 From iris.base_logic.lib Require Import invariants.
 
 
-(**** adapted from Iris' implementation of parallel composition *)
+(** adapted from Iris' implementation of parallel composition *)
 
 Class parG Σ := SpawnG { #[local] spawn_tokG :: inG Σ (exclR unitO) }.
 
@@ -241,19 +241,18 @@ Section SpawnJoin.
     iExists _. iFrame. by iApply ep_weaken.
   Qed.
 
-  (* Notice that this allows us to strip a later *after* the two Ψ have been
-     brought together.  That is strictly stronger than first stripping a later
-     and then merging them, as demonstrated by [tests/joining_existentials.v].
-     This is why these are not Texan triples. *)
+  (** Notice that this allows us to strip a later *after* the two Ψ have been
+      brought together.  That is strictly stronger than first stripping a later
+      and then merging them, as demonstrated by [tests/joining_existentials.v].
+      This is why these are not Texan triples. *)
   Lemma par_spec τ π (Q__w Q__s : val → iProp Σ) R__s R__w R__w'
     (f__s f__w : val) (Φ : val → iProp Σ) d__w d__s
     (DISJsw: R__s ## R__w):
       waiter_spec (f__w #()) R__w R__w' d__w Q__w -∗
       spawnee_spec (f__s #()) R__s d__s Q__s -∗
-      (* TODO: is it possible to avoid mentioning phase specifically? *)
-      (* tried to do so, but have problems with eliminating laters and/or phase disappearing *)
+      (* TODO: is it possible to avoid mentioning phase specifically?
+         tried to do so, but have problems with eliminating laters and/or phase disappearing *)
       (▷ ∀ vw vs, obls τ R__w' -∗ Q__w vw -∗ Q__s vs -∗
-                        (* th_phase_eq τ π2' -∗ ⌜ phase_le π π2' ⌝ -∗ *)
                         ▷ Φ (vs, vw)%V) -∗
       obls τ (R__w ∪ R__s) -∗ th_phase_eq τ π -∗
       cp π d2 -∗ cp π d__s -∗ cp π d__w -∗
@@ -288,8 +287,8 @@ Section SpawnJoin.
     simpl. iIntros "%vw (%π__w' & Qw & OBw & PH & %PH_LEw')".
     rewrite cp_mul_weaken. 2, 3: by eauto.
 
-    (* exchange bound is smaller than what we need,
-       but we can just do two exchanges *)
+    (** exchange bound is smaller than what we need,
+        but we can just do two exchanges *)
     split_cps "CPS" 2. iDestruct (cp_mul_take with "CPS'") as "[CP1 CP1']".
     rewrite -cp_mul_1. 
     wp_bind (Rec _ _ _)%E.
@@ -315,19 +314,18 @@ Section SpawnJoin.
     iFrame. iPureIntro. etrans; eauto.  
   Qed.
 
-  (* Notice that this allows us to strip a later *after* the two Ψ have been
-     brought together.  That is strictly stronger than first stripping a later
-     and then merging them, as demonstrated by [tests/joining_existentials.v].
-     This is why these are not Texan triples. *)
+  (** Notice that this allows us to strip a later *after* the two Ψ have been
+      brought together.  That is strictly stronger than first stripping a later
+      and then merging them, as demonstrated by [tests/joining_existentials.v].
+      This is why these are not Texan triples. *)
   Lemma par_sym_spec τ π (Q1 Q2 : val → iProp Σ) R1 R2 R'
     (f1 f2 : val) (Φ : val → iProp Σ) (df1 df2: Degree)
     (DISJ12: R1 ## R2) (DISJ': R' ## (R1 ∪ R2)):
       spawnee_spec (f1 #()) R1 df1 Q1 -∗
       spawnee_spec (f2 #()) R2 df2 Q2 -∗
-      (* TODO: is it possible to avoid mentioning phase specifically? *)
-      (* tried to do so, but have problems with eliminating laters and/or phase disappearing *)
+      (* TODO: is it possible to avoid mentioning phase specifically?
+         tried to do so, but have problems with eliminating laters and/or phase disappearing *)
       (▷ ∀ v1 v2, obls τ R' -∗ Q1 v1 -∗ Q2 v2 -∗
-                        (* th_phase_eq τ π2' -∗ ⌜ phase_le π π2' ⌝ -∗ *)
                         ▷ Φ (v1, v2)%V) -∗
       obls τ (R1 ∪ R2 ∪ R') -∗ th_phase_eq τ π -∗
       cp π d2 -∗ cp π df1 -∗ cp π df2 -∗
@@ -367,13 +365,10 @@ Section SpawnJoin.
     rewrite cp_mul_weaken; [| apply PH_LE2| reflexivity]. 
     wp_bind (Rec _ _ _)%E.
 
-    (* do 2 pure_step_cases. *)
-
-    (* exchange bound is smaller than what we need,
-       but we can just do multiple exchanges *)
+    (** exchange bound is smaller than what we need,
+        but we can just do multiple exchanges *)
     split_cps "CPS" 3.
     iDestruct (cp_mul_take with "CPS'") as "[CP1 CP1']".
-    (* rewrite -cp_mul_1.  *)
     wp_bind (Rec _ _ _)%E.
     pure_step_hl. MU_by_BOU.
     iMod (exchange_cp_upd with "CP1' [$]") as "CPS0"; eauto.
@@ -401,7 +396,6 @@ Section SpawnJoin.
     { iFrame "#∗". }
     iIntros "!> %v2 (Q2 & OB & PH)".
     wp_bind (Rec _ _ _)%E.
-    (* pure_steps.  *)
     
     iSpecialize ("POST" with "[$] [$] [$]").
     wp_bind (Rec _ _ _)%E. pure_steps.

@@ -138,7 +138,6 @@ Section Adequacy.
       rewrite elem_of_union !elem_of_singleton.
       intros [-> | ->]; apply ith_bn_lt; lia. }
     1, 2: apply ith_bn_lt; lia. 
-    (* 1-3: cbv; lia. *)
     { cbv; lia. }
     { simpl. by iIntros (? _) "X". }
     { (* TODO: why solve_inG doesn't solve it? *)

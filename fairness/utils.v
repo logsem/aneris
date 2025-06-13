@@ -6,7 +6,6 @@ From fairness Require Export utils_coPset utils_logic utils_maps utils_sets util
 
 (* TODO: move these lemmas to appropriate places *)
 
-
 Section Disjoint.
 
   Lemma disjoint_subseteq:

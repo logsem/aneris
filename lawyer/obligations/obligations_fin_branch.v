@@ -15,9 +15,7 @@ Section FiniteBranching.
   Let Degree := ofe_car DegO.
   Let Level := ofe_car LevelO.
 
-  (* Context {Locale: Type}. *)
   Context {Λ: language}.
-  (* Context `{Countable (locale Λ)}. *)
   Let Locale := locale Λ.
 
   Context {LIM_STEPS: nat}.
@@ -184,7 +182,6 @@ Section FiniteBranching.
       intros ? STEP.
       rewrite !elem_of_app.
       inv_loc_step_ex STEP.      
-      (* destruct STEP as [T|[T|[T|[T|[T|[T|T]]]]]].  *)
       - left. destruct (burns_cp_next_states δ); eauto. 
       - do 2 right. left.
         apply elem_of_list_In, in_flat_map. setoid_rewrite <- elem_of_list_In.      
@@ -232,7 +229,7 @@ Section FiniteBranching.
       red. intros ???????. subst. eauto.
     Qed.
 
-    (* Statement mentioned in the paper *)
+    (** Statement mentioned in the paper *)
     Lemma om_trans_locale_approx δ τ (L: gset Locale):
       list_approx (fun δ' => dom (ps_obls δ') ⊆ L /\ om_trans δ τ δ'). 
     Proof using FINlvl FINdeg.

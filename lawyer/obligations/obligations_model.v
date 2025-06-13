@@ -162,7 +162,7 @@ Section Model.
       let ps' := update_phases new_phases $ update_obls new_obls ps in
       forks_locale ps θ ps' θ' obls_.
 
-  (* small steps that are "made by" a particular locale *)
+  (** small steps that are "made by" a particular thread *)
   Definition loc_step_of ps1 θ ps2 :=
     (exists π δ, burns_cp ps1 θ ps2 π δ) \/
     (exists l, creates_signal ps1 θ ps2 l) \/
@@ -170,7 +170,7 @@ Section Model.
     (exists s π δ δ', creates_ep ps1 θ ps2 s π δ δ') \/
     (exists s π δ, expects_ep ps1 θ ps2 s π δ).
 
-  (* small steps that don't depend on any thread *)
+  (** small steps that don't depend on any thread *)
   Definition loc_step0 ps1 ps2 :=
     (exists π δ δ' n, exchanges_cp ps1 ps2 π δ δ' n) \/
     (increases_eb ps1 ps2).

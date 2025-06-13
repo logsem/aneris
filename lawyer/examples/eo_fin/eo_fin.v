@@ -20,7 +20,6 @@ Section EoFin.
   Let MAX_OBL_STEPS := 10.
   Let NUM_DEG := 5.
   
-  (* Instance EO_OP: ObligationsParams (EODegree NUM_DEG) (EOLevel LIM) (locale heap_lang) MAX_OBL_STEPS. *)
   Instance EO_OP': ObligationsParamsPre (EODegree NUM_DEG) (EOLevel LIM) MAX_OBL_STEPS.
   Proof using.
     esplit; try by apply _.
@@ -30,23 +29,12 @@ Section EoFin.
   Definition EO_OP := LocaleOP (Locale := locale heap_lang). 
   Existing Instance EO_OP. 
 
-  (* Let OM := ObligationsModel. *)
-
   Let EOLevelOfe := BNOfe LIM. 
   Let EODegreeOfe := BNOfe NUM_DEG.
 
   Instance EOFin_OP_HL: OP_HL EODegreeOfe EOLevelOfe MAX_OBL_STEPS.
   Proof. esplit; by apply _. Defined.
   Existing Instance EOFin_OP_HL. 
-
-  (* Context `{EM: ExecutionModel heap_lang M}.  *)
-  (* Context `{hGS: @heapGS Σ _ EM}. *)
-
-  (* Let ASEM := ObligationsASEM. *)
-  (* (* Keeping the more general interface for future developments *) *)
-  (* Context `{oGS': @asem_GS _ _ ASEM Σ}. *)
-  (* Let oGS: ObligationsGS (OP := EO_OP) Σ := oGS'. *)
-  (* Existing Instance oGS. *)
 
   Context `{EM: ExecutionModel heap_lang M}.
   Context {Σ} {OHE: OM_HL_Env EOFin_OP_HL EM Σ}. 
@@ -86,8 +74,6 @@ Section EoFin.
   Lemma d01_lt: strict (bounded_nat_le _) d0 d1.
   Proof using. apply ith_bn_lt. lia. Qed.
     
-  (* Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS' _ EM _ (↑ nroot)}. *)
-  
   Section ThreadResources.
     Context {PRE: EoFinPreG Σ}.
 
@@ -169,8 +155,6 @@ Section EoFin.
 
     Lemma lt_B_LIM: B < LIM. lia. Qed. 
 
-    (* Existing Instance oGS. *)
-    
     Lemma BOU_update_SR τ m:
   obls τ ∅ -∗
   smap_repr_eo (m + 1) (B `min` (m + 2)) -∗
@@ -186,11 +170,8 @@ Section EoFin.
         iApply BOU_intro. iModIntro. do 1 iExists _. iFrame.
         iLeft. done. }
 
-      (* iDestruct (smap_expose_dom with "[$]") as "%SM_DOM". *)
-      (* rewrite PeanoNat.Nat.min_r in DOM; [| lia]. *)
       iApply BOU_wand.
       2: { rewrite /smap_repr_eo. simpl.
-           (* rewrite !PeanoNat.Nat.min_r; [| lia]. *)
            iPoseProof (BOU_smap_extend B__eo τ (m + 2) _ ∅
 (flip Nat.ltb (m + 1)) (flip Nat.ltb (m + 1)) with "[$] [$]") as "foo".
            4: by iFrame.
@@ -370,7 +351,6 @@ Section EoFin.
         iDestruct "EXTRA" as "[CP2' | EXP]". 
         + MU_by_BOU. 
           (* TODO: avoid unfolding BOU *)
-          (* rewrite Nat.min_r; [| lia]. *)
           rewrite /smap_repr_eo. 
           iPoseProof (smap_create_ep' B__eo m with "[$] [$] [$]") as "OU"; eauto.
           { apply elem_of_set_seq. lia. } 
@@ -514,9 +494,7 @@ Section EoFin.
 
     (* TODO: parametrize smap_repr_eo with the lower bound *)
     (* TODO: try to use init_smap_repr for initialization *)
-    Lemma alloc_inv l (* (i: nat) *) τ
-      (* (i := 0) *)
-      :
+    Lemma alloc_inv l τ:
       obls τ ∅ -∗ l ↦ #0 -∗ 
         BOU ⊤ 2 (|={∅}=> ∃ (eoG: EoFinG Σ) (sigs: list SignalId),
                        even_res 0 (H := eoG)∗
@@ -566,7 +544,6 @@ Section EoFin.
           2: { subst smap0 m. rewrite EQ. rewrite /sigs_block. simpl. done. } 
 
           rewrite !bi.sep_assoc.
-          (* assert (sm_PreG = eofin_sigs) as EQ_PRE.  *)
           iSplitL; [| done]. iSplitL. 
           2: { iPureIntro. econstructor; try set_solver. apply NoDup_singleton. }
           
@@ -616,10 +593,6 @@ Section EoFin.
           iSplitR "OB".
           2: { iFrame. iPureIntro. repeat split; try (done || constructor).
                subst smap0 m. rewrite dom_empty_L H. done. }
-          (* iSplitR. *)
-          (* { subst smap0. iPureIntro.  *)
-          (*   subst m. (* subst i. *) *)
-          (*   rewrite H. set_solver. } *)
           subst smap0. rewrite big_sepM_empty.
           subst m. rewrite H. iPureIntro. set_solver. } 
 
@@ -635,9 +608,7 @@ Section EoFin.
       iExists eoG, _. iFrame.
       iApply fupd_frame_r.
       iSplit. 
-      {
-        (* admit.  *)
-        iApply inv_alloc. iNext.
+      { iApply inv_alloc. iNext.
         rewrite /eofin_inv_inner. iExists 0. iFrame. }
       rewrite bi.sep_assoc. iSplit.
       { iPureIntro. split; try done. apply sigs_block_len. } 
@@ -648,7 +619,6 @@ Section EoFin.
       2: { simpl. rewrite DOM. apply elem_of_set_seq. lia. }
       simpl in IN.       
       rewrite /ith_sig.
-      (* Set Printing Implicit. simpl. *)
       rewrite EQ_PRE. 
       iApply (own_mono with "F").
       apply auth_frag_mono.
@@ -684,7 +654,6 @@ Section EoFin.
       
       pure_steps.
       wp_bind (ref _)%E.
-      (* iApply wp_atomic.       *)
       iApply sswp_MU_wp_fupd; [done| ]. iApply wp_alloc.
       iModIntro.
       iNext. iIntros "%l L _".
@@ -715,7 +684,7 @@ Section EoFin.
         iApply sswp_MUf_wp. iIntros (τ'). iApply (MU__f_wand with "[-CP PH OB]").
         2: { iApply ohe_obls_AMU__f; [done| ].
              iApply BOU_AMU__f.
-             (* TODO: change BOU_burn_cp*)
+             (* TODO: change BOU_burn_cp *)
              iApply BOU_intro. iFrame "PH OB".
              iSplitR "CP".
              2: { iExists _. iFrame. }
@@ -731,8 +700,6 @@ Section EoFin.
         { iApply (thread_spec_wrapper with "[-]").
           { apply even_thread_resource. }
           2: { iNext. iIntros (v) "OB". by iApply NO_OBS_POST. }
-          (* iDestruct (cp_mul_weaken with "CPS2") as "?". *)
-          (* { eapply strict_include, LT2. }  *)
           rewrite Nat.sub_0_r. iFrame "#∗".
           rewrite bi.sep_assoc. iSplitR "OB2".
           2: { rewrite (proj2 (PeanoNat.Nat.ltb_lt _ _)); [ | lia].

@@ -17,9 +17,7 @@ Section ObligationsEM.
   Let Degree := ofe_car DegO.
   Let Level := ofe_car LevelO.
 
-  (* Context {Locale: Type}. *)
   Context {Λ: language}.
-  (* Context `{Countable (locale Λ)}. *)
   Let Locale := locale Λ.
 
   Context {LIM_STEPS: nat}.
@@ -75,7 +73,6 @@ Section ObligationsEM.
     exists τ0,
       let R := {[ τ0 ]} in
       locales_of_cfg σ = R /\ dom $ ps_obls δ = R /\ 
-      (* TODO: add this to invariant? *)
       om_st_wf δ.
 
   Lemma obls_resources_init Σ {PRE: ObligationsPreGS Σ}:
