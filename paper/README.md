@@ -9,6 +9,7 @@
    - `lawyer/`
      - `examples/` - case studies
 	 - `obligations/` - implementation of the obligations-based reasoning
+   - `check/` - collection of the end results.
 	 
 ## Installation
 
@@ -33,6 +34,13 @@
     opam install . --deps-only
     # build Lawyer; adjust the number of jobs as needed
     make -j 5
+	
+## Checking the end results
+
+To check the axioms used in the development, step through the file `check/check.v`. It is a collection of our end results (adequacy statements for the case studies), to which all the used assumptions are printed.
+	
+Our development relies on the axiom of choice, law of excluded middle, functional and propositional extensionality.
+	
 
 ## Correspondence between the paper and Rocq formalization
 
@@ -50,14 +58,14 @@
   Each example program from Section 2.1 has a subfolder X in `lawyer/lawyer/examples/`.
   Inside of it, the `X.v` file contains the verification of the program, and `X_adequacy.v` proves the meta-level property about the execution of that program.
   Unless said otherwise, the property we prove is termination under fair scheduler.
-  - Statically-determined Bound (Fig. 1): `const_term/`subfolder
+  - Statically-determined Bound (Fig. 1): `const_term/`subfolder.
 	The proved property is execution time being linear wrt. the value of N argument.
-  - Runtime-determined Bound (Fig. 2): `rt_bound/` subfolder
+  - Runtime-determined Bound (Fig. 2): `rt_bound/` subfolder.
   - Blocking example (Fig. 3)
     We don't verify this exact example: it is a simplified version of Fig. 5, which is verified (see below).
-  - Delaying example (Fig. 4): `lf_counter/` subfolder
+  - Delaying example (Fig. 4): `lf_counter/` subfolder.
     The proved property is termination under any scheduler.
-  - Fork example (Fig. 5): `nondet/` folder
+  - Fork example (Fig. 5): `nondet/` subfolder.
 - Finite branching of OM (Lemma 2.1): `lawyer/lawyer/obligations/obligations_fin_branch.v`, lemma `om_trans_locale_approx`.
   Note that it restricts the domain of obligations mapping, instead of phases mapping. For well-formed states, these restrictions are equivalent.
 
