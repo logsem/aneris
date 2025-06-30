@@ -64,7 +64,6 @@ Section ConstantTimeTermination.
          { eapply @big_opS_proper'; [| reflexivity].
            Unshelve. 2: exact (fun _ => ∅).
            red. intros [[]]. set_solver. }
-         (* TODO: rename that lemma *)
          by rewrite multiplicity_big_DU_set_empty. }
     rewrite gmultiset_disj_union_right_id.
     rewrite /compose. rewrite mset_filter_True; [done| ].
@@ -100,7 +99,6 @@ Section ConstantTimeTermination.
     - by intros ? [].
   Qed.
 
-  (* TODO: generalize, move *)
   Lemma scalar_mul_singleton_ms_le m n ED C:
     ms_le deg_le ((m *: {[+ () +]}): @gmultiset unit ED C) (n *: {[+ () +]})
     <-> m <= n.

@@ -97,9 +97,19 @@ Section BoundedNat.
     simpl. lia.
   Qed.     
 
+  Lemma lvl_lt_equiv (l1 l2: bounded_nat):
+    strict bounded_nat_le l1 l2 <-> bn2nat l1 < bn2nat l2.
+  Proof using.
+    destruct l1, l2; simpl in *.
+    rewrite strict_spec_alt. simpl.
+    rewrite /bounded_nat_le. simpl. split.
+    - intros [? ?]. apply PeanoNat.Nat.le_neq. split; auto.
+      intros ->. destruct H0. f_equal. apply Nat.lt_pi.
+    - intros ?. split; [lia| ]. intros ?. inversion H0. subst. lia.
+  Qed.
+    
 End BoundedNat.
 
-(* TODO: use in eo_fin adequacy *)
 Definition bn_ith N (i: nat): bounded_nat (S N) :=
   match (le_lt_dec (S N) i) with
   | left GE => ith_bn (S N) 0 ltac:(lia)                                      

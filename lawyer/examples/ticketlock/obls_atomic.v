@@ -32,10 +32,10 @@ Section TotalTriples.
 
     Context
       {ST: Type}
-      (τ: Locale) (* TODO: should it be fixed? *)
+      (τ: Locale)
       (P: ST -> iProp Σ)
       (Q: ST -> ST -> iProp Σ) (** second ST is the previous state *)
-      (L: gset Level) (* TODO: only finite sets? *)
+      (L: gset Level)
       (d__m: Degree)
       (c: nat) (B: nat -> nat)
       (ε__m: coPset)
@@ -250,6 +250,7 @@ Section TotalTriples.
 
   End AtomicTriples.
 
+  (* TODO: simplify *)
   Global Instance TAU_acc_Proper {ST: Type}:
     Proper
       (eq ==> (eq ==> equiv) ==> (eq ==> eq ==> equiv) ==> equiv ==> 
@@ -257,7 +258,6 @@ Section TotalTriples.
        (eq ==> eq ==> equiv ) ==> equiv ==> ac_equiv ==> equiv ==>
        equiv) (TAU_acc (ST := ST)).
   Proof using.
-    (* TODO: simplify *)
     red.
     rewrite /respectful.
     intros ?? -> ?? EQUIV_P ?? EQUIV_Q ?? ->%leibniz_equiv_iff.

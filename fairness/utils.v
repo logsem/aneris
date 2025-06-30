@@ -57,7 +57,6 @@ Section bigop_utils.
     rewrite /gset_to_gmap big_opM_fmap //.
   Qed.
 
-  (* TODO: upstream *)
   Lemma big_opM_fmap_singletons
     {B: cmra} (m : gmap K A) (f: A -> B)
     (LE: LeibnizEquiv B):
@@ -76,7 +75,6 @@ Section bigop_utils.
     apply map_disjoint_singleton_l_2. rewrite lookup_fmap H0. done.
   Qed.
 
-  (* TODO: upstream *)
   Lemma big_opM_insert_delete':
   ∀ {M : ofe} {o : M → M → M} {Monoid0 : Monoid o}
     {B : Type} 
@@ -100,7 +98,6 @@ Proof.
   simpl. rewrite fmap_app. congruence.
 Qed.
 
-(* TODO: upstream *)
 Lemma concat_NoDup {A: Type} (ll : list (list A)):
   (forall i l, ll !! i = Some l -> NoDup l) ->
   (forall i j li lj, i ≠ j -> ll !! i = Some li -> ll !! j = Some lj -> li ## lj) ->

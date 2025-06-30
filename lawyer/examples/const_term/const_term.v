@@ -39,7 +39,7 @@ Section Decr.
   Definition cnt_frag `{DecrG Σ} (n: nat) :=
     own γ__decr (◯ (Excl' n)). 
 
-  (* TODO: these lemmas are used way too often, move them to library *)
+  (* TODO: such resources and lemmas are used often, move them to library *)
   Lemma cnt_agree `{DecrG Σ} n1 n2:
     cnt_auth n1-∗ cnt_frag n2 -∗ ⌜ n1 = n2 ⌝.
   Proof using.

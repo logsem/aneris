@@ -88,9 +88,6 @@ Section SSWP.
     rewrite /sswp. simpl.
     iIntros (σ) "Hσ".
     iMod fupd_mask_subseteq as "Hclose"; last iModIntro; first by set_solver.
-    (* TODO: was derivable by eauto before *)
-    assert (head_reducible (AllocN #n v) σ) as RED.
-    { eauto. }
     iSplit.
     { iPureIntro. destruct s; [|done]. apply head_prim_reducible. eauto. }
     iIntros (e2 σ2 efs Hstep). iIntros "!>!>!>".

@@ -471,7 +471,6 @@ Section MultisetOrder.
     X ⊆ ∅ <-> X = ∅.
   Proof using. clear. mss. Qed.  
 
-  (* TODO: refactor! *)
   Global Instance ms_le_AntiSymm: AntiSymm eq ms_le.
   Proof using PO.
     red. intros X Y.
@@ -604,7 +603,6 @@ Section MultisetOrder.
     intros [LE NE]%strict_spec_alt. apply ms_le_empty in LE. done.
   Qed. 
 
-  (* TODO: generalize, move *)
   Lemma multiset_difference_empty (X: gmultiset A):
     X ∖ ∅ = X. 
   Proof using. clear R PO. mss. Qed. 

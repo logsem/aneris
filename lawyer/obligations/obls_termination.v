@@ -1542,7 +1542,6 @@ Section Termination.
 End Termination.
 
 
-(* TODO: merge the sections *)
 Section TerminationFull.
   Context `{OP: ObligationsParams Degree Level Locale LIM_STEPS}.
   Let OM := ObligationsModel.

@@ -157,9 +157,7 @@ Section Nondet.
 
     pure_step_hl. MU_by_BOU.
     iApply (BOU_lower _ (20 + 2)).
-    { (* TODO: make abstract *)
-      etrans; [| apply LS_LB].
-      unfold nondet_LS_LB. lia. }
+    { try_solve_bounds. }
     iApply BOU_split. 
     iMod (first_BOU with "[$]") as "[CPS #EB]".
     { apply DEG12. }
@@ -348,8 +346,7 @@ Section Nondet.
       { apply LTfw. }
       { apply DEG01. }
       { apply DEG12. }
-      { (* TODO: abstract *)
-        etrans; [| apply LS_LB].
+      { try_solve_bounds. 
         rewrite /par.fuels_spawn /nondet_LS_LB. lia. }
       { apply NO_OBS_POST. }
       2: { iApply incr_loop_waiter_spec. iFrame "#∗". }

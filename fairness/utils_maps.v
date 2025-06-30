@@ -82,9 +82,38 @@ Section gmap.
     rewrite map_fold_insert_L; done.
   Qed.
     
+  Lemma gmap_filter_dom_id {A: Type} (m: gmap K A):
+    filter (fun '(k, _) => k ∈ dom m) m = m.
+  Proof.
+    rewrite map_filter_id; [done| ].
+    intros. by eapply elem_of_dom_2. 
+  Qed. 
+
+  Lemma gmap_empty_subseteq_equiv {A: Type} (m: gmap K A):
+    m ⊆ ∅ <-> m = ∅. 
+  Proof.
+    clear.
+    split; [| set_solver].
+    intros E. destruct (map_eq_dec_empty m); try set_solver.
+    apply map_choose in n as (?&?&?).
+    eapply lookup_weaken in E; set_solver. 
+  Qed. 
+  
+  Lemma gmap_filter_disj_id {A: Type} (m1 m2: gmap K A)
+    (DISJ: m1 ##ₘ m2):
+    m1 = filter (λ '(k, _), k ∈ dom m1) (m1 ∪ m2).
+  Proof.
+    rewrite map_filter_union; auto.
+    rewrite map_union_comm; [| by apply map_disjoint_filter]. 
+    rewrite gmap_filter_dom_id.
+    symmetry. apply map_subseteq_union. etransitivity; [| apply map_empty_subseteq].
+    apply gmap_empty_subseteq_equiv. 
+    eapply map_filter_empty_iff. apply map_Forall_lookup_2.
+    intros. intros [? ?]%elem_of_dom. eapply map_disjoint_spec; eauto.
+  Qed. 
+
 End gmap.
 
-(* TODO: upstream*)
 Lemma map_img_insert_L :
   ∀ {K : Type} {M : Type → Type} {H : FMap M} {H0 : ∀ A : Type, Lookup K A (M A)} 
     {H1 : ∀ A : Type, Empty (M A)} {H2 : ∀ A : Type, PartialAlter K A (M A)} 
@@ -118,7 +147,6 @@ Proof.
   apply elem_of_dom in Hin' as [??]. set_solver.
 Qed.
 
-(* TODO: generalize *)
 Lemma dom_filter_sub {K V: Type} `{Countable K} (m: gmap K V)
   (ks: gset K):
   dom (filter (λ '(k, _), k ∈ ks) m) ⊆ ks.
@@ -128,7 +156,6 @@ Proof.
   apply map_lookup_filter_Some in IN. apply IN.
 Qed. 
 
-(* TODO: generalize, upstream *)
 Lemma dom_filter_comm {K A: Type} `{Countable K}
   (P: K -> Prop) `{∀ x : K, Decision (P x)}:
   forall (m: gmap K A), dom (filter (fun '(k, _) => P k) m) = filter P (dom m).

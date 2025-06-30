@@ -28,8 +28,7 @@ Section Adequacy.
   Let l__acq := CL 1.
   Let l0 := CL 0.
 
-  (* TODO: make the lower bounds separate definitions in ticketlock module *)
-  Definition ClosedLim := max_list [2 + tl_exc; 2 * c__cl + 3 + tl_exc; MAX_EXC + 2].
+  Definition ClosedLim := max_list [tl_c__cr; tl_fl_B c__cl; MAX_EXC + 2].
 
   Instance ClosedObligationsPre: ObligationsParamsPre ClosedDegree ClosedLevel ClosedLim.
     esplit; try by apply _.

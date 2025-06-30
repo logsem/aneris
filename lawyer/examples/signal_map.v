@@ -214,8 +214,6 @@ Section SignalMap.
     iApply "SR'". by rewrite /ex_ith_sig SET'.
   Qed. 
 
-  (* TODO: use bupd in definition of OU *)
-  (* TODO: get rid of this version*)
   Lemma smap_create_ep' i B D π q τ d__h d__l
     (LT: i ∈ D)
     (DEG_LT: deg_lt d__l d__h):

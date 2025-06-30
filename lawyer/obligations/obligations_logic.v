@@ -170,7 +170,6 @@ Section ProgramLogic.
       eexists. split; eauto. by left.  
     Qed.
 
-    (* TODO: make this version the main one *)
     Lemma BOU_AMU__f' E ζ ζ' π R0 R' P:
       ⊢
         let om_fork_post := ∃ π1 π2,

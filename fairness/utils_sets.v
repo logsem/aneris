@@ -34,7 +34,7 @@ Section Powerset.
   Context `{Countable K}. 
   
   (** it's easier to perform recursion on lists *)
-  (* TODO: another name? *)
+
   Fixpoint powerlist (l: list K): gset (gset K) :=
     match l with
     | [] => {[ ∅ ]}

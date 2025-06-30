@@ -311,7 +311,6 @@ Section OblsAdequacy.
     iApply (no_obls_live_tids with "[$] [$] [$]"). done.
   Qed.
 
-  (* TODO: refactor these lemmas *)
   Lemma obls_match_impl Σ
     {HEAP: heapGpreS Σ EM}
     (extr : heap_lang_extrace) (e: expr) (σ: state)
@@ -351,7 +350,6 @@ Section OblsAdequacy.
     :
     extrace_fairly_terminating extr.
   Proof.
-    (* TODO: get rid of extra nat parameter of di *)    
     unshelve epose proof (simple_om_simulation_adequacy_terminate Σ NotStuck
                   _ _ _ _
                   _ _ Hexfirst) as FAIR_TERM; eauto.

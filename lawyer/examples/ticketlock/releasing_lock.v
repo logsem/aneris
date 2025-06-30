@@ -139,7 +139,6 @@ Section RFLFromFL.
     ⌜ rfl_fl_sb_fun u <= LIM_STEPS ⌝.
 
   (** need to assume at least one FL level to prove that client's obligations are "above" that of lock *)
-  (* TODO: can we change either TAU or levels order? *)
   Context (l__fl: Level).
   Hypothesis (L__FL: l__fl ∈ fl_acq_lvls FLP).
 
@@ -412,7 +411,6 @@ Section RFLFromFL.
       iFrame.
     Qed.
 
-    (* TODO: remove sgns_levels_gt' restriction; probably need to change obls def *)
     Lemma release_usage u (lk: val) τ s__o Ob π Q
       (ADD: s__o ∉ Ob)
       :

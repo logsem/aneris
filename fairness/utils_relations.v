@@ -10,7 +10,6 @@ Section RelationsUtils.
   Definition rel_compose (R1 R2 : relation A): relation A :=
     fun x y => exists z, R1 x z /\ R2 z y.
   
-  (* TODO: find existing *)
   Global Instance rel_subseteq: SubsetEq (relation A) :=
     fun R1 R2 => forall x y, R1 x y -> R2 x y. 
 

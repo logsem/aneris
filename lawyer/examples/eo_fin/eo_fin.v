@@ -133,18 +133,6 @@ Section EoFin.
     Definition eofin_inv l: iProp Σ :=
       inv (nroot .@ "eofin") (eofin_inv_inner l).
 
-    (* TODO: generalize, move *)
-    Lemma lvl_lt_equiv (l1 l2: EOLevel LIM):
-      lvl_lt l1 l2 <-> bn2nat _ l1 < bn2nat _ l2.
-    Proof using.
-      destruct l1, l2; simpl in *.
-      rewrite /lvl_lt. rewrite strict_spec_alt. simpl.
-      rewrite /bounded_nat_le. simpl. split.
-      - intros [? ?]. apply PeanoNat.Nat.le_neq. split; auto.
-        intros ->. destruct H1. f_equal. apply Nat.lt_pi.
-      - intros ?. split; [lia| ]. intros ?. inversion H1. subst. lia.
-    Qed.
-    
     Record ThreadResource (th_res: nat -> iProp Σ) (cond: nat -> bool) := {
         tr_agree (n1 n2: nat): threads_auth n1-∗ th_res n2 -∗
                               ⌜ n2 = if (cond n1) then n1 else (n1 + 1)%nat ⌝;
@@ -492,8 +480,6 @@ Section EoFin.
   Section MainProof.
     Context {PRE: EoFinPreG Σ}.
 
-    (* TODO: parametrize smap_repr_eo with the lower bound *)
-    (* TODO: try to use init_smap_repr for initialization *)
     Lemma alloc_inv l τ:
       obls τ ∅ -∗ l ↦ #0 -∗ 
         BOU ⊤ 2 (|={∅}=> ∃ (eoG: EoFinG Σ) (sigs: list SignalId),
@@ -684,7 +670,6 @@ Section EoFin.
         iApply sswp_MUf_wp. iIntros (τ'). iApply (MU__f_wand with "[-CP PH OB]").
         2: { iApply ohe_obls_AMU__f; [done| ].
              iApply BOU_AMU__f.
-             (* TODO: change BOU_burn_cp *)
              iApply BOU_intro. iFrame "PH OB".
              iSplitR "CP".
              2: { iExists _. iFrame. }
@@ -822,7 +807,6 @@ Section EoFin.
         iApply sswp_MUf_wp. iIntros (τ'). iApply (MU__f_wand with "[-CP PH OB]").
         2: { iApply ohe_obls_AMU__f; [done| ].
              iApply BOU_AMU__f.
-             (* TODO: change BOU_burn_cp*)
              iApply BOU_intro. iFrame "PH OB".
              iSplitR "CP".
              2: { iExists _. iFrame. }
@@ -849,7 +833,6 @@ Section EoFin.
         iApply sswp_MUf_wp. iIntros (τ''). iApply (MU__f_wand with "[-CP PH OB1]").
         2: { iApply ohe_obls_AMU__f; [done| ].
              iApply BOU_AMU__f. 
-             (* TODO: change BOU_burn_cp*)
              iApply BOU_intro. iFrame "PH OB1".
              iSplitR "CP".
              2: { iExists _. iFrame. }

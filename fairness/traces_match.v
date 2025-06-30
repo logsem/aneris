@@ -76,11 +76,6 @@ Section TracesMatch.
     | _, _ => True
     end.
 
-  Definition valid_lift_fairness
-             (φ: execution_trace Λ -> auxiliary_trace M -> Prop)
-             (extr : execution_trace Λ) (auxtr : auxiliary_trace M) :=
-    valid_state_evolution_fairness extr auxtr ∧ φ extr auxtr.
-
   (* TODO: this should already be covered by .._strong' lemma above *)
   Lemma valid_inf_system_trace_implies_traces_match
         (φ : execution_trace Λ -> auxiliary_trace M -> Prop)

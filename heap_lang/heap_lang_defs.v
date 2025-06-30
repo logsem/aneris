@@ -5,6 +5,7 @@ From heap_lang Require Export lang.
 From fairness Require Export execution_model.
 From heap_lang Require Import tactics notation.
 
+
 (* TODO: the missing fact of em_GS etc. being typeclasses
    hardens automatic resolution of their instances *)
 Class heapGpreS Σ `(EM: ExecutionModel heap_lang M) := HeapPreG {
@@ -12,6 +13,7 @@ Class heapGpreS Σ `(EM: ExecutionModel heap_lang M) := HeapPreG {
   heapGpreS_gen_heap :: gen_heapGpreS loc val Σ;
   heapGpreS_em :: em_preGS Σ;
 }.
+
 
 Class heapGS Σ `(EM: ExecutionModel heap_lang M) := HeapG {
   heap_inG :: heapGpreS Σ EM;
@@ -25,10 +27,11 @@ Class heapGS Σ `(EM: ExecutionModel heap_lang M) := HeapG {
 Definition heapΣ `(EM: ExecutionModel heap_lang M) : gFunctors :=
   #[ invΣ; gen_heapΣ loc val; em_Σ ].
 
+
 (* TODO: automatize *)
 Global Instance subG_heapPreG {Σ} `{EM: ExecutionModel heap_lang M}:
   subG (heapΣ EM) Σ → heapGpreS Σ EM.
-Proof.
+Proof. 
   intros. 
   enough (em_preGS Σ); [solve_inG| ].
   apply em_Σ_subG. solve_inG.
@@ -73,40 +76,7 @@ Section GeneralProperties.
       + rewrite /locale_of /= length_take_le //.
         assert (tid < length tp)%nat; last lia. by eapply lookup_lt_Some.
   Qed.
-
-  (* TODO: upstream? *)
-  Lemma gmap_filter_dom_id {K A: Type} `{Countable K} (m: gmap K A):
-    filter (fun '(k, _) => k ∈ dom m) m = m.
-  Proof.
-    rewrite map_filter_id; [done| ].
-    intros. by eapply elem_of_dom_2. 
-  Qed. 
   
-  (* TODO: upstream? *)
-  Lemma gmap_empty_subseteq_equiv {K A: Type} `{Countable K} (m: gmap K A):
-  m ⊆ ∅ <-> m = ∅. 
-  Proof.
-    clear.
-    split; [| set_solver].
-    intros E. destruct (map_eq_dec_empty m); try set_solver.
-    apply map_choose in n as (?&?&?).
-    eapply lookup_weaken in E; set_solver. 
-  Qed. 
-  
-  (* TODO: upstream? *)
-  Lemma gmap_filter_disj_id {K A: Type} `{Countable K} (m1 m2: gmap K A)
-    (DISJ: m1 ##ₘ m2):
-    m1 = filter (λ '(k, _), k ∈ dom m1) (m1 ∪ m2).
-  Proof.
-    rewrite map_filter_union; auto.
-    rewrite map_union_comm; [| by apply map_disjoint_filter]. 
-    rewrite gmap_filter_dom_id.
-    symmetry. apply map_subseteq_union. etransitivity; [| apply map_empty_subseteq].
-    apply gmap_empty_subseteq_equiv. 
-    eapply map_filter_empty_iff. apply map_Forall_lookup_2.
-    intros. intros [? ?]%elem_of_dom. eapply map_disjoint_spec; eauto.
-  Qed. 
-
 End GeneralProperties.
 
 (** Override the notations so that scopes and coercions work out *)

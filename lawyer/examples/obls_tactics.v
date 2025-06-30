@@ -53,7 +53,8 @@ Ltac split_cps cps_res n :=
 (** Tactics for solving goals related to SB *)
 Ltac try_solve_bounds :=
   (try iPureIntro);
-  try (match goal with | |- ?x < ?y => red end);
+  try (match goal with | |- ?x < ?y => red end);  (** for goals like x < LIM_STEPS *)
+  repeat apply Nat.le_add_le_sub_l; (** for goals like x <= LIM_STEPS - y - z *)
   match goal with
   | BOUND: ?rfl_fl_sb_fun ?u ≤ ?LIM_STEPS |- ?n <= ?LIM_STEPS =>
       etrans; [| apply BOUND];
@@ -72,4 +73,9 @@ Ltac use_list_head :=
 
 Ltac use_rfl_fl_sb :=
   use_list_head ||
-  match goal with | |- ?n ≤ ?F _ => rewrite /F; use_list_head end.
+  simpl;
+  match goal with
+  (** ?? some definitions of F require double "rewrite /F" or just a single unfold *)
+  | |- ?n ≤ ?F _ => (unfold F || rewrite /F); (use_list_head || lia)
+  | |- ?n ≤ ?F => (unfold F || rewrite /F); (use_list_head || lia)
+  end.

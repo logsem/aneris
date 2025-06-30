@@ -199,9 +199,12 @@ Section Ticketlock.
       λ: "lk", FAA (Fst "lk") #1
   .
 
+  Definition tl_c__cr := 2 + tl_exc.
+  Definition tl_fl_B c := 2 * c + 3 + tl_exc.
+
   Program Definition TLPre: FairLockPre := {|    
-    fl_c__cr := 2 + tl_exc;
-    fl_B := fun c => 2 * c + 3 + tl_exc;
+    fl_c__cr := tl_c__cr;
+    fl_B := tl_fl_B;
     fl_GpreS := TicketlockPreG;
     fl_GS := TicketlockG;
     fl_LK := fun Σ FLG HEAP => tl_LK;
@@ -516,10 +519,10 @@ Section Ticketlock.
     iMod (exchange_cp_upd _ _ _ _ 10 with "[$] EB") as "CPS'".
     { lia. }
     { etrans; [apply fl_degs_wl0 | apply fl_degs_lh0]. }
-    { simpl in LIM_STEPS'. lia. }
+    { try_solve_bounds. use_rfl_fl_sb. }
 
     iMod (increase_eb_upd with "EBd") as "#EBd'".
-    { simpl in LIM_STEPS'. lia. }
+    { try_solve_bounds. use_rfl_fl_sb. }
     iClear "EBd".
 
     iDestruct (ow_exact_lb with "[$]") as "[EXACT LB]".
@@ -579,7 +582,7 @@ Section Ticketlock.
     { Unshelve. 2: eapply (pair (pair _ _ ) _). 
       rewrite /acquire_at_post. simpl. rewrite /tl_LK.
       iFrame. iSplit; [| done]. iExists _. done. }
-    { simpl in LIM_STEPS'. lia. }
+    { try_solve_bounds. use_rfl_fl_sb. }
 
     BOU_burn_cp. iModIntro. iApply wp_value.
     iMod "COMM" as "Φ".
@@ -710,14 +713,14 @@ Section Ticketlock.
     iModIntro.
     
     iMod "WAIT" as "((RR & CP) & PH & OB & CLOS')".
-    { etrans; [| apply LIM_STEPS']. simpl. lia. }
+    { try_solve_bounds. use_rfl_fl_sb. }
     iSpecialize ("CLOS'" with "[OW' HELD']").
     { iFrame. iSplit; [| done]. iNext. iExists _. eauto. }
 
     iMod (exchange_cp_upd with "[$] EXC") as "CPS'". 
     { reflexivity. }
     { apply fl_degs_wl0. }
-    { simpl in LIM_STEPS'. lia. }
+    { try_solve_bounds. use_rfl_fl_sb. }
 
     iDestruct (cp_mul_split with "[CPS CPS']") as "CPS"; [iFrame| ]. simpl.
     iModIntro. iMod "CLOS'" as "TAUs". iModIntro. burn_cp_after_BOU.
@@ -818,8 +821,6 @@ Section Ticketlock.
 
     rewrite /acquire_at_pre. simpl.
 
-    (* TODO: why does this unfold BOU?
-       iMod "foo". *)
     iDestruct "PRE" as "[foo ->]".
     iApply (class_instances_later.elim_modal_timeless false). 
     2: done.
@@ -924,7 +925,7 @@ Section Ticketlock.
       do 2 iExists _. iSplitR; [by eauto| ]. iFrame.
       Set Printing Coercions.
       by rewrite Nat2Z.inj_add. }
-    { etrans; [| apply LIM_STEPS']. simpl. lia. }
+    { try_solve_bounds. use_rfl_fl_sb. }
    
     iApply BOU_proper.
     1, 2: reflexivity.
@@ -938,7 +939,7 @@ Section Ticketlock.
 
     iMod (tau_map_interp_update with "[$] [$] [OW] [$]") as "UPD".
     { by rewrite Nat2Z.inj_add. }
-    { simpl in LIM_STEPS'. lia. }
+    { try_solve_bounds. use_rfl_fl_sb. }
     iDestruct "UPD" as "(HELD & OW & RTOK & TMI)". 
     iModIntro. iIntros "PH".
     rewrite -{1}(Qp.div_2 q). rewrite Qp.add_sub. simpl. iSpecialize ("Φ" with "[$]").
@@ -987,13 +988,15 @@ Section Ticketlock.
     iMod (exchange_cp_upd with "[$] [$]") as "CPSh".
     { reflexivity. }
     { apply fl_degs_he. }
-    { simpl in LIM_STEPS'. lia. } 
+    { try_solve_bounds. simpl.
+      rewrite /tl_fl_B. rewrite /tl_exc. lia. }
     iDestruct (cp_mul_take with "CPSh") as "[CPSh CPh]".
     iMod (exchange_cp_upd _ _ d__w with "[CPh] [$]") as "CPS".
     { reflexivity. }
     { do 2 (etrans; eauto). }
     { done. }
-    { simpl in LIM_STEPS'. lia. }
+    { try_solve_bounds. simpl. 
+      rewrite /tl_fl_B. rewrite /tl_exc. lia. }
     BOU_burn_cp.
     replace 19 with (10 + 9) at 3 by lia.
     iDestruct (cp_mul_split with "CPS") as "[CPS1 CPS]".

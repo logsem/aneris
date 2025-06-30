@@ -220,7 +220,6 @@ Section ObligationsRepr.
       inversion H0. subst. rewrite H. set_solver. 
     Qed. 
 
-    (* TODO: unify sigs_msi_.. proofs *)
     Lemma sigs_msi_in δ sid l ov:
       ⊢ obls_msi δ -∗ sgn sid l ov -∗
         ⌜ exists v, ps_sigs δ !! sid = Some (l, v) ⌝.
@@ -372,7 +371,6 @@ Section ObligationsRepr.
       rewrite -pure_forall_2. setoid_rewrite <- bi.pure_impl_2. 
       iIntros (l IN).
 
-      (* TODO: lemma? *)
       apply extract_Somes_gset_spec in IN. simpl in IN.
       apply elem_of_map in IN. destruct IN as [sid [EQ IN]].
       destruct (ps_sigs δ !! sid) as [[l' b]| ] eqn:SID; [| done].
@@ -646,7 +644,6 @@ Section ObligationsRepr.
       eapply not_elem_of_weaken; [apply next_sig_id_fresh| ]. set_solver. 
     Qed.
 
-    (* TODO: do we need to generalize to "optional v" instead? *)
     Lemma OU_set_sig ζ R sid l v
       (IN: sid ∈ R):
       ⊢ obls ζ R -∗ sgn sid l (Some v) -∗
@@ -743,7 +740,6 @@ Section ObligationsRepr.
       iApply ("IH" with "[] [$]"). iPureIntro. lia. 
     Qed.
 
-    (* TODO: ? use duplicable "signal exists" resource *)
     Lemma create_ep_upd ζ π q d d' sid l ov (DEG: deg_lt d' d)
       :
       ⊢ cp π d -∗ sgn sid l ov -∗ th_phase_frag ζ π q -∗ 
@@ -861,7 +857,6 @@ Section ObligationsRepr.
       iApply OU_rep_frame_l. iFrame. iApply ("IH" with "[$] [$] [$]").
     Qed.
 
-    (* TODO: ? refactor these proofs about burn_cp *)
     Lemma burn_cp_upd_impl δ ζ π deg
       (PH_MAX: exists π__max, ps_phases δ !! ζ = Some π__max /\ phase_le π π__max)
       :
@@ -979,7 +974,6 @@ Section ObligationsRepr.
       iApply (exc_lb_le with "[$]"). lia.
     Qed.
 
-    (* TODO: ? refactor these proofs about fork step *)
     Lemma fork_locale_upd_impl δ ζ ζ' π R0 R'
       (FRESH: ζ' ∉ dom $ ps_phases δ)
       (DOM_EQ: dom_phases_obls δ)

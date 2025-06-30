@@ -2,7 +2,7 @@ Require Import ClassicalFacts.
 Require Import Lia.
 From stdpp Require Import base option.
 
-(* TODO: find existing? *)
+
 Section LogicHelpers.
 
   Lemma ex2_comm {A B: Type} (P: A -> B -> Prop):

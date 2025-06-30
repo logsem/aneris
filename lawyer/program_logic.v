@@ -193,7 +193,6 @@ Section ProgramLogic.
       iExists _, _. iFrame. by iApply "HPQ".
     Qed.
 
-    (* TODO: refactor *)
     Lemma MU__f_wand E ζ ζ' (P Q : iProp Σ) :
       (P -∗ Q) -∗ MU__f E ζ ζ' P -∗ MU__f E ζ ζ' Q.
     Proof.

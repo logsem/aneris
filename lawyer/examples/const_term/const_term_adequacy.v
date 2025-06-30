@@ -58,7 +58,7 @@ Section ConstTermAdequacy.
       (eb := 0); eauto.
     1-5: by apply _.
     2: { intros (mtr & MATCH & OM_WF & FIRST).
-         (* TODO: extract lemma *)
+
          enough (trace_len_le mtr (bound + 1)).
          { destruct H as (len & LEN & LE). eexists. split; eauto.
            destruct (trace_has_len extr) as [len' LEN'].
