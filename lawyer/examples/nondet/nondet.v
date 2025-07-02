@@ -33,14 +33,20 @@ Section Nondet.
         FAA "c" #1 ;;
         "loop" "c" "f"
       ).
+
+  Definition stop_and_read: val :=
+    λ: "c" "f",
+      "f" <- #true ;;
+      !"c"
+  .
+    
   
   Definition nondet: val :=
     λ: <>,
       let: "c" := ref #(0%nat) in
       let: "f" := ref #false in
       Fork (incr_loop "c" "f") ;;
-      "f" <- #true ;;
-      !"c"
+      stop_and_read "c" "f"
   .
 
   Context (l__f: Level).
@@ -175,6 +181,47 @@ Section Nondet.
     iModIntro. do 2 iExists _. rewrite union_empty_l_L. iFrame "#∗".
   Qed.
 
+  Lemma stop_and_read_spec `{NondetG Σ} τ π s__f flag cnt:
+    {{{ exc_lb 29 ∗ nondet_inv cnt flag s__f ∗ sgn s__f l__f None ∗ ep s__f π d0 ∗
+        obls τ {[s__f]} ∗ tok ∗ cp_mul π d0 9 ∗ th_phase_frag τ π 1 }}}
+      stop_and_read #cnt #flag @τ
+    {{{ vn, RET vn; ∃ (n : nat), ⌜vn = #n⌝ ∗ exc_lb (K * n) ∗ 
+                                 obls τ ∅ ∗ th_phase_eq τ π }}}.
+  Proof.
+    iIntros (Φ) "(#EB & #INV & #SGN0 & #EP & OB1 & TOK & CPS & PH) POST".
+    rewrite /stop_and_read. pure_steps. 
+
+    wp_bind (_ <- _)%E.
+    iApply wp_atomic.
+    iInv "INV" as "inv" "CLOS". iModIntro.
+    rewrite {1}/nondet_inv_inner. iDestruct "inv" as ">(%c & %f & CNT & FLAG & SGN & TOK' & EXc)".
+    iApply sswp_MU_wp; [done| ]. iApply (wp_store with "[$]"). iIntros "!> FLAG".
+    MU_by_BOU.
+    iMod (OU_set_sig with "OB1 [$]") as "[SGN OB]".
+    { set_solver. }
+    { unfold nondet_LS_LB in LS_LB. lia. }
+    BOU_burn_cp. iApply wp_value.
+    iMod ("CLOS" with "[CNT FLAG SGN TOK TOK' EXc]") as "_".
+    { iExists _, true. iNext. iFrame. done. }
+    iModIntro. 
+    
+    wp_bind (Rec _ _ _)%E. pure_steps.
+    wp_bind (! _)%E. 
+    clear c f. 
+    iApply wp_atomic.
+    iInv "INV" as "inv" "CLOS". iModIntro.
+    rewrite {1}/nondet_inv_inner. iDestruct "inv" as ">(%c & %f & CNT & FLAG & SGN & TOK & #EXc)".
+    iApply sswp_MU_wp; [done| ]. iApply (wp_load with "CNT"). iIntros "!> CNT".
+    MU_by_burn_cp. iApply wp_value. 
+    iMod ("CLOS" with "[CNT FLAG SGN TOK]") as "_".
+    { do 2 iExists _. iFrame "#∗". }
+    iModIntro.
+
+    iApply "POST". iExists _. iFrame "#∗". iSplit; [done| ].
+    iApply (obls_proper with "[$]"). set_solver.
+  Qed.
+
+
   Theorem nondet_spec `{NondetPreG Σ} τ π:
     {{{ th_phase_eq τ π ∗ cp_mul π d1 2 ∗ obls τ ∅ }}}
       nondet #() @ τ
@@ -231,37 +278,14 @@ Section Nondet.
       iIntros "!> % OB". by iApply NO_OBS_POST. }
 
     erewrite cp_mul_weaken; [| apply PH_LT1| reflexivity]. iRename "PH1" into "PH".
-    wp_bind (Rec _ _ _)%E. pure_steps.
-
-    wp_bind (_ <- _)%E.
-    iApply wp_atomic.
-    iInv "INV" as "inv" "CLOS". iModIntro.
-    rewrite {1}/nondet_inv_inner. iDestruct "inv" as ">(%c & %f & CNT & FLAG & SGN & TOK' & EXc)".
-    iApply sswp_MU_wp; [done| ]. iApply (wp_store with "[$]"). iIntros "!> FLAG".
-    MU_by_BOU.
-    iMod (OU_set_sig with "OB1 [$]") as "[SGN OB]".
-    { set_solver. }
-    { unfold nondet_LS_LB in LS_LB. lia. }
-    BOU_burn_cp. iApply wp_value.
-    iMod ("CLOS" with "[CNT FLAG SGN TOK TOK' EXc]") as "_".
-    { iExists _, true. iNext. iFrame. done. }
-    iModIntro. 
+    wp_bind (Rec _ _ _)%E. do 3 pure_step_cases.
     
-    wp_bind (Rec _ _ _)%E. pure_steps.
-    wp_bind (! _)%E. 
-    clear c f. 
-    iApply wp_atomic.
-    iInv "INV" as "inv" "CLOS". iModIntro.
-    rewrite {1}/nondet_inv_inner. iDestruct "inv" as ">(%c & %f & CNT & FLAG & SGN & TOK & #EXc)".
-    iApply sswp_MU_wp; [done| ]. iApply (wp_load with "CNT"). iIntros "!> CNT".
-    MU_by_burn_cp. iApply wp_value. 
-    iMod ("CLOS" with "[CNT FLAG SGN TOK]") as "_".
-    { do 2 iExists _. iFrame "#∗". }
-    iModIntro.
-
-    iApply "POST". do 2 iExists _. iFrame "#∗". iSplit; [done| ].
-    iSplit; [| iPureIntro; by apply PH_LT1]. 
-    iApply (obls_proper with "[$]"). set_solver.
+    erewrite ep_weaken; [| apply PH_LT1].
+    iApply (stop_and_read_spec with "[-POST]").
+    { iFrame "#∗". iApply (obls_proper with "[$]"). set_solver. }
+    iNext. iIntros (?) "(%&?&?&?&?)".
+    iApply "POST". do 2 iExists _. iFrame.
+    iPureIntro. apply PH_LT1.
   Qed.
   
 End Nondet.
