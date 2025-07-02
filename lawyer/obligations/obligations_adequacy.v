@@ -47,21 +47,22 @@ Section OblsAdequacy.
     apply _.
   Qed.
     
-  Theorem om_simulation_adequacy_model_trace Σ
+  Theorem om_simulation_adequacy_model_trace_multiple Σ
         `{hPre: !heapGpreS Σ EM} (s: stuckness)
-        (e1: expr) σ1 (s1: mstate M) p
-        (INIT: em_is_init_st ([e1], σ1) s1 (ExecutionModel := EM))
+        (es: list expr) σ1 (s1: mstate M) p
+        (INIT: em_is_init_st (es, σ1) s1 (ExecutionModel := EM))
         (extr : heap_lang_extrace)
         (Hvex : extrace_valid extr)
-        (Hexfirst : trfirst extr = ([e1], σ1))    :
-    wp_premise Σ s e1 σ1 s1 obls_sim_rel (p: @em_init_param _ _ EM) ->
+        (Hexfirst : trfirst extr = (es, σ1))
+        (LEN: length es ≥ 1):
+    wp_premise_multiple Σ s es σ1 s1 obls_sim_rel (p: @em_init_param _ _ EM) ->
     ∃ (omtr: trace (mstate M) (mlabel M)),
       obls_om_traces_match extr omtr ∧
       trfirst omtr = s1.
   Proof using FIN_LVL FIN_DEG.
     intros PREM.
 
-    unshelve epose proof (@strong_simulation_adequacy_traces _ _ _ hPre s e1 σ1
+    unshelve epose proof (@strong_simulation_adequacy_traces_multiple _ _ _ hPre s es σ1
                 s1
                 obls_sim_rel
                 p
@@ -84,8 +85,27 @@ Section OblsAdequacy.
       constructor. apply STEP. }
     { simpl. intros ?? SIM. apply SIM. }
     { simpl. intros ?? SIM. apply SIM. }
+    { done. }
     { apply obls_sim_rel_FB. }
-    all: done.
+    { done. }
+    eapply SIM; eauto. 
+  Qed.
+
+  Theorem om_simulation_adequacy_model_trace Σ
+        `{hPre: !heapGpreS Σ EM} (s: stuckness)
+        (e1: expr) σ1 (s1: mstate M) p
+        (INIT: em_is_init_st ([e1], σ1) s1 (ExecutionModel := EM))
+        (extr : heap_lang_extrace)
+        (Hvex : extrace_valid extr)
+        (Hexfirst : trfirst extr = ([e1], σ1)):
+    wp_premise Σ s e1 σ1 s1 obls_sim_rel (p: @em_init_param _ _ EM) ->
+    ∃ (omtr: trace (mstate M) (mlabel M)),
+      obls_om_traces_match extr omtr ∧
+      trfirst omtr = s1.
+  Proof using FIN_LVL FIN_DEG.
+    intros. eapply om_simulation_adequacy_model_trace_multiple; last first.
+    { by eapply wp_premise_single. }
+    all: eauto. 
   Qed.
 
   Hypotheses (WF_LVL: well_founded (strict lvl_le)) (WF_DEG: well_founded (strict deg_le)).
@@ -202,13 +222,34 @@ Section OblsAdequacy.
   Let ASEM := ObligationsASEM.
   Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls τ ∅ (oGS := aGS)).
 
-  Lemma obls_init_wf e1 σ1 s1
-    (INIT: obls_is_init_st ([e1], σ1) s1):
+  Lemma obls_init_wf es σ1 s1
+    (INIT: obls_is_init_st (es, σ1) s1):
     om_st_wf s1.
   Proof using.
     clear -INIT. 
     red in INIT. set_solver.
   Qed. 
+
+  Theorem simple_om_simulation_adequacy_terminate_multiple Σ
+        `{hPre: !heapGpreS Σ EM} (s: stuckness)
+        es σ1 (s1: mstate M) p
+        (INIT: em_is_init_st (es, σ1) s1 (ExecutionModel := EM))
+        (extr : heap_lang_extrace)
+        (Hexfirst : trfirst extr = (es, σ1))
+        (LEN: length es ≥ 1):
+    wp_premise_multiple Σ s es σ1 s1 obls_sim_rel (p: @em_init_param _ _ EM) ->
+    extrace_fairly_terminating extr.
+  Proof.
+    rewrite /extrace_fairly_terminating.
+    intros Hwp VALID FAIR.
+
+    destruct (om_simulation_adequacy_model_trace_multiple
+                Σ _ es _ s1 _ INIT _ VALID Hexfirst LEN Hwp) as (omtr&MATCH&OM0).
+
+    eapply obls_matching_traces_termination; eauto.
+    rewrite OM0. simpl in INIT.
+    eapply obls_init_wf; eauto. 
+  Qed.
 
   Theorem simple_om_simulation_adequacy_terminate Σ
         `{hPre: !heapGpreS Σ EM} (s: stuckness)
@@ -219,27 +260,47 @@ Section OblsAdequacy.
     wp_premise Σ s e1 σ1 s1 obls_sim_rel (p: @em_init_param _ _ EM) ->
     extrace_fairly_terminating extr.
   Proof.
-    rewrite /extrace_fairly_terminating.
-    intros Hwp VALID FAIR.
-
-    destruct (om_simulation_adequacy_model_trace
-                Σ _ e1 _ s1 _ INIT _ VALID Hexfirst Hwp) as (omtr&MATCH&OM0).
-
-    eapply obls_matching_traces_termination; eauto.
-    rewrite OM0. simpl in INIT.
-    eapply obls_init_wf; eauto. 
+    intros. eapply simple_om_simulation_adequacy_terminate_multiple; last first.
+    { by eapply wp_premise_single. }
+    all: by eauto. 
   Qed.
 
-  Lemma om_live_tids_init e σ ds eb:
-    om_live_tids id locale_enabled ([e], σ) (init_om_state ([e], σ) ds eb).
+  Lemma om_live_tids_init es σ ds eb:
+    om_live_tids id locale_enabled (es, σ) (init_om_state (es, σ) ds eb).
   Proof using.
+    clear. 
     red. intros ?.
     rewrite /has_obls. simpl.
-    rewrite locales_of_cfg_simpl. simpl. rewrite union_empty_r_L.
-    rewrite gset_to_gmap_singleton.
-    destruct (decide (ζ = 0)) as [-> | ?].
-    2: { simpl. simpl. rewrite lookup_singleton_ne; [| done]. done. }
-    by rewrite lookup_singleton.
+    rewrite locales_of_cfg_simpl. simpl.
+
+    destruct lookup eqn:IN; simpl; try done.
+    apply lookup_gset_to_gmap_Some in IN. set_solver. 
+  Qed.
+
+  Lemma no_obls_live_tids_multiple {Σ: gFunctors} {Hinv: @heapGS Σ M EM}
+    (oGS := @heap_fairnessGS Σ _ _ Hinv)
+    (tp : list expr) (σ : state) (δ' : ProgressState)
+    (TH_OWN : threads_own_obls (tp, σ) δ'):
+    gen_heap_interp (heap σ) -∗ obls_msi δ' (oGS := oGS) -∗
+      (let Φs := map (fun τ _ => @em_thread_post heap_lang M EM Σ (@heap_fairnessGS Σ M EM _) τ) (seq 0 (length tp)) in
+      posts_of tp Φs) -∗
+      ⌜om_live_tids id locale_enabled (tp, σ) δ'⌝.
+  Proof using.
+    iIntros "HEAP MSI POSTS".
+    rewrite /om_live_tids. iIntros (τ OBτ).
+    rewrite /locale_enabled.
+    red in OBτ.
+    destruct (ps_obls δ' !! τ) as [V| ] eqn:OB_; [| done].
+    simpl in OBτ.
+    red in TH_OWN. rewrite set_eq in TH_OWN. specialize (TH_OWN τ).
+    apply proj2 in TH_OWN. specialize (TH_OWN ltac:(eapply elem_of_dom; eauto)).
+    apply locales_of_cfg_Some in TH_OWN as [e Ee]. simpl in Ee.
+    iExists _. iSplit; [done| ].
+    destruct (language.to_val e) eqn:VALe; [| done].
+    apply from_locale_lookup in Ee.
+    iDestruct (posts_of_empty_mapping_multiple with "[POSTS]") as "foo"; eauto.
+    iDestruct (obls_msi_exact with "MSI foo") as %OB.
+    rewrite OB_ in OB. congruence.
   Qed.
 
   Lemma no_obls_live_tids {Σ: gFunctors} {Hinv: @heapGS Σ M EM}
@@ -265,6 +326,90 @@ Section OblsAdequacy.
     iDestruct (posts_of_empty_mapping with "[POSTS]") as "foo"; eauto.
     iDestruct (obls_msi_exact with "MSI foo") as %OB.
     rewrite OB_ in OB. congruence.
+  Qed.
+
+  (* TODO: move *)
+  Lemma prefixes_simpl {A: Type} (es tp: list expr) (P: nat -> gset SignalId -> A): 
+    ((λ '(tnew, e) (_ : val), P (locale_of tnew e) ∅) <$> prefixes_from es (drop (length es) tp)) = (map (fun i _ => P i ∅) (seq (length es) (length tp - length es))). 
+  Proof using.
+    destruct (decide (length es < length tp)).
+    2: { rewrite skipn_all2; [| lia].
+         replace (length tp - length es) with 0.
+         { done. }
+         simpl in n. lia. }
+
+    remember (drop (length es) tp) as tp'.
+    replace (length tp - length es) with (length tp').
+    2: { subst. rewrite length_drop. lia. }
+    clear Heqtp'. simpl.
+
+    clear l. revert es. 
+
+    induction tp'.
+    { simpl. done. }
+
+    intros. simpl.
+    f_equal.
+    pose proof (IHtp' (es ++ [a])).
+    replace (S (length es)) with (length (es ++ [a])).
+    2: { simpl. rewrite length_app. simpl. lia. } 
+    rewrite -H2. simpl. done.
+  Qed.    
+
+  (* TODO: generalize? *)
+  Lemma om_sim_RAH_multiple
+          {Σ: gFunctors} {Hinv: @heapGS Σ M EM}
+    σ1 es ds eb:
+  ⊢
+  rel_always_holds  NotStuck
+    (* (λ _ : language.val heap_lang, *)
+    (*    @em_thread_post heap_lang _ _ Σ *)
+    (*      (@heap_fairnessGS Σ *)
+    (*         _ *)
+    (*         _ Hinv) 0) *)
+    (map (fun i _ => em_thread_post i%nat (em_GS0 := (@heap_fairnessGS Σ
+            _
+            _ Hinv))) (seq 0 (length es)))
+    (@obls_sim_rel)
+    (es, σ1)
+    (@init_om_state _ _ _ LIM_STEPS OP (es, σ1) ds eb).
+  Proof using.
+    rewrite /rel_always_holds.
+    
+    iIntros (extr omtr [tp σ] VALID EX0 OM0 EX_FIN CONT_SIM).
+    simpl. iIntros (NSTUCK FOOBAR).
+    iIntros "(%VALID_STEP & HEAP & MSI & [%TH_OWN %OBLS]) POSTS".
+    
+    iApply fupd_mask_intro_discard; [done| ].
+    
+    clear CONT_SIM.
+
+    destruct extr.
+    { iPureIntro.
+      simpl in VALID_STEP.
+      inversion VALID. subst.
+      red in EX0, OM0. simpl in EX0, OM0. subst.
+      rewrite /obls_sim_rel. rewrite /valid_state_evolution_fairness /om_live_tids.
+      split; [done| ]. simpl. red.
+      apply om_live_tids_init. }
+
+    (* Unset Printing Notations. *)
+
+    rewrite prefixes_simpl.
+    rewrite -map_app. rewrite -seq_app.
+    rewrite -Nat.le_add_sub. 
+ 
+    simpl in VALID_STEP. inversion VALID. subst. simpl in *.
+    red in EX_FIN. simpl in EX_FIN. subst. simpl.
+    rewrite /obls_sim_rel. iSplit.
+    { simpl. iPureIntro. red.
+      destruct ℓ. done. }
+    simpl. rewrite /obls_st_rel.
+
+    iApply (no_obls_live_tids_multiple with "[$] [$]"); try done.
+    eapply valid_exec_length.
+    { eapply valid_system_trace_valid_exec_trace; eauto. }
+    all: eauto.
   Qed.
 
   (* TODO: generalize? *)
@@ -311,6 +456,36 @@ Section OblsAdequacy.
     iApply (no_obls_live_tids with "[$] [$] [$]"). done.
   Qed.
 
+  Lemma obls_match_impl_multiple Σ
+    {HEAP: heapGpreS Σ EM}
+    (extr : heap_lang_extrace) (es: list expr) (σ: state)
+    (cps_degs: gmultiset Degree) (eb: nat)
+    (s1 := init_om_state (trfirst extr) cps_degs eb (OP := OP))
+    (Hexfirst : trfirst extr = (es, σ))
+    (LEN: length es ≥ 1)
+    (WPe: forall (HEAP: heapGS Σ EM), ⊢ (([∗ map] l↦v ∈ heap σ, l ↦ v) ∗
+                                     (@em_init_resource heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) s1 tt))%I -∗
+            let Φs := map (fun τ _ => @em_thread_post heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) τ) (seq 0 (length es)) in
+              wptp NotStuck es Φs)
+    (VALID: extrace_valid extr)
+    :
+    ∃ omtr, exec_OM_traces_match extr omtr ∧ om_tr_wf omtr /\ trfirst omtr = s1. 
+  Proof.
+    forward eapply om_simulation_adequacy_model_trace_multiple; eauto.
+    - simpl. subst s1. rewrite Hexfirst. apply init_om_state_init_multiple. 
+    - red. intros ?. iStartProof. iIntros "[HEAP INIT] !>".
+      iSplitL.
+      + simpl. simpl in WPe. iPoseProof (WPe Hinv with "[HEAP INIT]") as "foo".
+        2: by iFrame. 
+        iFrame "HEAP". subst s1. by rewrite Hexfirst.
+      + subst s1. iApply om_sim_RAH_multiple. 
+    - intros (?&?&?).
+      subst s1. rewrite Hexfirst -H3. 
+      eapply obls_matching_traces_OM; eauto.
+      rewrite H3. eapply obls_init_wf.
+      apply init_om_state_init_multiple. 
+  Qed.
+
   Lemma obls_match_impl Σ
     {HEAP: heapGpreS Σ EM}
     (extr : heap_lang_extrace) (e: expr) (σ: state)
@@ -324,24 +499,43 @@ Section OblsAdequacy.
     :
     ∃ omtr, exec_OM_traces_match extr omtr ∧ om_tr_wf omtr /\ trfirst omtr = s1. 
   Proof.
-    forward eapply om_simulation_adequacy_model_trace; eauto.
-    - simpl. subst s1. rewrite Hexfirst. apply init_om_state_init. 
-    - red. intros ?. iStartProof. iIntros "[HEAP INIT] !>".
-      iSplitL.
-      + iApply WPe. subst s1.
-        rewrite -Hexfirst. iFrame.
-      + subst s1. iApply om_sim_RAH. 
-    - intros (?&?&?).
-      subst s1. rewrite Hexfirst -H3. 
-      eapply obls_matching_traces_OM; eauto.
-      rewrite H3. eapply obls_init_wf.
-      apply init_om_state_init. 
+    eapply obls_match_impl_multiple; eauto.
+    iIntros "**".
+    simpl. iSplit; [| done].
+    by iApply WPe.
+  Qed.
+
+  Lemma obls_terminates_impl_multiple Σ
+    {HEAP: heapGpreS Σ EM}
+    (extr : heap_lang_extrace) (es: list expr) (σ: state)
+    (cps_degs: gmultiset Degree) (eb: nat)    
+    (s1 := init_om_state (trfirst extr) cps_degs eb (OP := OP))
+    (Hexfirst : trfirst extr = (es, σ))
+    (LEN: length es >= 1)
+    (WPe: forall (HEAP: heapGS Σ EM), ⊢ (([∗ map] l↦v ∈ heap σ, l ↦ v) ∗
+                                     (@em_init_resource heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) s1 tt))%I -∗
+            let Φs := map (fun τ _ => @em_thread_post heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) τ) (seq 0 (length es)) in
+              wptp NotStuck es Φs)
+    :
+    extrace_fairly_terminating extr.
+  Proof.
+    unshelve epose proof (simple_om_simulation_adequacy_terminate_multiple Σ NotStuck
+                  _ _ _ _
+                  _ _ Hexfirst) as FAIR_TERM; eauto.
+    { exact tt. }
+    { simpl. subst s1. rewrite Hexfirst. apply init_om_state_init_multiple. }
+    
+    apply FAIR_TERM; auto. 
+    red. intros ?. iStartProof. iIntros "[HEAP INIT] !>".
+    iSplitL.
+    - iApply WPe. iFrame. 
+    - subst s1. rewrite Hexfirst. iApply om_sim_RAH_multiple.
   Qed.
 
   Lemma obls_terminates_impl Σ
     {HEAP: heapGpreS Σ EM}
     (extr : heap_lang_extrace) (e: expr) (σ: state)
-    (cps_degs: gmultiset Degree) (eb: nat)
+    (cps_degs: gmultiset Degree) (eb: nat)    
     (s1 := init_om_state (trfirst extr) cps_degs eb (OP := OP))
     (Hexfirst : trfirst extr = ([e], σ))
     (WPe: forall (HEAP: heapGS Σ EM), ⊢ (([∗ map] l↦v ∈ heap σ, l ↦ v) ∗
@@ -350,17 +544,9 @@ Section OblsAdequacy.
     :
     extrace_fairly_terminating extr.
   Proof.
-    unshelve epose proof (simple_om_simulation_adequacy_terminate Σ NotStuck
-                  _ _ _ _
-                  _ _ Hexfirst) as FAIR_TERM; eauto.
-    { exact tt. }
-    { simpl. subst s1. rewrite Hexfirst. apply init_om_state_init. }
-    
-    apply FAIR_TERM.
-    red. intros ?. iStartProof. iIntros "[HEAP INIT] !>".
-    iSplitL.
-    - iApply WPe. iFrame. 
-    - subst s1. rewrite Hexfirst. iApply om_sim_RAH.
+    eapply obls_terminates_impl_multiple; eauto.
+    iIntros "**". simpl. iSplit; [| done].
+    by iApply WPe.
   Qed.
 
   Local Existing Instance OP. 

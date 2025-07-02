@@ -51,6 +51,34 @@ Section GeneralProperties.
   Context `{HGS: @heapGS Σ _ EM}.
   Let eGS := heap_fairnessGS. 
 
+  Lemma posts_of_empty_mapping_multiple  (es e: expr) v (tid : nat) (tp : list expr):
+    tp !! tid = Some e ->
+    to_val e = Some v ->
+    (* cur_posts tp e1 (fun _ => em_thread_post 0%nat (em_GS0 := eGS)) -∗ *)
+    (let Φs := map (fun τ _ => @em_thread_post heap_lang M EM Σ (@heap_fairnessGS Σ M EM _) τ) (seq 0 (length tp)) in
+      posts_of tp Φs) -∗
+    em_thread_post tid (em_GS0 := eGS).
+  Proof.
+    intros Hsome Hval. simpl.
+    
+    rewrite (big_sepL_elem_of (λ x, x.2 x.1) _ (v, (fun _ => em_thread_post tid)) _) //.
+    { eauto. } 
+    apply elem_of_list_omap.
+    exists (e, (fun _ => em_thread_post tid (em_GS0 := eGS))); split; last first.
+    - simpl. apply fmap_Some. exists v. split; done.
+    - destruct tp as [|e1' tp]; first set_solver. simpl.
+      apply elem_of_cons.
+      destruct tid as [|tid]; [left|right]; first by simpl in Hsome; simplify_eq.
+      apply elem_of_lookup_zip_with. eexists tid, e, _. do 2 split =>//.
+      rewrite /locale_of /=.
+      rewrite list_lookup_fmap fmap_Some. simpl in Hsome.
+      exists (S tid). split; auto.
+      rewrite lookup_seq_lt.
+      { set_solver. }
+      eapply lookup_lt_is_Some; eauto. 
+  Qed.
+
+  (* TODO: derive from previous? *)
   Lemma posts_of_empty_mapping  (e1 e: expr) v (tid : nat) (tp : list expr):
     tp !! tid = Some e ->
     to_val e = Some v ->

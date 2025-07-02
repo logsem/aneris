@@ -70,9 +70,11 @@ Section ObligationsEM.
   .
 
   Definition obls_is_init_st (σ: cfg Λ) (δ: mstate OM) :=
-    exists τ0,
-      let R := {[ τ0 ]} in
-      locales_of_cfg σ = R /\ dom $ ps_obls δ = R /\ 
+    (* exists τ0, *)
+    (*   let R := {[ τ0 ]} in *)
+    (*   locales_of_cfg σ = R /\ dom $ ps_obls δ = R /\  *)
+    (*   om_st_wf δ. *)
+      locales_of_cfg σ = dom (ps_obls δ) /\
       om_st_wf δ.
 
   Lemma obls_resources_init Σ {PRE: ObligationsPreGS Σ}:
@@ -107,9 +109,9 @@ Section ObligationsEM.
     { by iApply cps_mset. } 
 
     iPureIntro. 
-    red in INIT. destruct INIT as (?&?&?&?).
+    red in INIT. destruct INIT as (?&?).
     red. rewrite /threads_own_obls /dom_phases_obls.
-    erewrite om_wf_dpo; eauto. set_solver.
+    erewrite om_wf_dpo; eauto.
   Qed.
   
   Definition ObligationsEM: ExecutionModel Λ OM :=
@@ -148,7 +150,7 @@ Section ObligationsEM.
     { by rewrite list_to_set_elements_L dom_gset_to_gmap. }
     rewrite /init_phases. rewrite length_fmap.
     rewrite seq_length. rewrite length_size. lia.
-  Qed. 
+  Qed.
 
   Lemma init_phases_helper e σ:
     list_to_map $ zip 
@@ -161,36 +163,89 @@ Section ObligationsEM.
     set_solver.
   Qed. 
 
-  Lemma init_om_state_init e σ ds eb:
-    obls_is_init_st ([e], σ) (init_om_state (([e], σ)) ds eb).
+  (* TODO: move *)
+  Lemma zip_lookup_Some_1 {A B: Type} (la: list A) (lb: list B) i a b:
+    zip la lb !! i = Some (a, b) -> la !! i = Some a /\ lb !! i = Some b.
+  Proof using.
+    clear. 
+    revert la lb a b. induction i.
+    { intros. destruct la, lb; simpl in *; try discriminate. set_solver. }
+    intros. destruct la, lb; simpl in *; try discriminate.
+    apply IHi in H. done.
+  Qed.
+
+  Lemma init_om_state_init_multiple es σ ds eb:
+    obls_is_init_st (es, σ) (init_om_state ((es, σ)) ds eb).
   Proof.
-    red. rewrite locales_of_cfg_singleton.
-    eexists. split; [eauto| ].
-    rewrite dom_gset_to_gmap. rewrite locales_of_cfg_singleton. split; [done| ].
+    red. 
+    rewrite dom_gset_to_gmap. split; eauto. 
+    
+    assert (NoDup (zip (elements (locales_of_cfg (es, σ)))
+                     (init_phases (size (locales_of_cfg (es, σ))))).*1) as ND1.
+    { rewrite fst_zip.
+      { apply NoDup_elements. }
+      rewrite /init_phases. rewrite length_fmap.
+      by rewrite length_size List.length_seq. }
+    assert (NoDup (zip (elements (locales_of_cfg (es, σ)))
+                     (init_phases (size (locales_of_cfg (es, σ))))).*2) as ND2.
+    { rewrite snd_zip; cycle 1. 
+      { rewrite /init_phases. rewrite length_fmap.
+        by rewrite length_size List.length_seq. }
+      rewrite /init_phases.
+      apply NoDup_fmap_2; try apply _.
+      apply NoDup_seq. }
    
     rewrite /init_om_state. split.
     - apply init_om_dpo.
     - red. simpl.
       trans (∅: gset nat); set_solver. 
-    - red. rewrite init_phases_helper. simpl.
-      intros ?????. rewrite !lookup_singleton_Some. set_solver.
-    - red. rewrite init_phases_helper. simpl.
-      intros (?&?&[??]& P). revert P.  
-      rewrite lookup_singleton_Some.
+    - red. simpl. intros ????? X%elem_of_list_to_map Y%elem_of_list_to_map; eauto.
+      remember (locales_of_cfg (es, σ)) as ts. clear Heqts.
+      apply elem_of_list_lookup_1 in X as (i&X).
+      apply elem_of_list_lookup_1 in Y as (j&Y).
+      apply zip_lookup_Some_1 in X as [? X].  
+      apply zip_lookup_Some_1 in Y as [? Y]. 
+      destruct (decide (i = j)).
+      { congruence. }
+      rewrite /init_phases in X, Y.
+      apply list_lookup_fmap_Some in X as (?&?&->). 
+      apply list_lookup_fmap_Some in Y as (?&?&->).
+      apply phases_disj_forks.
+      intros <-.
+      pose proof (NoDup_seq 0 (size ts)) as ND. eapply NoDup_alt in ND; eauto.  
+    - intros (?&?&[??]& P). revert P. simpl.   
       rewrite elem_of_mset_map. simpl.
-      intros ([<- <-] & (?&[=]&?) & LT). subst.
-      pose proof (phase_lt_fork π0 0) as LT'.
+      intros (? & (?&[=]&?) & LT). subst.
+      apply elem_of_list_to_map in H2; [| done]. 
+      apply elem_of_zip_r in H2.
+      rewrite /init_phases in H2. apply elem_of_list_fmap in H2 as (?&->&?).  
+      pose proof (phase_lt_fork π0 x1) as LT'.
       apply strict_spec in LT.
       rewrite strict_spec in LT. destruct LT as [? N].
-      destruct N. apply LT'. 
+      apply N. apply LT'. 
     - red. simpl. set_solver.
     - red. simpl.
-      rewrite locales_of_cfg_singleton. rewrite gset_to_gmap_singleton.
-      rewrite map_img_singleton_L. set_solver.
+      remember (locales_of_cfg (es, σ)) as ts eqn:foo. clear foo.
+      clear ND1 ND2. 
+      pattern ts. apply set_ind; clear ts.
+      { red. intros ????. set_solver. }
+      { done. }
+      intros. rewrite gset_to_gmap_union_singleton.
+      rewrite map_img_insert_L. rewrite delete_notin.
+      2: { by apply lookup_gset_to_gmap_None. }
+      rewrite flatten_gset_union flatten_gset_singleton. set_solver. 
     - red. simpl. 
-      rewrite locales_of_cfg_singleton. rewrite gset_to_gmap_singleton.
-      intros ???. rewrite !lookup_map_singleton.
-      destruct decide, decide; simpl; done.
+      intros ???.
+      destruct (_ !! τ1) eqn:X, (_ !! τ2) eqn:Y; simpl; try done.
+      apply lookup_gset_to_gmap_Some in X as [? <-]. 
+      apply lookup_gset_to_gmap_Some in Y as [? <-].
+      done. 
+  Qed.
+
+  Lemma init_om_state_init e σ ds eb:
+    obls_is_init_st ([e], σ) (init_om_state (([e], σ)) ds eb).
+  Proof.
+    apply init_om_state_init_multiple.
   Qed.
     
   From lawyer Require Import sub_action_em obligations_am action_model. 
