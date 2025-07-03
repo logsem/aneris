@@ -88,7 +88,7 @@ Our development relies on the axiom of choice, law of excluded middle, functiona
 	    Namely, the last transitions of such traces must form a valid evolution step.
 	 3. Then, we show that this intensional refinement in fact implies the refinement from Definition 4 (minus the sameThreads part discussed above).
 
-	See `lawyer/heap_lang/simulation_adequacy.v`, comment inside of `strong_simulation_adequacy_traces` lemma that discusses points 2 and 3 above.
+	See `lawyer/heap_lang/simulation_adequacy.v`, comment inside of `strong_simulation_adequacy_traces_multiple` lemma that discusses points 2 and 3 above.
 - Relative image-finiteness of refinement relation (Lemma 2.2): `lawyer/lawyer/obligations/obligations_adequacy.v`, lemma `obls_sim_rel_FB`.
 - OM starting state (definition 3): `lawyer/lawyer/obligations/obligations_em.v`, definition `obls_sim_rel_FB`.
   Note that it applies to physical states with potentially more than one thread, which requires assigning non-initial phases to each of them.
