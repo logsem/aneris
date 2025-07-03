@@ -12,6 +12,7 @@ LAWYER_GIT_URL=git@github.com:logsem/aneris.git
 LAWYER_BRANCH=lawyer_paper
 
 WORKING_DIR_NAME=submission
+COMMITS_LOG=commits.log
 
 cleanup_current_dir () {
    for arg in "$@" .git .gitignore .gitmodules .github; do
@@ -26,11 +27,14 @@ cleanup_current_dir () {
 WORKING_DIR=$(realpath $WORKING_DIR_NAME)
 rm -rf $WORKING_DIR
 mkdir $WORKING_DIR
+touch $WORKING_DIR/$COMMITS_LOG
 
 # prepare paper
 cd $WORKING_DIR
 git clone -b $PAPER_BRANCH --single-branch $PAPER_GIT_URL paper
 cd paper/lawyer
+echo "Paper commit:" >> $WORKING_DIR/$COMMITS_LOG
+git log -1 >> $WORKING_DIR/$COMMITS_LOG
 make clean
 make no-appendix
 cp paper.pdf $WORKING_DIR/paper.pdf
@@ -47,11 +51,15 @@ git clone -b $TRILLIUM_BRANCH --single-branch $TRILLIUM_GIT_URL trillium
 git clone -b $LAWYER_BRANCH --single-branch $LAWYER_GIT_URL lawyer
 
 cd trillium
+echo "Trillium commit:" >> $WORKING_DIR/$COMMITS_LOG
+git log -1 >> $WORKING_DIR/$COMMITS_LOG
 cleanup_current_dir
 cd $WORKING_DIR
 
 mv lawyer/paper/README.md .
 cd lawyer
+echo "Lawyer commit:" >> $WORKING_DIR/$COMMITS_LOG
+git log -1 >> $WORKING_DIR/$COMMITS_LOG
 cleanup_current_dir paper
 cd $WORKING_DIR
 
@@ -65,4 +73,5 @@ cp paper.pdf $WORKING_DIR/paper-appendix.pdf
 cd $WORKING_DIR
 zip -r lawyer_suppl.zip trillium lawyer README.md paper-appendix.pdf
 
-echo "Supplementary material is built in $(realpath lawyer_suppl.zip)"
+echo "Submission material is built in $WORKING_DIR"
+cat $WORKING_DIR/$COMMITS_LOG
