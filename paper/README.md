@@ -50,8 +50,9 @@ Our development relies on the axiom of choice, law of excluded middle, functiona
 
 - Definition of Obligations Model (Fig. 6): `lawyer/lawyer/obligations/obligations_model.v`
   - OM parameters:  `ObligationsParams` typeclass
-  - OM state: `ProgressState` record
+  - OM state: `ProgressState` record.
 	Well-formedness condition is defined in `lawyer/lawyer/obligations/obligations_wf.v`, record `om_st_wf`.
+	Note that "fuel" component of the state is named "ps_cps", and the corresponding resource in logic is called "cp".
   - OM transitions: definition `om_trans`
   - OM as a Trillium model: definition `ObligationsModel`
 - Example programs
@@ -61,8 +62,7 @@ Our development relies on the axiom of choice, law of excluded middle, functiona
   - Statically-determined Bound (Fig. 1): `const_term/`subfolder.
 	The proved property is execution time being linear wrt. the value of N argument.
   - Runtime-determined Bound (Fig. 2): `rt_bound/` subfolder.
-  - Blocking example (Fig. 3)
-    We don't verify this exact example: it is a simplified version of Fig. 5, which is verified (see below).
+  - Blocking example (Fig. 3): `nondet/` subfolder, see specifically `nondet/nondet_adequacy.v`, theorem `nondet_pre_allocated_termination`.
   - Delaying example (Fig. 4): `lf_counter/` subfolder.
     The proved property is termination under any scheduler.
   - Fork example (Fig. 5): `nondet/` subfolder.
