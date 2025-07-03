@@ -359,20 +359,18 @@ Section OblsAdequacy.
   (* TODO: generalize? *)
   Lemma om_sim_RAH_multiple
           {Σ: gFunctors} {Hinv: @heapGS Σ M EM}
-    σ1 es ds eb:
+    σ1 es (* ds eb *) δ
+    (LIVE0: om_live_tids id locale_enabled (es, σ1) δ) :
   ⊢
   rel_always_holds  NotStuck
-    (* (λ _ : language.val heap_lang, *)
-    (*    @em_thread_post heap_lang _ _ Σ *)
-    (*      (@heap_fairnessGS Σ *)
-    (*         _ *)
-    (*         _ Hinv) 0) *)
     (map (fun i _ => em_thread_post i%nat (em_GS0 := (@heap_fairnessGS Σ
             _
             _ Hinv))) (seq 0 (length es)))
     (@obls_sim_rel)
     (es, σ1)
-    (@init_om_state _ _ _ LIM_STEPS OP (es, σ1) ds eb).
+    (* (@init_om_state _ _ _ LIM_STEPS OP (es, σ1) ds eb) *)
+    δ
+  .
   Proof using.
     rewrite /rel_always_holds.
     
@@ -391,7 +389,9 @@ Section OblsAdequacy.
       red in EX0, OM0. simpl in EX0, OM0. subst.
       rewrite /obls_sim_rel. rewrite /valid_state_evolution_fairness /om_live_tids.
       split; [done| ]. simpl. red.
-      apply om_live_tids_init. }
+      (* apply om_live_tids_init. *)
+      apply LIVE0. 
+    }
 
     (* Unset Printing Notations. *)
 
@@ -459,31 +459,33 @@ Section OblsAdequacy.
   Lemma obls_match_impl_multiple Σ
     {HEAP: heapGpreS Σ EM}
     (extr : heap_lang_extrace) (es: list expr) (σ: state)
-    (cps_degs: gmultiset Degree) (eb: nat)
-    (s1 := init_om_state (trfirst extr) cps_degs eb (OP := OP))
+    (* (cps_degs: gmultiset Degree) (eb: nat) *)
+    (* (s1 := init_om_state (trfirst extr) cps_degs eb (OP := OP)) *)
+    δ
     (Hexfirst : trfirst extr = (es, σ))
     (LEN: length es ≥ 1)
+    (OM_INIT: obls_is_init_st (es, σ) δ)
+    (LIVE0: om_live_tids id locale_enabled (es, σ) δ)
     (WPe: forall (HEAP: heapGS Σ EM), ⊢ (([∗ map] l↦v ∈ heap σ, l ↦ v) ∗
-                                     (@em_init_resource heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) s1 tt))%I -∗
+                                     (@em_init_resource heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) δ tt))%I -∗
             let Φs := map (fun τ _ => @em_thread_post heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) τ) (seq 0 (length es)) in
               wptp NotStuck es Φs)
     (VALID: extrace_valid extr)
     :
-    ∃ omtr, exec_OM_traces_match extr omtr ∧ om_tr_wf omtr /\ trfirst omtr = s1. 
+    ∃ omtr, exec_OM_traces_match extr omtr ∧ om_tr_wf omtr /\ trfirst omtr = δ. 
   Proof.
     forward eapply om_simulation_adequacy_model_trace_multiple; eauto.
-    - simpl. subst s1. rewrite Hexfirst. apply init_om_state_init_multiple. 
     - red. intros ?. iStartProof. iIntros "[HEAP INIT] !>".
       iSplitL.
       + simpl. simpl in WPe. iPoseProof (WPe Hinv with "[HEAP INIT]") as "foo".
         2: by iFrame. 
-        iFrame "HEAP". subst s1. by rewrite Hexfirst.
-      + subst s1. iApply om_sim_RAH_multiple. 
+        iFrame "HEAP". iFrame.
+      + iApply om_sim_RAH_multiple. auto. 
     - intros (?&?&?).
-      subst s1. rewrite Hexfirst -H3. 
+      rewrite -H3.
       eapply obls_matching_traces_OM; eauto.
       rewrite H3. eapply obls_init_wf.
-      apply init_om_state_init_multiple. 
+      eauto.
   Qed.
 
   Lemma obls_match_impl Σ
@@ -500,6 +502,8 @@ Section OblsAdequacy.
     ∃ omtr, exec_OM_traces_match extr omtr ∧ om_tr_wf omtr /\ trfirst omtr = s1. 
   Proof.
     eapply obls_match_impl_multiple; eauto.
+    { subst s1. rewrite Hexfirst. apply init_om_state_init. } 
+    { subst s1. rewrite Hexfirst. apply om_live_tids_init. } 
     iIntros "**".
     simpl. iSplit; [| done].
     by iApply WPe.
@@ -508,12 +512,16 @@ Section OblsAdequacy.
   Lemma obls_terminates_impl_multiple Σ
     {HEAP: heapGpreS Σ EM}
     (extr : heap_lang_extrace) (es: list expr) (σ: state)
-    (cps_degs: gmultiset Degree) (eb: nat)    
-    (s1 := init_om_state (trfirst extr) cps_degs eb (OP := OP))
+    (* (cps_degs: gmultiset Degree) (eb: nat)     *)
+    (* (s1 := init_om_state (trfirst extr) cps_degs eb (OP := OP)) *)
+    δ
     (Hexfirst : trfirst extr = (es, σ))
     (LEN: length es >= 1)
+    (OM_INIT: obls_is_init_st (es, σ) δ)
+    (LIVE0: om_live_tids id locale_enabled (es, σ) δ)
     (WPe: forall (HEAP: heapGS Σ EM), ⊢ (([∗ map] l↦v ∈ heap σ, l ↦ v) ∗
-                                     (@em_init_resource heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) s1 tt))%I -∗
+                                     (@em_init_resource heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) δ tt))%I
+            ={⊤}=∗
             let Φs := map (fun τ _ => @em_thread_post heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) τ) (seq 0 (length es)) in
               wptp NotStuck es Φs)
     :
@@ -523,13 +531,12 @@ Section OblsAdequacy.
                   _ _ _ _
                   _ _ Hexfirst) as FAIR_TERM; eauto.
     { exact tt. }
-    { simpl. subst s1. rewrite Hexfirst. apply init_om_state_init_multiple. }
     
     apply FAIR_TERM; auto. 
-    red. intros ?. iStartProof. iIntros "[HEAP INIT] !>".
+    red. intros ?. iStartProof. iIntros "[HEAP INIT]".
     iSplitL.
     - iApply WPe. iFrame. 
-    - subst s1. rewrite Hexfirst. iApply om_sim_RAH_multiple.
+    - iApply om_sim_RAH_multiple. eauto. 
   Qed.
 
   Lemma obls_terminates_impl Σ
@@ -545,8 +552,10 @@ Section OblsAdequacy.
     extrace_fairly_terminating extr.
   Proof.
     eapply obls_terminates_impl_multiple; eauto.
-    iIntros "**". simpl. iSplit; [| done].
-    by iApply WPe.
+    { subst s1. rewrite Hexfirst. apply init_om_state_init. } 
+    { subst s1. apply om_live_tids_init. }
+    iIntros "**". simpl. iModIntro. iSplit; [| done].
+    subst s1. rewrite -Hexfirst. by iApply WPe. 
   Qed.
 
   Local Existing Instance OP. 

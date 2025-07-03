@@ -155,6 +155,21 @@ Section Nondet.
     rewrite /nondet_LS_LB. lia.       
   Qed.
 
+  Lemma alloc_nondet_inv_impl  `{NondetPreG Σ} τ cnt flag s__f:
+    cnt ↦ #0%nat -∗ flag ↦ #false -∗ obls τ {[s__f]} -∗ sgn s__f l__f (Some false) -∗ exc_lb 0 ={∅}=∗ ∃ (ND : NondetG Σ), nondet_inv cnt flag s__f ∗
+       obls τ {[s__f]} ∗ sgn s__f l__f None ∗ tok.
+  Proof using.
+    iIntros "CNT FLAG OB SGN EB".
+    iDestruct (sgn_get_ex with "[$]") as "[SGN #SGN']". 
+    iMod (own_alloc (Excl tt: exclR unitO)) as (γ) "TOK".
+    { done. }
+    set (ND := {| γ__tok := γ |}).
+    iMod (inv_alloc nondet_ns _ (nondet_inv_inner _ _ _) with "[-OB TOK]") as "#?".
+    { do 2 iExists _. iNext. iFrame.
+      rewrite Nat.mul_0_r. iFrame. by iIntros (?). } 
+    iModIntro. do 1 iExists _. iFrame "#∗".
+  Qed.
+
   Lemma alloc_nondet_inv `{NondetPreG Σ} τ cnt flag:
     cnt ↦ #(0%nat) -∗ flag ↦ #false -∗ obls τ ∅ -∗
     BOU ∅ 1 (∃ s__f (ND: NondetG Σ), nondet_inv cnt flag s__f ∗ obls τ {[ s__f ]} ∗ 
@@ -163,8 +178,6 @@ Section Nondet.
     iIntros "CNT FLAG OB".
     iMod (OU_create_sig _ _ l__f with "[$]") as "(%s__f & SGN & OB & _)".
     iDestruct (sgn_get_ex with "[$]") as "[SGN #SGN']".
-    iMod (own_alloc (Excl tt: exclR unitO)) as (γ) "TOK".
-    { done. }
 
     (** workaround to get exc_lb 0*)
     rewrite Nat.sub_diag. rewrite {2}(plus_n_O 0). iApply BOU_split.
@@ -173,22 +186,19 @@ Section Nondet.
     2: { iApply (increase_eb_upd_rep0 0). }
     iIntros "EB".
 
-    set (ND := {| γ__tok := γ |}).
-    iMod (inv_alloc nondet_ns _ (nondet_inv_inner _ _ _) with "[-OB TOK]") as "#?".
-    { do 2 iExists _. iNext. iFrame.
-      rewrite Nat.mul_0_r. iFrame. by iIntros (?). } 
-
-    iModIntro. do 2 iExists _. rewrite union_empty_l_L. iFrame "#∗".
+    rewrite union_empty_l_L.
+    iMod (alloc_nondet_inv_impl with "[$] [$] [$] [$] [$]") as "foo".
+    iModIntro. iExists _. done.
   Qed.
 
   Lemma stop_and_read_spec `{NondetG Σ} τ π s__f flag cnt:
-    {{{ exc_lb 29 ∗ nondet_inv cnt flag s__f ∗ sgn s__f l__f None ∗ ep s__f π d0 ∗
+    {{{ exc_lb 29 ∗ nondet_inv cnt flag s__f ∗ sgn s__f l__f None ∗ 
         obls τ {[s__f]} ∗ tok ∗ cp_mul π d0 9 ∗ th_phase_frag τ π 1 }}}
       stop_and_read #cnt #flag @τ
     {{{ vn, RET vn; ∃ (n : nat), ⌜vn = #n⌝ ∗ exc_lb (K * n) ∗ 
                                  obls τ ∅ ∗ th_phase_eq τ π }}}.
   Proof.
-    iIntros (Φ) "(#EB & #INV & #SGN0 & #EP & OB1 & TOK & CPS & PH) POST".
+    iIntros (Φ) "(#EB & #INV & #SGN0 & OB1 & TOK & CPS & PH) POST".
     rewrite /stop_and_read. pure_steps. 
 
     wp_bind (_ <- _)%E.
@@ -220,7 +230,6 @@ Section Nondet.
     iApply "POST". iExists _. iFrame "#∗". iSplit; [done| ].
     iApply (obls_proper with "[$]"). set_solver.
   Qed.
-
 
   Theorem nondet_spec `{NondetPreG Σ} τ π:
     {{{ th_phase_eq τ π ∗ cp_mul π d1 2 ∗ obls τ ∅ }}}
