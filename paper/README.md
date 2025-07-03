@@ -1,4 +1,4 @@
-# Lawyer
+# Supplementary material for the Lawyer paper
 
 ## Structure of the technical development
 
@@ -9,7 +9,8 @@
    - `lawyer/`
      - `examples/` - case studies
 	 - `obligations/` - implementation of the obligations-based reasoning
-   - `check/` - collection of the end results.
+   - `check/` - collection of the end results
+- `paper-appendix.pdf` - version of the paper with the technical appendix.
 	 
 ## Installation
 
