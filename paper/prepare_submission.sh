@@ -1,15 +1,17 @@
 #! /bin/bash
 
-# this is a script that automatically prepares the supplementary material to be submitted with the Lawyer paper.
+# this is a script that automatically prepares the submission of the Lawyer paper: the main paper and supplementary material.
 # This is intended to be used by the paper authors, not by the end user/reviewers!
 # !!! This script doesn't change the Rocq sources, so they must already be anonymized
 
+PAPER_GIT_URL=git@github.com:logsem/wmm-liveness-notes.git
+PAPER_BRANCH=main
 TRILLIUM_GIT_URL=git@github.com:logsem/trillium.git
 TRILLIUM_BRANCH=opam_package
 LAWYER_GIT_URL=git@github.com:logsem/aneris.git
 LAWYER_BRANCH=lawyer_paper
 
-WORKING_DIR=lawyer_suppl
+WORKING_DIR_NAME=submission
 
 cleanup_current_dir () {
    for arg in "$@" .git .gitignore .gitmodules .github; do
@@ -18,23 +20,49 @@ cleanup_current_dir () {
 }
 
 
-### script body
+# ### script body
 
+# recreate working dir
+WORKING_DIR=$(realpath $WORKING_DIR_NAME)
 rm -rf $WORKING_DIR
 mkdir $WORKING_DIR
-cd $WORKING_DIR
 
+# prepare paper
+cd $WORKING_DIR
+git clone -b $PAPER_BRANCH --single-branch $PAPER_GIT_URL paper
+cd paper/lawyer
+make clean
+make no-appendix
+cp paper.pdf $WORKING_DIR/paper.pdf
+
+# echo "Supplementary material is built in $(realpath $WORKING_DIR/paper.pdf)"
+# echo EXITING EARLY
+# exit 0
+
+# prepare supplementary material
+
+## 1) prepare Rocq development
+cd $WORKING_DIR
 git clone -b $TRILLIUM_BRANCH --single-branch $TRILLIUM_GIT_URL trillium
 git clone -b $LAWYER_BRANCH --single-branch $LAWYER_GIT_URL lawyer
 
 cd trillium
 cleanup_current_dir
-cd ..
+cd $WORKING_DIR
 
 mv lawyer/paper/README.md .
 cd lawyer
 cleanup_current_dir paper
-cd ..
+cd $WORKING_DIR
 
-zip -r lawyer_suppl.zip trillium lawyer README.md
+## 2) prepare paper with appendix
+cd paper/lawyer
+make clean
+make
+cp paper.pdf $WORKING_DIR/paper-appendix.pdf
+
+## 3) complete supplementary material
+cd $WORKING_DIR
+zip -r lawyer_suppl.zip trillium lawyer README.md paper-appendix.pdf
+
 echo "Supplementary material is built in $(realpath lawyer_suppl.zip)"
