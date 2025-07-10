@@ -60,7 +60,7 @@ mv lawyer/paper/README.md .
 cd lawyer
 echo "Lawyer commit:" >> $WORKING_DIR/$COMMITS_LOG
 git log -1 >> $WORKING_DIR/$COMMITS_LOG
-cleanup_current_dir paper
+cleanup_current_dir paper README.md
 cd $WORKING_DIR
 
 ## 2) prepare paper with appendix
