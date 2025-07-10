@@ -75,7 +75,7 @@ Our development relies on the axiom of choice, law of excluded middle, functiona
 - Definition of traces: `lawyer/fairness/inftraces.v`, definition `trace`.
 - Definitions of trace state and label lookups: `lawyer/fairness/trace_lookup.v`, definitions `state_lookup` and `label_lookup` correspondingly.
 - Definition of trace validity: `lawyer/fairness/inftraces.v`, definition `trace_valid`; also see `lawyer/fairness/trace_lookup.v`, lemma `trace_valid_steps''`.
-- Operational semantics of Lambda: `lawyer/heap_lang/lang.v`
+- Operational semantics of our language: `lawyer/heap_lang/lang.v`
 - Refinement relation (definitions 1, 2 and 4).
   Our implementation of refinement proceeds slightly differently compared to the paper presentation.
   1. The state relation in paper (Definition 1) consists of two parts: _sameThreads_ and _liveThreads_. Contrary, the Rocq version (`lawyer/lawyer/obligations/obligations_adequacy.v`, definition `obls_st_rel`) only includes the latter.
