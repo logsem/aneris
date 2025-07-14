@@ -305,8 +305,8 @@ Section TestProg.
   Context {OBLS_AMU: @AMU_lift_MU _ _ _ oGS' _ EM _ (↑ nroot)}.
   Context {OBLS_AMU__f: forall τ, @AMU_lift_MU__f _ _ _ τ oGS' _ EM _ (↑ nroot)}.
  
-  Context {NO_OBLS_POST: ⊢ ∀ τ, obls τ ∅ -∗ 
-                                  em_thread_post τ (em_GS0 := heap_fairnessGS (heapGS := hGS))}.
+  Context {NO_OBLS_POST: ⊢ ∀ τ v, obls τ ∅ -∗ 
+                                 em_thread_post τ v (em_GS0 := heap_fairnessGS (heapGS := hGS))}.
   
   Lemma test_spec (τ: locale heap_lang) (π: Phase) (d d': Degree) (l: Level)
     (DEG: deg_lt d' d)

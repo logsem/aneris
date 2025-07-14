@@ -729,7 +729,6 @@ Section EoFin.
              iExists _. by iFrame. }
         iSplitL "CPS2"; (iApply cp_mul_weaken; [| reflexivity| by iFrame]).
         all: etrans; eauto.
-        Unshelve. exact #(). 
       - simpl in SIGS_LEN. 
         destruct sigs as [| si [|]]; try by (simpl in SIGS_LEN; lia).
 
@@ -797,7 +796,6 @@ Section EoFin.
         iFrame "PH #∗".
         iSplitL "CPS2"; (iApply cp_mul_weaken; [| reflexivity| by iFrame]).
         all: etrans; eauto. 
-        Unshelve. exact #().
       - simpl in SIGS_LEN. 
         destruct sigs as [| ]; try by (simpl in SIGS_LEN; lia).
 
@@ -861,7 +859,6 @@ Section EoFin.
         iFrame "PH #∗".
         iSplitL "CPS2'"; (iApply cp_mul_weaken; [| reflexivity| by iFrame]).
         all: etrans; eauto.
-        Unshelve. exact #().
     Qed.
       
   End MainProof.

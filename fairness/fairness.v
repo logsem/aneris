@@ -1,8 +1,9 @@
 From stdpp Require Import option countable gmap ssreflect.
 From Paco Require Import paco1 paco2 pacotac.
-From fairness Require Export inftraces trace_lookup utils.
+From fairness Require Export utils.
 From trillium.program_logic Require Export traces.
 From trillium.program_logic Require Import language adequacy.
+From trillium.traces Require Import inftraces trace_lookup exec_traces.
 
 Record FairModel : Type := {
   fmstate:> Type;
@@ -263,8 +264,6 @@ Section LocaleFairness.
 
 End LocaleFairness.
 
-Definition extrace Λ := trace (cfg Λ) (olocale Λ).
-
 Section exec_trace.
   Context {Λ : language}.
   Context `{EqDecision (locale Λ)}.
@@ -277,45 +276,6 @@ Section exec_trace.
 
   Definition fair_ex ζ (extr: extrace Λ): Prop :=
     fair_by locale_enabled tid_match ζ extr. 
-
-  CoInductive extrace_valid: extrace Λ -> Prop :=
-  | extrace_valid_singleton c: extrace_valid ⟨c⟩
-  | extrace_valid_cons c oζ tr:
-      locale_step c oζ (trfirst tr) ->
-      extrace_valid tr →
-      extrace_valid (c -[oζ]-> tr).
-
-  Lemma to_trace_preserves_validity ex iex:
-    extrace_valid (to_trace (trace_last ex) iex) -> valid_exec ex -> valid_inf_exec ex iex.
-  Proof.
-    revert ex iex. cofix CH. intros ex iex Hexval Hval.
-    rewrite (trace_unfold_fold (to_trace _ _)) in Hexval.
-    destruct iex as [|[??] iex]; first by econstructor. cbn in Hexval.
-    inversion Hexval. simplify_eq.
-    econstructor; try done.
-    - by destruct iex as [|[??]?].
-    - apply CH; eauto. econstructor; try done. by destruct iex as [|[??]?].
-  Qed.
-
-  Lemma from_trace_preserves_validity (extr: extrace Λ) ex:
-    extrace_valid extr ->
-    valid_exec ex ->
-    trace_last ex = trfirst extr ->
-    valid_inf_exec ex (from_trace extr).
-  Proof.
-    revert ex extr. cofix CH. intros ex extr Hexval Hval Heq.
-    rewrite (inflist_unfold_fold (from_trace extr)). destruct extr as [c|c tid tr]; cbn;
-     first by econstructor.
-    inversion Hexval; simplify_eq; econstructor; eauto. apply CH; eauto.
-      by econstructor.
-  Qed.
-
-  Lemma from_trace_preserves_validity_singleton (extr: extrace Λ):
-    extrace_valid extr ->
-    valid_inf_exec (trace_singleton (trfirst extr)) (from_trace extr).
-  Proof.
-    intros ?. eapply from_trace_preserves_validity; eauto. econstructor.
-  Qed.
 
   Definition extrace_fairly_terminating (extr : extrace Λ) :=
     extrace_valid extr →

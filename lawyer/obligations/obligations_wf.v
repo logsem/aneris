@@ -1,5 +1,6 @@
 Require Import Relation_Operators.
 From stdpp Require Import namespaces fin_maps ssreflect fin_map_dom gmultiset.
+From trillium.traces Require Import trace_lookup.
 From fairness Require Import fairness locales_helpers utils utils_tactics.
 From lawyer.obligations Require Import obligations_model obls_utils.
 

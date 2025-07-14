@@ -1,4 +1,5 @@
 Require Import Relation_Operators.
+From trillium Require Import inftraces.
 From fairness Require Import fairness.
 From fairness Require Import utils.
 From stdpp Require Import countable gmultiset gmap.
@@ -285,4 +286,3 @@ Ltac inv_loc_step_ex STEP :=
 
 Ltac inv_loc_step_with STEP :=
   destruct STEP as [T | T]; [inv_loc_step_of T | inv_loc_step0 T]. 
-

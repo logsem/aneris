@@ -60,7 +60,7 @@ Section ProgramLogic.
           ⌜ extr_last_fork $ extr' :tr[oζ]: c' = oτ' ⌝
     end.
 
-    Let iG := @heapG_irisG _ _ _ hGS. 
+    Let iG := @IEM_irisG _ _ _ _ _ (@heap_iemgs _ _ _ hGS).
     
     Definition MU_impl (f: option (locale heap_lang)) E ζ (P : iProp Σ) : iProp Σ := ∀ extr atr, 
       trace_interp_interim extr atr ζ f ={E}=∗

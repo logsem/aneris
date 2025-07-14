@@ -1,8 +1,8 @@
 From stdpp Require Import fin_maps.
 From iris.proofmode Require Import tactics.
 From trillium Require Import language.
-From trillium.program_logic Require Import traces weakestpre.
-From fairness Require Import locales_helpers execution_model.
+From trillium.program_logic Require Import traces weakestpre execution_model.
+From fairness Require Import locales_helpers.
 From lawyer Require Import action_model.
 
 
@@ -33,7 +33,7 @@ Class ActionSubEM (Λ: language) (AM: ActionModel) := {
 
 
 Definition TopAM_EM {Λ AM} (ASEM: ActionSubEM Λ AM)
-  (thread_post: forall Σ, asem_GS Σ -> locale Λ → iProp Σ):
+  (thread_post: forall Σ, asem_GS Σ -> locale Λ → val Λ -> iProp Σ):
   ExecutionModel Λ (AM2M AM).
   esplit. 
   - apply asem_Σ_subG.

@@ -170,7 +170,6 @@ Section SpawnJoin.
       { do 2 iExists _. iFrame. iRight. iExists _. by iFrame. }
       iModIntro. simpl. 
       by iApply NO_OBS_POST.
-      Unshelve. exact #(). 
     - rewrite cp_mul_weaken; [| | reflexivity].
       2: { apply PH_LTw. }
       iRename "PHw" into "PH".

@@ -1,6 +1,7 @@
 From iris.algebra Require Import auth gmap gset excl excl_auth.
 From iris.proofmode Require Import tactics.
-From fairness Require Import locales_helpers inftraces fairness.
+From trillium.traces Require Import trace_lookup inftraces.
+From fairness Require Import locales_helpers fairness.
 From lawyer.obligations Require Import obligations_model.
 
 

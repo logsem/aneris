@@ -1,9 +1,9 @@
 From iris.proofmode Require Import tactics.
 From stdpp Require Import namespaces.
-From trillium.program_logic Require Import language.
+From trillium.program_logic Require Import language execution_model.
 From iris.base_logic Require Import ghost_map.
 From iris.algebra Require Import auth gmap gset excl gmultiset big_op mono_nat.
-From fairness Require Import fairness locales_helpers execution_model.
+From fairness Require Import fairness locales_helpers.
 From lawyer.obligations Require Import obligations_model obls_utils obligations_resources obligations_wf.
 
 
@@ -119,7 +119,7 @@ Section ObligationsEM.
       em_Σ := obls_Σ;
       em_valid_evolution_step := obls_valid_evolution_step;
       em_thread_post Σ `{!ObligationsGS Σ} :=
-        fun τ => (obls τ ∅)%I;
+        fun τ _ => (obls τ ∅)%I;
       em_initialization := obls_resources_init;
     |}.
 

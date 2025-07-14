@@ -1,5 +1,6 @@
 From iris.proofmode Require Import tactics.
-From fairness Require Import locales_helpers comp_utils trace_lookup fairness fin_branch utils_tactics.
+From trillium.traces Require Import trace_lookup.
+From fairness Require Import locales_helpers comp_utils fairness fin_branch utils_tactics.
 From heap_lang Require Import simulation_adequacy.
 From lawyer Require Import sub_action_em action_model.
 From lawyer.obligations Require Import obligations_model obligations_resources obligations_em obls_fairness_preservation obligations_am obligations_fin_branch obls_termination obligations_wf obligations_logic env_helpers.
@@ -48,21 +49,21 @@ Section OblsAdequacy.
   Qed.
     
   Theorem om_simulation_adequacy_model_trace_multiple Σ
-        `{hPre: !heapGpreS Σ EM} (s: stuckness)
+        `{hPre: @heapGpreS Σ M EM} (s: stuckness)
         (es: list expr) σ1 (s1: mstate M) p
         (INIT: em_is_init_st (es, σ1) s1 (ExecutionModel := EM))
         (extr : heap_lang_extrace)
         (Hvex : extrace_valid extr)
         (Hexfirst : trfirst extr = (es, σ1))
         (LEN: length es ≥ 1):
-    wp_premise_multiple Σ s es σ1 s1 obls_sim_rel (p: @em_init_param _ _ EM) ->
+    wp_premise_multiple obls_sim_rel Σ s es σ1 s1 (p: @em_init_param _ _ EM) ->
     ∃ (omtr: trace (mstate M) (mlabel M)),
       obls_om_traces_match extr omtr ∧
       trfirst omtr = s1.
   Proof using FIN_LVL FIN_DEG.
     intros PREM.
 
-    unshelve epose proof (@strong_simulation_adequacy_traces_multiple _ _ _ hPre s es σ1
+    unshelve epose proof (@strong_simulation_adequacy_traces_multiple_HL _ _ _ hPre s es σ1
                 s1
                 obls_sim_rel
                 p
@@ -92,13 +93,13 @@ Section OblsAdequacy.
   Qed.
 
   Theorem om_simulation_adequacy_model_trace Σ
-        `{hPre: !heapGpreS Σ EM} (s: stuckness)
+        `{hPre: @heapGpreS Σ M EM} (s: stuckness)
         (e1: expr) σ1 (s1: mstate M) p
         (INIT: em_is_init_st ([e1], σ1) s1 (ExecutionModel := EM))
         (extr : heap_lang_extrace)
         (Hvex : extrace_valid extr)
         (Hexfirst : trfirst extr = ([e1], σ1)):
-    wp_premise Σ s e1 σ1 s1 obls_sim_rel (p: @em_init_param _ _ EM) ->
+    wp_premise obls_sim_rel Σ s e1 σ1 s1 (p: @em_init_param _ _ EM) ->
     ∃ (omtr: trace (mstate M) (mlabel M)),
       obls_om_traces_match extr omtr ∧
       trfirst omtr = s1.

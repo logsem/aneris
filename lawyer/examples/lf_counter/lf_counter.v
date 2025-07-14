@@ -436,7 +436,6 @@ Section LFCounter.
     - iApply (incr_spec with "[$]").
       { apply PH_LT2. }
       iIntros "!> % _". simpl. by iApply NO_OBS_POST.
-      Unshelve. by eauto. 
     - iRename "PH1" into "PH". rewrite cp_mul_weaken; [| apply PH_LT1| reflexivity].
       wp_bind (Rec _ _ _)%E. pure_steps.
 
