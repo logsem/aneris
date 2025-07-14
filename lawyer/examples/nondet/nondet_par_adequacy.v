@@ -1,6 +1,6 @@
 From iris.algebra Require Import auth gmap gset excl excl_auth.
 From iris.proofmode Require Import tactics.
-From fairness Require Import utils utils_tactics trace_len utils_multisets.
+From fairness Require Import utils utils_tactics utils_multisets.
 From heap_lang Require Import simulation_adequacy.
 From lawyer Require Import sub_action_em action_model.
 From lawyer.obligations Require Import obligations_adequacy obligations_logic obligations_em obligations_resources obligations_model obligations_am unfair_termination env_helpers.
@@ -21,11 +21,11 @@ Section NondetAdequacy.
   Local Instance ND_OP_HL: OP_HL ND_Degree ND_Level nondet_LS_LB.
   Proof. esplit; try by apply _. Defined.
 
-  Let EM := TopAM_EM ObligationsASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls τ ∅ (oGS := aGS)).
+  Let EM := TopAM_EM ObligationsASEM (fun {Σ} {aGS: asem_GS Σ} τ _ => obls τ ∅ (oGS := aGS)).
 
   Definition NDΣ := #[
     GFunctor $ (exclR unitO); 
-    heapΣ EM;
+    iemΣ HeapLangEM EM;
     parΣ
   ].
   Global Instance subG_NDΣ {Σ}: 
@@ -40,7 +40,7 @@ Section NondetAdequacy.
   Let l__f := bn_ith 1 0.
 
   Local Instance OHE
-    (HEAP: heapGS NDΣ (TopAM_EM ObligationsASEM (λ Σ (aGS : ObligationsGS Σ) τ, obls τ ∅)))
+    (HEAP: @heapGS NDΣ _ (TopAM_EM ObligationsASEM (λ Σ (aGS : ObligationsGS Σ) τ _, obls τ ∅)))
     : OM_HL_Env ND_OP_HL EM NDΣ.
   Proof.
     unshelve esplit; try by apply _. 
@@ -51,14 +51,21 @@ Section NondetAdequacy.
       apply AMU_lift_top.
   Defined.
 
+  Instance NDΣ_pre: @IEMGpreS _ _ HeapLangEM EM NDΣ.
+  Proof.
+    split; try by (apply _ || solve_inG).
+    - simpl. apply _.
+    - simpl. apply obls_Σ_pre. apply _.
+  Qed.
+
   Theorem nondet_par_termination
     (extr : heap_lang_extrace)
     (START: trfirst extr = ([nondet_par #()], Build_state ∅ ∅))
     (VALID: extrace_valid extr):
     extrace_fairly_terminating extr.
   Proof.
-    assert (heapGpreS NDΣ EM) as HPreG.
-    { apply subG_heapPreG. apply _. }
+    assert (@heapGpreS NDΣ _ EM) as HPreG.
+    { econstructor. }
 
     eapply @obls_terminates_impl with
       (cps_degs := 3 *: {[+ d2 +]})

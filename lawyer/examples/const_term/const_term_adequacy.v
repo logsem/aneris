@@ -1,6 +1,7 @@
 From iris.algebra Require Import auth gmap gset excl excl_auth.
 From iris.proofmode Require Import tactics.
-From fairness Require Import utils utils_tactics trace_len utils_multisets.
+From trillium.traces Require Import trace_len.
+From fairness Require Import utils utils_tactics utils_multisets.
 From heap_lang Require Import simulation_adequacy heap_lang_defs.
 From lawyer Require Import sub_action_em action_model.
 From lawyer.obligations Require Import obligations_adequacy obligations_logic obligations_em obligations_resources obligations_model obligations_am unfair_termination env_helpers.
@@ -19,18 +20,18 @@ Section ConstTermAdequacy.
   Local Instance CT_OP_HL: OP_HL unit Empty_set 0.
   Proof. esplit; try by apply _. Defined.
 
-  Let EM := TopAM_EM ObligationsASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls τ ∅ (oGS := aGS)).
+  Let EM := TopAM_EM ObligationsASEM (fun {Σ} {aGS: asem_GS Σ} τ _ => obls τ ∅ (oGS := aGS)).
 
   Definition CTΣ := #[
     GFunctor $ (excl_authUR natO); 
-    heapΣ EM
+    iemΣ HeapLangEM EM
   ].
   Global Instance subG_CTΣ {Σ}: 
     subG CTΣ Σ → DecrPreG Σ.
   Proof. solve_inG. Qed.
 
   Local Instance OHE
-    (HEAP: heapGS CTΣ (TopAM_EM ObligationsASEM (λ Σ (aGS : ObligationsGS Σ) τ, obls τ ∅)))
+    (HEAP: @heapGS CTΣ _ (TopAM_EM ObligationsASEM (λ Σ (aGS : ObligationsGS Σ) τ _, obls τ ∅)))
     : OM_HL_Env CT_OP_HL EM CTΣ.
   Proof.
     unshelve esplit; try by apply _. 
@@ -41,6 +42,13 @@ Section ConstTermAdequacy.
       apply AMU_lift_top.
   Defined.
 
+  Instance CTΣ_pre: @IEMGpreS _ _ HeapLangEM EM CTΣ.
+  Proof.
+    split; try by (apply _ || solve_inG).
+    - simpl. apply _.
+    - simpl. apply obls_Σ_pre. apply _.
+  Qed.
+
   Theorem const_term_bound_termination N
     (prog := const_term N)
     (bound := (N + 2) * 10)
@@ -49,9 +57,8 @@ Section ConstTermAdequacy.
     (VALID: extrace_valid extr):
     trace_len_le extr (bound + 1). 
   Proof.
-    assert (heapGpreS CTΣ EM) as HPreG.
-    { apply subG_heapPreG. (* TODO: why it's not applied automatically now? *)
-      apply _. }
+    assert (@heapGpreS CTΣ _ EM) as HPreG.
+    { econstructor. }
 
     forward eapply @obls_match_impl with
       (cps_degs := bound *: {[+ () +]})

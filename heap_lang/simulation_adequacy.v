@@ -46,38 +46,39 @@ Section adequacy.
     esplit; try by (apply _ || apply hPre). 
   Qed.
 
-  (* Theorem strong_simulation_adequacy_traces Σ *)
-  (*   `{hPre: @heapGpreS Σ M EM} (s: stuckness)  *)
-  (*   (e1 : expr) σ1 (s1: M) *)
-  (*   (R: execution_trace heap_lang → auxiliary_trace M → Prop) *)
-  (*   (p: em_init_param) *)
+  Theorem strong_simulation_adequacy_traces_HL Σ
+    `{hPre: @heapGpreS Σ M EM} (s: stuckness)
+    (e1 : expr) σ1 (s1: M)
+    (R: execution_trace heap_lang → auxiliary_trace M → Prop)
+    (p: em_init_param)
 
-  (*   (extr : heap_lang_extrace) *)
-  (*   (Hvex : extrace_valid extr) *)
-  (*   (Hexfirst : trfirst extr = ([e1], σ1)) *)
+    (extr : heap_lang_extrace)
+    (Hvex : extrace_valid extr)
+    (Hexfirst : trfirst extr = ([e1], σ1))
 
-  (*   (valid_step: cfg heap_lang -> olocale heap_lang → cfg heap_lang →  *)
-  (*                mstate M → mlabel M → mstate M -> Prop) *)
-  (*   (state_rel: cfg heap_lang -> mstate M -> Prop) *)
-  (*   (lbl_rel: olocale heap_lang -> mlabel M -> Prop) *)
-  (*   (STEP_LBL_REL: forall c1 oζ c2 δ1 ℓ δ2, *)
-  (*                valid_step c1 oζ c2 δ1 ℓ δ2 -> *)
-  (*                lbl_rel oζ ℓ) *)
-  (*   (STEP_MTRANS: forall c1 oζ c2 δ1 ℓ δ2, *)
-  (*                valid_step c1 oζ c2 δ1 ℓ δ2 -> *)
-  (*                mtrans δ1 ℓ δ2) *)
-  (*   (R_ST: forall extr mtr, R extr mtr -> state_rel (trace_last extr) (trace_last mtr)) *)
-  (*   (R_STEP: forall extr mtr, R extr mtr -> valid_state_evolution_fairness valid_step extr mtr) *)
+    (valid_step: cfg heap_lang -> olocale heap_lang → cfg heap_lang →
+                 mstate M → mlabel M → mstate M -> Prop)
+    (state_rel: cfg heap_lang -> mstate M -> Prop)
+    (lbl_rel: olocale heap_lang -> mlabel M -> Prop)
+    (STEP_LBL_REL: forall c1 oζ c2 δ1 ℓ δ2,
+                 valid_step c1 oζ c2 δ1 ℓ δ2 ->
+                 lbl_rel oζ ℓ)
+    (STEP_MTRANS: forall c1 oζ c2 δ1 ℓ δ2,
+                 valid_step c1 oζ c2 δ1 ℓ δ2 ->
+                 mtrans δ1 ℓ δ2)
+    (R_ST: forall extr mtr, R extr mtr -> state_rel (trace_last extr) (trace_last mtr))
+    (R_STEP: forall extr mtr, R extr mtr -> valid_state_evolution_fairness valid_step extr mtr)
 
-  (*   : *)
-  (*   rel_finitary R → *)
-  (*   em_is_init_st ([e1], σ1) s1 -> *)
-  (*   (wp_premise Σ s e1 σ1 s1 R p) -> *)
-  (*   ∃ (mtr : trace (mstate M) (mlabel M)),  *)
-  (*     traces_match lbl_rel state_rel locale_step (@mtrans M) extr mtr /\ *)
-  (*     trfirst mtr = s1.  *)
-  (* Proof. *)
-  (*   foobar.  *)
-  (* Qed. *)
-  
+    :
+    rel_finitary R →
+    em_is_init_st ([e1], σ1) s1 ->
+    (wp_premise R Σ s e1 σ1 s1 p) ->
+    ∃ (mtr : trace (mstate M) (mlabel M)),
+      traces_match lbl_rel state_rel locale_step (@mtrans M) extr mtr /\
+      trfirst mtr = s1.
+  Proof.
+    eapply strong_simulation_adequacy_traces; eauto.
+    esplit; try by (apply _ || apply hPre).
+  Qed.
+
 End adequacy.

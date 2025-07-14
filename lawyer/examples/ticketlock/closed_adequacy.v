@@ -62,7 +62,7 @@ Section Adequacy.
     (* solve_inG. *)
   Qed.
 
-  Let EM := TopAM_EM ObligationsASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls τ ∅ (oGS := aGS)).
+  Let EM := TopAM_EM ObligationsASEM (fun {Σ} {aGS: asem_GS Σ} τ _ => obls τ ∅ (oGS := aGS)).
 
   Program Definition TLPreInstance :=
     TLPre d__l d__h d__e d__m _ _ _ l__acq (OP := Closed_OP_HL) (EM := EM).
@@ -95,12 +95,12 @@ Section Adequacy.
   Proof. intros. esplit; solve_inG. Qed. 
 
   Definition ClosedΣ := #[ ClientΣ;
-                           heapΣ EM;
+                           iemΣ HeapLangEM EM;
                            RFLΣ
                           ].
 
   Instance Closed_OM_HL_Env
-    (HEAP: heapGS ClosedΣ (TopAM_EM ObligationsASEM (λ Σ (aGS : ObligationsGS Σ) τ, obls τ ∅))):
+    (HEAP: @heapGS ClosedΣ _ (TopAM_EM ObligationsASEM (λ Σ (aGS : ObligationsGS Σ) τ _, obls τ ∅))):
     OM_HL_Env Closed_OP_HL EM ClosedΣ.
   Proof.
     unshelve esplit; try by apply _.
@@ -109,13 +109,20 @@ Section Adequacy.
     - intros. rewrite -nclose_nroot. apply AMU_lift_top.
   Defined.
 
+  Instance ClosedΣ_pre: @IEMGpreS _ _ HeapLangEM EM ClosedΣ.
+  Proof.
+    split; try by (apply _ || solve_inG).
+    - simpl. apply _.
+    - simpl. apply obls_Σ_pre. apply _.
+  Qed.
+
   Lemma closed_program_terminates_impl
     (extr : heap_lang_extrace)
     (START: trfirst extr = ([client_prog RFLInstance #()], Build_state ∅ ∅)):
     extrace_fairly_terminating extr.
   Proof.
-    assert (heapGpreS ClosedΣ EM) as HPreG.
-    { apply subG_heapPreG. apply _. }
+    assert (@heapGpreS ClosedΣ _ EM) as HPreG.
+    { econstructor. }
 
     eapply @obls_terminates_impl with
       (cps_degs := 4 *: {[+ d__r +]})

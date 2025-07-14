@@ -1,6 +1,6 @@
 From iris.algebra Require Import auth gmap gset excl excl_auth.
 From iris.proofmode Require Import tactics.
-From fairness Require Import utils utils_tactics trace_len utils_multisets.
+From fairness Require Import utils utils_tactics utils_multisets.
 From heap_lang Require Import simulation_adequacy.
 From lawyer Require Import sub_action_em action_model.
 From lawyer.obligations Require Import obligations_adequacy obligations_logic obligations_em obligations_resources obligations_model obligations_am unfair_termination env_helpers.
@@ -25,12 +25,12 @@ Section RTBAdequacy.
   Local Instance RTB_OP_HL: OP_HL RTB_Degree RTB_Level LB.
   Proof. esplit; try by apply _. Defined.
 
-  Let EM := TopAM_EM ObligationsASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls τ ∅ (oGS := aGS)).
+  Let EM := TopAM_EM ObligationsASEM (fun {Σ} {aGS: asem_GS Σ} τ _ => obls τ ∅ (oGS := aGS)).
 
   Definition RTBΣ := #[
     NDΣ;
     CTΣ;
-    heapΣ EM;
+    iemΣ HeapLangEM EM;
     par.parΣ
   ].
   Global Instance subG_DecrΣ {Σ}: 
@@ -48,7 +48,7 @@ Section RTBAdequacy.
   Let l__f := bn_ith 1 0.
 
   Local Instance OHE
-    (HEAP: heapGS RTBΣ (TopAM_EM ObligationsASEM (λ Σ (aGS : ObligationsGS Σ) τ, obls τ ∅)))
+    (HEAP: @heapGS RTBΣ _ (TopAM_EM ObligationsASEM (λ Σ (aGS : ObligationsGS Σ) τ _, obls τ ∅)))
     : OM_HL_Env RTB_OP_HL EM RTBΣ.
   Proof.
     unshelve esplit; try by apply _. 
@@ -59,14 +59,21 @@ Section RTBAdequacy.
       apply AMU_lift_top.
   Defined.
 
+  Instance RTBΣ_pre: @IEMGpreS _ _ HeapLangEM EM RTBΣ.
+  Proof.
+    split; try by (apply _ || solve_inG).
+    - simpl. apply _.
+    - simpl. apply obls_Σ_pre. apply _.
+  Qed.
+
   Theorem rt_bound_termination
     (extr : heap_lang_extrace)
     (START: trfirst extr = ([rt_bound #()], Build_state ∅ ∅))
     (VALID: extrace_valid extr):
     extrace_fairly_terminating extr.
   Proof.
-    assert (heapGpreS RTBΣ EM) as HPreG.
-    { apply subG_heapPreG. apply _. }
+    assert (@heapGpreS RTBΣ _ EM) as HPreG.
+    { econstructor. }
 
     eapply @obls_terminates_impl with
       (cps_degs := 7 *: {[+ d2 +]})

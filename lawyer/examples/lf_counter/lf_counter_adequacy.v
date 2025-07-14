@@ -1,6 +1,7 @@
 From iris.algebra Require Import auth gmap gset excl excl_auth.
 From iris.proofmode Require Import tactics.
-From fairness Require Import utils utils_tactics trace_len utils_multisets.
+From trillium.traces Require Import trace_len.
+From fairness Require Import utils utils_tactics utils_multisets.
 From heap_lang Require Import simulation_adequacy.
 From lawyer Require Import sub_action_em action_model.
 From lawyer.obligations Require Import obligations_adequacy obligations_logic obligations_em obligations_resources obligations_model obligations_am unfair_termination env_helpers.
@@ -21,11 +22,12 @@ Section LFCAdequacy.
   Local Instance LFC_OP_HL: OP_HL (bounded_nat 2) Empty_set LS.
   Proof. esplit; try by apply _. Defined.
 
-  Let EM := TopAM_EM ObligationsASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls τ ∅ (oGS := aGS)).
+  Let EM := TopAM_EM ObligationsASEM (fun {Σ} {aGS: asem_GS Σ} τ _ => obls τ ∅ (oGS := aGS)).
 
   Definition LFCΣ := #[
     GFunctor $ (authUR (gmapUR nat natUR)); 
-    heapΣ EM
+    (* heapΣ EM *)
+    iemΣ HeapLangEM EM
   ].
   Global Instance subG_LFCΣ {Σ}: 
     subG LFCΣ Σ → LFCPreG Σ.
@@ -35,7 +37,7 @@ Section LFCAdequacy.
   Let d0 := bn_ith 1 0.
 
   Local Instance OHE
-    (HEAP: heapGS LFCΣ (TopAM_EM ObligationsASEM (λ Σ (aGS : ObligationsGS Σ) τ, obls τ ∅)))
+    (HEAP: @heapGS LFCΣ _ (TopAM_EM ObligationsASEM (λ Σ (aGS : ObligationsGS Σ) τ _, obls τ ∅)))
     : OM_HL_Env LFC_OP_HL EM LFCΣ.
   Proof.
     unshelve esplit; try by apply _. 
@@ -46,14 +48,21 @@ Section LFCAdequacy.
       apply AMU_lift_top.
   Defined.
 
+  Instance LFCΣ_pre: @IEMGpreS _ _ HeapLangEM EM LFCΣ.
+  Proof.
+    split; try by (apply _ || solve_inG).
+    - simpl. apply _.
+    - simpl. apply obls_Σ_pre. apply _.
+  Qed.
+
   Theorem lf_counter_termination
     (extr : heap_lang_extrace)
     (START: trfirst extr = ([counter_client #()], Build_state ∅ ∅))
     (VALID: extrace_valid extr):
     terminating_trace extr.
   Proof.
-    assert (heapGpreS LFCΣ EM) as HPreG.
-    { apply subG_heapPreG. apply _. }
+    assert (@heapGpreS LFCΣ _ EM) as HPreG.
+    { econstructor. }
 
     forward eapply @obls_match_impl with
       (cps_degs := 5 *: {[+ d1 +]})

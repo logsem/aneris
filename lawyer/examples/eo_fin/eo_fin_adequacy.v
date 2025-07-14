@@ -18,19 +18,19 @@ Section EOFinAdequacy.
     esplit; try by apply _.
   Defined.
 
-  Let EM := TopAM_EM ObligationsASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls τ ∅ (oGS := aGS)).
+  Let EM := TopAM_EM ObligationsASEM (fun {Σ} {aGS: asem_GS Σ} τ _ => obls τ ∅ (oGS := aGS)).
 
   Let eofinΣ: gFunctors := #[
       GFunctor (excl_authR natO); 
       sig_mapΣ;
-      heapΣ EM
+      iemΣ HeapLangEM EM
   ].
 
   Global Instance subG_eofinΣ {Σ}: subG eofinΣ Σ → EoFinPreG Σ.
   Proof. solve_inG. Qed.
 
   Local Instance OHE
-    (HEAP: heapGS eofinΣ (TopAM_EM ObligationsASEM (λ Σ (aGS : ObligationsGS Σ) τ, obls τ ∅)))
+    (HEAP: @heapGS eofinΣ _ (TopAM_EM ObligationsASEM (λ Σ (aGS : ObligationsGS Σ) τ v, obls τ ∅)))
     : OM_HL_Env EOF_OP_HL EM eofinΣ.
   Proof.
     unshelve esplit; try by apply _. 
@@ -41,13 +41,20 @@ Section EOFinAdequacy.
       apply AMU_lift_top.
   Defined.
 
+  Instance eofinΣ_pre: @IEMGpreS _ _ HeapLangEM EM eofinΣ.
+  Proof.
+    split; try by (apply _ || solve_inG).
+    - simpl. apply _.
+    - simpl. apply obls_Σ_pre. apply _.
+  Qed.
+
   Lemma eofin_terminates_impl
     (extr : heap_lang_extrace)
     (START: trfirst extr = ([start #(0%nat) #B], Build_state ∅ ∅)):
     extrace_fairly_terminating extr. 
   Proof.
-    assert (heapGpreS eofinΣ EM) as HPreG.
-    { apply subG_heapPreG. apply _. }
+    assert (@heapGpreS eofinΣ _ EM) as HPreG.
+    { econstructor. }
 
     eapply @obls_terminates_impl with
       (cps_degs := (2 * B + 5) *: {[+ d2 B +]} ⊎ 50 *: {[+ d0 B +]})
