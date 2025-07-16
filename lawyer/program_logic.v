@@ -54,7 +54,7 @@ Section ProgramLogic.
           let c := trace_last extr' in
           let δ := trace_last mtr in
           gen_heap_interp c'.2.(heap) ∗
-          em_msi c δ (em_GS0 := eGS) ∗ 
+          em_mti extr' mtr (em_GS0 := eGS) ∗
           ⌜ oζ = Some τ ⌝ ∗
           ⌜ locale_step c (Some τ) c' ⌝ ∗
           ⌜ extr_last_fork $ extr' :tr[oζ]: c' = oτ' ⌝
@@ -179,7 +179,7 @@ Section ProgramLogic.
                rewrite /locales_of_cfg. simpl. f_equal.
                apply locales_of_list_equiv.
                apply locales_equiv_from_middle. done. }
-        simpl. rewrite -TP -Heqxx. subst. iFrame. }
+        simpl. subst. iFrame. }
       iMod "CLOS'" as "_". iMod "HMU" as (??) "[Hσ Hwp]". iMod "Hwp". iModIntro.
       iExists _, _. rewrite right_id_L. by iFrame.
     Qed.

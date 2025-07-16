@@ -18,7 +18,7 @@ Class ActionSubEM (Λ: language) (AM: ActionModel) := {
       cfg Λ -> olocale Λ → cfg Λ → 
       amSt AM → Action * option (amRole AM) → amSt AM → Prop;
 
-    asem_msi {Σ} `{asem_GS Σ}: cfg Λ -> amSt AM -> iProp Σ;
+    asem_mti {Σ} `{asem_GS Σ}: execution_trace Λ -> finite_trace (amSt AM) (Action * option (amRole AM))%type -> iProp Σ;
     
     asem_init_param: Type; 
     asem_init_resource {Σ: gFunctors} `{asem_GS Σ}: 
@@ -28,9 +28,9 @@ Class ActionSubEM (Λ: language) (AM: ActionModel) := {
     asem_initialization Σ `{ePreGS: asem_preGS Σ}: 
     forall (s1: amSt AM) (σ: cfg Λ) (p: asem_init_param)
       (INIT_ST: asem_is_init_st σ s1),
-      ⊢ (|==> ∃ eGS: asem_GS Σ, @asem_init_resource _ eGS s1 p ∗ @asem_msi _ eGS σ s1)
+      ⊢ (|==> ∃ eGS: asem_GS Σ, @asem_init_resource _ eGS s1 p ∗ 
+                                 @asem_mti _ eGS {tr[ σ ]} {tr[ s1 ]})
 }.
-
 
 Definition TopAM_EM {Λ AM} (ASEM: ActionSubEM Λ AM)
   (thread_post: forall Σ, asem_GS Σ -> locale Λ → val Λ -> iProp Σ):
@@ -39,31 +39,57 @@ Definition TopAM_EM {Λ AM} (ASEM: ActionSubEM Λ AM)
   - apply asem_Σ_subG.
   - apply asem_valid_evolution_step.
   - exact thread_post. 
-  - by apply asem_initialization.
+  - by apply asem_initialization. 
 Defined. 
   
+
 Section AM_UPD.
 
   Context `{ASEM: ActionSubEM Λ AM}. 
   Context `{aeGS: asem_GS Σ}.
   Context `{Countable (locale Λ)}.
   
-  Definition AM_st_interp_interim (c c': cfg Λ)
-    (δ: amSt AM) (τ: locale Λ) oτ': iProp Σ :=
-    asem_msi c δ (asem_GS0 := aeGS) ∗ 
-    ⌜ locale_step c (Some τ) c' ⌝ ∗
-    ⌜ step_fork c c' = oτ' ⌝
-  .
+  (* Definition AM_st_interp_interim (c c': cfg Λ) *)
+  (*   (δ: amSt AM) (τ: locale Λ) oτ': iProp Σ := *)
+  (*   asem_mti c δ (asem_GS0 := aeGS) ∗  *)
+  (*   ⌜ locale_step c (Some τ) c' ⌝ ∗ *)
+  (*   ⌜ step_fork c c' = oτ' ⌝ *)
+  (* . *)
+
+  Definition AM_st_interp_interim
+    (extr: execution_trace Λ) (mtr: finite_trace (amSt AM) (Action * option (amRole AM)))
+      (τ: locale Λ) oτ': iProp Σ :=
+      match extr with
+      | {tr[ _ ]} => False
+      | extr' :tr[oζ]: c' =>
+          let c := trace_last extr' in
+          let δ := trace_last mtr in
+          (* gen_heap_interp c'.2.(heap) ∗ *)
+          asem_mti extr' mtr (asem_GS0 := aeGS) ∗
+          ⌜ locale_step c (Some τ) c' ⌝ ∗          
+          (* ⌜ extr_last_fork $ extr' :tr[oζ]: c' = oτ' ⌝ *)
+          ⌜ step_fork c c' = oτ' ⌝ ∗
+          ⌜ oζ = Some τ ⌝
+    end.
 
   Section AMU.
     Context {iGS: invGS_gen HasNoLc Σ}. 
 
+    Definition asem_valid_state_evolution_fairness
+      (extr : execution_trace Λ) auxtr (a: Action) :=
+      match extr, auxtr with
+      | (extr :tr[oζ]: σ), auxtr :tr[ℓ]: δ =>
+          asem_valid_evolution_step (trace_last extr) oζ σ (trace_last auxtr) ℓ δ /\
+          ℓ.1 = a
+      | _, _ => True
+      end.
+
     Definition AMU_impl
       (f: option (locale Λ)) E ζ (a: Action) (P : iProp Σ): iProp Σ :=
-      ∀ c c' δ, 
-        AM_st_interp_interim c c' δ ζ f ={E}=∗
-        ∃ δ' oρ, asem_msi c' δ' (asem_GS0 := aeGS) ∗
-                 ⌜ asem_valid_evolution_step c (Some ζ) c' δ (a, oρ) δ' ⌝ ∗
+      ∀ etr' mtr, 
+        AM_st_interp_interim etr' mtr ζ f ={E}=∗
+        ∃ δ' oρ, asem_mti etr' (mtr :tr[oρ]: δ') (asem_GS0 := aeGS) ∗
+                 ⌜ asem_valid_state_evolution_fairness etr' (mtr :tr[oρ]: δ') a ⌝ ∗
                  P
     .
 
@@ -73,7 +99,7 @@ Section AM_UPD.
     Lemma AMU_impl_wand f E ζ a P Q:
       (P -∗ Q) -∗ AMU_impl f E ζ a P -∗ AMU_impl f E ζ a Q.
     Proof using.
-      rewrite /AMU_impl. iIntros "PQ AMU" (???) "?".
+      rewrite /AMU_impl. iIntros "PQ AMU" (??) "?".
       iMod ("AMU" with "[$]") as (??) "(?&?&?)".
       iModIntro. do 2 iExists _. iFrame. by iApply "PQ".
     Qed.
@@ -111,10 +137,11 @@ Section AMU_HL.
     iIntros "AMU" (extr mtr) "TI'".
     simpl. destruct extr as [| extr c']; [done| ]. simpl.
     iDestruct "TI'" as "(?&MSI&->&%&%)".
-    iMod ("AMU" with "[MSI]") as "AMU".
-    { iFrame. iPureIntro. eauto. }
+    iMod ("AMU" $! (_ :tr[_]: _) with "[MSI]") as "AMU".
+    { iFrame. eauto. }
     iModIntro. iDestruct "AMU" as (??) "(?&%&?)".
     do 2 iExists _. iFrame. eauto.
+    iPureIntro. apply H1. 
   Qed. 
 
 End AMU_HL.
@@ -177,34 +204,32 @@ Section ProdASEM.
     asem_init_resource s.2 p.2 (asem_GS0 := pG.2)
   .
 
-  Definition prod_asem_msi `{pG: prod_asem_GS Σ}
-    (τ: cfg Λ) (p: amSt PM): iProp Σ :=
-    @asem_msi _ _ ASEM1 _ pG.1 τ p.1 ∗ @asem_msi _ _ ASEM2 _ pG.2 τ p.2.
+  (* Definition prod_asem_tsi `{pG: prod_asem_GS Σ} *)
+  (*   etr mtr: iProp Σ := *)
+  (*   @asem_mti _ _ ASEM1 _ pG.1 etr mtr ∗ @asem_mti _ _ ASEM2 _ pG.2 etr mtr.  *)
 
-  Lemma prod_asem_initialization Σ {pG: prod_asem_preGS Σ}:
-    forall (s1: amSt PM) (σ: cfg Λ) (p: prod_asem_init_param)
-      (INIT_ST: prod_asem_is_init σ s1),
-      ⊢ (|==> ∃ eGS: prod_asem_GS Σ,
-             prod_asem_init_resource s1 p (pG := eGS) ∗ 
-             prod_asem_msi σ s1 (pG := eGS)).
-  Proof using.
-    intros [s1 s2] σ [p1 p2] [??]. iStartProof. 
-    iMod (@asem_initialization _ _ ASEM1 _ pG.1 s1 σ p1) as "(%g1&I1&M1)"; [done| ].
-    iMod (@asem_initialization _ _ ASEM2 _ pG.2 s2 σ p2) as "(%g2&I2&M2)"; [done| ].
-    iModIntro. iExists (g1, g2). iFrame.
-  Qed.
+  (* Lemma prod_asem_initialization Σ {pG: prod_asem_preGS Σ}: *)
+  (*   forall (s1: amSt PM) (σ: cfg Λ) (p: prod_asem_init_param) *)
+  (*     (INIT_ST: prod_asem_is_init σ s1), *)
+  (*     ⊢ (|==> ∃ eGS: prod_asem_GS Σ, *)
+  (*            prod_asem_init_resource s1 p (pG := eGS) ∗  *)
+  (*            prod_asem_msi σ s1 (pG := eGS)). *)
+  (* Proof using. *)
+  (*   intros [s1 s2] σ [p1 p2] [??]. iStartProof.  *)
+  (*   iMod (@asem_initialization _ _ ASEM1 _ pG.1 s1 σ p1) as "(%g1&I1&M1)"; [done| ]. *)
+  (*   iMod (@asem_initialization _ _ ASEM2 _ pG.2 s2 σ p2) as "(%g2&I2&M2)"; [done| ]. *)
+  (*   iModIntro. iExists (g1, g2). iFrame. *)
+  (* Qed. *)
 
-
-  Program Definition ProdASEM: ActionSubEM Λ PM := {|
-    asem_Σ := #[@asem_Σ _ _ ASEM1; @asem_Σ _ _ ASEM2];
-    asem_valid_evolution_step := prod_asem_valid_evolution_step;
-    asem_initialization := prod_asem_initialization;
-  |}.
-  Next Obligation.
-    simpl. intros.
-    apply subG_inv in H as [??].
-    split; eapply asem_Σ_subG; solve_inG. 
-  Qed.
-
+  (* Program Definition ProdASEM: ActionSubEM Λ PM := {| *)
+  (*   asem_Σ := #[@asem_Σ _ _ ASEM1; @asem_Σ _ _ ASEM2]; *)
+  (*   asem_valid_evolution_step := prod_asem_valid_evolution_step; *)
+  (*   asem_initialization := prod_asem_initialization; *)
+  (* |}. *)
+  (* Next Obligation. *)
+  (*   simpl. intros. *)
+  (*   apply subG_inv in H as [??]. *)
+  (*   split; eapply asem_Σ_subG; solve_inG.  *)
+  (* Qed. *)
 
 End ProdASEM.

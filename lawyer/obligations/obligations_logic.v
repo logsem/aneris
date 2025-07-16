@@ -61,8 +61,10 @@ Section ProgramLogic.
       ⊢ BOU E LIM_STEPS ((th_phase_frag ζ π q -∗ P) ∗ ∃ d, cp π d ∗ th_phase_frag ζ π q) -∗
          AMU E ζ obls_act P (aeGS := oGS').
     Proof using.
-      rewrite /AMU /AMU_impl. iIntros "BOU" (c c' δ) "TI'".
-      rewrite /AM_st_interp_interim. iDestruct "TI'" as "(MSI&%STEP&%FORK)".
+      rewrite /AMU /AMU_impl. iIntros "BOU" (etr' mtr) "TI'".
+      rewrite /AM_st_interp_interim.
+      destruct etr' as [| etr τ c']; [done| ]. 
+      iDestruct "TI'" as "(MSI&%STEP&%FORK&->)".
 
       simpl. rewrite /obls_si. iDestruct "MSI" as "[MSI %CORR]".
       iMod (obls_msi_interim_progress with "[$] [BOU]") as "X".
@@ -72,7 +74,7 @@ Section ProgramLogic.
         iIntros "X". iApply "X". }
       iDestruct "X" as (δ') "(MSI & %PSTEP & PH & P)".
       iSpecialize ("P" with "[$]"). 
-      iModIntro. iExists δ', (Some ζ). iFrame. 
+      iModIntro. iExists δ', (obls_act, Some ζ). iFrame. 
       iPureIntro. simpl.
 
       assert (obls_cfg_corr c' δ') as OCC'.
@@ -84,7 +86,7 @@ Section ProgramLogic.
         - apply empty_difference_subseteq_L in FORK. set_solver.
         - eapply locale_step_sub; eauto. }
         
-      split; auto. split; [| auto].
+      split; auto. split; [| done]. split; [| done].
       red. repeat split; try by apply OCC' || done.
       simpl. eexists. split; eauto. by right.
     Qed.
@@ -98,8 +100,10 @@ Section ProgramLogic.
             ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝) (aeGS := oGS').
     Proof using.
       clear H1 H0 H. 
-      rewrite /AMU__f /AMU_impl. iIntros "BOU" (c c' δ) "TI'".
-      iDestruct "TI'" as "(MSI&%STEP&%FORK)". iFrame. 
+      rewrite /AMU__f /AMU_impl. iIntros "BOU" (etr' mtr) "TI'".
+      destruct etr' as [| etr τ c']; [done| ]. 
+      iDestruct "TI'" as "(MSI&%STEP&%FORK&->)".
+      iFrame. 
       iDestruct "MSI" as "(MSI&%OBLS&%DPO)".
       iMod (obls_msi_interim_omtrans_fork with "[$] [BOU]") as "X".
       3: { iApply (BOU_wand with "[-BOU] [$]"); try done.
@@ -112,7 +116,7 @@ Section ProgramLogic.
       iFrame "P".
       iModIntro. repeat setoid_rewrite bi.sep_exist_l.
       iDestruct (th_phase_msi_frag with "[$] PH3") as %PH_NEW.
-      iExists _, (Some ζ). do 2 iExists _. iFrame. iPureIntro.
+      iExists _, (obls_act, Some ζ). do 2 iExists _. iFrame. iPureIntro.
       apply and_assoc. split; [| done].
 
       destruct TRANS as (δ' & PSTEP & MFORK).
@@ -142,7 +146,7 @@ Section ProgramLogic.
         rewrite TOO' -DPO'. simpl.
         eapply elem_of_dom; eauto. }
       
-      split; [done| ]. simpl. split; auto.
+      split; [done| ]. simpl. split; [| done]. split; [| done].
       red. do 2 (split; auto). 
       eexists. split; eauto. by left.  
     Qed.
@@ -157,6 +161,7 @@ Section ProgramLogic.
         AMU__f E ζ ζ' obls_act P (aeGS := oGS').
     Proof using.
       simpl. iIntros "BOU".
+      rewrite /AMU__f.  
       iApply AMU_impl_wand.
       2: { iApply (BOU_AMU__f with "[$]"). }
       iIntros "[X Y]".

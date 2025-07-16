@@ -55,9 +55,11 @@ Section ObligationsEM.
       obls_cfg_corr σ2 δ2
   .
 
-  Definition obls_si `{!ObligationsGS Σ}
-    (σ: cfg Λ) (δ: mstate OM): iProp Σ :=
-      obls_msi δ ∗ ⌜ obls_cfg_corr σ δ ⌝. 
+  Definition obls_si `{!ObligationsGS Σ} (σ: cfg Λ) (δ: mstate OM): iProp Σ :=
+      obls_msi δ ∗ ⌜ obls_cfg_corr σ δ ⌝.
+
+  Definition obls_ti `{!ObligationsGS Σ} (etr: execution_trace Λ) (omtr: auxiliary_trace OM) := 
+    obls_si (trace_last etr) (trace_last omtr).
 
   Definition obls_init_resource `{!ObligationsGS Σ}
     (δ: mstate OM) (_: unit): iProp Σ :=
@@ -79,7 +81,7 @@ Section ObligationsEM.
 
   Lemma obls_resources_init Σ {PRE: ObligationsPreGS Σ}:
     ∀ s1 σ p (INIT: obls_is_init_st σ s1),
-        ⊢ |==> ∃ eGS: ObligationsGS Σ, obls_init_resource s1 p ∗ obls_si σ s1. 
+        ⊢ |==> ∃ eGS: ObligationsGS Σ, obls_init_resource s1 p ∗ obls_ti {tr[ σ ]} {tr[ s1 ]}.
   Proof using.
     clear H1 H0 H. 
     simpl. intros δ σ ? INIT. iStartProof.
@@ -259,13 +261,22 @@ Section ObligationsEM.
     fun c1 oτ c2 δ1 (aoτ: Action * olocale Λ) δ2 =>
       let '(a, oρ) := aoτ in
       from_option (fun ρ => obls_valid_evolution_step c1 oτ c2 δ1 ρ δ2) False oρ /\
-      a = obls_act. 
+      a = obls_act.
+
+  Definition obls_asem_mti `{!ObligationsGS Σ}
+    (etr: execution_trace Λ) (omtr: finite_trace (amSt OAM) (Action * option (amRole OAM))) :=
+    obls_si (trace_last etr) (trace_last omtr).
+
+  Lemma obls_asem_resources_init Σ {PRE: ObligationsPreGS Σ}:
+    ∀ s1 σ p (INIT: obls_is_init_st σ s1),
+        ⊢ |==> ∃ eGS: ObligationsGS Σ, obls_init_resource s1 p ∗ obls_asem_mti {tr[ σ ]} {tr[ s1 ]}.
+  Proof using. by apply obls_resources_init. Qed.
 
   Definition ObligationsASEM: ActionSubEM Λ (ObligationsAM) :=
     {| 
       asem_Σ := obls_Σ;
       asem_valid_evolution_step := obls_ves_wrapper;
-      asem_initialization := obls_resources_init;
+      asem_initialization := obls_asem_resources_init;
     |}.
        
 End ObligationsEM.
