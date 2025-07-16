@@ -10,29 +10,6 @@ From heap_lang Require Export heap_lang_defs tactics notation sswp_logic locales
 
 Close Scope Z.
 
-(** Some lemmas about HeapLang rely on concrete instances of EqDecision and Countable.
-    Therefore we construct ObligationsParams instance with these concrete instances using LocaleOP. *)
-(* TODO: find better solution *)
-Class ObligationsParamsPre (Degree Level: Type) (LIM_STEPS: nat) := { 
-    opar_deg_eqdec' :: EqDecision Degree;
-    opar_deg_cnt' :: Countable Degree;
-    deg_le' :: relation Degree;
-    deg_PO' :: PartialOrder deg_le';
-
-    opar_lvl_eqdec' :: EqDecision Level;
-    opar_lvl_cnt' :: Countable Level;
-    lvl_le' :: relation Level;
-    lvl_PO' :: PartialOrder lvl_le';
-  }.
-
-Global Instance LocaleOP
-  `{OPRE: ObligationsParamsPre Degree Level LIM_STEPS}
-  `{CNT: Countable Locale}:
-  ObligationsParams Degree Level Locale LIM_STEPS.
-Proof using.
-  esplit; try by apply OPRE. apply CNT.
-Defined.                 
-
 
 Section ProgramLogic.
   Context `{OfeDiscrete DegO} `{OfeDiscrete LevelO}.
