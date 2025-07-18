@@ -23,18 +23,25 @@ Section OblsAdequacy.
   Definition obls_st_rel (c: cfg heap_lang) (δ: mstate M) :=
     om_live_tids id locale_enabled c δ.
     
-  Definition obls_sim_rel (extr: execution_trace heap_lang) (omtr: auxiliary_trace M) :=
+  Definition obls_sim_rel_gen
+    (SR: cfg heap_lang -> mstate M -> Prop)
+    (extr: execution_trace heap_lang) (omtr: auxiliary_trace M) :=
     valid_state_evolution_fairness
       (obls_ves_wrapper: cfg heap_lang -> olocale heap_lang -> cfg heap_lang -> mstate M -> mlabel M -> mstate M -> Prop)
       extr omtr ∧
-    obls_st_rel (trace_last extr) (trace_last omtr).
+      SR (trace_last extr) (trace_last omtr).
 
-  Definition obls_om_traces_match: extrace heap_lang -> trace (mstate M) (mlabel M) -> Prop :=
+  Definition obls_sim_rel := obls_sim_rel_gen obls_st_rel. 
+
+  Definition obls_om_traces_match_gen (SR: cfg heap_lang -> mstate M -> Prop):
+    extrace heap_lang -> trace (mstate M) (mlabel M) -> Prop :=
     traces_match
       (fun oτ '(_, τ') => oτ = τ')
-      obls_st_rel
+      SR
       locale_step
       (@mtrans M).
+
+  Definition obls_om_traces_match := obls_om_traces_match_gen obls_st_rel.
 
   Hypotheses (FIN_LVL: finite.Finite LevelO) (FIN_DEG: finite.Finite DegO).
 
@@ -49,29 +56,32 @@ Section OblsAdequacy.
   Qed.
     
   Theorem om_simulation_adequacy_model_trace_multiple Σ
-        `{hPre: @heapGpreS Σ M EM} (s: stuckness)
+        `{hPre: @heapGpreS Σ M EM}
+        SR
+        (s: stuckness)
         (es: list expr) σ1 (s1: mstate M) p
         (INIT: em_is_init_st (es, σ1) s1 (ExecutionModel := EM))
         (extr : heap_lang_extrace)
         (Hvex : extrace_valid extr)
         (Hexfirst : trfirst extr = (es, σ1))
-        (LEN: length es ≥ 1):
-    wp_premise_multiple obls_sim_rel Σ s es σ1 s1 (p: @em_init_param _ _ EM) ->
+        (LEN: length es ≥ 1)
+        (FB: rel_finitary (obls_sim_rel_gen SR)):
+    wp_premise_multiple (obls_sim_rel_gen SR) Σ s es σ1 s1 (p: @em_init_param _ _ EM) ->
     ∃ (omtr: trace (mstate M) (mlabel M)),
-      obls_om_traces_match extr omtr ∧
+      obls_om_traces_match_gen SR extr omtr ∧
       trfirst omtr = s1.
   Proof using FIN_LVL FIN_DEG.
     intros PREM.
 
     unshelve epose proof (@strong_simulation_adequacy_traces_multiple_HL _ _ _ hPre s es σ1
                 s1
-                obls_sim_rel
+                (obls_sim_rel_gen SR)
                 p
                 extr
                 Hvex
                 ltac:(done)
                 obls_ves_wrapper
-                obls_st_rel
+                SR
                 (fun oτ '(_, τ') => oτ = τ')
                 _ _ _ _ _ _ _
       ) as SIM.
@@ -87,21 +97,24 @@ Section OblsAdequacy.
     { simpl. intros ?? SIM. apply SIM. }
     { simpl. intros ?? SIM. apply SIM. }
     { done. }
-    { apply obls_sim_rel_FB. }
+    { done. }
     { done. }
     eapply SIM; eauto. 
   Qed.
 
   Theorem om_simulation_adequacy_model_trace Σ
-        `{hPre: @heapGpreS Σ M EM} (s: stuckness)
+        `{hPre: @heapGpreS Σ M EM}
+        SR
+        (s: stuckness)
         (e1: expr) σ1 (s1: mstate M) p
         (INIT: em_is_init_st ([e1], σ1) s1 (ExecutionModel := EM))
         (extr : heap_lang_extrace)
         (Hvex : extrace_valid extr)
-        (Hexfirst : trfirst extr = ([e1], σ1)):
-    wp_premise obls_sim_rel Σ s e1 σ1 s1 (p: @em_init_param _ _ EM) ->
+        (Hexfirst : trfirst extr = ([e1], σ1))
+        (FB: rel_finitary (obls_sim_rel_gen SR)):
+    wp_premise (obls_sim_rel_gen SR) Σ s e1 σ1 s1 (p: @em_init_param _ _ EM) ->
     ∃ (omtr: trace (mstate M) (mlabel M)),
-      obls_om_traces_match extr omtr ∧
+      (obls_om_traces_match_gen SR) extr omtr ∧
       trfirst omtr = s1.
   Proof using FIN_LVL FIN_DEG.
     intros. eapply om_simulation_adequacy_model_trace_multiple; last first.
@@ -131,14 +144,18 @@ Section OblsAdequacy.
     by rewrite ITH in VALID. 
   Qed.
 
-  Lemma obls_matching_traces_OM extr mtr
-    (MATCH: obls_om_traces_match extr mtr)
+  Lemma obls_matching_traces_OM SR extr mtr
+    (SR_LIVE: forall c δ, SR c δ -> obls_st_rel c δ)
+    (MATCH: obls_om_traces_match_gen SR extr mtr)
     (WF0: om_st_wf (trfirst mtr))
     :
-    ∃ (omtr: obls_trace), exec_OM_traces_match extr omtr ∧ om_tr_wf omtr /\
-            trfirst omtr = trfirst mtr.
+    ∃ (omtr: obls_trace),
+      exec_OM_traces_match extr omtr ∧
+      traces_match (fun _ _ => True) SR (fun _ _ _ => True) (fun _ _ _ => True) extr omtr /\
+      om_tr_wf omtr /\
+      trfirst omtr = trfirst mtr.
   Proof using.
-    clear -MATCH OM WF0.
+    clear -MATCH OM WF0 SR_LIVE.
     assert (exists omtr, traces_match (fun ℓ τ => ℓ.2 = Some τ) eq (@mtrans M) (@mtrans OM) mtr omtr) as [omtr MATCHo].
     { clear -MATCH mtr.
       exists (project_nested_trace id ((mbind Some) ∘ snd) mtr).
@@ -166,15 +183,17 @@ Section OblsAdequacy.
               extr omtr) as MATCH''.
     { eapply trace_utils.traces_match_impl; [..| apply MATCH'].
       - simpl. intros ?? ([??] & <- & ?). done.
-      - simpl. intros ?? (? & ? & ?). subst. eauto. }
+      - simpl. intros ?? (? & ? & ?). subst. 
+        eapply SR_LIVE; eauto. }
 
-    eexists. split; eauto. split.
+    eexists. split; eauto. split_and !.
+    - admit. (* TODO: strenghten traces_match_impl *)       
     - eapply om_st_wf_tr.
       + eapply traces_match_valid2; eauto.
       + apply traces_match_first in MATCHo.
         by rewrite MATCHo in WF0.
     - by apply traces_match_first in MATCHo.
-  Qed.
+  Admitted. 
 
   Lemma exec_om_fairness_preserved extr omtr τ:
       exec_OM_traces_match extr omtr ->
@@ -208,7 +227,8 @@ Section OblsAdequacy.
   Proof using WF_LVL WF_DEG.
     clear -MATCH FAIR OM OM_WF0 WF_LVL WF_DEG.
 
-    pose proof (obls_matching_traces_OM _ _ MATCH OM_WF0) as (omtr & MATCH'' & OM_WF & FIRST''). 
+    opose proof (obls_matching_traces_OM _ _ _ _ MATCH OM_WF0) as (omtr & MATCH'' & OM_WF & FIRST'' & ?).
+    { done. }
 
     assert (forall τ, obls_trace_fair τ omtr) as OM_FAIR.
     { intros. eapply exec_om_fairness_preserved; eauto. } 
@@ -244,8 +264,9 @@ Section OblsAdequacy.
     rewrite /extrace_fairly_terminating.
     intros Hwp VALID FAIR.
 
-    destruct (om_simulation_adequacy_model_trace_multiple
-                Σ _ es _ s1 _ INIT _ VALID Hexfirst LEN Hwp) as (omtr&MATCH&OM0).
+    odestruct (om_simulation_adequacy_model_trace_multiple
+                Σ _ _ es _ s1 _ INIT _ VALID Hexfirst LEN _ Hwp) as (omtr&MATCH&OM0).
+    { apply obls_sim_rel_FB. }
 
     eapply obls_matching_traces_termination; eauto.
     rewrite OM0. simpl in INIT.
@@ -490,6 +511,7 @@ Section OblsAdequacy.
     ∃ omtr, exec_OM_traces_match extr omtr ∧ om_tr_wf omtr /\ trfirst omtr = δ. 
   Proof.
     forward eapply om_simulation_adequacy_model_trace_multiple; eauto.
+    - apply obls_sim_rel_FB. 
     - red. intros ?. iStartProof. iIntros "[HEAP INIT] !>".
       set (hGS := {| heap_iemgs := Hinv |}). 
       iPoseProof (WPe hGS with "[$HEAP $INIT]") as "foo".
@@ -501,9 +523,9 @@ Section OblsAdequacy.
         by iApply om_sim_RAH_multiple.
     - intros (?&?&?).
       rewrite -H3.
-      eapply obls_matching_traces_OM; eauto.
-      rewrite H3. eapply obls_init_wf.
-      eauto.
+      opose proof * (obls_matching_traces_OM) as (omtr & COND); eauto.
+      { rewrite H3. eapply obls_init_wf. eauto. }
+      exists omtr. split_and !; apply COND. 
   Qed.
 
   Lemma obls_match_impl Σ
