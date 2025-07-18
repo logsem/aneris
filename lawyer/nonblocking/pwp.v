@@ -1,0 +1,311 @@
+From iris.proofmode Require Import tactics.
+From trillium.traces Require Import inftraces trace_lookup exec_traces trace_len. 
+From trillium.program_logic Require Import execution_model weakestpre adequacy simulation_adequacy_em_cond. 
+From trillium.prelude Require Import classical.
+From fairness Require Import fairness.
+From lawyer Require Import program_logic sub_action_em action_model.
+From lawyer.examples Require Import orders_lib obls_tactics.
+From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am.
+From heap_lang Require Import lang.
+From lawyer.nonblocking Require Import trace_context.
+
+
+Close Scope Z.
+
+
+Definition LoopingModel: Model :=
+  {| mstate := unit; mlabel := unit; mtrans := fun _ _ _ => True |}.
+
+(* Class LoopIrisG {Λ: language} Σ := { *)
+(*     lig_inner :: irisG Λ LoopingModel Σ *)
+(* }. *)
+
+
+Section CallInTrace.
+  Context (tr: extrace heap_lang). 
+  Context (m: val). (** the method under consideration *)
+  
+  Definition expr_under '(TraceCtx i τ K) (e: expr) :=
+    exists c, tr S!! i = Some c /\ from_locale c.1 τ = Some (ectx_fill K e).
+
+  Definition call_at tc (a: val) :=
+    expr_under tc (App (of_val m) (of_val a)). 
+
+  Definition return_at tc (r: val) :=
+    expr_under tc (of_val r).
+
+  (* TODO: rename *)
+  Definition expr_under_expr tc :=
+    exists e, expr_under tc e /\ to_val e = None. 
+  
+  Definition has_return '(TraceCtx i τ K as tc) :=
+    exists j r, i <= j /\ return_at (TraceCtx j τ K) r.
+
+  Definition always_returns := 
+    forall tc a, fair_ex (tctx_tid tc) tr -> call_at tc a -> has_return tc.
+  
+End CallInTrace.
+
+
+Section SimpleExample.
+
+  Definition mk_ref: val :=
+    λ: "v",
+      let: "l" := ref "v" in
+      "l"
+  .
+
+  Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
+  Context `{EM: ExecutionModel heap_lang M}.
+  Notation "'Degree'" := (om_hl_Degree). 
+  Notation "'Level'" := (om_hl_Level).  
+
+  Context {Σ} {OHE: OM_HL_Env OP EM Σ}.
+
+  Context (d: Degree). 
+
+  Lemma mk_ref_spec τ π q (a: val):
+    {{{ cp_mul π d 5 ∗ th_phase_frag τ π q }}}
+        mk_ref a @ τ
+    {{{ (l: loc), RET #l; l ↦ a ∗ th_phase_frag τ π q }}}.
+  Proof using.
+    iIntros (Φ) "(CPS & PH) POST". rewrite /mk_ref. 
+    pure_steps.
+    wp_bind (ref _)%E.
+    iApply sswp_MU_wp; [done| ].
+    iApply wp_alloc. iModIntro. iIntros (l) "L _".
+    MU_by_burn_cp.
+    pure_steps.
+    wp_bind (Rec _ _ _)%E. pure_steps.
+    iApply "POST". by iFrame.
+  Qed.
+
+End SimpleExample.
+
+
+(* Section WaitFreeSpec. *)
+
+(*   Instance OP_HL_WF: OP_HL unit unit WF_SB := {| om_hl_OPRE := OPP_WF |}. *)
+
+(*   Notation "'Degree'" := (om_hl_Degree).  *)
+(*   Notation "'Level'" := (om_hl_Level). *)
+(*   Let d0: Degree := tt. *)
+
+(*   Definition om_wfree_init (i: nat): ProgressState. *)
+(*   Admitted. *)
+
+(*   (* TODO: support invariants in precondition *) *)
+(*   (* TODO: relax to non-trivial degrees *) *)
+(*   (* TODO: remove phases? *) *)
+(*   Definition wait_free_spec (m: val) := *)
+(*     exists N,  *)
+(*       forall {M EM} Σ {OHE: OM_HL_Env OP_HL_WF EM Σ}  *)
+(*         τ π q (a: val), *)
+(*       let _ := @IEM_irisG _ M HeapLangEM EM Σ _ in *)
+(*       {{{ cp_mul π d0 N ∗ th_phase_frag τ π q }}} *)
+(*         m a @ τ *)
+(*       {{{ v, RET v; th_phase_frag τ π q }}}. *)
+
+(*   Lemma mk_ref_WF_spec: wait_free_spec mk_ref. *)
+(*   Proof using. *)
+(*     red. exists 5. intros. *)
+(*     iIntros "(CPS & PH) POST". *)
+(*     iApply (mk_ref_spec with "[-POST]"). *)
+(*     { iFrame. } *)
+(*     iIntros "!> % (?&?)". iApply "POST". iFrame. *)
+(*   Qed. *)
+
+(* End WaitFreeSpec. *)
+
+Definition WF_SB := 1.
+
+Instance OPP_WF: ObligationsParamsPre (bounded_nat 2) unit WF_SB.
+esplit; try by apply _.
+- apply nat_bounded_PO.
+- apply unit_PO.
+Defined.
+
+Section WFAdequacy.
+
+  Let OP := LocaleOP (OPRE := OPP_WF) (Locale := locale heap_lang).
+  Existing Instance OP.
+  Let OM := ObligationsModel.
+  Notation "'Degree'" := (bounded_nat 2). 
+  Notation "'Level'" := (unit).
+
+  Let d0: Degree. refine (ith_bn 2 0 _). abstract lia. Defined. 
+  Let d1: Degree. refine (ith_bn 2 1 _). abstract lia. Defined. 
+  Let l0: Level := tt.
+
+  Let M := AM2M ObligationsAM.
+  Let ASEM := ObligationsASEM.
+  Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} τ _ => obls τ ∅ (oGS := aGS)).
+
+  Context (ic: @trace_ctx heap_lang).
+  Context (m: val).
+
+  Definition fits_inf_call: execution_trace heap_lang → Prop.
+  Admitted.
+
+  Definition PR_wfree {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
+    (iG := IEM_irisG HeapLangEM EM)
+    : ProgressResource state_interp fork_post fits_inf_call.
+  Admitted.
+
+  Instance fic_dec: ∀ ex, Decision (fits_inf_call ex).
+  Proof. Admitted.
+
+  Lemma fic_fpc: filter_pref_closed fits_inf_call.
+  Proof. Admitted.
+
+  Theorem om_simulation_adequacy_model_trace_multiple_waitfree Σ
+        `{hPre: @heapGpreS Σ M EM} (s: stuckness)
+        (es: list expr) σ1 (s1: mstate M) p
+        (INIT: em_is_init_st (es, σ1) s1 (ExecutionModel := EM))
+        (extr : extrace heap_lang)
+        (Hvex : extrace_valid extr)
+        (Hexfirst : trfirst extr = (es, σ1))
+        (LEN: length es ≥ 1):
+    PR_premise_multiple obls_sim_rel fits_inf_call Σ s es σ1 s1 (p: @em_init_param _ _ EM) ->
+    (∃ omtr, obls_om_traces_match extr omtr ∧ trfirst omtr = s1) \/
+    (exists k, ¬ fits_inf_call (trace_take_fwd k extr)).
+  Proof using.
+    intros PREM.
+
+    unshelve epose proof (@PR_strong_simulation_adequacy_traces_multiple _ _ EM 
+                            HeapLangEM obls_sim_rel fits_inf_call
+                            _ _ _ _ _ 
+                            s es σ1 s1 p
+                extr
+                Hvex
+                ltac:(done)
+                obls_ves_wrapper
+                obls_st_rel
+                (fun oτ '(_, τ') => oτ = τ')
+                _ _ _ _ _ _ _
+                PREM
+      ) as SIM.
+    { apply fic_fpc. }
+    { simpl. intros ????[??]? STEP.
+      red in STEP. simpl in STEP. destruct STEP as [STEP ->].
+      destruct o; [| done].
+      simpl in STEP. red in STEP. apply STEP. }
+    { simpl. intros ????[??]? STEP.
+      red in STEP. simpl in STEP. destruct STEP as [STEP ->].
+      destruct o; [| done].
+      simpl in STEP. red in STEP.
+      constructor. apply STEP. }
+    { simpl. intros ?? SIM. apply SIM. }
+    { simpl. intros ?? SIM. apply SIM. }
+    { done. }
+    { apply obls_sim_rel_FB.
+      all: by apply _. }
+    { done. }
+
+    done.
+  Qed.
+
+  Theorem simple_om_simulation_adequacy_terminate_multiple_waitfree Σ
+        `{hPre: @heapGpreS Σ M EM} (s: stuckness)
+        es σ1 (s1: mstate M) p
+        (INIT: em_is_init_st (es, σ1) s1 (ExecutionModel := EM))
+        (extr : extrace heap_lang)
+        (Hexfirst : trfirst extr = (es, σ1))
+        (LEN: length es ≥ 1):
+    PR_premise_multiple obls_sim_rel fits_inf_call Σ s es σ1 s1 (p: @em_init_param _ _ EM) ->
+    (extrace_fairly_terminating extr \/
+    (exists k, ¬ fits_inf_call (trace_take_fwd k extr))).
+  Proof.
+    (* TODO: execution trace should be only fair by τ. *)
+    (* TODO: need to prove that the obtained OM trace is obls-fair.
+       For this we need to exploit the fact that only τ has obligations 
+       --- but so far nothing enforces it.
+       Need to try using trace_inv
+     *)
+
+  (*   rewrite /extrace_fairly_terminating. *)
+  (*   intros Hwp VALID FAIR. *)
+
+  (*   destruct (om_simulation_adequacy_model_trace_multiple *)
+  (*               Σ _ es _ s1 _ INIT _ VALID Hexfirst LEN Hwp) as (omtr&MATCH&OM0). *)
+
+  (*   eapply obls_matching_traces_termination; eauto. *)
+  (*   rewrite OM0. simpl in INIT. *)
+  (*   eapply obls_init_wf; eauto.  *)
+  (* Qed. *)
+  Abort. 
+
+  (* TODO: rename *)
+  Lemma obls_terminates_impl_multiple_waitfree Σ {HEAP: @heapGpreS Σ M EM}
+    (extr : extrace heap_lang)
+    a
+    (* (es: list expr) *)
+    (* (σ: state) *)
+    (* δ *)
+    (* (Hexfirst : trfirst extr = (es, σ)) *)
+    (ETR0: exists e0, (trfirst extr).1 = [subst "m" m e0])
+    (* (LEN: length es >= 1) *)
+    (* (OM_INIT: obls_is_init_st (es, σ) δ) *)
+    (* (LIVE0: om_live_tids id locale_enabled (es, σ) δ) *)
+    (VALID: extrace_valid extr)
+    (CALL: call_at extr m ic a)
+    (* ~= this should be provable for arbitrary client of WF method *)
+    (* (WPe: forall (HEAP: @heapGS Σ M EM), ⊢ (([∗ map] l↦v ∈ heap σ, l ↦ v) ∗ *)
+    (*                                  (@em_init_resource heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) δ tt))%I *)
+    (*         ={⊤}=∗ *)
+    (*         let Φs := map (fun τ v => @em_thread_post heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) τ v) (seq 0 (length es)) in *)
+    (*           wptp NotStuck es Φs) *)
+
+    :
+    extrace_fairly_terminating extr \/ has_return extr ic. 
+  Proof.
+    unshelve epose proof (simple_om_simulation_adequacy_terminate_multiple Σ NotStuck
+                  _ _ _ _
+                  _ _ Hexfirst) as FAIR_TERM; eauto.
+    { exact tt. }
+    
+    apply FAIR_TERM; auto. 
+    red. intros ?. iStartProof. iIntros "[HEAP INIT]".
+    set (hGS := {| heap_iemgs := Hinv |}). 
+    iPoseProof (WPe hGS with "[$HEAP $INIT]") as "foo".
+    rewrite locales_of_list_indexes indexes_seq.
+    iSplitR; [| iSplitL].
+    - by iApply hl_config_wp.
+    - done. 
+    - iApply om_sim_RAH_multiple. eauto. 
+  Qed.
+
+
+
+  Theorem mk_ref_wait_free:
+    forall etr,
+    (exists e0, (trfirst etr).1 = [subst "m" mk_ref e0]) ->
+    extrace_valid etr -> always_returns etr mk_ref.
+  Proof using.
+    intros etr CLIENT VALID. red. intros τ FAIR i K a.
+    red. intros CALL.
+    epose proof (Classical_Prop.classic _) as [X | NORET]; [by apply X| ].
+    assert (infinite_trace etr) as INF.
+    { clear -CALL NORET FAIR.
+      pose proof (trace_has_len etr) as [len LEN].
+      eapply infinite_trace_equiv; eauto.
+      destruct len; [done| ].
+      admit. }    
+    (* assert (forall j, j <= i -> expr_under_expr etr (TraceCtx j τ K)) as ALW. *)
+    (* { intros j LE. red. *)
+    (*   admit. } *)
+   
+    (* pose proof not_exists_forall_not. *)
+    (* fold all in H.  *)
+    (* Ltac not_ex_into_all_not H :=  *)
+    (*   pose proof @not_exists_forall_not as Y; *)
+    (*   specialize (Y _ _ H); simpl in Y; clear H; simpl in Y; rename Y into H.  *)
+    (* not_ex_into_all_not INF.  *)
+    (* apply (@not_exists_forall_not _ (fun (j: nat) => _) _) in INF.  *)
+    (* by_classical_contradiction *)
+
+    assert (∃ omtr, exec_OM_traces_match etr omtr ∧ om_tr_wf omtr /\ trfirst omtr = om_wfree_init i) as (omtr & MATCH & WF & OM0).
+    { admit. }
+    
+
+End WFAdequacy.

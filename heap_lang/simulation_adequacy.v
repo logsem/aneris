@@ -6,11 +6,13 @@ From fairness Require Export fairness.
 From heap_lang Require Export heap_lang_defs lang.
 
 
+(* TODO: move *)
 Definition heap_lang_extrace : Type := extrace heap_lang.
 
 
 Section adequacy.
 
+  (* TODO: remove? *)
   Theorem strong_simulation_adequacy_traces_multiple_HL Σ
     `{hPre: @heapGpreS Σ M EM} (s: stuckness) 
     (es: list expr) σ1 (s1: M)
@@ -46,6 +48,7 @@ Section adequacy.
     esplit; try by (apply _ || apply hPre). 
   Qed.
 
+  (* TODO: remove? *)
   Theorem strong_simulation_adequacy_traces_HL Σ
     `{hPre: @heapGpreS Σ M EM} (s: stuckness)
     (e1 : expr) σ1 (s1: M)
