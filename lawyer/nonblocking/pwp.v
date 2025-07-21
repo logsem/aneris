@@ -318,13 +318,16 @@ Section WFAdequacy.
 End WFAdequacy.
 
 
-Theorem wfree_is_wait_free etr m
-  (ETR0: exists e0, (trfirst etr).1 = [subst "m" m e0])
-  (SPEC: wait_free_spec m)
-  (VALID: extrace_valid etr):
+Definition wait_free (m: val) := 
+  forall etr, (exists e0, (trfirst etr).1 = [subst "m" m e0]) -> extrace_valid etr ->
   always_returns etr m.
+
+Theorem wfree_is_wait_free m
+  (SPEC: wait_free_spec m):
+  wait_free m. 
 Proof using.
-  red. intros tc a FAIR CALL.    
+  red. intros etr ETR0 VALID.
+  red. intros tc a FAIR CALL. 
 
   eapply simple_om_simulation_adequacy_terminate_multiple_waitfree in ETR0; eauto.
   destruct ETR0 as [TERM | NO_INF_CALL].
@@ -334,3 +337,11 @@ Proof using.
     (** if it's infinite, there must've been return at k *)
     admit. 
 Admitted.
+
+
+Theorem mk_ref_is_wait_free: wait_free mk_ref.
+Proof using.
+  apply wfree_is_wait_free.
+  apply mk_ref_WF_spec.
+Qed.
+
