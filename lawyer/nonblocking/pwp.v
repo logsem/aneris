@@ -82,48 +82,52 @@ Section SimpleExample.
 
 End SimpleExample.
 
-
-(* Section WaitFreeSpec. *)
-
-(*   Instance OP_HL_WF: OP_HL unit unit WF_SB := {| om_hl_OPRE := OPP_WF |}. *)
-
-(*   Notation "'Degree'" := (om_hl_Degree).  *)
-(*   Notation "'Level'" := (om_hl_Level). *)
-(*   Let d0: Degree := tt. *)
-
-(*   Definition om_wfree_init (i: nat): ProgressState. *)
-(*   Admitted. *)
-
-(*   (* TODO: support invariants in precondition *) *)
-(*   (* TODO: relax to non-trivial degrees *) *)
-(*   (* TODO: remove phases? *) *)
-(*   Definition wait_free_spec (m: val) := *)
-(*     exists N,  *)
-(*       forall {M EM} Σ {OHE: OM_HL_Env OP_HL_WF EM Σ}  *)
-(*         τ π q (a: val), *)
-(*       let _ := @IEM_irisG _ M HeapLangEM EM Σ _ in *)
-(*       {{{ cp_mul π d0 N ∗ th_phase_frag τ π q }}} *)
-(*         m a @ τ *)
-(*       {{{ v, RET v; th_phase_frag τ π q }}}. *)
-
-(*   Lemma mk_ref_WF_spec: wait_free_spec mk_ref. *)
-(*   Proof using. *)
-(*     red. exists 5. intros. *)
-(*     iIntros "(CPS & PH) POST". *)
-(*     iApply (mk_ref_spec with "[-POST]"). *)
-(*     { iFrame. } *)
-(*     iIntros "!> % (?&?)". iApply "POST". iFrame. *)
-(*   Qed. *)
-
-(* End WaitFreeSpec. *)
-
+Definition WF_Degree := bounded_nat 2.
 Definition WF_SB := 1.
 
-Instance OPP_WF: ObligationsParamsPre (bounded_nat 2) unit WF_SB.
+Instance OPP_WF: ObligationsParamsPre WF_Degree unit WF_SB.
 esplit; try by apply _.
 - apply nat_bounded_PO.
 - apply unit_PO.
 Defined.
+
+
+Section WaitFreeSpec.
+
+  Instance OP_HL_WF: OP_HL WF_Degree unit WF_SB := {| om_hl_OPRE := OPP_WF |}.
+
+  Notation "'Degree'" := (om_hl_Degree).
+  Notation "'Level'" := (om_hl_Level).
+
+  Let d0: Degree. refine (ith_bn 2 0 _). abstract lia. Defined. 
+  Let d1: Degree. refine (ith_bn 2 1 _). abstract lia. Defined. 
+  Let l0: Level := tt.
+
+  (* Definition om_wfree_init (i: nat): ProgressState. *)
+  (* Admitted. *)
+
+  (* TODO: support invariants in precondition *)
+  (* TODO: relax to non-trivial degrees *)
+  (* TODO: remove phases? *)
+  Definition wait_free_spec (m: val) :=
+    exists N,
+      forall {M EM} Σ {OHE: OM_HL_Env OP_HL_WF EM Σ}
+        τ π q (a: val),
+      let _ := @IEM_irisG _ M HeapLangEM EM Σ _ in
+      {{{ cp_mul π d0 N ∗ th_phase_frag τ π q }}}
+        m a @ τ
+      {{{ v, RET v; th_phase_frag τ π q }}}.
+
+  Lemma mk_ref_WF_spec: wait_free_spec mk_ref.
+  Proof using.
+    red. exists 5. intros.
+    iIntros "(CPS & PH) POST".
+    iApply (mk_ref_spec with "[-POST]").
+    { iFrame. }
+    iIntros "!> % (?&?)". iApply "POST". iFrame.
+  Qed.
+
+End WaitFreeSpec.
 
 Section WFAdequacy.
 
@@ -133,9 +137,9 @@ Section WFAdequacy.
   Notation "'Degree'" := (bounded_nat 2). 
   Notation "'Level'" := (unit).
 
-  Let d0: Degree. refine (ith_bn 2 0 _). abstract lia. Defined. 
-  Let d1: Degree. refine (ith_bn 2 1 _). abstract lia. Defined. 
-  Let l0: Level := tt.
+  (* Let d0: Degree. refine (ith_bn 2 0 _). abstract lia. Defined.  *)
+  (* Let d1: Degree. refine (ith_bn 2 1 _). abstract lia. Defined.  *)
+  (* Let l0: Level := tt. *)
 
   Let M := AM2M ObligationsAM.
   Let ASEM := ObligationsASEM.
@@ -222,30 +226,53 @@ Section WFAdequacy.
     done.
   Qed.
 
-  (* Hypotheses (WF_LVL: well_founded (strict lvl_le)) (WF_DEG: well_founded (strict deg_le)). *)
+  Definition init_om_wfree_state (c: cfg heap_lang): ProgressState.
+  Admitted.
 
-  Theorem simple_om_simulation_adequacy_terminate_multiple_waitfree Σ
-        `{hPre: @heapGpreS Σ M EM} (s: stuckness)
-        es σ1 (s1: mstate M) p
-        (INIT: em_is_init_st (es, σ1) s1 (ExecutionModel := EM))
-        (extr : extrace heap_lang)
-        (Hexfirst : trfirst extr = (es, σ1))
-        (LEN: length es ≥ 1):
-    PR_premise_multiple obls_sim_rel_wfree fits_inf_call Σ s es σ1 s1 (p: @em_init_param _ _ EM) ->
+  Lemma init_om_wfree_is_init c:
+    obls_is_init_st c (init_om_wfree_state c).
+  Proof using. Admitted. 
+
+  Lemma PR_premise_wfree `{hPre: @heapGpreS Σ M EM} c
+        (ETR0: exists e0, c.1 = [subst "m" m e0])
+        (SPEC: wait_free_spec m):
+  PR_premise_multiple obls_sim_rel_wfree fits_inf_call Σ MaybeStuck c.1 c.2
+    (init_om_wfree_state c) ((): @em_init_param _ _ EM).
+  Proof using.
+    red in SPEC.
+  Admitted.
+
+  Definition wfreeΣ: gFunctors.
+  Admitted.
+
+  Instance wfree_pre: @heapGpreS wfreeΣ M EM.
+  Admitted. 
+
+  Theorem simple_om_simulation_adequacy_terminate_multiple_waitfree extr
+        (ETR0: exists e0, (trfirst extr).1 = [subst "m" m e0])
+        (SPEC: wait_free_spec m):
     extrace_valid extr -> 
     fair_ex (tctx_tid ic) extr ->
     terminating_trace extr \/ exists k, ¬ fits_inf_call (trace_take_fwd k extr).
   Proof.
-    intros Hwp VALID FAIR.
+    intros VALID FAIR.
+    destruct ETR0 as [e0 ETR0]. 
+
+    opose proof (om_simulation_adequacy_model_trace_multiple_waitfree
+                wfreeΣ _ (trfirst extr).1 _ _ _ _ _ VALID _ _ _) as ADEQ.
+    { apply init_om_wfree_is_init. }
+    { apply surjective_pairing. }
+    { rewrite ETR0. simpl. lia. } 
+    { rewrite -surjective_pairing. 
+      eapply PR_premise_wfree; eauto. }
     
-    pose proof (om_simulation_adequacy_model_trace_multiple_waitfree
-                Σ _ es _ s1 _ INIT _ VALID Hexfirst LEN Hwp) as ADEQ.
     destruct ADEQ as [(mtr & MATCH & OM0) | RET]. 
     2: { right. done. } 
     left. 
     opose proof (obls_matching_traces_OM _ _ _ _ MATCH _) as (omtr & MATCH'' & SR & OM_WF & FIRST'').
     { intros ?? X. apply X. }
-    { simpl in INIT. rewrite OM0. eapply obls_init_wf; eauto. }
+    { eapply obls_init_wf. rewrite OM0. apply init_om_wfree_is_init. }
+ 
     assert (forall τ, obls_trace_fair τ omtr) as OM_FAIR.
     { intros.
       destruct (decide (τ = tctx_tid ic)) as [-> | NEQ].
@@ -269,63 +296,41 @@ Section WFAdequacy.
     + apply fin_wf.
   Qed.
 
-  Definition init_om_wfree_state (c: cfg heap_lang): ProgressState.
-  Admitted.
-
   (* TODO: rename *)
-  Lemma obls_terminates_impl_multiple_waitfree Σ {HEAP: @heapGpreS Σ M EM}
+  Lemma obls_terminates_impl_multiple_waitfree
     (extr : extrace heap_lang) a
     (ETR0: exists e0, (trfirst extr).1 = [subst "m" m e0])
     (VALID: extrace_valid extr)
     (FAIR: fair_ex (tctx_tid ic) extr)
     (CALL: call_at extr m ic a)
+    (SPEC: wait_free_spec m)
     :
     terminating_trace extr \/ has_return extr ic. 
   Proof.
-    destruct ETR0 as (?& X).
-    destruct (trfirst extr) as [? σ] eqn:ETR0. simpl in X. subst. 
-    unshelve opose proof (simple_om_simulation_adequacy_terminate_multiple_waitfree Σ NotStuck
-                  _ _ _ _
-                  _ _ ETR0 _ _ _ _) as ADEQ; eauto.
-    { exact (init_om_wfree_state (trfirst extr)). }
-    { admit. }
-    { admit. }
+    opose proof * (simple_om_simulation_adequacy_terminate_multiple_waitfree) as ADEQ; eauto.
 
     destruct ADEQ; [tauto| ].
     right. red.
     destruct ic. simpl in *.
 
   Admitted.
-  
-  (* Theorem mk_ref_wait_free: *)
-  (*   forall etr, *)
-  (*   (exists e0, (trfirst etr).1 = [subst "m" mk_ref e0]) -> *)
-  (*   extrace_valid etr -> always_returns etr mk_ref. *)
-  (* Proof using. *)
-  (*   intros etr CLIENT VALID. red. intros τ FAIR i K a. *)
-  (*   red. intros CALL. *)
-  (*   epose proof (Classical_Prop.classic _) as [X | NORET]; [by apply X| ]. *)
-  (*   assert (infinite_trace etr) as INF. *)
-  (*   { clear -CALL NORET FAIR. *)
-  (*     pose proof (trace_has_len etr) as [len LEN]. *)
-  (*     eapply infinite_trace_equiv; eauto. *)
-  (*     destruct len; [done| ]. *)
-  (*     admit. }     *)
-  (*   (* assert (forall j, j <= i -> expr_under_expr etr (TraceCtx j τ K)) as ALW. *) *)
-  (*   (* { intros j LE. red. *) *)
-  (*   (*   admit. } *) *)
-   
-  (*   (* pose proof not_exists_forall_not. *) *)
-  (*   (* fold all in H.  *) *)
-  (*   (* Ltac not_ex_into_all_not H :=  *) *)
-  (*   (*   pose proof @not_exists_forall_not as Y; *) *)
-  (*   (*   specialize (Y _ _ H); simpl in Y; clear H; simpl in Y; rename Y into H.  *) *)
-  (*   (* not_ex_into_all_not INF.  *) *)
-  (*   (* apply (@not_exists_forall_not _ (fun (j: nat) => _) _) in INF.  *) *)
-  (*   (* by_classical_contradiction *) *)
-
-  (*   assert (∃ omtr, exec_OM_traces_match etr omtr ∧ om_tr_wf omtr /\ trfirst omtr = om_wfree_init i) as (omtr & MATCH & WF & OM0). *)
-  (*   { admit. } *)
-    
-
+     
 End WFAdequacy.
+
+
+Theorem wfree_is_wait_free etr m
+  (ETR0: exists e0, (trfirst etr).1 = [subst "m" m e0])
+  (SPEC: wait_free_spec m)
+  (VALID: extrace_valid etr):
+  always_returns etr m.
+Proof using.
+  red. intros tc a FAIR CALL.    
+
+  eapply simple_om_simulation_adequacy_terminate_multiple_waitfree in ETR0; eauto.
+  destruct ETR0 as [TERM | NO_INF_CALL].
+  - (** if it's finite, then τ should've reduced to a value *)
+    admit. 
+  - (** if it's finite, see above *)
+    (** if it's infinite, there must've been return at k *)
+    admit. 
+Admitted.
