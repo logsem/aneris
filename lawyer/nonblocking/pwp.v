@@ -5,20 +5,12 @@ From trillium.prelude Require Import classical.
 From fairness Require Import fairness.
 From lawyer Require Import program_logic sub_action_em action_model.
 From lawyer.examples Require Import orders_lib obls_tactics.
+From lawyer.nonblocking Require Import trace_context om_wfree_inst mk_ref.
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am obls_termination.
 From heap_lang Require Import lang.
-From lawyer.nonblocking Require Import trace_context.
 
 
 Close Scope Z.
-
-
-Definition LoopingModel: Model :=
-  {| mstate := unit; mlabel := unit; mtrans := fun _ _ _ => True |}.
-
-(* Class LoopIrisG {Λ: language} Σ := { *)
-(*     lig_inner :: irisG Λ LoopingModel Σ *)
-(* }. *)
 
 
 Section CallInTrace.
@@ -47,99 +39,30 @@ Section CallInTrace.
 End CallInTrace.
 
 
-Section SimpleExample.
+(* TODO: support invariants in precondition *)
+(* TODO: relax to non-trivial degrees *)
+(* TODO: remove phases? *)
+Definition wait_free_spec (m: val) :=
+  exists N,
+  forall {M EM} Σ {OHE: OM_HL_Env OP_HL_WF EM Σ}
+    τ π q (a: val),
+    let _ := @IEM_irisG _ M HeapLangEM EM Σ _ in
+    {{{ cp_mul π d_wfr0 N ∗ th_phase_frag τ π q }}}
+      m a @ τ
+    {{{ v, RET v; th_phase_frag τ π q }}}.
 
-  Definition mk_ref: val :=
-    λ: "v",
-      let: "l" := ref "v" in
-      "l"
-  .
-
-  Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
-  Context `{EM: ExecutionModel heap_lang M}.
-  Notation "'Degree'" := (om_hl_Degree). 
-  Notation "'Level'" := (om_hl_Level).  
-
-  Context {Σ} {OHE: OM_HL_Env OP EM Σ}.
-
-  Context (d: Degree). 
-
-  Lemma mk_ref_spec τ π q (a: val):
-    {{{ cp_mul π d 5 ∗ th_phase_frag τ π q }}}
-        mk_ref a @ τ
-    {{{ (l: loc), RET #l; l ↦ a ∗ th_phase_frag τ π q }}}.
-  Proof using.
-    iIntros (Φ) "(CPS & PH) POST". rewrite /mk_ref. 
-    pure_steps.
-    wp_bind (ref _)%E.
-    iApply sswp_MU_wp; [done| ].
-    iApply wp_alloc. iModIntro. iIntros (l) "L _".
-    MU_by_burn_cp.
-    pure_steps.
-    wp_bind (Rec _ _ _)%E. pure_steps.
-    iApply "POST". by iFrame.
-  Qed.
-
-End SimpleExample.
-
-Definition WF_Degree := bounded_nat 2.
-Definition WF_SB := 1.
-
-Instance OPP_WF: ObligationsParamsPre WF_Degree unit WF_SB.
-esplit; try by apply _.
-- apply nat_bounded_PO.
-- apply unit_PO.
-Defined.
-
-
-Section WaitFreeSpec.
-
-  Instance OP_HL_WF: OP_HL WF_Degree unit WF_SB := {| om_hl_OPRE := OPP_WF |}.
-
-  Notation "'Degree'" := (om_hl_Degree).
-  Notation "'Level'" := (om_hl_Level).
-
-  Let d0: Degree. refine (ith_bn 2 0 _). abstract lia. Defined. 
-  Let d1: Degree. refine (ith_bn 2 1 _). abstract lia. Defined. 
-  Let l0: Level := tt.
-
-  (* Definition om_wfree_init (i: nat): ProgressState. *)
-  (* Admitted. *)
-
-  (* TODO: support invariants in precondition *)
-  (* TODO: relax to non-trivial degrees *)
-  (* TODO: remove phases? *)
-  Definition wait_free_spec (m: val) :=
-    exists N,
-      forall {M EM} Σ {OHE: OM_HL_Env OP_HL_WF EM Σ}
-        τ π q (a: val),
-      let _ := @IEM_irisG _ M HeapLangEM EM Σ _ in
-      {{{ cp_mul π d0 N ∗ th_phase_frag τ π q }}}
-        m a @ τ
-      {{{ v, RET v; th_phase_frag τ π q }}}.
-
-  Lemma mk_ref_WF_spec: wait_free_spec mk_ref.
-  Proof using.
-    red. exists 5. intros.
-    iIntros "(CPS & PH) POST".
-    iApply (mk_ref_spec with "[-POST]").
-    { iFrame. }
-    iIntros "!> % (?&?)". iApply "POST". iFrame.
-  Qed.
-
-End WaitFreeSpec.
 
 Section WFAdequacy.
 
-  Let OP := LocaleOP (OPRE := OPP_WF) (Locale := locale heap_lang).
+  (* Let OP := LocaleOP (OPRE := OPP_WF) (Locale := locale heap_lang). *)
+  (* Existing Instance OP. *)
+  (* Let OM := ObligationsModel. *)
+  (* Notation "'Degree'" := (bounded_nat 2).  *)
+  (* Notation "'Level'" := (unit). *)
+
+  Let OP := LocaleOP (OPRE := OPP_WF) (Locale := locale heap_lang). 
   Existing Instance OP.
   Let OM := ObligationsModel.
-  Notation "'Degree'" := (bounded_nat 2). 
-  Notation "'Level'" := (unit).
-
-  (* Let d0: Degree. refine (ith_bn 2 0 _). abstract lia. Defined.  *)
-  (* Let d1: Degree. refine (ith_bn 2 1 _). abstract lia. Defined.  *)
-  (* Let l0: Level := tt. *)
 
   Let M := AM2M ObligationsAM.
   Let ASEM := ObligationsASEM.
@@ -318,9 +241,10 @@ Section WFAdequacy.
 End WFAdequacy.
 
 
-Definition wait_free (m: val) := 
-  forall etr, (exists e0, (trfirst etr).1 = [subst "m" m e0]) -> extrace_valid etr ->
-  always_returns etr m.
+Definition wait_free (m: val) := forall etr,
+    (exists e0, (trfirst etr).1 = [subst "m" m e0]) ->
+    extrace_valid etr ->
+    always_returns etr m.
 
 Theorem wfree_is_wait_free m
   (SPEC: wait_free_spec m):
@@ -339,9 +263,18 @@ Proof using.
 Admitted.
 
 
+Lemma mk_ref_WF_spec: wait_free_spec mk_ref.
+Proof using.
+  red. exists 5. intros.
+  iIntros "(CPS & PH) POST".
+  iApply (mk_ref_spec with "[-POST]").
+  { iFrame. }
+  iIntros "!> % (?&?)". iApply "POST". iFrame.
+Qed.
+
+
 Theorem mk_ref_is_wait_free: wait_free mk_ref.
 Proof using.
   apply wfree_is_wait_free.
   apply mk_ref_WF_spec.
 Qed.
-
