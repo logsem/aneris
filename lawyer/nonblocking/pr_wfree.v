@@ -1,12 +1,12 @@
 From iris.proofmode Require Import tactics.
 From trillium.traces Require Import inftraces trace_lookup exec_traces trace_len. 
-From trillium.program_logic Require Import execution_model weakestpre adequacy_utils adequacy_cond simulation_adequacy_em_cond. 
 From fairness Require Import fairness locales_helpers.
-From lawyer Require Import program_logic sub_action_em action_model.
 (* From lawyer.examples Require Import orders_lib obls_tactics. *)
-From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am.
-From heap_lang Require Import lang.
+From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am obls_termination obligations_wf.
 From lawyer.nonblocking Require Import trace_context om_wfree_inst.
+From trillium.program_logic Require Import execution_model weakestpre adequacy_utils adequacy_cond simulation_adequacy_em_cond. 
+From lawyer Require Import action_model sub_action_em.
+From heap_lang Require Import lang.
 
 
 Close Scope Z.
@@ -87,6 +87,17 @@ Section WaitFreePR.
       rewrite prefixes_from_length. tauto.  
     Qed.
 
+    Lemma wptp_from_gen_app t0 t1 Φs1 t2 Φs2:
+      wptp_from_gen t0 t1 Φs1 ∗ wptp_from_gen (t0 ++ t1) t2 Φs2 ⊢
+      wptp_from_gen t0 (t1 ++ t2) (Φs1 ++ Φs2). 
+    Proof using.
+      iIntros "[WPS1 WPS2]".
+      rewrite {3}/wptp_from_gen. rewrite prefixes_from_app.
+      iDestruct (big_sepL2_length with "WPS1") as "%".
+      iApply big_sepL2_app_same_length; [tauto| ].
+      iFrame. 
+    Qed.
+
     Lemma wptp_gen_split_1 t0 t1 t2 Φs:
       wptp_from_gen t0 (t1 ++ t2) Φs ⊢
       ⌜ exists Φs1 Φs2, Φs1 ++ Φs2 = Φs /\ length Φs1 = length t1 /\ length Φs2 = length t2 ⌝.
@@ -108,6 +119,46 @@ Section WaitFreePR.
       rewrite /wptp_from_gen. simpl.
       by rewrite bi.sep_emp.
     Qed.
+
+    Lemma new_threads_wptp_from_gen `{!irisG heap_lang M Σ} t efs:
+      ([∗ list] i ↦ ef ∈ efs, 
+         W ef (locale_of (t ++ take i efs) ef) (fork_post (locale_of (t ++ take i efs) ef))
+       )
+         ⊣⊢ wptp_from_gen t efs (newposts t (t ++ efs)).
+    Proof.
+      rewrite  /wptp_from_gen. 
+      rewrite big_sepL2_alt; iSplit.
+      - iIntros "H". iSplit.
+        { rewrite /newposts. rewrite map_length.
+          rewrite /newelems. rewrite drop_app_length // map_length !prefixes_from_length //. }
+        iInduction efs as [|ef efs] "IH" forall (t); first done.
+        rewrite /newposts /newelems.
+        rewrite /= !drop_app_length //=.
+        iDestruct "H" as "[H1 H]". rewrite (right_id [] (++)). iFrame.
+        replace (map (λ '(tnew, e), fork_post (locale_of tnew e))
+                   (prefixes_from (t ++ [ef]) efs))
+          with (newposts (t ++[ef]) ((t ++ [ef]) ++ efs)).
+        + iApply "IH". iApply (big_sepL_impl with "H").
+          iIntros "!>" (k e Hin) "H". by list_simplifier.
+        + list_simplifier.
+          replace (t ++ ef :: efs) with ((t ++ [ef]) ++ efs); last by list_simplifier.
+          rewrite /newposts /newelems.
+          rewrite drop_app_length //.
+      - iIntros "[_ H]".
+        iInduction efs as [|ef efs] "IH" forall (t); first done.
+        rewrite /newposts /newelems.
+        rewrite /= !drop_app_length //=.
+        iDestruct "H" as "[H1 H]". rewrite (right_id [] (++)). iFrame.
+        replace (map (λ '(tnew, e), fork_post (locale_of tnew e))
+                   (prefixes_from (t ++ [ef]) efs))
+          with (newposts (t ++[ef]) ((t ++ [ef]) ++ efs)).
+        + iSpecialize ("IH" with "H"). iApply (big_sepL_impl with "IH").
+          iIntros "!>" (k e Hin) "H". by list_simplifier.
+        + list_simplifier.
+          replace (t ++ ef :: efs) with ((t ++ [ef]) ++ efs); last by list_simplifier.
+          rewrite /newposts /newelems.
+          rewrite drop_app_length //.
+  Qed.
 
   End WptpGen.
 
@@ -186,6 +237,61 @@ Section WaitFreePR.
 (*     (etr: execution_trace Λ) (omtr: auxiliary_trace OM): iProp Σ := *)
 (*     obls_ti etr omtr ∗ extra_fuel omtr ∗ cur_phases omtr ∗ cur_obls_sigs omtr. *)
 
+  Lemma cur_phases_take `{!ObligationsGS Σ} etr τ
+    (IN: τ ∈ locales_of_cfg (trace_last etr)):
+    let ph π := th_phase_frag τ π (/2)%Qp in
+    cur_phases etr ⊣⊢ ∃ π, ph π ∗ (ph π -∗ cur_phases etr).
+  Proof using.
+    simpl. rewrite /cur_phases.
+    destruct (decide (τ = τi)) as [-> | NEQ]. 
+    - iSplit.
+      2: { iIntros "(%π & PH & CLOS)".
+           by iApply "CLOS". }
+      iIntros "[PHS' PH]". iDestruct ("PH" with "[//]") as (π) "PH".
+      erewrite th_phase_frag_combine' with (p := (/ 2)%Qp).
+      2: { by destruct Nat.ltb. }
+      iDestruct "PH" as "[PH PH']".
+      iExists π. iFrame.
+      iIntros "PH _".
+      iExists _. iApply th_phase_frag_combine'; [| by iFrame].
+      by destruct Nat.ltb.
+    - iSplit.
+      2: { iIntros "(%π & PH & CLOS)".
+           by iApply "CLOS". }
+      iIntros "[PHS' PH]". iFrame "PH".
+      iDestruct (big_sepS_elem_of_acc with "[$]") as "[PH PHS]".
+      { apply elem_of_difference. split; eauto. set_solver. }
+      iDestruct "PH" as "(%π & PH)".
+      rewrite {1}/th_phase_eq. rewrite -Qp.inv_half_half. 
+      iDestruct (th_phase_frag_combine with "PH") as "[PH1 PH2]".
+      iExists _. iFrame.
+      iIntros "PH". iApply "PHS".
+      iExists _. iEval (rewrite /th_phase_eq).
+      rewrite -Qp.inv_half_half. iApply th_phase_frag_combine. iFrame.
+  Qed.
+
+  (* TODO: move *)
+  Lemma phases_update_phases πs δ:
+    ps_phases (update_phases πs δ) = πs.
+  Proof using. by destruct δ. Qed.
+
+  (* TODO: move, generalize *)
+  Lemma set_seq_uniq2 s l1 l2:
+    (set_seq s l1: gset nat) = set_seq s l2 <-> l1 = l2.
+  Proof using.
+    clear. 
+    split; [| congruence]. 
+    intros EQ. rewrite set_eq in EQ.
+    repeat setoid_rewrite elem_of_set_seq in EQ.
+    destruct (Nat.lt_trichotomy l1 l2) as [LT | [? | LT]]; try done.
+    - specialize (EQ (s + l1)). lia.
+    - specialize (EQ (s + l2)). lia.
+  Qed.
+
+  Lemma under_ctx_fill K e:
+    under_ctx K (ectx_fill K e) = Some e.
+  Proof using. Admitted. 
+
   Program Definition PR_wfree {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}:
     @ProgressResource heap_lang M Σ (@iem_invGS _ _ _ _ _ Hinv)
       state_interp wfree_trace_inv fork_post fits_inf_call :=
@@ -210,7 +316,9 @@ Section WaitFreePR.
   Final Obligation.
     intros ??? etr Φs c oτ c' mtr VALID FIN STEP.
     iIntros "#CWP TI #INV PR %FIT".
-    simpl. rewrite /obls_asem_mti. iDestruct "TI" as "(%EV & PHYS & MSI)".
+    simpl.
+    (* rewrite /obls_asem_mti. *)
+    (* iDestruct "TI" as "(%EV & PHYS & MSI)". *)
     inversion STEP as
         [?? e σ e' σ' efs t1 t2 -> -> PSTEP | ].
     2: { done. }
@@ -229,12 +337,138 @@ Section WaitFreePR.
     iDestruct (wptp_gen_split_1 with "WPS'") as %X.
     destruct X as (Φ_ & Φs2 & EQ' & LEN_ & LEN2).
     iEval (rewrite -EQ') in "WPS'".
-    iDestruct (wptp_from_gen_app' with "WPS'") as "[WPS_ WPS2] /="; [done| ].
+    iDestruct (wptp_from_gen_app' with "WPS'") as "[WP WPS2] /="; [done| ].
     destruct Φ_ as [ | Φ [|]].
     1, 3: simpl in LEN_; lia.
     rewrite wptp_gen_singleton.
 
-    
+    iEval (rewrite /thread_pr) in "WP".
+    destruct decide.
+    - rewrite H3 in e0.
+      (* subst τ.  *)
+      rewrite /wp_tc.
+      destruct Nat.ltb eqn:LEN.
+      + assert (exists ec, under_ctx Ki e = Some ec /\ language.to_val ec = None) as (ec & CUR & NVAL).
+        { (* should be derivable from fits_inf_call for current trace *)
+          admit. }
+        rewrite CUR. simpl.
+        apply under_ctx_spec in CUR.
+
+        iDestruct (cur_phases_take _ τi with "PH") as "(%π & PH & PHS)".
+        { eapply locales_of_cfg_Some.
+          rewrite FIN. rewrite e0.
+          by apply locale_step_from_locale_src in STEP. }
+        iAssert (⌜ ps_phases (trace_last mtr) !! τi = Some π ⌝)%I as "%PH".
+        { iApply (th_phase_msi_frag with "[-PH] [$]").
+          by iDestruct "TI" as "(?&?&(?&?&?))". }
+        iAssert (⌜ obls_cfg_corr (trace_last etr) (trace_last mtr) ⌝)%I as "%CORR".
+        { iDestruct "TI" as "(_&_&CORR)".
+          rewrite /obls_asem_mti /obls_si.
+          iDestruct "CORR" as "(_&%CORR)". done. }
+
+        rewrite -CUR in PSTEP. eapply fill_step_inv in PSTEP as (?&?&?).
+        2: done. 
+        iDestruct (wp_ctx_take_step with "[TI] WP") as "He"; eauto.
+        { red. rewrite FIN. rewrite -CUR. eauto. }
+        { subst. done. }
+
+        iMod "He" as "He". iModIntro.
+        iMod "He" as "He". iModIntro. iNext.
+        iMod "He" as "He". iModIntro.
+        iApply (step_fupdN_wand with "[He]"); first by iApply "He".
+        iIntros "He".
+        iMod "He" as (δ' ℓ) "(HSI & He2 & Hefs) /=".
+
+        iAssert (⌜ efs = [] ⌝)%I as %->.
+        { iAssert (⌜ ps_phases δ'  !! τi = Some π ⌝)%I as "%PH'".
+          { iApply (th_phase_msi_frag with "[-PH] [$]").
+            by iDestruct "HSI" as "(?&?&(?&?&?))". }
+          iDestruct "HSI" as "(%EVOL&_&CORR')".
+          rewrite /obls_asem_mti. simpl. 
+          red in EVOL. destruct ℓ as [? [|]].
+          2: { tauto. } 
+          destruct EVOL as [MSTEP ->]. simpl in MSTEP.
+          red in MSTEP. destruct MSTEP as (_ & MSTEP & [=<-] & CORR').
+          simpl in MSTEP.
+
+          (* TODO: make a lemma *)
+          assert (ps_phases (trace_last mtr) = ps_phases δ') as PH_EQ.
+          { destruct MSTEP as (δ2 & PSTEP & OFORK).
+            destruct PSTEP as (? & ? & δ1 & STEPS & BURN).
+            assert (ps_phases (trace_last mtr) = ps_phases δ2) as EQ2. 
+            { rewrite (lse_rep_phases_eq_helper _ _ _ STEPS).
+              destruct BURN as (?&?&BURN).
+              eapply lse_rep_phases_eq_helper.
+              apply nsteps_once. red. left.
+              eexists. red. eauto. }
+            inversion OFORK.
+            2: { congruence. }
+            subst y. red in H5. destruct H5 as (?&?&FORK).
+            inversion FORK. subst.
+            subst ps'. rewrite phases_update_phases in PH'.
+            subst new_phases0.
+            rewrite lookup_insert_ne in PH'.
+            2: { intros ->. destruct FRESH'. by eapply elem_of_dom. }
+            rewrite lookup_insert in PH'. inversion PH'.
+            rewrite -EQ2 PH in LOC_PHASE. inversion LOC_PHASE. subst π0.
+            pose proof (phase_lt_fork π 0) as NEQ. red in NEQ.
+            apply strict_ne in NEQ. done. }
+
+          red in CORR'. destruct CORR' as (CORR' & DPO').
+          red in DPO'. apply (@f_equal _ _ dom) in PH_EQ. 
+          rewrite DPO' in PH_EQ.
+          red in CORR'. rewrite -PH_EQ in CORR'.
+          red in CORR. rewrite (proj2 CORR) -(proj1 CORR) in CORR'.
+          rewrite FIN in CORR'. subst e. simpl in CORR.
+          rewrite !locales_of_cfg_simpl in CORR'.
+          repeat (rewrite !length_app /= in CORR').          
+          destruct efs; [done| ].
+          simpl in CORR'. apply set_seq_uniq2 in CORR'. lia. }
+
+        simpl. rewrite !app_nil_r.
+        iSpecialize ("PHS" with "[$]").
+        iModIntro. iSplit.
+        { admit. }
+        iDestruct "HSI" as "(?&?&?)". 
+        subst. rewrite e0. do 2 iExists _.
+        iFrame.
+        iSplit.
+        { iEval (rewrite /wfree_trace_inv).          
+          admit. }
+        iSplitL "WPS1 WPS2 He2".
+        {
+          assert (newposts (t1 ++ ectx_fill Ki ec :: t2) (t1 ++ ectx_fill Ki x :: t2) = []) as NONEW.
+          { admit. }
+          rewrite NONEW. rewrite app_nil_r. 
+          iApply wptp_from_gen_app. iSplitL "WPS1".
+          { (* for threads other than τi, change of trace index doesn't matter *)
+            admit. }
+          simpl.
+          iApply (wptp_from_gen_app _ _ [_] [_]).
+          iSplitL "He2".
+          { simpl. iApply wptp_gen_singleton.
+            rewrite /thread_pr. rewrite decide_True; [| done].
+            rewrite /wp_tc. rewrite (proj2 (Nat.ltb_lt _ _)).
+            2: { apply Nat.ltb_lt in LEN. lia. }
+            rewrite under_ctx_fill. rewrite e0. done. }
+          (* same as before *)
+          admit. }
+        iSplitL "CPS".
+        { rewrite /extra_fuel. simpl.
+          rewrite (proj2 (Nat.ltb_ge (S _) _)); [done| ]. 
+          apply Nat.ltb_lt in LEN. lia. }
+        iSplitL "PHS".
+        { rewrite /cur_phases. simpl.
+          admit. }
+        rewrite /cur_obls_sigs. simpl.
+        admit.
+      + simpl. 
+            
+          
+        
+        iFrame. i
+          
+
     
   
   Admitted. 
