@@ -114,15 +114,28 @@ Section GmultisetUtils.
     Context (P : A → Prop). 
     Context `{∀ x, Decision (P x)}. 
 
-    Definition mset_filter (g: gmultiset A): gmultiset A :=
-      list_to_set_disj $ filter P $ elements g. 
+    Definition mset_filter '(GMultiSet ms): gmultiset A :=
+      GMultiSet (map_filter (fun '(k, _) => P k) _ ms).
+
+    Lemma mset_filter_multiplicity g (a: A):
+      multiplicity a (mset_filter g) =
+      if (decide (P a)) then multiplicity a g else 0.
+    Proof using.
+      destruct g as [ms]. simpl. rewrite /multiplicity. simpl.
+      rewrite map_lookup_filter.
+      destruct lookup, decide; try mss; simpl. 
+      - by rewrite option_guard_True.
+      - by rewrite option_guard_False.
+    Qed. 
 
     Lemma mset_filter_spec g:
       forall a, a ∈ mset_filter g <-> a ∈ g /\ P a.
     Proof using.
-      intros. rewrite /mset_filter.
-      rewrite elem_of_list_to_set_disj elem_of_list_filter.
-      rewrite gmultiset_elem_of_elements. tauto.
+      intros.
+      rewrite /elem_of /gmultiset_elem_of.
+      rewrite mset_filter_multiplicity.
+      destruct decide; try tauto.
+      split; [lia| tauto].
     Qed.
 
     Lemma mset_filter_empty:
@@ -132,37 +145,19 @@ Section GmultisetUtils.
     Lemma mset_filter_disj_union x y:
       mset_filter (x ⊎ y) = mset_filter x ⊎ mset_filter y.
     Proof using.
-      rewrite /mset_filter.
-      rewrite -list_to_set_disj_app. rewrite -filter_app. 
-      apply list_to_set_disj_perm. apply filter_Permutation.
-      apply gmultiset_elements_disj_union.
+      apply gmultiset_eq. intros a.
+      repeat (rewrite multiplicity_disj_union || rewrite mset_filter_multiplicity).
+      destruct decide; lia. 
     Qed.
 
     Lemma mset_filter_singleton a:
       mset_filter {[+ a +]} = if (decide (P a)) then {[+ a +]} else ∅.
     Proof using.
-      rewrite /mset_filter. rewrite gmultiset_elements_singleton.
-      rewrite filter_cons !filter_nil.
-      destruct decide; mss.
-    Qed. 
-
-    Lemma mset_filter_multiplicity g (a: A):
-      multiplicity a (mset_filter g) =
-      if (decide (P a)) then multiplicity a g else 0.
-    Proof using. 
-      revert a. pattern g. apply gmultiset_ind; clear g. 
-      { intros ?. rewrite mset_filter_empty multiplicity_empty.
-        destruct decide; auto. }
-      intros x g IH a.
-      rewrite mset_filter_disj_union mset_filter_singleton.
-      rewrite !multiplicity_disj_union. rewrite multiplicity_singleton'. 
-      rewrite IH. 
-      destruct (decide (P x)), (decide (P a)); try rewrite multiplicity_singleton'.
-      - lia.
-      - rewrite decide_False; [| by intros ->]. lia.
-      - rewrite decide_False; [| by intros ->].
-        rewrite multiplicity_empty. lia.
-      - rewrite multiplicity_empty. lia.
+      apply gmultiset_eq. intros b.
+      rewrite mset_filter_multiplicity.
+      rewrite multiplicity_singleton'.
+      repeat destruct decide; try mss.
+      rewrite multiplicity_singleton_ne; mss.
     Qed.
 
     Lemma mset_filter_True g
@@ -171,20 +166,20 @@ Section GmultisetUtils.
     Proof using.
       apply gmultiset_eq. intros a.
       rewrite mset_filter_multiplicity.
-      destruct (decide (a ∈ g)).
-      { rewrite decide_True; eauto. }
+      destruct decide; [done| ]. 
       rewrite (proj1 (not_elem_of_multiplicity _ _) _); auto.
-      destruct decide; done. 
     Qed.
 
     Lemma mset_filter_False g
       (FALSE: forall a, a ∈ g -> ¬ P a):
       mset_filter g = ∅.
     Proof using.
-      destruct (decide (mset_filter g = ∅)) as [| NE]; [done| ]. 
-      apply gmultiset_choose in NE as [? IN].
-      apply mset_filter_spec in IN as [??]. set_solver.
-    Qed. 
+      apply gmultiset_eq. intros a.
+      rewrite mset_filter_multiplicity.
+      destruct decide; [| done].
+      rewrite multiplicity_empty. apply not_elem_of_multiplicity.
+      mss. 
+    Qed.
 
     Lemma mset_filter_subseteq_mono:
       Proper (subseteq ==> subseteq) mset_filter.
@@ -192,7 +187,7 @@ Section GmultisetUtils.
       red. intros ????.
       rewrite !mset_filter_multiplicity.
       destruct decide; mss.
-    Qed. 
+    Qed.
 
     Lemma mset_filter_difference x y:
       mset_filter (x ∖ y) = mset_filter x ∖ mset_filter y.
@@ -217,7 +212,7 @@ Section GmultisetUtils.
     Proof using.
       do 2 red. intros. rewrite mset_filter_multiplicity.
       destruct decide; lia.
-    Qed. 
+    Qed.
 
   End MultisetFilter.
 
