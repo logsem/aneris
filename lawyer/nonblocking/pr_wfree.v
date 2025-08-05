@@ -205,7 +205,48 @@ Section WaitFreePR.
     { iPureIntro. set_solver. } 
     iIntros "WP".
     iApply wptp_from_gen_app. iFrame.
-  Qed. 
+  Qed.
+
+  (* EQUIV : locales_equiv t0 t0' *)
+
+  (* Lemma wptp_from_gen_locales_equiv_1_impl t0 t0' efs efs' Φs *)
+  (*   (EQUIV: locales_equiv_from t0 t0' efs efs'): *)
+  (*   wptp_from_gen t0 efs Φs -∗ wptp_from_gen t0' efs' Φs. *)
+  (* Proof using. *)
+  (*   iIntros "WPS".  *)
+  (*   (* rewrite /wptp_from_gen. *) *)
+  (*   (* iApply big_sepL2_proper_2. *) *)
+  (*   (* 4: by iFrame.  *) *)
+  (*   clear -EQUIV. *)
+  (*   Unset Printing Notations. *)
+    
+  (*   Disable Notation locales_equiv.  *)
+  (*   eapply EQUIV.  *)
+    
+    
+  Lemma wptp_from_gen_locales_equiv_1 t0 t0' efs Φs
+    (EQUIV: locales_equiv t0 t0'):
+    wptp_from_gen t0 efs Φs ⊣⊢ wptp_from_gen t0' efs Φs.
+  Proof using.
+    generalize dependent Φs. generalize dependent t0. generalize dependent t0'.
+    induction efs.
+    { intros. simpl. set_solver. }
+    destruct Φs.
+    { set_solver. }
+    rewrite !wptp_from_gen_cons.
+    iApply bi.sep_proper.
+    2: { iApply IHefs.
+         clear -EQUIV.
+         rewrite !prefixes_from_app.
+         eapply Forall2_app; try done.
+         simpl. constructor; try done.
+         (* TODO: specific to heap_lang, can it be generalized? *)
+         rewrite /locale_of.
+         eapply adequacy_utils.locales_equiv_from_length; eauto. }
+    rewrite /locale_of.
+    eapply adequacy_utils.locales_equiv_from_length in EQUIV; eauto.
+    by rewrite EQUIV.
+  Qed.
 
   End WptpGen.
 
@@ -481,6 +522,32 @@ Section WaitFreePR.
     simpl in CORR'. apply set_seq_uniq2 in CORR'. lia.
   Qed.
 
+  (* Lemma prefixes_from_ith_length (t: list expr) pf i *)
+  (*   (ITH: prefixes_from t0 t !! i = Some pf): *)
+  (*   length pf.1 = i.  *)
+  (* Proof using. *)
+
+  (* TODO: move *)
+  Lemma prefixes_from_ith_length (t0 t: list expr) pf i
+    (ITH: prefixes_from t0 t !! i = Some pf):
+    length pf.1 = length t0 + i.
+  Proof using.
+    clear -ITH. 
+    generalize dependent t0. generalize dependent i. generalize dependent pf.
+    induction t.
+    { intros. simpl. destruct t0; done. }
+    intros. destruct i.
+    { simpl in ITH. inversion ITH. subst. simpl. lia. }
+    simpl in ITH. apply IHt in ITH.
+    rewrite length_app /= in ITH. lia.
+  Qed.
+
+  Lemma prefixes_ith_length (t: list expr) pf i
+    (ITH: prefixes t !! i = Some pf):
+    length pf.1 = i. 
+  Proof using.
+    apply prefixes_from_ith_length in ITH. by rewrite ITH.
+  Qed.
 
   Program Definition PR_wfree {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}:
     @ProgressResource heap_lang M Σ (@iem_invGS _ _ _ _ _ Hinv)
@@ -502,26 +569,13 @@ Section WaitFreePR.
     admit.
   Admitted.
   Next Obligation.
-
-    iIntros "* %VALID %END SI PR". 
+    iIntros "* %VALID %END SI PR".
     rewrite /pr_pr_wfree. iDestruct "PR" as "(WPS &X&Y&Z)".
-    iFrame "X Y Z". 
-    iApply wptp_wfre_not_stuck. 
-    
-    (* clear R FILTER_PCL C_DEC. *)
-    intros. rewrite H0.
-    iIntros "? WPS".
-    iMod (wptp_not_stuck_same _ _ _ _ [] with "[$] [WPS]") as "(?&?&%NS)". 
-    3: by iFrame.
-    { eauto. }
-    { erewrite app_nil_l, app_nil_r.
-      erewrite <- surjective_pairing. apply trace_ends_in_last. }
-    iModIntro. iFrame.
-    iPureIntro. intros. subst. rewrite -H0.
-    eapply NS; eauto.
-    apply last_eq_trace_ends_in in H0. rewrite H0. simpl. set_solver.
-
-
+    iFrame "X Y Z".
+    (* TODO: we can probably weaken this obligation,
+       since t0 is never used? *)
+    assert (t0 = []) as -> by admit. simpl in END.
+    iApply (wptp_wfre_not_stuck with "[$] [$]"); eauto.
   Admitted. 
   Final Obligation.
     intros ??? etr Φs c oτ c' mtr VALID FIN STEP.
@@ -598,19 +652,34 @@ Section WaitFreePR.
         iModIntro. iSplit.
         { admit. }
         iDestruct "HSI" as "(?&?&?)". 
-        subst. rewrite e0. do 2 iExists _.
+
+        assert (newposts (t1 ++ ectx_fill Ki ec :: t2) (t1 ++ ectx_fill Ki x :: t2) = []) as NONEW.
+        { erewrite adequacy_utils.newposts_locales_equiv.
+          { apply adequacy_utils.newposts_same_empty. }
+          apply locales_equiv_from_middle. done. }
+        subst. rewrite NONEW. rewrite app_nil_r. 
+
+        rewrite e0. do 2 iExists _.
         iFrame.
         iSplit.
         { iEval (rewrite /wfree_trace_inv).          
           admit. }
         iSplitL "WPS1 WPS2 He2".
         {
-          assert (newposts (t1 ++ ectx_fill Ki ec :: t2) (t1 ++ ectx_fill Ki x :: t2) = []) as NONEW.
-          { admit. }
-          rewrite NONEW. rewrite app_nil_r. 
           iApply wptp_from_gen_app. iSplitL "WPS1".
-          { (* for threads other than τi, change of trace index doesn't matter *)
-            admit. }
+          { simpl.
+            rewrite /wptp_from_gen.
+            iApply (big_sepL2_impl with "[$]").
+            iModIntro. iIntros (i pfi Φi PFith Φith).
+            rewrite /thread_pr.
+            destruct decide.
+            2: { set_solver. }
+            rewrite e0 in e.
+            simpl in e.
+            rewrite /locale_of in e.
+            erewrite prefixes_ith_length in e; eauto.
+            apply lookup_lt_Some in PFith.
+            rewrite adequacy_utils.prefixes_from_length in PFith. lia. }
           simpl.
           iApply (wptp_from_gen_app _ _ [_] [_]).
           iSplitL "He2".
@@ -619,7 +688,22 @@ Section WaitFreePR.
             rewrite /wp_tc. rewrite (proj2 (Nat.ltb_ge _ _)).
             2: { apply Nat.ltb_ge in LEN. lia. }
             rewrite under_ctx_fill. rewrite e0. done. }
-          (* same as before *)
+          (* TODO: make a lemma, use above too *)
+          { simpl.
+            rewrite /wptp_from_gen.
+            iApply (big_sepL2_impl with "[WPS2]").
+            { iApply "WPS2". 
+            iModIntro. iIntros (i pfi Φi PFith Φith).
+            rewrite /thread_pr.
+            destruct decide.
+            2: { set_solver. }
+            rewrite e0 in e.
+            simpl in e.
+            rewrite /locale_of in e.
+            erewrite prefixes_ith_length in e; eauto.
+            apply lookup_lt_Some in PFith.
+            rewrite adequacy_utils.prefixes_from_length in PFith. lia. }
+
           admit. }
         iSplitL "CPS".
         { rewrite /extra_fuel. simpl.
