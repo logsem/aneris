@@ -78,9 +78,50 @@ Section WaitFreePR.
     (extr: execution_trace heap_lang) (omtr: auxiliary_trace M): iProp Σ :=
     ⌜ no_extra_obls (trace_last extr) (trace_last omtr) ⌝.
 
-  Definition fits_inf_call: execution_trace heap_lang → Prop.
+
+  (* TODO: move *)
+  Definition under_ctx (K: ectx heap_lang) (e: expr): option expr.
   Admitted.
 
+  Lemma under_ctx_spec K e e':
+    under_ctx K e = Some e' <-> ectx_fill K e' = e.
+  Proof using. Admitted.
+
+  Lemma under_ctx_fill K e:
+    under_ctx K (ectx_fill K e) = Some e.
+  Proof using. Admitted. 
+
+  Definition runs_call (c: cfg heap_lang): Prop :=
+    exists e ec, from_locale c.1 τi = Some e /\ under_ctx Ki e = Some ec /\ to_val ec = None. 
+
+  Definition fits_inf_call (etr: execution_trace heap_lang): Prop :=
+    forall j, ii <= j -> from_option runs_call True (etr !! j).
+
+  Lemma fits_inf_call_last_or_short etr
+    (FITS: fits_inf_call etr):
+    runs_call (trace_last etr) \/ trace_length etr <= ii. 
+  Proof using.
+    edestruct Nat.lt_ge_cases as [LT| ]; [| by eauto].
+    red in FITS. red in LT.
+    ospecialize * (FITS (trace_length etr - 1)).
+    { lia. }
+    rewrite trace_lookup_last in FITS.
+    2: { lia. }
+    simpl in FITS. by left.
+  Qed.
+
+  Lemma fits_inf_call_prev etr τ c
+    (FITS: fits_inf_call (etr :tr[τ]: c)):
+    fits_inf_call etr.
+  Proof using.
+    red. intros ? LE.
+    red in FITS. specialize (FITS _ LE).
+    destruct (etr !! j) eqn:JTH; rewrite JTH; [| done]. simpl.
+    rewrite trace_lookup_extend_lt in FITS.
+    2: { by apply trace_lookup_lt_Some. }
+    by rewrite JTH in FITS.
+  Qed.    
+  
   Definition phys_SI {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
     (etr: execution_trace heap_lang) (_: auxiliary_trace LoopingModel): iProp Σ :=
     lgem_si (trace_last etr).2 (lgem_GS0 := (iem_phys HeapLangEM EM)).
@@ -258,15 +299,6 @@ Section WaitFreePR.
   Proof using.
     exact {| state_interp := phys_SI; fork_post := fun _ _ => (⌜ True ⌝)%I |}.
   Defined.
-
-  (* TODO: move *)
-  Definition under_ctx (K: ectx heap_lang) (e: expr): option expr.
-  Admitted.
-
-  Lemma under_ctx_spec K e e':
-    under_ctx K e = Some e' <-> ectx_fill K e' = e.
-  Proof using. Admitted.
-
   (* Definition empty_post {Σ: gFunctors}: val -> iProp Σ := (fun _ => ⌜ True ⌝%I).  *)
 
   Definition wp_tc {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
@@ -279,7 +311,7 @@ Section WaitFreePR.
       wp s ⊤ τi e' Φ.
 
   Definition thread_pr {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} s N :=
-    (fun e τ Φ => if decide (τi = τ) then wp_tc s e (N <? ii) Φ
+    (fun e τ Φ => if decide (τi = τ) then wp_tc s e (N <=? ii) Φ
                  else let _ := iris_OM_into_Looping in pwp s ⊤ τ e Φ).
 
   (* Definition wptp_wfree_ {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} *)
@@ -298,10 +330,6 @@ Section WaitFreePR.
     iProp Σ :=
     wptp_gen (thread_pr s (trace_length etr)) (trace_last etr).1 Φs.
 
-  Lemma under_ctx_fill K e:
-    under_ctx K (ectx_fill K e) = Some e.
-  Proof using. Admitted. 
-
   (* TODO: move; isn't it already proven somewhere? *)
   Lemma not_stuck_fill (ec: expr) K σ
     (NS: not_stuck ec σ)
@@ -311,6 +339,20 @@ Section WaitFreePR.
     destruct NS as [VAL | RED]. 
     { simpl in VAL. rewrite NV in VAL. red in VAL. set_solver. }
     red. right. eapply reducible_fill; eauto.
+  Qed.
+
+  Lemma runs_call_helper t1 t2 e σ
+    (EQ: τi = locale_of t1 e)
+    (RUNS: runs_call (t1 ++ e :: t2, σ)):
+    exists ec, under_ctx Ki e = Some ec /\ to_val ec = None.
+  Proof using.
+    red in RUNS. destruct RUNS as (e_ & ec & TIth & CUR & NVAL).
+    simpl in TIth.
+    pose proof (from_locale_from_Some [] (t1 ++ e :: t2) t1 e) as X.
+    ospecialize (X _).
+    { apply prefixes_from_spec. eauto. }
+    simpl in X. rewrite EQ /from_locale in TIth. 
+    rewrite TIth in X. inversion X. subst. eauto.
   Qed.
 
   Lemma wptp_wfre_not_stuck {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
@@ -339,7 +381,7 @@ Section WaitFreePR.
     rewrite /thread_pr.
     apply elem_of_list_split in He as (?&?&->).
     rewrite -app_assoc -app_comm_cons in Hex. 
-    destruct decide; [rewrite /wp_tc; destruct Nat.ltb| ].
+    destruct decide; [rewrite /wp_tc; destruct Nat.leb eqn:LEN| ].
     - iMod (wp_not_stuck _ _ ectx_emp with "[HSI] W") as "(_ & _ & ?)";
       [done| rewrite ectx_fill_emp // | .. ].
       { done. }
@@ -348,8 +390,15 @@ Section WaitFreePR.
       simpl. by rewrite Hex.
     - assert (fits_inf_call ex) as FITS.
       { admit. }
-      assert (exists ec, under_ctx Ki e = Some ec /\ language.to_val ec = None) as (ec & CUR & NVAL).
-      { admit. }
+      apply fits_inf_call_last_or_short in FITS as [FITS | SHORT].
+      2: { apply Nat.leb_gt in LEN. 
+           exfalso. clear -LEN SHORT.
+           (* TODO: why lia doesn't work? *)
+           by apply Nat.lt_nge in LEN. }
+      rewrite Hex in FITS.
+
+      eapply runs_call_helper in FITS; eauto. destruct FITS as (ec & CUR & NVAL).
+
       rewrite CUR.
       pose proof CUR as <-%under_ctx_spec. 
       iSimpl in "W". 
@@ -370,19 +419,19 @@ Section WaitFreePR.
       simpl. by rewrite Hex in NS.
     (* TODO: get rid of this? *)
     Unshelve. all: by apply trace_singleton. 
-  Admitted. 
+  Admitted.
 
   Open Scope WFR_scope. 
 
   Definition extra_fuel `{!ObligationsGS Σ} (etr: execution_trace heap_lang) :=
     let len := trace_length etr in
-    if len <? ii then (cp_mul π0 d0 (ii - len) ∗ cp_mul π0 d0 F)%I else ⌜ True ⌝%I.
+    if len <=? ii then (cp_mul π0 d0 (S ii - len) ∗ cp_mul π0 d0 F)%I else ⌜ True ⌝%I.
 
   Definition cur_phases `{!ObligationsGS Σ} (etr: execution_trace heap_lang): iProp Σ :=
     let c := trace_last etr in
     (* ([∗ map] τ' ↦ π' ∈ delete τ (ps_phases δ), th_phase_eq τ' π') ∗ *)
     ([∗ set] τ ∈ locales_of_cfg c ∖ {[ τi ]}, ∃ π, th_phase_eq τ π) ∗
-    let ph_res := let q := if (trace_length etr <? ii) then 1%Qp else (/2)%Qp in
+    let ph_res := let q := if (trace_length etr <=? ii) then 1%Qp else (/2)%Qp in
                   (∃ π, th_phase_frag τi π q)%I in
     ⌜ τi ∈ locales_of_cfg c ⌝ → ph_res.
 
@@ -419,12 +468,12 @@ Section WaitFreePR.
            by iApply "CLOS". }
       iIntros "[PHS' PH]". iDestruct ("PH" with "[//]") as (π) "PH".
       erewrite th_phase_frag_combine' with (p := (/ 2)%Qp).
-      2: { by destruct Nat.ltb. }
+      2: { by destruct Nat.leb. }
       iDestruct "PH" as "[PH PH']".
       iExists π. iFrame.
       iIntros "PH _".
       iExists _. iApply th_phase_frag_combine'; [| by iFrame].
-      by destruct Nat.ltb.
+      by destruct Nat.leb.
     - iSplit.
       2: { iIntros "(%π & PH & CLOS)".
            by iApply "CLOS". }
@@ -442,8 +491,7 @@ Section WaitFreePR.
 
   (* TODO: refactor *)
   Lemma same_phase_no_fork {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
-    (etr : execution_trace heap_lang)
-    (mtr : finite_trace ProgressState (Action * option nat))
+    etr mtr
     (e : expr)
     (σ σ' : state)
     (efs t1 t2 : list expr)
@@ -452,7 +500,7 @@ Section WaitFreePR.
     (π : Phase)
     (PH : ps_phases (trace_last mtr) !! τi = Some π)
     (CORR : obls_cfg_corr (trace_last etr) (trace_last mtr))
-    (x : language.expr heap_lang)
+    (x : expr)
     (H2 : prim_step ec σ x σ' efs)
     (δ' : AM2M ObligationsAM)
     (ℓ : mlabel (AM2M ObligationsAM)):
@@ -473,7 +521,7 @@ Section WaitFreePR.
             (@iem_fairnessGS heap_lang _ HeapLangEM EM Σ Hinv)
             (etr :tr[ @Some nat τi]: (t1 ++ @fill _ Ki x :: t2 ++ efs, σ'))
             (mtr :tr[ ℓ ]: δ') -∗
-  ⌜efs = []⌝.
+  ⌜efs = [] /\ locales_of_cfg (trace_last etr) = locales_of_cfg (t1 ++ @fill _ Ki x :: t2 ++ efs, σ')⌝.
   Proof using.
     iIntros "PH HSI".
     iAssert (⌜ ps_phases δ'  !! τi = Some π ⌝)%I as "%PH'".
@@ -511,13 +559,20 @@ Section WaitFreePR.
       apply strict_ne in NEQ. done. }
     
     red in CORR'. destruct CORR' as (CORR' & DPO').
+
+    rewrite (proj1 CORR) (CORR'). 
+
     red in DPO'. apply (@f_equal _ _ dom) in PH_EQ. 
     rewrite DPO' in PH_EQ.
     red in CORR'. rewrite -PH_EQ in CORR'.
     red in CORR. rewrite (proj2 CORR) -(proj1 CORR) in CORR'.
     rewrite FIN in CORR'. simpl in CORR.
     rewrite !locales_of_cfg_simpl in CORR'.
-    repeat (rewrite !length_app /= in CORR').          
+    repeat (rewrite !length_app /= in CORR').
+
+     iPureIntro. split.
+     2: { set_solver. }
+    
     destruct efs; [done| ].
     simpl in CORR'. apply set_seq_uniq2 in CORR'. lia.
   Qed.
@@ -579,7 +634,8 @@ Section WaitFreePR.
   Admitted. 
   Final Obligation.
     intros ??? etr Φs c oτ c' mtr VALID FIN STEP.
-    iIntros "#CWP TI #INV PR %FIT".
+    (* Set Printing Implicit. *)
+    iIntros "_ TI #INV PR %FIT". (* cwp is not needed*)
     simpl.
     (* rewrite /obls_asem_mti. *)
     (* iDestruct "TI" as "(%EV & PHYS & MSI)". *)
@@ -609,13 +665,19 @@ Section WaitFreePR.
     iEval (rewrite /thread_pr) in "WP".
     destruct decide.
     - rewrite H3 in e0.
-      (* subst τ.  *)
+      subst τ.
       rewrite /wp_tc.
-      destruct Nat.ltb eqn:LEN.
+      destruct Nat.leb eqn:LEN.
       + admit.
-      + assert (exists ec, under_ctx Ki e = Some ec /\ language.to_val ec = None) as (ec & CUR & NVAL).
-        { (* should be derivable from fits_inf_call for current trace *)
-          admit. }
+      + 
+        apply fits_inf_call_prev in FIT.
+        apply fits_inf_call_last_or_short in FIT as [FIT | SHORT].
+        2: { apply Nat.leb_gt in LEN. 
+             clear -LEN SHORT.
+             simpl in SHORT. lia. }
+        rewrite FIN in FIT. eapply runs_call_helper in FIT; eauto.
+        destruct FIT as (ec & CUR & NVAL).
+
         rewrite CUR. simpl.
         apply under_ctx_spec in CUR.
 
@@ -644,25 +706,95 @@ Section WaitFreePR.
         iIntros "He".
         iMod "He" as (δ' ℓ) "(HSI & He2 & Hefs) /=".
 
-        iDestruct (same_phase_no_fork with "[$] [$]") as %->; eauto.
+        iDestruct (same_phase_no_fork with "[$] [$]") as %(-> & EQ_CFG); eauto.
+
         simpl. rewrite !app_nil_r.
+        iDestruct "HSI" as "(%MSTEP & HEAP & MSI)".
 
         iSpecialize ("PHS" with "[$]").
 
-        iModIntro. iSplit.
+        iAssert (wptp_wfree s (etr :tr[ Some τi ]: (t1 ++ fill Ki x :: t2, σ')) Φs)%I with "[WPS1 WPS2 He2]" as "WPS". 
         { admit. }
-        iDestruct "HSI" as "(?&?&?)". 
+        
+        iAssert (@state_interp _ M _ _ (etr :tr[ Some τi ]: (t1 ++ fill Ki x :: t2, σ')) _)%I with "[HEAP MSI]" as "TI".
+        { simpl. by iFrame. }
+
+        iMod (wptp_wfre_not_stuck with "TI WPS") as "(TI & WPS & %NSTUCK')". 
+        { econstructor; eauto. move STEP at bottom.
+          rewrite app_nil_r in STEP. rewrite <- e0 in STEP.
+          by rewrite H0 in STEP. }
+        { red. simpl.
+          rewrite -(app_nil_r (_ ++ _)). reflexivity. }
+        simpl in NSTUCK'. rewrite -H0 in NSTUCK'.
+        iApply fupd_frame_l. iSplit.
+        { iPureIntro. intros. by apply NSTUCK'. }
 
         assert (newposts (t1 ++ ectx_fill Ki ec :: t2) (t1 ++ ectx_fill Ki x :: t2) = []) as NONEW.
         { erewrite adequacy_utils.newposts_locales_equiv.
           { apply adequacy_utils.newposts_same_empty. }
           apply locales_equiv_from_middle. done. }
-        subst. rewrite NONEW. rewrite app_nil_r. 
+        subst. rewrite NONEW. rewrite app_nil_r.
+
+        iAssert (cur_obls_sigs (etr :tr[ Some τi ]: (t1 ++ fill Ki x :: t2, σ')))%I with "[OB]" as "OB".
+        { rewrite /cur_obls_sigs. simpl.
+          rewrite app_nil_r in EQ_CFG. rewrite -EQ_CFG. done. }  
+
+        iAssert (wfree_trace_inv
+          (etr :tr[ Some (locale_of t1 (ectx_fill Ki ec))
+                  ]: (t1 ++ ectx_fill Ki x :: t2, σ'))
+            (mtr :tr[ ℓ ]: δ'))%I with "[OB TI]" as "#INV'".
+        { rewrite /wfree_trace_inv. simpl.
+          rewrite /no_extra_obls. simpl.
+          iDestruct "TI" as "(_&_&MSI)". rewrite /obls_asem_mti. simpl.
+          rewrite /obls_si. iDestruct "MSI" as "(MSI & %CORR')".
+          iIntros (τ' OBS).
+          rewrite /cur_obls_sigs.
+          destruct (decide (τ' = τi)); [done| ].
+          simpl. 
+          iDestruct "OB" as "(OB & _)".
+          iDestruct (big_sepS_elem_of with "[$]") as "OB".
+          { apply elem_of_difference. rewrite not_elem_of_singleton. split; [| done].
+            rewrite (proj1 CORR').
+            destruct (ps_obls δ' !! τ') eqn:TT; rewrite TT in OBS; [| done]. 
+            eapply elem_of_dom; eauto. }
+          iDestruct (obls_msi_exact with "[$] [$]") as %NOOBS.
+          by rewrite NOOBS in OBS. }
+            
+        iAssert (extra_fuel
+    (etr :tr[ Some (locale_of t1 (ectx_fill Ki ec))
+     ]: (t1 ++ ectx_fill Ki x :: t2, σ')))%I with "[CPS]" as "CPS".
+        { rewrite /extra_fuel.
+          destruct (trace_length (_ :tr[ _ ]: _) <=? _) eqn:LE; [| done].
+          rewrite leb_correct.
+          2: { apply leb_complete in LE. simpl in LE.
+               clear -LE.
+               (* TODO: why lia doesn't solve it as is? *)
+               remember (trace_length etr).
+               rewrite -Heqn in LE. lia. }
+          simpl. iDestruct "CPS" as "(? & $)".
+          iApply (cp_mul_weaken with "[$]"); [done| lia]. }
 
         rewrite e0. do 2 iExists _.
-        iFrame.
-        iSplit.
-        { iEval (rewrite /wfree_trace_inv).          
+
+        iFrame "#∗". 
+        iModIntro.
+
+        iSplitR.
+        { done. rewrite /wfree_trace_inv. simpl.
+          rewrite /no_extra_obls. simpl.
+          red in MSTEP. destruct ℓ as [? [|]]; [| set_solver]. 
+          destruct MSTEP as [MSTEP ->]. simpl in MSTEP.
+          red in MSTEP. destruct MSTEP as (? & MSTEP & [=<-] & ?).
+          simpl in MSTEP.
+          iDestruct "INV" as %INV. iPureIntro.
+          intros. destruct (decide (τ' = τi)); [done| ].
+          apply INV.
+          assert (om_st_wf (trace_last mtr)) as WF.
+          { (* TODO: find where it's enforced now *)
+            admit. }
+          
+          
+          
           admit. }
         iSplitL "WPS1 WPS2 He2".
         {
@@ -690,9 +822,12 @@ Section WaitFreePR.
             rewrite under_ctx_fill. rewrite e0. done. }
           (* TODO: make a lemma, use above too *)
           { simpl.
+            erewrite wptp_from_gen_locales_equiv_1 with (t0' := (t1 ++ [fill Ki x])).
+            2: { rewrite !prefixes_from_app.
+                 eapply Forall2_app; [apply adequacy_utils.locales_equiv_refl| ].
+                 simpl. by constructor. }
             rewrite /wptp_from_gen.
-            iApply (big_sepL2_impl with "[WPS2]").
-            { iApply "WPS2". 
+            iApply (big_sepL2_impl with "[$]").
             iModIntro. iIntros (i pfi Φi PFith Φith).
             rewrite /thread_pr.
             destruct decide.
@@ -700,11 +835,10 @@ Section WaitFreePR.
             rewrite e0 in e.
             simpl in e.
             rewrite /locale_of in e.
-            erewrite prefixes_ith_length in e; eauto.
-            apply lookup_lt_Some in PFith.
-            rewrite adequacy_utils.prefixes_from_length in PFith. lia. }
 
-          admit. }
+            pose proof PFith as ?%prefixes_from_ith_length.
+            rewrite length_app in H. simpl in H. lia. }
+        }
         iSplitL "CPS".
         { rewrite /extra_fuel. simpl.
           rewrite (proj2 (Nat.ltb_ge (S _) _)); [done| ].
