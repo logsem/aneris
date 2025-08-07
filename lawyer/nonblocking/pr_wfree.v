@@ -604,6 +604,77 @@ Section WaitFreePR.
     apply prefixes_from_ith_length in ITH. by rewrite ITH.
   Qed.
 
+  Lemma reestablish_wfree_inv {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
+    etr mtr
+    (σ' : state)
+    (t1 t2 : list expr)
+    e' e''
+    (δ' : AM2M ObligationsAM)
+    (ℓ : mlabel (AM2M ObligationsAM)):
+    let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
+  cur_obls_sigs (etr :tr[ Some τi ]: (t1 ++ e' :: t2, σ')) -∗
+  state_interp (etr :tr[ Some τi ]: (t1 ++ e' :: t2, σ'))
+           (mtr :tr[ ℓ ]: δ') -∗
+  wfree_trace_inv
+    (etr :tr[ Some (locale_of t1 e'')
+     ]: (t1 ++ e'' :: t2, σ'))
+    (mtr :tr[ ℓ ]: δ').
+  Proof using.
+    simpl. iIntros "OB TI".
+    clear. 
+    rewrite /wfree_trace_inv. simpl.
+    rewrite /no_extra_obls. simpl.
+    iDestruct "TI" as "(_&_&MSI)". rewrite /obls_asem_mti. simpl.
+    rewrite /obls_si. iDestruct "MSI" as "(MSI & %CORR')".
+    iIntros (τ' OBS).
+    rewrite /cur_obls_sigs.
+    destruct (decide (τ' = τi)); [done| ].
+    simpl. 
+    iDestruct "OB" as "(OB & _)".
+    iDestruct (big_sepS_elem_of with "[$]") as "OB".
+    { apply elem_of_difference. rewrite not_elem_of_singleton. split; [| done].
+      rewrite (proj1 CORR').
+      destruct (ps_obls δ' !! τ') eqn:TT; rewrite TT in OBS; [| done]. 
+      eapply elem_of_dom; eauto. }
+    iDestruct (obls_msi_exact with "[$] [$]") as %NOOBS.
+    by rewrite NOOBS in OBS.
+  Qed.
+
+  Lemma reestablish_fuel {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
+    etr c' τ:
+    let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
+    ⊢ extra_fuel etr -∗ extra_fuel (etr :tr[ Some τ]: c').
+  Proof using.
+    simpl. iIntros "CPS". 
+    rewrite /extra_fuel.
+    destruct (trace_length (_ :tr[ _ ]: _) <=? _) eqn:LE; [| done].
+    rewrite leb_correct.
+    2: { apply leb_complete in LE. simpl in LE.
+         clear -LE.
+         (* TODO: why lia doesn't solve it as is? *)
+         remember (trace_length etr).
+         rewrite -Heqn in LE. lia. }
+    simpl. iDestruct "CPS" as "(? & $)".
+    iApply (cp_mul_weaken with "[$]"); [done| lia].
+  Qed.
+
+  Lemma reestablish_phases {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
+    etr τ c'
+    (EQ_CFG: locales_of_cfg (trace_last etr) = locales_of_cfg c')
+    (AFTER: ii < trace_length etr)
+    :
+    let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
+    cur_phases etr -∗ cur_phases (etr :tr[ Some τ ]: c').
+  Proof using.
+    simpl. iIntros "PHS".
+    rewrite /cur_phases.
+    rewrite -EQ_CFG.    
+    rewrite leb_correct_conv; [| done].
+    rewrite leb_correct_conv; [done| ].
+    simpl.
+    remember (trace_length etr) as X. rewrite -HeqX. lia.
+  Qed.
+
   Program Definition PR_wfree {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}:
     @ProgressResource heap_lang M Σ (@iem_invGS _ _ _ _ _ Hinv)
       state_interp wfree_trace_inv fork_post fits_inf_call :=
@@ -782,46 +853,21 @@ Section WaitFreePR.
           (etr :tr[ Some (locale_of t1 (ectx_fill Ki ec))
                   ]: (t1 ++ ectx_fill Ki x :: t2, σ'))
             (mtr :tr[ ℓ ]: δ'))%I with "[OB TI]" as "#INV'".
-        { rewrite /wfree_trace_inv. simpl.
-          rewrite /no_extra_obls. simpl.
-          iDestruct "TI" as "(_&_&MSI)". rewrite /obls_asem_mti. simpl.
-          rewrite /obls_si. iDestruct "MSI" as "(MSI & %CORR')".
-          iIntros (τ' OBS).
-          rewrite /cur_obls_sigs.
-          destruct (decide (τ' = τi)); [done| ].
-          simpl. 
-          iDestruct "OB" as "(OB & _)".
-          iDestruct (big_sepS_elem_of with "[$]") as "OB".
-          { apply elem_of_difference. rewrite not_elem_of_singleton. split; [| done].
-            rewrite (proj1 CORR').
-            destruct (ps_obls δ' !! τ') eqn:TT; rewrite TT in OBS; [| done]. 
-            eapply elem_of_dom; eauto. }
-          iDestruct (obls_msi_exact with "[$] [$]") as %NOOBS.
-          by rewrite NOOBS in OBS. }
-            
+        { iApply (reestablish_wfree_inv with "[$] [$]"). }
+        
         iAssert (extra_fuel
     (etr :tr[ Some (locale_of t1 (ectx_fill Ki ec))
      ]: (t1 ++ ectx_fill Ki x :: t2, σ')))%I with "[CPS]" as "CPS".
-        { rewrite /extra_fuel.
-          destruct (trace_length (_ :tr[ _ ]: _) <=? _) eqn:LE; [| done].
-          rewrite leb_correct.
-          2: { apply leb_complete in LE. simpl in LE.
-               clear -LE.
-               (* TODO: why lia doesn't solve it as is? *)
-               remember (trace_length etr).
-               rewrite -Heqn in LE. lia. }
-          simpl. iDestruct "CPS" as "(? & $)".
-          iApply (cp_mul_weaken with "[$]"); [done| lia]. }
+        { iApply (reestablish_fuel with "[$]"). }
 
         iAssert (cur_phases
           (etr :tr[ Some (locale_of t1 (ectx_fill Ki ec))
                   ]: (t1 ++ ectx_fill Ki x :: t2, σ')))%I with "[PHS]" as "PHS".
-        { rewrite /cur_phases.
-          rewrite -e0. rewrite app_nil_r in EQ_CFG. rewrite -EQ_CFG.
-          rewrite LEN. rewrite leb_correct_conv; [done| ].
-          simpl. apply leb_complete_conv in LEN. lia. } 
+        { iApply (reestablish_phases with "[$]").
+          - rewrite EQ_CFG. by rewrite app_nil_r.
+          - apply Nat.leb_gt in LEN. done. }
 
-        rewrite e0. do 2 iExists _. by iFrame "#∗".         
+        rewrite e0. do 2 iExists _. by iFrame "#∗".
     - 
     
   
