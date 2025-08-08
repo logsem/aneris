@@ -796,6 +796,20 @@ Section WaitFreePR.
     by rewrite NOOBS in OBS.
   Qed.
 
+  Lemma split_trace_fuel {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
+    etr c' τ
+    (BEFORE: trace_length etr <= ii):
+    let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
+    ⊢ extra_fuel etr -∗ cp π0 d0 ∗ extra_fuel (etr :tr[ Some τ]: c').
+  Proof using.
+    simpl. iIntros "CPS". 
+    rewrite /extra_fuel.
+    rewrite leb_correct; [| done]. 
+    rewrite Nat.sub_succ_l; [| done]. rewrite cp_mul_take.
+    iDestruct "CPS" as "((CPS & CP) & ?)". iFrame.
+    destruct leb; [| done]. iFrame. 
+  Qed.
+
   Lemma reestablish_fuel {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
     etr c' τ:
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
@@ -840,6 +854,77 @@ Section WaitFreePR.
     simpl. iIntros "OBS". 
     rewrite /cur_obls_sigs. simpl.
     rewrite -EQ_CFG. done.
+  Qed.
+
+  Definition looping_trace: auxiliary_trace LoopingModel :=
+    trace_singleton ().
+
+  From lawyer Require Import program_logic.  
+
+  Lemma pwp_MU_ctx_take_step {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
+    s Φ ex atr tp1 K e1 tp2 σ1 e2 σ2 efs ζ:    
+    let (E1, E2) := (ectx_fill K e1, ectx_fill K e2) in
+    valid_exec ex →
+    prim_step e1 σ1 e2 σ2 efs ->
+    trace_ends_in ex (tp1 ++ E1 :: tp2, σ1) →
+    locale_of tp1 E1 = ζ ->
+    state_interp ex atr -∗
+    (let hGS: @heapGS Σ M EM := {| heap_iemgs := Hinv |} in
+     let oτ' := step_fork (trace_last ex) (tp1 ++ E2 :: tp2 ++ efs, σ2) in
+     @MU_impl _ EM Σ hGS oτ' ⊤ ζ ⌜ True ⌝ ) -∗
+    (let _ := iris_OM_into_Looping in pwp s ⊤ ζ e1 Φ)
+    ={⊤,∅}=∗   |={∅}▷=>^(S $ trace_length ex)   |={∅,⊤}=>
+    ∃ δ' ℓ,
+      state_interp (trace_extend ex (Some ζ) (tp1 ++ E2 :: tp2 ++ efs, σ2))
+                   (trace_extend atr ℓ δ') ∗
+      (let _ := iris_OM_into_Looping in pwp s ⊤ ζ e2 Φ) ∗ 
+      ([∗ list] i↦ef ∈ efs,
+        let τf := locale_of (tp1 ++ E1 :: tp2 ++ take i efs) ef in
+        (let _ := iris_OM_into_Looping in pwp s ⊤ τf ef (fork_post τf))
+      ).
+  Proof using.
+    simpl.
+    iIntros (Hex Hstp Hei Hlocale) "HSI MU Hwp".
+    rewrite /pwp. 
+    rewrite wp_unfold /wp_pre.
+    destruct (to_val e1) eqn:He1.
+    { erewrite val_stuck in He1; done. }
+    simpl. rewrite He1.
+    iDestruct "HSI" as "(%EV & PHYS & MSI)". simpl. 
+    iMod ("Hwp" $! _ looping_trace K with "[//] [] [] PHYS") as "[Hs Hwp]".
+    1, 2: done.
+    iDestruct ("Hwp" with "[]") as "Hwp"; first done.
+    iModIntro. 
+    iApply (step_fupdN_wand with "Hwp").
+    iIntros "!> Hwp".
+    iMod "Hwp" as ([] []) "(PHYS & WP & WPS')".
+
+    rewrite /MU /MU_impl. iMod ("MU" $! (trace_extend _ _ _) with "[PHYS MSI]") as (δ ρ) "TI".
+    { rewrite /trace_interp_interim. iFrame.
+      iPureIntro. split.
+      { rewrite -Hlocale. reflexivity. }
+      split; [| done]. 
+      rewrite -Hlocale. econstructor; eauto.
+      simpl in Hstp. simpl.
+      by apply fill_prim_step. }
+
+    iModIntro.
+    simpl.  iDestruct "TI" as "((%&?&?)&?)". 
+    do 2 iExists _. iFrame.
+    iPureIntro. congruence. 
+  Qed.
+
+  Lemma MU_burn_cp {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} τ π d q :
+    let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
+    ⊢ cp π d -∗ th_phase_frag τ π q -∗ 
+    (let hGS: @heapGS Σ M EM := {| heap_iemgs := Hinv |} in
+     @MU _ EM Σ hGS ⊤ τ (th_phase_frag τ π q)).
+  Proof using.
+    simpl. iIntros "CP PH".
+    iApply AMU_lift_top; [(try rewrite nclose_nroot); done| ]. 
+    iApply BOU_AMU. iModIntro. iSplitR.
+    { iIntros "$". }
+    iFrame.
   Qed.
 
   Program Definition PR_wfree {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}:
@@ -919,34 +1004,44 @@ Section WaitFreePR.
     destruct decide.
     - subst τ.
       rewrite /wp_tc.
+
+      iDestruct (cur_phases_take _ τi with "PH") as "(%π & PH & PHS)".
+      { eapply locales_of_cfg_Some.
+        rewrite FIN. rewrite e0.
+        by apply locale_step_from_locale_src in STEP. }
+      iAssert (⌜ ps_phases (trace_last mtr) !! τi = Some π ⌝)%I as "%PH".
+      { iApply (th_phase_msi_frag with "[-PH] [$]").
+        by iDestruct "TI" as "(?&?&(?&?&?))". }
+      iAssert (⌜ obls_cfg_corr (trace_last etr) (trace_last mtr) ⌝)%I as "%CORR".
+      { iDestruct "TI" as "(_&_&CORR)".
+        rewrite /obls_asem_mti /obls_si.
+        iDestruct "CORR" as "(_&%CORR)". done. }
+
       destruct Nat.leb eqn:LEN.
-      + admit.
-      + 
+      + apply Nat.leb_le in LEN.
+
+        iDestruct (split_trace_fuel with "[$]") as "(CP & CPS)"; [done| ].
+
+        iDestruct (pwp_MU_ctx_take_step with "TI [CP] WP") as "foo"; eauto. 
+        { red. rewrite FIN. erewrite ectx_fill_emp. reflexivity. }
+        { rewrite /step_fork. 
+          subst. done. }
+
+
+        foobar. 
+      + apply Nat.leb_gt in LEN. 
         apply fits_inf_call_prev in FIT.
         apply fits_inf_call_last_or_short in FIT as [FIT | SHORT].
-        2: { apply Nat.leb_gt in LEN. 
-             clear -LEN SHORT.
-             simpl in SHORT. lia. }
+        2: { simpl in SHORT. lia. }
         rewrite FIN in FIT. eapply runs_call_helper in FIT; eauto.
         destruct FIT as (ec & CUR & NVAL).
 
         rewrite CUR. simpl.
         apply under_ctx_spec in CUR.
 
-        iDestruct (cur_phases_take _ τi with "PH") as "(%π & PH & PHS)".
-        { eapply locales_of_cfg_Some.
-          rewrite FIN. rewrite e0.
-          by apply locale_step_from_locale_src in STEP. }
-        iAssert (⌜ ps_phases (trace_last mtr) !! τi = Some π ⌝)%I as "%PH".
-        { iApply (th_phase_msi_frag with "[-PH] [$]").
-          by iDestruct "TI" as "(?&?&(?&?&?))". }
-        iAssert (⌜ obls_cfg_corr (trace_last etr) (trace_last mtr) ⌝)%I as "%CORR".
-        { iDestruct "TI" as "(_&_&CORR)".
-          rewrite /obls_asem_mti /obls_si.
-          iDestruct "CORR" as "(_&%CORR)". done. }
-
         rewrite -CUR in PSTEP. eapply fill_step_inv in PSTEP as (?&?&?).
         2: done. 
+
         iDestruct (wp_ctx_take_step with "[TI] WP") as "He"; eauto.
         { red. rewrite FIN. rewrite -CUR. eauto. }
         { subst. done. }
@@ -976,16 +1071,16 @@ Section WaitFreePR.
             rewrite /thread_pr.
             destruct decide.
             2: { set_solver. }
-            rewrite LEN.
-            rewrite leb_correct_conv; [set_solver| ].
-            apply leb_complete_conv in LEN. lia. } 
+            rewrite leb_correct_conv; [| lia].
+            rewrite leb_correct_conv; [| lia].
+            set_solver. }
           simpl. rewrite -EQ'.
           iApply (wptp_from_gen_app _ _ [_] [_]).
           iSplitL "He2".
           { simpl. iApply wptp_gen_singleton.
             rewrite /thread_pr. rewrite decide_True; [| done].
             rewrite /wp_tc. rewrite leb_correct_conv.
-            2: { apply leb_complete_conv in LEN. lia. }
+            2: { lia. }
             rewrite under_ctx_fill. rewrite e0. done. }
           (* TODO: make a lemma, use it above too *)
           { simpl.
@@ -1028,11 +1123,12 @@ Section WaitFreePR.
 
         iDestruct (reestablish_obls_sigs with "[$]") as "OBS".
         { by rewrite EQ_CFG app_nil_r. }
-        iDestruct (reestablish_wfree_inv with "[$] [$]") as "#INV'". 
+        iDestruct (reestablish_wfree_inv with "[$] [$]") as "#INV'".
+        foobar. try reusing lemma about fuel split.
         iDestruct (reestablish_fuel with "[$]") as "CPS". 
         iDestruct (reestablish_phases with "[$]")  as "PHS". 
         { rewrite EQ_CFG. by rewrite app_nil_r. }
-        { apply Nat.leb_gt in LEN. done. }
+        { done. }
 
         rewrite e0. do 2 iExists _. iFrame. done.
     - 
