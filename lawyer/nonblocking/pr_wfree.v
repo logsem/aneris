@@ -225,6 +225,51 @@ Section WaitFreePR.
   Proof using. done. Qed. 
 
   (* TODO: do we need anything stronger (e.g. matching indices for e and Φ) ? *)
+  Lemma wptp_from_gen_take_2 t efs Φs τ
+    (IN: τ ∈ locales_of_list_from t efs):
+    let WPS := wptp_from_gen t efs Φs in
+    WPS ⊣⊢ ∃ Φ e, ⌜ Φ ∈ Φs ⌝ ∗ ⌜ from_locale_from t efs τ = Some e ⌝ ∗ W e τ Φ ∗ (W e τ Φ -∗ WPS).
+  Proof using.
+    clear F. clear dependent ic.
+    simpl. iSplit. 
+    2: { iIntros "(%&%&?&?&?&CLOS)". by iApply "CLOS". }
+    iIntros "WPS".
+
+    pose proof IN as [e X]%locales_of_list_from_locale_from'.
+    apply from_locale_from_lookup in X. apply proj1 in X.
+    (* rewrite Nat.sub_0_r /= in X. *)
+    pose proof X as (t1 & t2 & -> & LEN)%elem_of_list_split_length. 
+
+    iDestruct (wptp_gen_split_1 with "[$]") as %(?&?&<-&?&?).
+    iDestruct (wptp_from_gen_app' with "[$]") as "[? WPS]"; eauto.
+    destruct x0; [done| ].
+    rewrite wptp_from_gen_cons. iDestruct "WPS" as "[WP ?]".
+
+    assert (length t ≤ τ).
+    { rewrite locales_of_list_from_indexes /= in IN.
+      apply elem_of_lookup_imap in IN as (?&?&?&?).
+      subst τ. clear.
+      simpl. lia. }
+
+    assert (from_locale_from t (t1 ++ e :: t2) τ = Some e) as E.
+    { eapply from_locale_from_lookup.
+      split; eauto. }
+    
+    do 2 iExists _. iSplit; [| iSplit].
+    2: done. 
+    { iPureIntro. Unshelve. 2: exact b. set_solver. }
+    assert (τ = locale_of (t ++ t1) e) as EQ.
+    2: { rewrite -EQ. iFrame.
+         iIntros. iApply wptp_from_gen_app. iFrame. simpl.
+         by rewrite -EQ. }
+    rewrite /locale_of. rewrite length_app.
+
+    (* lia.  *)
+    rewrite -LEN. by apply Nat.le_add_sub.     
+  Qed.
+
+  (* TODO: try to unify with wptp_from_gen_take_2 *)
+  (* TODO: do we need anything stronger (e.g. matching indices for e and Φ) ? *)
   Lemma wptp_from_gen_take_1 t efs Φs e
     (IN: e ∈ efs):
     let WPS := wptp_from_gen t efs Φs in
@@ -232,9 +277,9 @@ Section WaitFreePR.
        ⌜ Φ ∈ Φs ⌝ ∗ ⌜ efs = t1 ++ e :: t2 ⌝ ∗ W e τ Φ ∗ (W e τ Φ -∗ WPS).
   Proof using.
     clear F. clear dependent ic.
-    simpl. iSplit. 
+    simpl. iSplit.
     2: { iIntros "(%&%&%&?&?&?&CLOS)". by iApply "CLOS". }
-    iIntros "WPS".
+    iIntros "WPS".    
     apply elem_of_list_split in IN as (?&?&->).
     iDestruct (wptp_gen_split_1 with "[$]") as %(?&?&<-&?&?).
     iDestruct (wptp_from_gen_app' with "[$]") as "[? WPS]"; eauto.
@@ -243,7 +288,7 @@ Section WaitFreePR.
     do 3 iExists _. iSplit; [| iSplit].
     2: { eauto. }
     2: iFrame.
-    { iPureIntro. set_solver. } 
+    { iPureIntro. set_solver. }
     iIntros "WP".
     iApply wptp_from_gen_app. iFrame.
   Qed.
@@ -263,8 +308,7 @@ Section WaitFreePR.
     
   (*   Disable Notation locales_equiv.  *)
   (*   eapply EQUIV.  *)
-    
-    
+        
   Lemma wptp_from_gen_locales_equiv_1 t0 t0' efs Φs
     (EQUIV: locales_equiv t0 t0'):
     wptp_from_gen t0 efs Φs ⊣⊢ wptp_from_gen t0' efs Φs.
@@ -290,6 +334,133 @@ Section WaitFreePR.
   Qed.
 
   End WptpGen.
+
+  (* TODO: this is pretty much the definition of locales_of_list *)
+  Lemma locales_of_list_from_locales t0 (es : list expr):
+    locales_of_list_from t0 es = map (fun '(l, e) => locale_of l e) (prefixes_from t0 es).
+  Proof using. set_solver. Qed. 
+
+  (* TODO: this is pretty much the definition of locales_of_list *)
+  Lemma locales_of_list_locales (es : list expr) :    
+    locales_of_list es = map (fun '(l, e) => locale_of l e) (prefixes es).
+  Proof using. set_solver. Qed. 
+
+  (* TODO: move *)
+  Lemma prefixes_from_ith_length (t0 t: list expr) pf i
+    (ITH: prefixes_from t0 t !! i = Some pf):
+    length pf.1 = length t0 + i.
+  Proof using.
+    clear -ITH. 
+    generalize dependent t0. generalize dependent i. generalize dependent pf.
+    induction t.
+    { intros. simpl. destruct t0; done. }
+    intros. destruct i.
+    { simpl in ITH. inversion ITH. subst. simpl. lia. }
+    simpl in ITH. apply IHt in ITH.
+    rewrite length_app /= in ITH. lia.
+  Qed.
+
+  Lemma prefixes_ith_length (t: list expr) pf i
+    (ITH: prefixes t !! i = Some pf):
+    length pf.1 = i. 
+  Proof using.
+    apply prefixes_from_ith_length in ITH. by rewrite ITH.
+  Qed.
+
+  Lemma from_locale_from_locale_of t0 t1 t2 e:
+    from_locale_from t0 (t1 ++ e :: t2) (locale_of (t0 ++ t1) e) = Some e.
+  Proof using.
+    clear dependent ic. 
+    apply from_locale_from_lookup.
+    rewrite /locale_of. rewrite length_app. simpl.
+    split; [| lia].
+    rewrite Nat.add_sub'. by apply list_lookup_middle.
+  Qed.
+
+  Lemma wptp_from_gen_upd_2 {Σ: gFunctors}
+    (W1 W2: expr -> locale heap_lang -> (val → iPropI Σ) -> iProp Σ) t efs Φs
+    (τs: gset (locale heap_lang))
+    (IN: τs ⊆ list_to_set $ locales_of_list_from t efs):
+    wptp_from_gen W1 t efs Φs -∗                  
+    (□ ∀ τ Φ e, ⌜ τ ∈ locales_of_list_from t efs /\ τ ∉ τs ⌝ -∗ W1 e τ Φ -∗ W2 e τ Φ) -∗
+    ∃ (M: gmap (locale heap_lang) (expr * (val → iPropI Σ))),
+    ⌜ dom M = τs ⌝ ∗
+    ([∗ map] τ ↦ '(e, Φ) ∈ M, (* ⌜ Φ ∈ Φs ⌝ ∗  *)⌜ from_locale_from t efs τ = Some e ⌝ ∗ W1 e τ Φ) ∗
+    (([∗ map] τ ↦ '(e, Φ) ∈ M, (* ⌜ Φ ∈ Φs ⌝ ∗  *)⌜ from_locale_from t efs τ = Some e ⌝ ∗ W2 e τ Φ) -∗ wptp_from_gen W2 t efs Φs).
+  Proof using.
+    clear dependent ic F m.
+     iInduction efs as [|e efs] "IH" forall (Φs τs t IN). 
+     { simpl. iIntros "**".
+       apply equiv_empty_L in IN as ->.
+       iExists ∅. set_solver. }
+     iIntros "WPS #UPD".
+     assert (τs ∖ {[ locale_of t e ]} ⊆ list_to_set (locales_of_list_from (t ++ [e]) efs)).
+     { simpl in IN. set_solver. }
+
+     destruct Φs as [| Φ Φs]; [done| ].
+     rewrite wptp_from_gen_cons. iDestruct "WPS" as "[WP WPS]". 
+     
+     iSpecialize ("IH" with "[//] [$] []").
+     { iModIntro. iIntros "**". iApply ("UPD" with "[] [$]").
+       iPureIntro.
+       destruct H0.
+       rewrite locales_of_list_from_locales. simpl.
+       rewrite locales_of_list_from_locales in H0.
+       split; [set_solver| ].
+       apply not_elem_of_difference in H1 as [? | EQ]; [done| ].
+       apply elem_of_singleton in EQ.
+       apply elem_of_list_fmap in H0 as ((?&?)&?&?).
+       apply elem_of_list_lookup_1 in H1 as (?&?).
+       apply prefixes_from_ith_length in H1. simpl in H1.
+       rewrite /locale_of in EQ, H0.
+       rewrite length_app /= in H1. lia. }
+
+     iDestruct "IH" as (Ts) "(%DOM & WPS & CLOS)".
+     iExists (if decide (locale_of t e ∈ τs) then <[ locale_of t e := (e, Φ) ]> Ts else Ts).
+     iSplitR.
+     { iPureIntro. destruct decide.
+       - rewrite dom_insert_L. rewrite DOM.
+         rewrite union_comm_L. rewrite difference_union_L. set_solver.
+       - set_solver. }
+     destruct decide.
+     - iSplitL "WP WPS".
+       + rewrite big_sepM_insert.
+         2: { apply not_elem_of_dom. set_solver. }
+         iFrame. iSplitR.
+         { iPureIntro.
+           pose proof (from_locale_from_locale_of t [] efs e).
+           by rewrite app_nil_l app_nil_r in H0. }
+         iApply (big_sepM_impl with "[$]").
+         iModIntro. iIntros (k (e', Φ')) "%KTH".
+         simpl. rewrite decide_False; [set_solver| ].
+         intros <-. apply mk_is_Some, elem_of_dom in KTH. set_solver.
+       + iIntros "CLOS'".
+         rewrite big_sepM_insert.
+         2: { apply not_elem_of_dom. set_solver. }
+         iDestruct "CLOS'" as "((%EQ & WP2) & WPS2)".
+         rewrite wptp_from_gen_cons. iFrame.
+         iApply "CLOS". simpl.
+         iApply (big_sepM_impl with "[$]").
+         iModIntro. iIntros (k (e', Φ')) "%KTH".
+         rewrite decide_False; [set_solver| ].
+         intros <-. apply mk_is_Some, elem_of_dom in KTH. set_solver.
+     - iSplitL "WPS".
+       + simpl.
+         iApply (big_sepM_impl with "[$]").
+         iModIntro. iIntros (k (e', Φ')) "%KTH".
+         simpl. rewrite decide_False; [set_solver| ].
+         intros <-. apply mk_is_Some, elem_of_dom in KTH. set_solver.
+       + iIntros "CLOS'".
+         rewrite wptp_from_gen_cons. iSplitL "WP".
+         { iApply ("UPD" with "[] [$]").
+           iPureIntro. split; [| done].
+           rewrite locales_of_list_from_locales. simpl. set_solver. }
+         iApply "CLOS". simpl.
+         iApply (big_sepM_impl with "[$]").
+         iModIntro. iIntros (k (e', Φ')) "%KTH".
+         rewrite decide_False; [set_solver| ].
+         intros <-. apply mk_is_Some, elem_of_dom in KTH. set_solver.
+  Qed.
 
   Definition wptp_gen {Σ} W t Φs := (@wptp_from_gen Σ W [] t Φs).
 
@@ -355,6 +526,13 @@ Section WaitFreePR.
     rewrite TIth in X. inversion X. subst. eauto.
   Qed.
 
+  (* Lemma from_locale_from_locale_tp t1 t2 τ e: *)
+  (*   from_locale t1 τ = Some e <-> locale_of t1 e = τ /\ e *)
+  (* Proof using. *)
+  (*   rewrite /from_locale. rewrite /locale_of. *)
+  (*   rewrite /from_locale_from. *)
+  (*   [] tp ?Goal0 = Some e0 *)
+
   Lemma wptp_wfre_not_stuck {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
     ex atr σ tp trest s Φs :
     (* Forall2 (λ '(t, e) '(t', e'), locale_of t e = locale_of t' e') (prefixes t0) (prefixes t0') -> *)
@@ -375,7 +553,7 @@ Section WaitFreePR.
 
     iDestruct (wptp_gen_split_1 with "[$]") as %(?&?&<-&?&?).
     iDestruct (wptp_from_gen_app' with "[$]") as "[WPS _]"; eauto.
-    erewrite wptp_from_gen_take_1; eauto. 
+    erewrite wptp_from_gen_take_1; eauto.
     iDestruct "WPS" as "(%Φ & %t1 & %t2 & %IN & -> & W & _)".
     iSimpl in "W". 
     rewrite /thread_pr.
@@ -582,28 +760,6 @@ Section WaitFreePR.
   (*   length pf.1 = i.  *)
   (* Proof using. *)
 
-  (* TODO: move *)
-  Lemma prefixes_from_ith_length (t0 t: list expr) pf i
-    (ITH: prefixes_from t0 t !! i = Some pf):
-    length pf.1 = length t0 + i.
-  Proof using.
-    clear -ITH. 
-    generalize dependent t0. generalize dependent i. generalize dependent pf.
-    induction t.
-    { intros. simpl. destruct t0; done. }
-    intros. destruct i.
-    { simpl in ITH. inversion ITH. subst. simpl. lia. }
-    simpl in ITH. apply IHt in ITH.
-    rewrite length_app /= in ITH. lia.
-  Qed.
-
-  Lemma prefixes_ith_length (t: list expr) pf i
-    (ITH: prefixes t !! i = Some pf):
-    length pf.1 = i. 
-  Proof using.
-    apply prefixes_from_ith_length in ITH. by rewrite ITH.
-  Qed.
-
   Lemma reestablish_wfree_inv {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
     etr mtr
     (σ' : state)
@@ -675,6 +831,17 @@ Section WaitFreePR.
     remember (trace_length etr) as X. rewrite -HeqX. lia.
   Qed.
 
+  Lemma reestablish_obls_sigs {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
+    etr t1 t2 x σ'
+    (EQ_CFG: locales_of_cfg (trace_last etr) = locales_of_cfg (t1 ++ fill Ki x :: t2, σ')):
+    let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
+    cur_obls_sigs etr -∗ cur_obls_sigs (etr :tr[ Some τi ]: (t1 ++ fill Ki x :: t2, σ')).
+  Proof using.
+    simpl. iIntros "OBS". 
+    rewrite /cur_obls_sigs. simpl.
+    rewrite -EQ_CFG. done.
+  Qed.
+
   Program Definition PR_wfree {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}:
     @ProgressResource heap_lang M Σ (@iem_invGS _ _ _ _ _ Hinv)
       state_interp wfree_trace_inv fork_post fits_inf_call :=
@@ -718,13 +885,28 @@ Section WaitFreePR.
     rewrite H3 in STEP, FIT. rewrite H3.
 
     rewrite /pr_pr_wfree. iDestruct "PR" as "(WPS & CPS & PH & OB)".
-    iUnfold wptp_wfree in "WPS".    
+
+    iUnfold wptp_wfree in "WPS".
+
+    (* iDestruct (wptp_from_gen_upd_2 _ *)
+
+    
+    (* iDestruct (wptp_from_gen_take_2 _ _ _ _ τ with "WPS") as "WPS". *)
+    (* { rewrite FIN. simpl. rewrite -H3. *)
+    (*   rewrite locales_of_list_locales. *)
+    (*   eapply elem_of_fmap. eexists (_, _). split; eauto. *)
+    (*   apply prefixes_from_spec. eauto. } *)
+
+    (* simpl. iDestruct "WPS" as (Φ e_) "(%Φ_IN & %FIN_ & WP & WPS)". *)
+    (* rewrite FIN in FIN_. rewrite -H3 /= in FIN_. *)
+    (* rewrite from_locale_from_locale_of in FIN_. inversion FIN_. subst e_. clear FIN_. *)
+
     red in FIN. iEval (rewrite FIN; simpl) in "WPS".
     iDestruct (wptp_gen_split_1 with "WPS") as %X.
     destruct X as (Φs1 & Φs' & EQ & LEN1 & LEN').
     iEval (rewrite -EQ) in "WPS".
     iDestruct (wptp_from_gen_app' with "[$]") as "[WPS1 WPS'] /="; [done| ].
-    replace (e :: t2) with ([e] ++ t2) at 1 by done. 
+    replace (e :: t2) with ([e] ++ t2) at 1 by done.
     iDestruct (wptp_gen_split_1 with "WPS'") as %X.
     destruct X as (Φ_ & Φs2 & EQ' & LEN_ & LEN2).
     iEval (rewrite -EQ') in "WPS'".
@@ -735,8 +917,7 @@ Section WaitFreePR.
 
     iEval (rewrite /thread_pr) in "WP".
     destruct decide.
-    - rewrite H3 in e0.
-      subst τ.
+    - subst τ.
       rewrite /wp_tc.
       destruct Nat.leb eqn:LEN.
       + admit.
@@ -845,29 +1026,15 @@ Section WaitFreePR.
           apply locales_equiv_from_middle. done. }
         subst. rewrite NONEW. rewrite app_nil_r.
 
-        iAssert (cur_obls_sigs (etr :tr[ Some τi ]: (t1 ++ fill Ki x :: t2, σ')))%I with "[OB]" as "OB".
-        { rewrite /cur_obls_sigs. simpl.
-          rewrite app_nil_r in EQ_CFG. rewrite -EQ_CFG. done. }  
+        iDestruct (reestablish_obls_sigs with "[$]") as "OBS".
+        { by rewrite EQ_CFG app_nil_r. }
+        iDestruct (reestablish_wfree_inv with "[$] [$]") as "#INV'". 
+        iDestruct (reestablish_fuel with "[$]") as "CPS". 
+        iDestruct (reestablish_phases with "[$]")  as "PHS". 
+        { rewrite EQ_CFG. by rewrite app_nil_r. }
+        { apply Nat.leb_gt in LEN. done. }
 
-        iAssert (wfree_trace_inv
-          (etr :tr[ Some (locale_of t1 (ectx_fill Ki ec))
-                  ]: (t1 ++ ectx_fill Ki x :: t2, σ'))
-            (mtr :tr[ ℓ ]: δ'))%I with "[OB TI]" as "#INV'".
-        { iApply (reestablish_wfree_inv with "[$] [$]"). }
-        
-        iAssert (extra_fuel
-    (etr :tr[ Some (locale_of t1 (ectx_fill Ki ec))
-     ]: (t1 ++ ectx_fill Ki x :: t2, σ')))%I with "[CPS]" as "CPS".
-        { iApply (reestablish_fuel with "[$]"). }
-
-        iAssert (cur_phases
-          (etr :tr[ Some (locale_of t1 (ectx_fill Ki ec))
-                  ]: (t1 ++ ectx_fill Ki x :: t2, σ')))%I with "[PHS]" as "PHS".
-        { iApply (reestablish_phases with "[$]").
-          - rewrite EQ_CFG. by rewrite app_nil_r.
-          - apply Nat.leb_gt in LEN. done. }
-
-        rewrite e0. do 2 iExists _. by iFrame "#∗".
+        rewrite e0. do 2 iExists _. iFrame. done.
     - 
     
   
