@@ -22,7 +22,7 @@ Section proof.
     IsConnected c sa -∗  
     GlobalInv -∗
     RC_client_toolbox -∗
-    □ (|={⊤, E}=> ∃ V, key ↦ₖ V ∗ ▷ (key ↦ₖ V ={E, ⊤}=∗ emp)) -∗
+    □ (▷ |={⊤, E}=> ∃ V, key ↦ₖ V ∗ (key ↦ₖ V ={E, ⊤}=∗ emp)) -∗
     (∀ v', {{{ True }}}
             cond v' @[ip_of_address sa]
            {{{ (b : bool), RET #b; ⌜b → v = v'⌝ }}}) -∗
@@ -40,7 +40,7 @@ Section proof.
     iExists {[ key := V ]}.
     rewrite big_sepM_singleton.
     iFrame.
-    iIntros "!> (Hstate & Hkey & Hkey_con)".
+    iIntros "(Hstate & Hkey & Hkey_con)".
     rewrite big_sepM_singleton.
     iMod ("Hclose" with "[$Hkey]") as "_".
     iModIntro.
@@ -52,7 +52,6 @@ Section proof.
     iModIntro.
     iExists None, V'.
     iFrame.
-    iNext.
     iIntros (wo) "(Hkey_con & Hkey & Hdisj)".
     iMod (Seen_creation with "[$][$Hkey]") as "(Hkey & Hseen)"; first done.
     iMod ("Hclose" with "[$Hkey]") as "_".
@@ -75,8 +74,7 @@ Section proof.
           iSplitL.
           all : iPureIntro.
           all : set_solver.
-        * iNext.
-          iIntros (b') "(Hstate & Hkey)".
+        * iIntros (b') "(Hstate & Hkey)".
           rewrite big_sepM2_singleton; simpl.
           rewrite big_sepM_singleton.
           iDestruct "Hkey" as "[(_ & Hkey) | (_ & Hkey)]".

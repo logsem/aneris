@@ -62,13 +62,14 @@ Section with_Σ.
     iDestruct (write_spec_write_spec_atomic with "Hwr") as "Hwr'".
     iApply ("Hwr'" $! (⊤ ∖ ↑N) k (SerVal #n1) with "[] []");
       [ solve_ndisj | done |].
+    iNext.
     iInv N as ">HI" "Hclose".
     iDestruct "HI" as "[Hk | HI]".
     { iModIntro.
       iExists [], [], None.
       iFrame "Hobs Hwrites Hk".
       iSplit; [done|].
-      iIntros "!>" (hf a_new) "H".
+      iIntros (hf a_new) "H".
       iDestruct "H" as (Hatkey Hkey Hval Horig Hle) "(Hk & Hobs & Hwrites)".
       iMod ("Hclose" with "[Hk]") as "_".
       { iRight. iExists a_new.
@@ -107,7 +108,7 @@ Section with_Σ.
     rewrite -Hmval.
     iFrame "Hwrites Hobs' Hk".
     iSplit; [ done |].
-    iIntros "!>" (hf a_new) "H".
+    iIntros (hf a_new) "H".
     iDestruct "H" as (Hatkey Hkey Hval Horig Hle) "(Hk & Hobs''' & Hwrites)".
     iMod ("Hclose" with "[Hk]") as "_".
     { iRight. iNext.
@@ -168,6 +169,7 @@ Section with_Σ.
     iDestruct (read_spec_read_spec_atomic with "Hrd") as "Hrd'".
     iApply ("Hrd'" $! (⊤ ∖ ↑N) k with "[] []");
       [ solve_ndisj | done |].
+    iNext.
     iInv N as ">HI" "Hclose".
     iDestruct "HI" as "[Hk | HI]".
     { iMod (OwnMemKey_none_obs with "[$Hk $Hobs]") as "[Hk %Hatkey']";
@@ -188,7 +190,7 @@ Section with_Σ.
       assert (we = we1) as -> by set_solver.
       iSplit; [eauto|].
       { iPureIntro. rewrite assoc. by apply at_key_snoc_some. }
-      iIntros "!> [[%Hcont _] | H]"; [done|].
+      iIntros "[[%Hcont _] | H]"; [done|].
       iDestruct "H" as (we Hweeq) "Hk".
       inversion Hweeq as [Heq]. rewrite -Heq.
       iMod ("Hclose" with "[Hk]") as "_".
@@ -210,7 +212,7 @@ Section with_Σ.
     iFrame "Hobs' Hk".
     iSplit; [eauto|].
     { iPureIntro. rewrite !assoc. by apply at_key_snoc_some. }
-    iIntros "!> [[%Hcont _] | H]"; [done|].
+    iIntros "[[%Hcont _] | H]"; [done|].
     iDestruct "H" as (we' Hweeq) "Hk".
     inversion Hweeq as [Heq]. rewrite -Heq.
     iMod ("Hclose" with "[Hk]") as "_".

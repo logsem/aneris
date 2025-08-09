@@ -18,14 +18,14 @@ Section Specification.
          (P : iProp Σ) (Q : we → ghst → ghst → ghst → iProp Σ),
         ⌜↑DB_InvName ⊆ E⌝ -∗
         ⌜k ∈ DB_keys⌝ -∗
-        □ (P
-            ={⊤, E}=∗
+        □ (P -∗ ▷ 
+            |={⊤, E}=>
               ∃ (h s: ghst) (a_old: option we),
                 ⌜at_key k h = a_old⌝ ∗
                 Obs h ∗
                 k ↦ₖ mval_of_we_opt a_old ∗
                 Writes sa s ∗
-                ▷ (∀ (hf : ghst) (a_new : we),
+                (∀ (hf : ghst) (a_new : we),
                   ⌜at_key k hf = None⌝ ∗
                   ⌜WE_key a_new = k⌝ ∗
                   ⌜WE_val a_new = v⌝ ∗
@@ -66,6 +66,7 @@ Section Specification.
     iIntros "#Hwr" (E k v HE Hkeys Φ) "!> Hvs".
     iApply ("Hwr" $! E k v _ (λ _ _ _ _, Φ #()) with "[] [] [] Hvs"); [ done .. | | ].
     { iIntros "!> Hvs".
+      iNext.
       iMod "Hvs" as (h s a_old) "[(%Hatkey & Hobs & Hk & writes) Hclose]".
       iModIntro.
       eauto 10 with iFrame. }
@@ -83,12 +84,12 @@ Section Specification.
          (Q2 : we → ghst → ghst → iProp Σ),
         ⌜↑DB_InvName ⊆ E⌝ -∗
         ⌜k ∈ DB_keys⌝ -∗
-        □ (P ={⊤, E}=∗
+        □ (P -∗ ▷ |={⊤, E}=>
            ∃ (h s : ghst) (q : Qp) (ao: option we),
                ⌜at_key k h = ao⌝ ∗
                Obs h ∗
                k ↦ₖ{q} mval_of_we_opt ao ∗
-               ▷ ((⌜ao = None⌝ ∗ (k ↦ₖ{q} None) ={E,⊤}=∗ Q1 ao h s) ∧
+               ((⌜ao = None⌝ ∗ (k ↦ₖ{q} None) ={E,⊤}=∗ Q1 ao h s) ∧
                   (∀ a, ⌜ao = Some a⌝ ∗ (k ↦ₖ{q} Some (mval_of_we a)) ={E,⊤}=∗ Q2 a h s))) -∗
         {{{ P }}}
           rd #k @[ip_of_address sa]
@@ -121,12 +122,12 @@ Section Specification.
                   (λ e _ _, Φ (SOMEV (WE_val e))) with "[] [] [] Hvs");
       [ done .. | | ].
     { iIntros "!> Hvs".
+      iNext.
       iMod "Hvs" as (h q ao) "[(%Hatkey & Hobs & Hk) Hclose]".
       iModIntro.
       iExists h, [], q, ao.
       iSplit; [done|].
       iFrame.
-      iNext.
       iSplit.
       - iIntros "[%Heq Hk]".
         iMod ("Hclose" with "[Hk]") as "Hclose".
@@ -232,8 +233,9 @@ Section Specification.
       unfold P, Q.
       iModIntro.
       iExists h, s, (at_key k h). iFrame. iFrame "#".
+      iModIntro.
       iSplit; first done.
-      iIntros (hf a_new) "!> (% & % & % & % & % & Hk & #Hobs' & Hw)".
+      iIntros (hf a_new) "(% & % & % & % & % & Hk & #Hobs' & Hw)".
       iFrame. iFrame "#". eauto.
     - iNext.
       unfold Q.

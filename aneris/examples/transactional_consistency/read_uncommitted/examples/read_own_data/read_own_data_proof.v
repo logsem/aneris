@@ -69,17 +69,17 @@ Section proof_of_code.
     rewrite !big_sepM_insert; try set_solver.
     rewrite big_sepM_empty.
     iSplitL "Hkx"; first iFrame.
-    iNext. iIntros "(Hcstate & (Hkx & _) & Hcx & _)".
+    iIntros "(Hcstate & (Hkx & _) & Hcx & _)".
     iMod ("Hclose" with "[Hkx]") as "_".
     { iNext. iExists _. iFrame. }
     iModIntro. wp_pures.
     wp_apply ("Hwr" $! _ _  (⊤ ∖ ↑client_inv_name) _ (SerVal #1) with "[][][$][HΦ Hcx Hcstate]"); 
       first solve_ndisj; first set_solver.
+    iNext.
     iInv "inv" as ">(%V' & Hkx)" "Hclose".
     iModIntro.
     iExists _, _.
     iFrame.
-    iNext.
     iIntros  "(Hcx & Hkx)".
     iMod ("Hclose" with "[Hkx]") as "_".
     { iNext. iExists _. iFrame. }
@@ -97,8 +97,7 @@ Section proof_of_code.
       iSplitR. iPureIntro. set_solver.
       rewrite !big_sepM_insert; try set_solver.
       rewrite !big_sepM_empty. iFrame.
-    - iNext.
-      iIntros (b) "(Hstate & Hkeys)".
+    - iIntros (b) "(Hstate & Hkeys)".
       iMod ("Hclose" with "[Hkeys]") as "_".
       { 
         iNext. iExists _.
@@ -130,17 +129,17 @@ Section proof_of_code.
     rewrite !big_sepM_insert; try set_solver.
     rewrite big_sepM_empty.
     iSplitL "Hkx"; first iFrame.
-    iNext. iIntros "(Hcstate & (Hkx & _) & Hcx & _)".
+    iIntros "(Hcstate & (Hkx & _) & Hcx & _)".
     iMod ("Hclose" with "[Hkx]") as "_".
     { iNext. iExists _. iFrame. }
     iModIntro. wp_pures.
     wp_apply ("Hwr" $! _ _  (⊤ ∖ ↑client_inv_name) _ (SerVal #2) with "[][][$][HΦ Hcx Hcstate]"); 
       first solve_ndisj; first set_solver.
+    iNext.
     iInv "inv" as ">(%V' & Hkx)" "Hclose".
     iModIntro.
     iExists _, _.
     iFrame.
-    iNext.
     iIntros  "(Hcx & Hkx)".
     iMod ("Hclose" with "[Hkx]") as "_".
     { iNext. iExists _. iFrame. }
@@ -148,11 +147,11 @@ Section proof_of_code.
     wp_pures.
     wp_apply ("Hrd" $! _ _ (⊤ ∖ ↑client_inv_name) with "[][][$][HΦ Hcx Hcstate]"); 
       first solve_ndisj; first set_solver.
+    iNext.
     iInv "inv" as ">(%V'' & Hkx)" "Hclose".
     iModIntro.
     iExists _, _.
     iFrame.
-    iNext.
     iIntros  (wo) "(Hcx & Hkx & Hdisj')".
     iMod ("Hclose" with "[Hkx]") as "_".
     { iNext. iExists _. iFrame. }
@@ -174,8 +173,7 @@ Section proof_of_code.
       iSplitR. iPureIntro. set_solver.
       rewrite !big_sepM_insert; try set_solver.
       rewrite !big_sepM_empty. iFrame.
-    - iNext.
-      iIntros (b) "(Hstate & Hkeys)".
+    - iIntros (b) "(Hstate & Hkeys)".
       iMod ("Hclose" with "[Hkeys]") as "_".
       { 
         iNext. iExists _.

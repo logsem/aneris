@@ -41,13 +41,13 @@ Section MT_user_params.
      ⌜↑DB_InvName ⊆ E⌝ ∗
      ⌜k ∈ DB_keys⌝ ∗
      P ∗
-     □ (P
-         ={⊤, E}=∗
+     □ (P -∗
+         ▷ |={⊤, E}=>
          ∃ (h : wrlog) (a_old: option we),
            ⌜at_key k h = a_old⌝ ∗
             own_mem_user γM k 1 a_old ∗
             own_obs γL DB_addr h ∗
-            ▷ (∀ (hf : ghst) (a_new : we),
+            (∀ (hf : ghst) (a_new : we),
                   ⌜at_key k hf = None⌝ -∗
                   ⌜we_key a_new = k⌝ -∗
                   ⌜we_val a_new = v⌝ -∗

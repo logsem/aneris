@@ -68,6 +68,7 @@ Section Proof.
     iApply ("Hwr_spec'" $! (⊤ ∖ ↑N) k1 (SerVal #1) with "[] [] [Hkwr]");
       [ solve_ndisj | eauto with set_solver | ].
     (* Proving the write precondition *)
+    iNext.
     iInv N as ">Hri" "Hcl".
     iDestruct "Hri" as (h1 s1) "(Hkwr2 & Hkrd1 & #HobsInv & Hw & [%h0f %Hh1eq])".
     iMod (OwnMemKey_obs_frame_prefix_some k1 _ h0 h1 e0_wr
@@ -80,7 +81,7 @@ Section Proof.
     rewrite Hkwrv_eq. rewrite Qp.half_half. iFrame "Hkwr Hw HobsInv". simpl in *.
     iIntros "!#".
     iSplit; [ done | ].
-    iIntros (hkwr1f ewr1) "!> (%Hkwr1f & %Hkwr1k & %Hkwr1v & %Hkwr1o & %Hkwr1t & Hkwr & #Hkwr1Obs & Hw)".
+    iIntros (hkwr1f ewr1) "(%Hkwr1f & %Hkwr1k & %Hkwr1v & %Hkwr1o & %Hkwr1t & Hkwr & #Hkwr1Obs & Hw)".
     rewrite -{4}Qp.half_half.
     iPoseProof (OwnMemKey_split k1 (1/2)%Qp (1/2)%Qp with "[$Hkwr]") as "(Hkwr1 & Hkwr2)".
     iMod (OwnMemKey_allocated k2 _ h0 h1 e_rd with "[$Hkrd1 //]") as (erd) "(Hkrd1 & %Herdh1 & %Hrde0e1)";
@@ -102,6 +103,7 @@ Section Proof.
     iApply ("Hrd_spec'" $!(⊤ ∖ ↑N) k2
               with "[] [] [Hkwr1]");
       [solve_ndisj | eauto with set_solver|..|].
+    iNext.
     iInv N as ">Hri" "Hcl".
     iDestruct "Hri" as (h2 s1) "(Hkwr2 & Hkrd1 & #HobsInv_rd & Hw & %Hh0h2)".
     iMod (Obs_lub with "[$Hginv] [$HobsInv_rd] [$Hkwr1Obs]") as (h3) "(%Hh3le1 & %Hh3le2 & #Hobsh3)";
@@ -117,7 +119,6 @@ Section Proof.
       [ solve_ndisj | by apply (PreOrder_Transitive h0 h2 h3) | by simplify_list_eq | ].
     iFrame "Hobsh3 Hkrd1". iModIntro.
     iSplit; [done|].
-    iNext.
     iIntros "H".
     iDestruct "H" as "[[%Heq Hk] | H]".
     { rewrite Heq in Hrdh2h3.

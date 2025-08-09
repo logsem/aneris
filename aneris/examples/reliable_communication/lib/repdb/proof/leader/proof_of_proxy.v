@@ -44,13 +44,13 @@ Section Client_Proxy_Proof.
          (P : iProp Σ) (Q : write_event → wrlog → wrlog → iProp Σ),
         ⌜↑DB_InvName ⊆ E⌝ -∗
         ⌜k ∈ DB_keys⌝ -∗
-        □ (P
-            ={⊤, E}=∗
+        □ (P -∗
+            ▷  |={⊤, E}=>
               ∃ (h : wrlog) (a_old: option write_event),
                 ⌜at_key k h = a_old⌝ ∗
                 own_mem_user γM k 1 a_old ∗
                 own_obs γL DB_addr h ∗
-                  ▷ (∀ (hf : ghst) (a_new : we),
+                  (∀ (hf : ghst) (a_new : we),
                   ⌜at_key k hf = None⌝ -∗
                   ⌜we_key a_new = k⌝ -∗
                   ⌜we_val a_new = v⌝ -∗

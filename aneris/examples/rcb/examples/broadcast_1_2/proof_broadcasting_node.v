@@ -35,7 +35,7 @@ Section Broadcast_1_2_spec.
     iApply fupd_mask_intro; first solve_ndisj.
     iIntros "Hclose_other".
     iExists ∅, ∅. iFrame.
-    iIntros "!>" (u e1) "(%Hu & _ & _ & %He1 & _ & _ & _ & HGlob & HLoc)".
+    iIntros (u e1) "(%Hu & _ & _ & %He1 & _ & _ & _ & HGlob & HLoc)".
     iMod "Hclose_other" as "_".
     rewrite !left_id_L.
     iMod ("Hclose_inv" with "[HGlob Ht1]") as "_".
@@ -47,6 +47,7 @@ Section Broadcast_1_2_spec.
 
     (* Second broadcast *)
     iApply ("Hbroadcast" $! (SerVal #2)); first done.
+    iNext.
     iInv "Inv" as ">HInv" "Hclose_inv".
     iDestruct "HInv" as (h) "[HGlob [-> | [Hone | Htwo]]]".
     - iMod (Local_included_Global e1 with "HGlobinv HGlob HLoc") as "%absurd";
@@ -59,7 +60,7 @@ Section Broadcast_1_2_spec.
       iApply fupd_mask_intro; first solve_ndisj.
       iIntros "Hclose_other".
       iExists {[ erasure e1 ]}, {[ e1 ]}; iFrame.
-      iIntros "!>" (v e2) "(%Hv & %He1_e2 & _ & %He2 & _ & _ & %Hmax & HGlob & HLoc)".
+      iIntros (v e2) "(%Hv & %He1_e2 & _ & %He2 & _ & _ & %Hmax & HGlob & HLoc)".
       iMod (OwnLocal_local_ext' with "HGlobinv HLoc") as "[HLoc %ext]"; first solve_ndisj.
       apply compute_maximum_correct in Hmax; last assumption.
       assert (vc_e1_e2 : vector_clock_lt (LE_vc e1) (LE_vc e2)).

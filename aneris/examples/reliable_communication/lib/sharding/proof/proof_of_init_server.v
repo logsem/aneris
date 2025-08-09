@@ -136,20 +136,30 @@ Section proof.
           last done.
     iIntros (req reqd Ψ) "!>pre HΨ".
     wp_pures.
-    wp_apply (client_request_handler_at_server_spec with "[$pre]");
+    wp_apply (client_request_handler_at_server_spec with "[pre]");
       last by iIntros (rep); iApply "HΨ".
-    iIntros (k k_keys ψ) "!>_ Hψ".
-    wp_apply ("hash_spec" $! _ _ k_keys with "[//]").
-    iIntros "_".
-    iApply "Hψ".
-    move: (DB_hash_valid k).
-    rewrite -data_addrs=>/lookup_lt_is_Some_2[[rpc lk] data_k].
-    iPoseProof (big_sepL_lookup _ _ _ _ data_k with "data") as "(%sa & %addrs_sa &
-            (%MTR & %γ & %lock & %MTRs_MTR & %γs_γ & #lock & #make_request))".
-    iExists rpc, sa.2, DB_inv_name, lock, MTR, lk, data.
-    rewrite -(Forall_lookup_1 _ _ _ _ DB_addrs_ips addrs_sa).
-    rewrite (hash_coh _ _ γs_γ).
-    by do 3 (iSplit; first done).
+    iSplitL.
+    { iDestruct "pre" as "[(%x&%y&%z&%t&H1&H2&H3&H4&H5)
+                          |(%x&%y&%z&H1&H2&H3&H4&H5)]".
+      - iLeft.
+        iExists x, y, z, t.
+        iFrame "H1 H2 H3 H4 H5".
+      - iRight.
+        iExists x, y, z.
+        iFrame "H1 H2 H3 H4 H5". }
+    { iIntros (k k_keys ψ) "!>_ Hψ".
+      wp_apply ("hash_spec" $! _ _ k_keys with "[//]").
+      iIntros "_".
+      iApply "Hψ".
+      move: (DB_hash_valid k).
+      rewrite -data_addrs=>/lookup_lt_is_Some_2[[rpc lk] data_k].
+      iPoseProof (big_sepL_lookup _ _ _ _ data_k with "data")
+        as "(%sa & %addrs_sa &
+             (%MTR & %γ & %lock & %MTRs_MTR & %γs_γ & #lock & #make_request))".
+      iExists rpc, sa.2, DB_inv_name, lock, MTR, lk, data.
+      rewrite -(Forall_lookup_1 _ _ _ _ DB_addrs_ips addrs_sa).
+      rewrite (hash_coh _ _ γs_γ).
+      by do 3 (iSplit; first done). }
   Qed.
 
 End proof.

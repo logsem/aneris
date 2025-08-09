@@ -40,8 +40,8 @@ Section proof.
     rewrite/commitU.
     wp_pures.
     wp_apply ("Hcom" with "[//] [$] [HΦ]").
-    iMod "HΦ" as "(%m & %ms & %mc & pre & HΦ)".
     iModIntro.
+    iMod "HΦ" as "(%m & %ms & %mc & pre & HΦ)".
     iExists m, ms, mc.
     iSplitL "pre"; first done.
     iIntros "!>%b (CanStart & [( _ & post)|(_ & post)])";
@@ -73,8 +73,8 @@ Section proof.
     rewrite/commitT/assert.
     wp_pures.
     wp_apply ("Hcom" with "[//] [$] [HΦ]").
-    iMod "HΦ" as "(%m & %ms & %mc & (%can_commit & pre) & HΦ)".
     iModIntro.
+    iMod "HΦ" as "(%m & %ms & %mc & (%can_commit & pre) & HΦ)".
     iExists m, ms, mc.
     iSplitL "pre"; first done.
     iIntros "!>%b (CanStart & [(-> & _ & post)|(_ & %abs & _)])"; try done.
@@ -121,7 +121,7 @@ Section proof.
       iSplit; first by rewrite dom_fmap_L.
       by iApply big_sepM_fmap.
     }
-    iIntros "!>(CanStart & kvs)".
+    iIntros "(CanStart & kvs)".
     iMod ("close" with "[$CanStart kvs]") as "HΦ"; last done.
     iPoseProof (big_sepM2_fmap_r _ _ _ ms with "kvs") as "kvs".
     iPoseProof (big_sepM2_sep with "kvs") as "(kvs & _)".
@@ -149,12 +149,12 @@ Section proof.
     ⌜↑KVS_InvName ⊆ E⌝ -∗
     IsConnected c sa -∗
     SI_client_toolbox -∗
-      □ (|={⊤, E}=> ∃ m, ⌜key ∈ dom m⌝ ∗ ⌜dom m ⊆ KVS_keys⌝ ∗
+    □ (▷|={⊤, E}=> ∃ m, ⌜key ∈ dom m⌝ ∗ ⌜dom m ⊆ KVS_keys⌝ ∗
               ([∗ map] k ↦ h ∈ m, k ↦ₖ h) ∗ Ψ m ∗
-            ▷ (([∗ map] k ↦ h ∈ m, k ↦ₖ h) ={E, ⊤}=∗ emp)) -∗
-    □ (∀ m, Ψ m ={⊤, E}=∗ ∃ m', ⌜dom m = dom m'⌝ ∗
+              (([∗ map] k ↦ h ∈ m, k ↦ₖ h) ={E, ⊤}=∗ emp)) -∗
+    □ (∀ m, Ψ m -∗ ▷|={⊤, E}=> ∃ m', ⌜dom m = dom m'⌝ ∗
               ([∗ map] k ↦ h ∈ m', k ↦ₖ h) ∗
-            ▷ (([∗ map] k ↦ h ∈ m', k ↦ₖ h) ={E, ⊤}=∗ emp)) -∗
+              (([∗ map] k ↦ h ∈ m', k ↦ₖ h) ={E, ⊤}=∗ emp)) -∗
     (∀ m v', {{{ P ∗ Ψ m ∗ ConnectionState c sa (Active m) ∗
               ([∗ map] k ↦ h ∈ m, k ↦{c} (last h) ∗ KeyUpdStatus c k false) }}}
               cond v' @[ip_of_address sa]
@@ -179,7 +179,7 @@ Section proof.
     iModIntro.
     iExists m_shift.
     iFrame.
-    iIntros "!>(Active & kvs & cache & #seen)".
+    iIntros "(Active & kvs & cache & #seen)".
     iMod ("close" with "kvs") as "_".
     iModIntro.
     wp_pures.
@@ -190,22 +190,21 @@ Section proof.
     iModIntro.
     iExists (last h).
     iFrame.
-    iNext.
     iIntros "key_h".
     iModIntro.
     iSpecialize ("cache" with "[$key_h $key_upd]").
     destruct (last h) eqn:Hlast; wp_pures.
     wp_apply ("cond" with "[$HP $HΨ $Active $cache //]").
     rename m_shift into m_old.
-    iIntros (m_shift []) "(Active & %Heq & HΨ & cache & HP)"; wp_pures.
+    iIntros (m_shift []) "(Active & %Heq & HΨ & cache & HP)".
+    all:  iSpecialize ("commit" with "HΨ"); wp_pures.
     all: wp_apply (simplified_commitT_spec with "[//][$][$]").
-    all: iMod ("commit" with "HΨ") as
-        "(%m_shift' & %Heq' & kvs & close)".
+    all: iMod "commit" as "(%m_shift' & %Heq' & kvs & close)".
     all: iModIntro.
     all: iExists _, _.
     all: iFrame.
     all: iSplit; first done.
-    all: iIntros "!>(CanStart & kvs)".
+    all: iIntros "(CanStart & kvs)".
     all: iMod ("close" with "kvs") as "_".
     {
       apply last_Some in Hlast as [h0]. simplify_eq /=.
@@ -223,7 +222,7 @@ Section proof.
     ⌜key ∈ KVS_keys⌝ -∗
     IsConnected c sa -∗  
     SI_client_toolbox -∗
-    □ (|={⊤, E}=> ∃ h, key ↦ₖ h ∗ ▷ (key ↦ₖ h ={E, ⊤}=∗ emp)) -∗
+    □ (▷ |={⊤, E}=> ∃ h, key ↦ₖ h ∗ (key ↦ₖ h ={E, ⊤}=∗ emp)) -∗
     (∀ v', {{{ True }}}
             cond v' @[ip_of_address sa]
            {{{ (b : bool), RET #b; ⌜b → v = v'⌝ }}}) -∗
@@ -248,6 +247,7 @@ Section proof.
     }
     iIntros "!>%m_shift ->".
     2: iModIntro.
+    all: iModIntro.
     all: iMod "shift" as "(%h & cache & close)".
     all: iModIntro.
     all: iExists {[ key := h ]}.
@@ -255,7 +255,7 @@ Section proof.
     2: iSplit; first (iPureIntro; set_solver).
     all: iSplitL "cache"; first iApply (big_sepM_singleton with "cache").
     2: iSplit; first (iPureIntro; set_solver).
-    all: iIntros "!>kvs".
+    all: iIntros "kvs".
     all: iMod ("close" with "[kvs]") as "_"; last done.
     all: by iApply big_sepM_singleton.
   Qed.
@@ -277,8 +277,8 @@ Section run_spec_proof.
     {{{
         ConnectionState c sa CanStart ∗
         (* Viewshift for looking at the state of the database at start time *)
-        (|={⊤, E}=> ∃ m_at_start, P m_at_start ∗ ([∗ map] k ↦ h ∈ m_at_start, k ↦ₖ h) ∗
-            ▷ (([∗ map] k ↦ h ∈ m_at_start, k ↦ₖ h) ={E, ⊤}=∗ emp)) ∗
+        (▷ |={⊤, E}=> ∃ m_at_start, P m_at_start ∗ ([∗ map] k ↦ h ∈ m_at_start, k ↦ₖ h) ∗
+            (([∗ map] k ↦ h ∈ m_at_start, k ↦ₖ h) ={E, ⊤}=∗ emp)) ∗
         (* Specification for the body of the transaction *)
         (∀ (m_snap : gmap Key Hist),
           {{{ 
@@ -290,9 +290,9 @@ Section run_spec_proof.
               ([∗ map] k ↦ p ∈ mc, k ↦{c} p.1 ∗ KeyUpdStatus c k p.2) ∗
               (* Viewshift for looking at the state of the database at commit time after
                 the transaction body has been executed *)
-              (|={⊤, E}=> ∃ m_at_commit, ([∗ map] k ↦ h ∈ m_at_commit, k ↦ₖ h) ∗
+              (▷ |={⊤, E}=> ∃ m_at_commit, ([∗ map] k ↦ h ∈ m_at_commit, k ↦ₖ h) ∗
                   ⌜dom m_at_commit = dom m_snap⌝ ∗ Q m_at_commit m_snap mc ∗
-                  (▷(([∗ map] k↦h;p ∈ m_at_commit; mc, k ↦ₖ (commit_event p h)) ∨
+                  ((([∗ map] k↦h;p ∈ m_at_commit; mc, k ↦ₖ (commit_event p h)) ∨
                     ([∗ map] k↦h ∈ m_at_commit, k ↦ₖ h)) ={E, ⊤}=∗ emp))
           }}})
     }}}
@@ -311,7 +311,7 @@ Proof.
   wp_pures. wp_apply "HspecS"; try eauto.
   iMod "Hsh1" as (m_at_start) "(HP & Hks & Hsh1)".
   iModIntro. iExists m_at_start. iFrame.
-  iNext. iIntros "(HstA & Hmks & Hcks & #Hseens1)".
+  iIntros "(HstA & Hmks & Hcks & #Hseens1)".
   iMod ("Hsh1" with "[$Hmks]") as "_".
   iModIntro. wp_pures. wp_apply ("HspecBdy" with "[$HP $Hcks]").
   iIntros (mc) "(%Hdeq1 & Hcks & Hsh2)".
@@ -319,7 +319,7 @@ Proof.
   iMod ("Hsh2") as (m_at_commit) "(Hks & %Hdom1 & HQ & Hsh2)".
   iModIntro. iExists _, _, _. iFrame.
   iSplit; [iPureIntro; set_solver|].
-  iNext. iIntros (b) "(HstS & Hdisj)".
+  iIntros (b) "(HstS & Hdisj)".
   iApply ("HΦ" $! m_at_commit m_at_start mc).
   iFrame. iDestruct "Hdisj" as "[Hc | Ha]".
   - iDestruct "Hc" as "(%Hbt & %Hcm & Hkts)".

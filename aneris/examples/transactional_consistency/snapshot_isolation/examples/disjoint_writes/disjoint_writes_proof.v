@@ -77,7 +77,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
     iExists {[ "x" := h ]}.
     iFrame.
     iSplitL "x_h"; first by iApply big_sepM_insert; first done; iFrame.
-    iIntros "!>(Active & mem & cache & _)".
+    iIntros "(Active & mem & cache & _)".
     iPoseProof (big_sepM_insert with "cache") as
       "((x_h & x_upd) & _)"; first done.
     iModIntro.
@@ -86,7 +86,6 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
     iModIntro.
     iExists _, _.
     iFrame.
-    iNext.
     iIntros "(x_h & x_upd)".
     iModIntro.
     wp_pures.
@@ -112,7 +111,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
       iApply big_sepM_insert; first done.
       by iFrame.
     }
-    iIntros "!>_".
+    iIntros "_".
     by iApply "HΦ".
   Qed.
 
@@ -138,7 +137,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
     iExists {[ "y" := h ]}.
     iFrame.
     iSplitL "y_h"; first by iApply big_sepM_insert; first done; iFrame.
-    iIntros "!>(Active & mem & cache & _)".
+    iIntros "(Active & mem & cache & _)".
     iPoseProof (big_sepM_insert with "cache") as
       "((y_h & y_upd) & _)"; first done.
     iModIntro.
@@ -147,7 +146,6 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
     iModIntro.
     iExists _, _.
     iFrame.
-    iNext.
     iIntros "(y_h & y_upd)".
     iModIntro.
     wp_pures.
@@ -173,7 +171,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
       iApply big_sepM_insert; first done.
       by iFrame.
     }
-    iIntros "!>_".
+    iIntros "_".
     by iApply "HΦ".
   Qed.
 

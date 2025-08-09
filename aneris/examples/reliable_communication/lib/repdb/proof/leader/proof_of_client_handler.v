@@ -55,6 +55,7 @@ Section Clients_MT_spec_params.
     iDestruct "Hpre" as "((#Htks & #HGinv) & [HpreW | HpreR])".
     do 2 wp_pure _.
     - iDestruct "HpreW" as (E k v P Q) "(%Hrd & -> & %HE & %Hkeys & P & Hvsh)".
+      iSpecialize ("Hvsh" with "P").
       wp_pures.
       wp_load.
       wp_apply (wp_map_insert $! Hkvs).
@@ -63,7 +64,7 @@ Section Clients_MT_spec_params.
       wp_apply (aneris_wp_atomic _ _ E).
       set (a := {|we_key := k; we_val := v;
                                we_time := (length lM : int_time.(Time))|}).
-      iMod ("Hvsh" with "[$P]") as (h a_old) "(%Hkh & Hk & Hobsh & Hpost)".
+      iMod "Hvsh" as (h a_old) "(%Hkh & Hk & Hobsh & Hpost)".
       iDestruct (own_obs_prefix with "[$HlogL][Hobsh]") as "%Hprefixh".
       { by iApply Obs_own_log_obs. }
       rewrite -{1} Hkh.
@@ -109,7 +110,7 @@ Section Clients_MT_spec_params.
           assert (e = e') as Heqe. { rewrite Hnth in He'. by inversion He'. }
           rewrite Heqe - He'time. lia. }
         done. }
-      { iNext. iLeft. list_simplifier. iSplit; first done. iFrame "#". }
+      { iLeft. list_simplifier. iSplit; first done. iFrame "#". }
       { iModIntro.
         wp_store.
         iMod "HQ".

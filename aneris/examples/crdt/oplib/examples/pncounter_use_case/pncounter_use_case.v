@@ -106,7 +106,6 @@ Section use_case_proof.
     iInv use_case_inv_name as (ges) ">[HGs Hstate]" "Hclose".
     iMod fupd_mask_subseteq as "Hmask"; [|iModIntro]; [solve_ndisj|].
     iExists _, _, _; iFrame.
-    iNext.
     iIntros (add_1_ev h' s1' s2').
     rewrite !left_id_L.
     iIntros "(%Hadd_1_val & %Hadd_1_orig & -> & -> & % & % & % & % & % & HGs & HLs)".
@@ -132,7 +131,6 @@ Section use_case_proof.
     wp_apply "Hget"; first done.
     iMod fupd_mask_subseteq as "Hmask"; [|iModIntro]; [solve_ndisj|].
     iExists _, _; iFrame "HLs".
-    iNext.
     iIntros (s3 pst lst) "(% & HLs & %Hop & %Hst)".
     iMod "Hmask" as "_".
     iInv use_case_inv_name as (ges') ">[HGs Hstate]" "Hclose".
@@ -221,7 +219,6 @@ Section use_case_proof.
     iInv use_case_inv_name as (ges) ">[HGs Hstate]" "Hclose".
     iMod fupd_mask_subseteq as "Hmask"; [|iModIntro]; [solve_ndisj|].
     iExists _, _, _; iFrame.
-    iNext.
     iIntros (add_2_ev h' s1' s2').
     rewrite !left_id_L.
     iIntros "(%Hadd_2_val & %Hadd_2_orig & -> & -> & % & % & % & % & % & HGs & HLs)".
@@ -247,7 +244,6 @@ Section use_case_proof.
     wp_apply "Hget"; first done.
     iMod fupd_mask_subseteq as "Hmask"; [|iModIntro]; [solve_ndisj|].
     iExists _, _; iFrame "HLs".
-    iNext.
     iIntros (s3 pst lst) "(% & HLs & %Hop & %Hst)".
     iMod "Hmask" as "_".
     iInv use_case_inv_name as (ges') ">[HGs Hstate]" "Hclose".

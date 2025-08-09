@@ -184,6 +184,7 @@ Section OpLib_Proof.
     wp_pures.
     wp_bind (broadcast__fun _).
     iApply "Hbc"; [done |].
+    iNext.
     iMod "Hvs" as (h s1 s2) "[(Hglobu & Huser) Hclose]".
     iDestruct "Hinv" as "[#Hrcbinv #Hopinv]".
     iInv OpLib_InvName as "> Hinvp" "Hclose'".
@@ -206,7 +207,6 @@ Section OpLib_Proof.
       (hglob' hloc) "(Hglob'&Hloc&%Hsetcoh&Hacc)"; [set_solver| done |].
     iExists hglob', hloc.
     iFrame.
-    iModIntro.
     iIntros (w a) "(%&%&%&%&%&%&%&Hglob&Hloc)".
     iMod (OwnGlobal_ext with "Hrcbinv Hglob") as "[Hglob %Hglobext]"; [done |].
     iMod (OwnLocal_local_ext' with "Hrcbinv Hloc") as "[Hloc %Hlocext]"; [done |].
@@ -405,7 +405,6 @@ Section OpLib_Proof.
     { apply rcb_invname_subseteq_mask. done. }
     iIntros "Hmaskcl".
     iExists s. iFrame.
-    iModIntro.
     iIntros (s' vo) "(Hownloc & [[-> ->] | Hr])".
     - (* received nothing *)
       iMod ("Hmaskcl").

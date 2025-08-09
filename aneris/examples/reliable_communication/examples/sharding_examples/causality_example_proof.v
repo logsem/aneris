@@ -110,7 +110,7 @@ Section spec.
     iModIntro.
     iExists None.
     iFrame.
-    iIntros "!>x_37".
+    iIntros "x_37".
     iMod ("close" with "[x_37 y_none Written_x NotRead]") as "_".
     { iNext. iRight. iLeft. iFrame. }
     iModIntro.
@@ -126,7 +126,7 @@ Section spec.
     iModIntro.
     iExists None.
     iFrame.
-    iIntros "!>y_1".
+    iIntros "y_1".
     iMod ("close" with "[x_37 y_1 Written_x Written_y NotRead]") as "_".
     { iNext. do 2 iRight. iLeft. iFrame. }
     iApply ("HΦ" with "[//]").
@@ -154,7 +154,7 @@ Section spec.
     all: iModIntro.
     all: iExists _.
     all: iFrame.
-    all: iIntros "!> y_vy".
+    all: iIntros "y_vy".
     1: iMod ("close" with "[x_none y_vy CanWrite NotRead]") as "_";
       first (iNext; iLeft; iFrame).
     2: iMod ("close" with "[x_37 y_vy Written_x NotRead]") as "_";
@@ -191,7 +191,7 @@ Section spec.
     iModIntro.
     iExists (Some 37).
     iFrame.
-    iIntros "!>x_37".
+    iIntros "x_37".
     iMod ("close" with "[x_37 Written_x Written_y Read]") as "_".
     { iNext. repeat iRight. iFrame. }
     iModIntro.

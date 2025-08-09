@@ -75,7 +75,7 @@ Local Open Scope list.
     iFrame.
     iSplitL "x_hx y_hy z_hz";
       first by repeat (iApply big_sepM_insert; first done; iFrame).
-    iIntros "!>(Active & mem & cache & _)".
+    iIntros "(Active & mem & cache & _)".
     iMod ("close" with "[mem init]") as "_".
     {
       iNext.
@@ -95,7 +95,6 @@ Local Open Scope list.
     iModIntro.
     iExists _, _.
     iFrame.
-    iNext.
     iIntros "(x_1 & x_upd)".
     iModIntro.
     wp_pures.
@@ -103,7 +102,6 @@ Local Open Scope list.
     iModIntro.
     iExists _, _.
     iFrame.
-    iNext.
     iIntros "(y_1 & y_upd)".
     iModIntro.
     wp_pures.
@@ -111,7 +109,6 @@ Local Open Scope list.
     iModIntro.
     iExists _, _.
     iFrame.
-    iNext.
     iIntros "(z_1 & z_upd)".
     iModIntro.
     wp_pures.
@@ -133,7 +130,7 @@ Local Open Scope list.
     have x_key : "x" ∈ KVS_keys by set_solver.
     have y_key : "y" ∈ KVS_keys by set_solver.
     have z_key : "z" ∈ KVS_keys by set_solver.
-    iIntros "!>(CanStart & [(%can_commit & mem)|(_ & mem)])";
+    iIntros "(CanStart & [(%can_commit & mem)|(_ & mem)])";
       (iMod ("close" with "[mem]") as "_"; last by iApply "HΦ").
     {
       iPoseProof (big_sepM2_insert with "mem") as "((x_1 & _) & mem)"; [done..|].
@@ -187,11 +184,12 @@ Local Open Scope list.
       [solve_ndisj|set_solver|..].
     {
       iModIntro.
+      iNext.
       iInv "inv" as ">(%hx & %hy & %hz & x_hx & y_hy & z_hz & %Hinv)" "close".
       iModIntro.
       iExists hz.
       iFrame.
-      iIntros "!>z_hz".
+      iIntros "z_hz".
       iMod ("close" with "[x_hx y_hy z_hz]") as "_"; last done.
       iNext.
       iExists hx, hy, hz.
@@ -220,7 +218,7 @@ Local Open Scope list.
     iFrame.
     iSplitL "x_hx y_hy";
       first by repeat (iApply big_sepM_insert; first done; iFrame).
-    iIntros "!>(Active & mem & cache & _)".
+    iIntros "(Active & mem & cache & _)".
     iMod ("close" with "[mem z_hz]") as "_".
     {
       iNext.
@@ -241,7 +239,6 @@ Local Open Scope list.
     iModIntro.
     iExists _.
     iFrame.
-    iNext.
     iIntros "x_hx".
     iModIntro.
     wp_pures.
@@ -252,7 +249,6 @@ Local Open Scope list.
     iModIntro.
     iExists _, _.
     iFrame.
-    iNext.
     iIntros "(y_hy & y_upd)".
     iModIntro.
     wp_pures.
@@ -276,7 +272,7 @@ Local Open Scope list.
     1, 3: do 2 (iSplit; first set_solver).
     1, 2: by iSplitL "x_hx' y_hy'";
             repeat (iApply big_sepM_insert; first done; iFrame).
-    all: iIntros "!>(CanStart & [(_ & kvs)|(_ & kvs)])".
+    all: iIntros "(CanStart & [(_ & kvs)|(_ & kvs)])".
     1, 3: iPoseProof (big_sepM2_insert with "kvs") as "((x_hx' & _) & kvs)";
           [done..|].
     1, 2: iPoseProof (big_sepM2_insert with "kvs") as "((y_hy' & _) & _)";
@@ -317,11 +313,12 @@ Local Open Scope list.
       [solve_ndisj|set_solver|..].
     {
       iModIntro.
+      iNext.
       iInv "inv" as ">(%hx & %hy & %hz & x_hx & y_hy & z_hz & %Hinv)" "close".
       iModIntro.
       iExists hz.
       iFrame.
-      iIntros "!>z_hz".
+      iIntros "z_hz".
       iMod ("close" with "[x_hx y_hy z_hz]") as "_"; last done.
       iNext.
       iExists hx, hy, hz.
@@ -350,7 +347,7 @@ Local Open Scope list.
     iFrame.
     iSplitL "x_hx y_hy";
       first by repeat (iApply big_sepM_insert; first done; iFrame).
-    iIntros "!>(Active & mem & cache & _)".
+    iIntros "(Active & mem & cache & _)".
     iMod ("close" with "[mem z_hz]") as "_".
     {
       iNext.
@@ -371,7 +368,6 @@ Local Open Scope list.
     iModIntro.
     iExists _.
     iFrame.
-    iNext.
     iIntros "y_hy".
     iModIntro.
     wp_pures.
@@ -382,7 +378,6 @@ Local Open Scope list.
     iModIntro.
     iExists _, _.
     iFrame.
-    iNext.
     iIntros "(x_hx & x_upd)".
     iModIntro.
     wp_pures.
@@ -407,7 +402,7 @@ Local Open Scope list.
     1, 3: do 2 (iSplit; first set_solver).
     1, 2: by iSplitL "x_hx' y_hy'";
             repeat (iApply big_sepM_insert; first done; iFrame).
-    all: iIntros "!>(CanStart & [(_ & kvs)|(_ & kvs)])".
+    all: iIntros "(CanStart & [(_ & kvs)|(_ & kvs)])".
     1, 3: iPoseProof (big_sepM2_insert with "kvs") as "((x_hx' & _) & kvs)";
           [done..|].
     1, 2: iPoseProof (big_sepM2_insert with "kvs") as "((y_hy' & _) & _)";
@@ -448,11 +443,12 @@ Local Open Scope list.
       [solve_ndisj|set_solver|..].
     {
       iModIntro.
+      iNext.
       iInv "inv" as ">(%hx & %hy & %hz & x_hx & y_hy & z_hz & %Hinv)" "close".
       iModIntro.
       iExists hz.
       iFrame.
-      iIntros "!>z_hz".
+      iIntros "z_hz".
       iMod ("close" with "[x_hx y_hy z_hz]") as "_"; last done.
       iNext.
       iExists hx, hy, hz.
@@ -481,7 +477,7 @@ Local Open Scope list.
     iFrame.
     iSplitL "x_hx y_hy";
       first by repeat (iApply big_sepM_insert; first done; iFrame).
-    iIntros "!>(Active & mem & cache & _)".
+    iIntros "(Active & mem & cache & _)".
     iMod ("close" with "[mem z_hz]") as "_".
     {
       iNext.
@@ -502,7 +498,6 @@ Local Open Scope list.
     iModIntro.
     iExists _.
     iFrame.
-    iNext.
     iIntros "x_hx".
     iModIntro.
     wp_pures.
@@ -512,7 +507,6 @@ Local Open Scope list.
     iModIntro.
     iExists _.
     iFrame.
-    iNext.
     iIntros "y_hy".
     iModIntro.
     wp_pures.
@@ -531,7 +525,7 @@ Local Open Scope list.
     1, 3, 5, 7: do 2 (iSplit; first done).
     1, 2, 3, 4: by iSplitL "x_hx' y_hy'";
                   repeat (iApply big_sepM_insert; first done; iFrame).
-    all: iIntros "!>(_ & [(_ & kvs)|(_ & kvs)])".
+    all: iIntros "(_ & [(_ & kvs)|(_ & kvs)])".
     1, 3, 5, 7: iPoseProof (big_sepM2_insert with "kvs") as "((x_hx' & _) & kvs)";
         [done..|].
     1, 2, 3, 4: iPoseProof (big_sepM2_insert with "kvs") as "((y_hy' & _) & _)";

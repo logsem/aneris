@@ -54,7 +54,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
     server #KVS_address @[ip]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (Hip Hports) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) %Φ 
+    iIntros (Hip Hports) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) %Φ
       !>(? & ? & ? & ?) HΦ".
     rewrite /server. wp_pures. rewrite Hip Hports.
     by wp_apply ("Hinit_kvs" with "[$]").
@@ -73,7 +73,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
     transaction1_client $client_1_addr $KVS_address @[ip]
   {{{ v, RET v; True }}}.
   Proof.
-    iIntros (Hip Hports) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) %Φ 
+    iIntros (Hip Hports) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) %Φ
       !>(#Hinv & Hmsghis & Hunalloc & Hcc & Hports & Hprot) HΦ".
     rewrite /transaction1_client. wp_pures. rewrite Hip Hports.
     wp_apply ("Hinit_cli" with "[$Hunalloc $Hprot $Hmsghis $Hports $Hcc]").
@@ -86,7 +86,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
     rewrite !big_sepM_insert; try set_solver.
     rewrite big_sepM_empty.
     iSplitL "Hkx"; first iFrame.
-    iNext. iIntros "(Hcstate & [Hkx  _] & [Hcx _] & _)".
+    iIntros "(Hcstate & [Hkx  _] & [Hcx _] & _)".
     iMod ("HClose" with "[Hkx]") as "_".
     { iNext. iExists hx. iFrame. }
     iModIntro. wp_pures.
@@ -94,7 +94,6 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
     iModIntro.
     iExists _, _.
     iFrame.
-    iNext.
     iIntros "Hcx".
     iModIntro.
     wp_pures.
@@ -109,7 +108,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
         try iPureIntro; try set_solver.
         rewrite !big_sepM_insert; try set_solver.
         rewrite !big_sepM_empty. iFrame.
-      * iNext. iIntros "[_ [[_ HBig]| [_ HBig]]]".
+      * iIntros "[_ [[_ HBig]| [_ HBig]]]".
         + iMod ("HClose" with "[HBig]") as "_".
             -- iNext. iExists _.
                rewrite !(big_sepM2_insert); try set_solver.
@@ -135,7 +134,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
       transaction2_client $client_2_addr $KVS_address @[ip]
     {{{ v, RET v; True }}}.
   Proof.
-    iIntros (Hip Hports) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) %Φ 
+    iIntros (Hip Hports) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) %Φ
       !>(#Hinv & Hmsghis & Hunalloc & Hcc & Hports & Hprot) HΦ".
     rewrite /transaction2_client. wp_pures. rewrite Hip Hports.
     wp_apply ("Hinit_cli" with "[$Hunalloc $Hprot $Hmsghis $Hports $Hcc]").
@@ -148,7 +147,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
     rewrite !big_sepM_insert; try set_solver.
     rewrite big_sepM_empty.
     iSplitL "Hkx"; first iFrame.
-    iNext. iIntros "(Hcstate & [Hkx  _] & [[Hcx Hxs] _] & _)".
+    iIntros "(Hcstate & [Hkx  _] & [[Hcx Hxs] _] & _)".
     iMod ("HClose" with "[Hkx]") as "_".
     { iNext. iExists hx. iFrame. }
     iModIntro. wp_pures.
@@ -156,7 +155,6 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
     iModIntro.
     iExists _.
     iFrame.
-    iNext.
     iIntros "Hcx".
     iModIntro.
     wp_pures.
@@ -171,7 +169,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
           try iPureIntro; try set_solver.
           rewrite !big_sepM_insert; try set_solver.
           rewrite !big_sepM_empty. iFrame.
-        * iNext. iIntros "[_ HBig]".
+        * iIntros "[_ HBig]".
           + iMod ("HClose" with "[HBig]") as "_".
               -- iNext. iExists _.
                  rewrite !(big_sepM2_insert); try set_solver.
@@ -240,7 +238,7 @@ Context `{!anerisG Mdl Σ, !SI_init, !KVSG Σ}.
         * iIntros "!> Hports". wp_apply (client_2_spec with "[$][$]"); try done.
       + iIntros "!> Hports". wp_apply (client_1_spec with "[$][$]"); try done.
     - iIntros "!> Hports". wp_apply (server_spec with "[$][$]"); done.
-      Unshelve. 
+      Unshelve.
       all: destruct specs as (Hs1 & Hs2 & Hs3 & Hs4 & Hs5 & Hs6); by eauto.
   Qed.
 
@@ -282,4 +280,4 @@ Proof.
   do 2 (rewrite big_sepS_union; [|set_solver];
   rewrite !big_sepS_singleton;
   iDestruct "Hips" as "[Hips ?]"; iFrame).
-Qed. 
+Qed.
