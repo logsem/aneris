@@ -845,7 +845,11 @@ Section WaitFreePR.
       (let _ := iris_OM_into_Looping in pwp s ⊤ ζ e2 Φ) ∗ 
       ([∗ list] i↦ef ∈ efs,
         let τf := locale_of (tp1 ++ E1 :: tp2 ++ take i efs) ef in
-        (let _ := iris_OM_into_Looping in pwp s ⊤ τf ef (fork_post τf))
+        (let _ := iris_OM_into_Looping in pwp s ⊤ τf ef
+                                            (fork_post τf) (* for pwp *)
+                                            (* (let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in *)
+                                            (*   fun _ => obls τf ∅) *)
+        )
       ) ∗
       P.
   Proof using.
@@ -1029,15 +1033,42 @@ Section WaitFreePR.
 
   Program Definition PR_wfree {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}:
     @ProgressResource heap_lang M Σ (@iem_invGS _ _ _ _ _ Hinv)
-      state_interp wfree_trace_inv fork_post fits_inf_call :=
+      state_interp wfree_trace_inv
+      (* fork_post *)
+      (fun _ _ =>
+         let _ := IEM_irisG HeapLangEM EM in
+         ⌜ True ⌝%I: iProp Σ) (* because upon forks we only obtain pwp .. { True } *)
+      fits_inf_call :=
     {| pr_pr := pr_pr_wfree |}.
   Next Obligation.
     intros.
     (* rewrite /pr_pr_wfree. *)
     iUnfold pr_pr_wfree.
     iIntros "(WPS & CPS & PH & OB)".
-    iAssert (|~~| (Ps ∗ (Ps -∗ wptp_wfree s ex Φs)))%I with "[WPS]" as "CLOS".
-    2: { iMod "CLOS". iModIntro. by iFrame. }
+
+    (* assert (irisG heap_lang M Σ). *)
+    (* { *)
+    (*   apply _. Show Proof.  *)
+
+    (* subst Ps. simpl. rewrite /adequacy_utils.posts_of. simpl.  *)
+    
+    iAssert (pre_step top top (Ps ∗ (Ps -∗ wptp_wfree s ex Φs)))%I with "[WPS]" as "CLOS".
+    2: {
+
+          (* (@pre_step heap_lang M Σ *)
+          (* (@pre_step heap_lang *)
+      (*    (AM2M *)
+      (* Set Printing All. *)
+      simpl. 
+      iApply (@pre_step_mono with "[-CLOS]"). 
+      2: {
+        (* Set Printing All. *)
+        simpl. 
+        iApply "CLOS".
+        foobar. 
+      
+
+      iMod "CLOS". iModIntro. by iFrame. }
     rewrite /wptp_wfree.
     iDestruct (big_sepL2_length with "[$]") as "%LENS".
     rewrite adequacy_utils.prefixes_from_length in LENS.
