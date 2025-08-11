@@ -335,48 +335,6 @@ Section WaitFreePR.
 
   End WptpGen.
 
-  (* TODO: this is pretty much the definition of locales_of_list *)
-  Lemma locales_of_list_from_locales t0 (es : list expr):
-    locales_of_list_from t0 es = map (fun '(l, e) => locale_of l e) (prefixes_from t0 es).
-  Proof using. set_solver. Qed. 
-
-  (* TODO: this is pretty much the definition of locales_of_list *)
-  Lemma locales_of_list_locales (es : list expr) :    
-    locales_of_list es = map (fun '(l, e) => locale_of l e) (prefixes es).
-  Proof using. set_solver. Qed. 
-
-  (* TODO: move *)
-  Lemma prefixes_from_ith_length (t0 t: list expr) pf i
-    (ITH: prefixes_from t0 t !! i = Some pf):
-    length pf.1 = length t0 + i.
-  Proof using.
-    clear -ITH. 
-    generalize dependent t0. generalize dependent i. generalize dependent pf.
-    induction t.
-    { intros. simpl. destruct t0; done. }
-    intros. destruct i.
-    { simpl in ITH. inversion ITH. subst. simpl. lia. }
-    simpl in ITH. apply IHt in ITH.
-    rewrite length_app /= in ITH. lia.
-  Qed.
-
-  Lemma prefixes_ith_length (t: list expr) pf i
-    (ITH: prefixes t !! i = Some pf):
-    length pf.1 = i. 
-  Proof using.
-    apply prefixes_from_ith_length in ITH. by rewrite ITH.
-  Qed.
-
-  Lemma from_locale_from_locale_of t0 t1 t2 e:
-    from_locale_from t0 (t1 ++ e :: t2) (locale_of (t0 ++ t1) e) = Some e.
-  Proof using.
-    clear dependent ic. 
-    apply from_locale_from_lookup.
-    rewrite /locale_of. rewrite length_app. simpl.
-    split; [| lia].
-    rewrite Nat.add_sub'. by apply list_lookup_middle.
-  Qed.
-
   Lemma wptp_from_gen_upd_2 {Σ: gFunctors}
     (W1 W2: expr -> locale heap_lang -> (val → iPropI Σ) -> iProp Σ) t efs Φs
     (τs: gset (locale heap_lang))
@@ -613,12 +571,13 @@ Section WaitFreePR.
                   (∃ π, th_phase_frag τi π q)%I in
     ⌜ τi ∈ locales_of_cfg c ⌝ → ph_res.
 
+  Definition obls_τi `{!ObligationsGS Σ}: iProp Σ :=
+    ∃ s, obls τi {[ s ]} ∗ sgn s l0 (Some false) ∗ ep s π0 d0. 
+
   Definition cur_obls_sigs `{!ObligationsGS Σ} (etr: execution_trace heap_lang): iProp Σ :=
     let c := trace_last etr in
     ([∗ set] τ ∈ locales_of_cfg c ∖ {[ τi ]}, obls τ ∅) ∗
-    if decide (τi ∈ locales_of_cfg c)
-    then (∃ s, obls τi {[ s ]} ∗ sgn s l0 (Some false) ∗ ep s π0 d0)%I
-    else cp π0 d1.
+    if decide (τi ∈ locales_of_cfg c) then obls_τi else cp π0 d1.
 
   (* Lemma foo {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}: ObligationsGS Σ. *)
   (*   apply Hinv. *)
@@ -862,7 +821,7 @@ Section WaitFreePR.
   From lawyer Require Import program_logic.  
 
   Lemma pwp_MU_ctx_take_step {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
-    s Φ ex atr tp1 K e1 tp2 σ1 e2 σ2 efs ζ:    
+    s Φ ex atr tp1 K e1 tp2 σ1 e2 σ2 efs ζ P:
     let (E1, E2) := (ectx_fill K e1, ectx_fill K e2) in
     valid_exec ex →
     prim_step e1 σ1 e2 σ2 efs ->
@@ -871,7 +830,7 @@ Section WaitFreePR.
     state_interp ex atr -∗
     (let hGS: @heapGS Σ M EM := {| heap_iemgs := Hinv |} in
      let oτ' := step_fork (trace_last ex) (tp1 ++ E2 :: tp2 ++ efs, σ2) in
-     @MU_impl _ EM Σ hGS oτ' ⊤ ζ ⌜ True ⌝ ) -∗
+     @MU_impl _ EM Σ hGS oτ' ⊤ ζ P ) -∗
     (let _ := iris_OM_into_Looping in pwp s ⊤ ζ e1 Φ)
     ={⊤,∅}=∗   |={∅}▷=>^(S $ trace_length ex)   |={∅,⊤}=>
     ∃ δ' ℓ,
@@ -881,7 +840,8 @@ Section WaitFreePR.
       ([∗ list] i↦ef ∈ efs,
         let τf := locale_of (tp1 ++ E1 :: tp2 ++ take i efs) ef in
         (let _ := iris_OM_into_Looping in pwp s ⊤ τf ef (fork_post τf))
-      ).
+      ) ∗
+      P.
   Proof using.
     simpl.
     iIntros (Hex Hstp Hei Hlocale) "HSI MU Hwp".
@@ -914,7 +874,7 @@ Section WaitFreePR.
     iPureIntro. congruence. 
   Qed.
 
-  Lemma MU_burn_cp {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} τ π d q :
+  Lemma MU_burn_cp_nofork {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} τ π d q :
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
     ⊢ cp π d -∗ th_phase_frag τ π q -∗ 
     (let hGS: @heapGS Σ M EM := {| heap_iemgs := Hinv |} in
@@ -925,6 +885,82 @@ Section WaitFreePR.
     iApply BOU_AMU. iModIntro. iSplitR.
     { iIntros "$". }
     iFrame.
+  Qed.
+
+  Lemma MU_burn_cp_fork {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} τ π0 d R τ':
+    let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
+    ⊢ cp π0 d -∗ th_phase_eq τ π0 -∗ obls τ R -∗
+      let hGS: @heapGS Σ M EM := {| heap_iemgs := Hinv |} in
+      @MU__f _ EM Σ hGS ⊤ τ τ'
+        (∃ π π', th_phase_eq τ π ∗ th_phase_eq τ' π' ∗ obls τ R ∗ obls τ' ∅).
+  Proof using.
+    simpl. iIntros "CP PH OB".
+    iApply AMU_lift_top; [(try rewrite nclose_nroot); done| ]. 
+    iApply BOU_AMU__f'. iModIntro. iSplitR.
+    2: { iFrame. }
+    iIntros "(%&%&?&?&?&?&?)".
+    iFrame.
+    erewrite difference_empty_L. rewrite intersection_empty_r_L. iFrame.
+  Qed.
+
+  Lemma MU_burn_cp {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} τ π0 d R oτ':
+    let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
+    ⊢ cp π0 d -∗ th_phase_eq τ π0 -∗ obls τ R -∗
+      let hGS: @heapGS Σ M EM := {| heap_iemgs := Hinv |} in
+      @MU_impl _ EM Σ hGS oτ' ⊤ τ
+        (∃ π, th_phase_eq τ π ∗ obls τ R ∗
+         from_option (fun τ' => ∃ π', th_phase_eq τ' π' ∗ obls τ' ∅) ⌜ True ⌝ oτ').
+  Proof using.
+    simpl. iIntros "CP PH OB".
+    destruct oτ'.
+    - iPoseProof (MU_burn_cp_fork with "[$] [$] [$]") as "foo".
+      iApply (MU__f_wand with "[] [$]"). simpl.
+      iIntros "(%&%&?&?&?&?)". iFrame.
+    - iPoseProof (MU_burn_cp_nofork with "[$] [$]") as "foo".
+      iApply (MU_wand with "[OB] [$]"). simpl.
+      iIntros "$". iFrame.
+  Qed.
+
+  (* Lemma locales_equiv_of_list (tp1 tp2: list expr) tp01 tp02: *)
+  (*   locales_equiv_from tp1 tp2 <-> locales_of_list tp1 = locales_of_list tp2. *)
+  (* Proof using. *)
+
+  Lemma locales_of_cfg_step c1 τ c2
+    (STEP: locale_step c1 (Some τ) c2):
+  τ ∈ locales_of_cfg c1.
+  Proof using.
+    apply locale_step_from_locale_src in STEP.
+    eapply locales_of_cfg_Some; eauto.
+    Unshelve. apply inhabitant. 
+  Qed.
+
+  Lemma cur_obls_sigs_τi_step `{!ObligationsGS Σ} etr c'
+    (STEP: locale_step (trace_last etr) (Some τi) c'):
+    cur_obls_sigs etr -∗ obls_τi ∗
+      let oτ' := step_fork (trace_last etr) c' in
+      (obls_τi -∗ from_option (fun τ' => obls τ' ∅) ⌜ True ⌝ oτ' -∗ cur_obls_sigs (etr :tr[ Some τi ]: c')).
+  Proof using.
+    simpl. iIntros "(OBLS & OB)".
+    rewrite /cur_obls_sigs. simpl.
+    rewrite decide_True.
+    2: { eapply locales_of_cfg_step; eauto. }
+    iFrame. iIntros "OB OB'". 
+    rewrite decide_True.
+    2: { eapply locale_step_sub; eauto. eapply locales_of_cfg_step; eauto. }
+    iFrame.
+    pose proof STEP as ->%locale_step_step_fork_exact. 
+    rewrite difference_union_distr_l_L big_sepS_union.
+    2: { destruct step_fork eqn:SF; [| set_solver].
+         simpl. apply elem_of_disjoint.
+         intros ? [??]%elem_of_difference [->%elem_of_singleton ?]%elem_of_difference.
+         apply step_fork_difference in SF. set_solver. }
+    iFrame. destruct step_fork eqn:SF; simpl. 
+    2: { rewrite subseteq_empty_difference_L; set_solver. }
+    rewrite difference_disjoint_L.
+    2: { apply step_fork_difference in SF.
+         apply locales_of_cfg_step in STEP.
+         set_solver. }
+    by rewrite big_sepS_singleton.
   Qed.
 
   Program Definition PR_wfree {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}:
@@ -1021,10 +1057,13 @@ Section WaitFreePR.
       + apply Nat.leb_le in LEN.
 
         iDestruct (split_trace_fuel with "[$]") as "(CP & CPS)"; [done| ].
+        iDestruct (cur_obls_sigs_τi_step with "[$]" ) as "(OB & OBLS)".
+        { by rewrite e0 FIN. }
 
         iDestruct (pwp_MU_ctx_take_step with "TI [CP] WP") as "foo"; eauto. 
         { red. rewrite FIN. erewrite ectx_fill_emp. reflexivity. }
-        { rewrite /step_fork. 
+        { 
+          rewrite /step_fork. 
           subst. done. }
 
 
