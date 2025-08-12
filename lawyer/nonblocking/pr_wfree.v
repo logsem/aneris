@@ -788,7 +788,7 @@ Section WaitFreePR.
         iSplitL "TI".
         { simpl. rewrite e0. iFrame. }
 
-        iAssert (wp_tc s e' (trace_length etr =? ii) Φ -∗
+        iAssert (wp_tc s e' (S (trace_length etr) <=? ii) Φ -∗
                  wptp_wfree s
                  (etr :tr[ Some (locale_of t1 e) ]: (t1 ++ e' :: t2 ++ efs, σ'))
                  (Φs ++ newposts (t1 ++ e :: t2) (t1 ++ e' :: t2 ++ efs) (irisG0 := {|
@@ -808,11 +808,61 @@ Section WaitFreePR.
           2: { simpl. rewrite /newposts.
                rewrite newelems_app_drop.
                2: { rewrite !length_app. simpl. lia. }
-               rewrite /wptp_from_gen.
-               simpl.
-               clear.
-               admit. }
-          admit. }
+
+               apply step_fork_hl in STEP as [[? ->] | (?&->&?)].
+               - simpl. set_solver.
+               - rewrite wptp_gen_singleton. rewrite /thread_pr.
+                 rewrite decide_False.
+                 2: { intros ->. rewrite /locale_of in e0.
+                      rewrite !length_app in e0. simpl in e0. lia. }
+                 rewrite big_sepL_singleton. simpl.
+                 rewrite app_nil_r.
+                 replace (locale_of (t1 ++ e' :: t2) x) with (locale_of (t1 ++ e :: t2) x); [done| ].
+                 rewrite /locale_of. rewrite !length_app. simpl. lia. } 
+          
+          rewrite -EQ. iApply wptp_from_gen_app. iSplitL "WPS1".
+          { iApply (big_sepL2_impl with "[$]").
+            iModIntro. iIntros (i pfi Φi PFith Φith).
+            rewrite /thread_pr.
+            destruct decide.
+            2: { set_solver. }
+
+            rewrite e1 in e0.
+            simpl in e0.
+            rewrite /locale_of in e0.
+
+            pose proof PFith as ?%prefixes_from_ith_length.
+            simpl in H0. rewrite H0 in e0. subst.
+            apply lookup_lt_Some in PFith.
+            rewrite adequacy_utils.prefixes_from_length in PFith. lia. }
+
+          simpl. rewrite -EQ'. iApply wptp_from_gen_cons.
+          iSplitL "WP".
+          2: { erewrite wptp_from_gen_locales_equiv_1 with (t0' := (t1 ++ [e'])).
+               2: { rewrite !prefixes_from_app.
+                    eapply Forall2_app; [apply adequacy_utils.locales_equiv_refl| ].
+                    simpl. by constructor. }
+               iApply (big_sepL2_impl with "[$]").
+               iModIntro. iIntros (i pfi Φi PFith Φith).
+               rewrite /thread_pr.
+               destruct decide.
+               2: { set_solver. }
+               
+               rewrite e1 in e0.
+               simpl in e0.
+               rewrite /locale_of in e0.
+               
+               pose proof PFith as ?%prefixes_from_ith_length.
+               simpl in H0. rewrite H0 in e0. subst.
+               apply lookup_lt_Some in PFith.
+               rewrite adequacy_utils.prefixes_from_length in PFith.
+               rewrite !length_app /= in e0. lia. }
+               
+          rewrite /thread_pr. rewrite decide_True.
+          2: { rewrite e0. done. }
+          done. }
+
+        
         admit. 
       + apply Nat.leb_gt in LEN. 
         apply fits_inf_call_prev in FIT.
