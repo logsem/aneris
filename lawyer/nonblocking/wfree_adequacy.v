@@ -66,7 +66,8 @@ Section WFAdequacy.
 
   Let M := AM2M ObligationsAM.
   Let ASEM := ObligationsASEM.
-  Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} τ _ => obls τ ∅ (oGS := aGS)).
+  (* Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} τ _ => obls τ ∅ (oGS := aGS)). *)
+  Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} _ _ => ⌜ True ⌝%I).
 
   Context (ic: @trace_ctx heap_lang).
   Context (m: val).
@@ -165,7 +166,61 @@ Section WFAdequacy.
   PR_premise_multiple obls_sim_rel_wfree fits_inf_call Σ MaybeStuck c.1 c.2
     (init_om_wfree_state c) ((): @em_init_param _ _ EM).
   Proof using.    
-    red. iIntros (Hinv) "(PHYS & MOD)". simpl. 
+    red. iIntros (Hinv) "(PHYS & MOD)". simpl.
+    iModIntro.
+    iExists wfree_trace_inv.
+    iExists (PR_wfree ic m F). simpl. 
+
+    rewrite !bi.sep_assoc. iSplitL.
+    2: { rewrite /adequacy_cond.rel_always_holds_with_trace_inv.
+
+         iIntros (extr omtr [tp σ] EXTRA FIN NSTUCK).
+         simpl. iIntros "(%VALID_STEP & HEAP & MSI & [%TH_OWN %OBLS]) POSTS #INV".
+         red in EXTRA. destruct EXTRA as (VALID & EX0 & OM0 & CONT_SIM). 
+         iApply fupd_mask_intro_discard; [done| ].
+
+         rewrite /wfree_trace_inv. iDestruct "INV" as %NOOBS'.
+         rewrite /obls_sim_rel_wfree. iSplit; [| done].  
+
+
+         destruct extr.
+         { iPureIntro.
+           simpl in VALID_STEP.
+           inversion VALID. subst.
+           red in EX0, OM0. simpl in EX0, OM0. subst.
+           rewrite /obls_sim_rel_wfree /obls_sim_rel /obls_sim_rel_gen.
+           simpl.
+
+           split; [done| ]. simpl. red.
+           (* (* apply om_live_tids_init. *) *)
+           (* apply LIVE0.  *)
+
+           (* should follow from init_om_wfree_state def *)
+           admit.  
+         }
+         
+         (* Unset Printing Notations. *)
+
+         (* rewrite prefixes_simpl. *)
+         (* rewrite -map_app. rewrite -seq_app. *)
+         (* rewrite -Nat.le_add_sub.  *)
+         
+         simpl in VALID_STEP. inversion VALID. subst. simpl in *.
+         (* red in EX_FIN. simpl in EX_FIN. subst. simpl. *)
+         rewrite /obls_sim_rel. iSplit.
+         { simpl. iPureIntro. 
+           destruct a. done. }
+         simpl. rewrite /obls_st_rel.
+
+         iPureIntro.
+         red. simpl. intros τ OB.
+         red in NOOBS'. red in OB. specialize (NOOBS' _ OB).
+         admit. (* can also enforce with trace invariant *)
+         (* iApply (no_obls_live_tids_multiple with "[$] [$]"); try done. *)
+         (* eapply valid_exec_length. *)
+         (* { eapply valid_system_trace_valid_exec_trace; eauto. } *)
+         (* all: eauto.          *)
+         
   Admitted.
 
   Definition wfreeΣ: gFunctors.
