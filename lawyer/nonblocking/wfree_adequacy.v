@@ -5,7 +5,7 @@ From trillium.prelude Require Import classical.
 From fairness Require Import fairness.
 From lawyer Require Import program_logic sub_action_em action_model.
 From lawyer.examples Require Import orders_lib obls_tactics.
-From lawyer.nonblocking Require Import trace_context om_wfree_inst mk_ref.
+From lawyer.nonblocking Require Import trace_context om_wfree_inst mk_ref pr_wfree.
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am obls_termination.
 From heap_lang Require Import lang.
 
@@ -81,13 +81,16 @@ Section WFAdequacy.
     (extr: execution_trace heap_lang) (omtr: auxiliary_trace M): iProp Σ :=
     ⌜ no_extra_obls (trace_last extr) (trace_last omtr) ⌝.
 
-  Definition fits_inf_call: execution_trace heap_lang → Prop.
-  Admitted.
+  (* Definition fits_inf_call: execution_trace heap_lang → Prop. *)
+  (* Admitted. *)
+  Context (F: nat). 
 
-  Definition PR_wfree {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
-    (iG := IEM_irisG HeapLangEM EM)
-    : ProgressResource state_interp wfree_trace_inv fork_post fits_inf_call.
-  Admitted.
+  Definition fits_inf_call := fits_inf_call ic m F. 
+
+  (* Definition PR_wfree {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} *)
+  (*   (iG := IEM_irisG HeapLangEM EM) *)
+  (*   : ProgressResource state_interp wfree_trace_inv fork_post fits_inf_call. *)
+  (* Admitted. *)
 
   Instance fic_dec: ∀ ex, Decision (fits_inf_call ex).
   Proof. Admitted.
@@ -161,8 +164,8 @@ Section WFAdequacy.
         (SPEC: wait_free_spec m):
   PR_premise_multiple obls_sim_rel_wfree fits_inf_call Σ MaybeStuck c.1 c.2
     (init_om_wfree_state c) ((): @em_init_param _ _ EM).
-  Proof using.
-    red in SPEC.
+  Proof using.    
+    red. iIntros (Hinv) "(PHYS & MOD)". simpl. 
   Admitted.
 
   Definition wfreeΣ: gFunctors.

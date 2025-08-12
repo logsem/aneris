@@ -3,7 +3,7 @@ From trillium.traces Require Import inftraces trace_lookup exec_traces trace_len
 From fairness Require Import fairness locales_helpers.
 (* From lawyer.examples Require Import orders_lib obls_tactics. *)
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am obls_termination obligations_wf.
-From lawyer.nonblocking Require Import trace_context om_wfree_inst wptp_gen.
+From lawyer.nonblocking Require Import trace_context om_wfree_inst wptp_gen pwp.
 From trillium.program_logic Require Import execution_model weakestpre adequacy_utils adequacy_cond simulation_adequacy_em_cond. 
 From lawyer Require Import action_model sub_action_em.
 From heap_lang Require Import lang.
@@ -29,25 +29,6 @@ Proof using.
   - specialize (EQ (s + l1)). lia.
   - specialize (EQ (s + l2)). lia.
 Qed.
-
-
-Section Pwp.
-
-  Definition LoopingModel: Model :=
-    {| mstate := unit; mlabel := unit; mtrans := fun _ _ _ => True |}.
-
-  (* Class LoopIrisG {Λ: language} Σ := { *)
-  (*   lig_inner :: irisG Λ LoopingModel Σ *)
-  (* }. *)
-
-  (* Definition pwp {Λ: language} {Σ: gFunctors} := @wp Λ (iProp Σ) LoopingModel. *)
-  (* Definition pwp := @wp (A := LoopingModel). *)
-  (* Definition pwp {Λ: language} {PROP} := @wp Λ PROP LoopingModel. *)
-  (* Global Arguments pwp {_ _ _}.  wp *)
-  Definition pwp `{!irisG Λ LoopingModel Σ} :=
-    @wp Λ (iProp Σ) stuckness _. 
-
-End Pwp. 
 
 
 Section WaitFreePR.
@@ -122,23 +103,11 @@ Section WaitFreePR.
     2: { by apply trace_lookup_lt_Some. }
     by rewrite JTH in FITS.
   Qed.    
-  
-  Definition phys_SI {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
-    (etr: execution_trace heap_lang) (_: auxiliary_trace LoopingModel): iProp Σ :=
-    lgem_si (trace_last etr).2 (lgem_GS0 := (iem_phys HeapLangEM EM)).
-
-  (** not making it an instance to avoid incorrect Iris instantiations *)
-  Definition iris_OM_into_Looping {Σ} (Hinv: @IEMGS _ _ HeapLangEM EM Σ):
-    irisG heap_lang LoopingModel Σ.
-  Proof using.
-    exact {| state_interp := phys_SI; fork_post := fun _ _ => (⌜ True ⌝)%I |}.
-  Defined.
-  (* Definition empty_post {Σ: gFunctors}: val -> iProp Σ := (fun _ => ⌜ True ⌝%I).  *)
 
   Definition wp_tc {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
     (s: stuckness) (e: expr) (b: bool) Φ :=
     if b then
-      let _ := iris_OM_into_Looping in
+      let _ := iris_OM_into_Looping (EM := EM) in
       pwp s ⊤ τi e Φ
     else
       let e' := default (Val #false) (under_ctx Ki e) in
@@ -146,7 +115,7 @@ Section WaitFreePR.
 
   Definition thread_pr {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} s N :=
     (fun e τ Φ => if decide (τi = τ) then wp_tc s e (N <=? ii) Φ
-                 else let _ := iris_OM_into_Looping in pwp s ⊤ τ e Φ).
+                 else let _ := iris_OM_into_Looping (EM := EM) in pwp s ⊤ τ e Φ).
 
   (* Definition wptp_wfree_ {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} *)
   (*   (s: stuckness) *)
@@ -526,68 +495,7 @@ Section WaitFreePR.
     rewrite -EQ_CFG. done.
   Qed.
 
-  Definition looping_trace: auxiliary_trace LoopingModel :=
-    trace_singleton ().
-
   From lawyer Require Import program_logic.  
-
-  Lemma pwp_MU_ctx_take_step {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
-    s Φ ex atr tp1 K e1 tp2 σ1 e2 σ2 efs ζ P:
-    let (E1, E2) := (ectx_fill K e1, ectx_fill K e2) in
-    valid_exec ex →
-    prim_step e1 σ1 e2 σ2 efs ->
-    trace_ends_in ex (tp1 ++ E1 :: tp2, σ1) →
-    locale_of tp1 E1 = ζ ->
-    state_interp ex atr -∗
-    (let hGS: @heapGS Σ M EM := {| heap_iemgs := Hinv |} in
-     let oτ' := step_fork (trace_last ex) (tp1 ++ E2 :: tp2 ++ efs, σ2) in
-     @MU_impl _ EM Σ hGS oτ' ⊤ ζ P ) -∗
-    (let _ := iris_OM_into_Looping in pwp s ⊤ ζ e1 Φ)
-    ={⊤,∅}=∗   |={∅}▷=>^(S $ trace_length ex)   |={∅,⊤}=>
-    ∃ δ' ℓ,
-      state_interp (trace_extend ex (Some ζ) (tp1 ++ E2 :: tp2 ++ efs, σ2))
-                   (trace_extend atr ℓ δ') ∗
-      (let _ := iris_OM_into_Looping in pwp s ⊤ ζ e2 Φ) ∗ 
-      ([∗ list] i↦ef ∈ efs,
-        let τf := locale_of (tp1 ++ E1 :: tp2 ++ take i efs) ef in
-        (let _ := iris_OM_into_Looping in pwp s ⊤ τf ef
-                                            (fork_post τf) (* for pwp *)
-                                            (* (let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in *)
-                                            (*   fun _ => obls τf ∅) *)
-        )
-      ) ∗
-      P.
-  Proof using.
-    simpl.
-    iIntros (Hex Hstp Hei Hlocale) "HSI MU Hwp".
-    rewrite /pwp. 
-    rewrite wp_unfold /wp_pre.
-    destruct (to_val e1) eqn:He1.
-    { erewrite val_stuck in He1; done. }
-    simpl. rewrite He1.
-    iDestruct "HSI" as "(%EV & PHYS & MSI)". simpl. 
-    iMod ("Hwp" $! _ looping_trace K with "[//] [] [] PHYS") as "[Hs Hwp]".
-    1, 2: done.
-    iDestruct ("Hwp" with "[]") as "Hwp"; first done.
-    iModIntro. 
-    iApply (step_fupdN_wand with "Hwp").
-    iIntros "!> Hwp".
-    iMod "Hwp" as ([] []) "(PHYS & WP & WPS')".
-
-    rewrite /MU /MU_impl. iMod ("MU" $! (trace_extend _ _ _) with "[PHYS MSI]") as (δ ρ) "TI".
-    { rewrite /trace_interp_interim. iFrame.
-      iPureIntro. split.
-      { rewrite -Hlocale. reflexivity. }
-      split; [| done]. 
-      rewrite -Hlocale. econstructor; eauto.
-      simpl in Hstp. simpl.
-      by apply fill_prim_step. }
-
-    iModIntro.
-    simpl.  iDestruct "TI" as "((%&?&?)&?)". 
-    do 2 iExists _. iFrame.
-    iPureIntro. congruence. 
-  Qed.
 
   Lemma MU_burn_cp_nofork {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} τ π d q :
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
@@ -635,10 +543,6 @@ Section WaitFreePR.
       iApply (MU_wand with "[OB] [$]"). simpl.
       iIntros "$". iFrame.
   Qed.
-
-  (* Lemma locales_equiv_of_list (tp1 tp2: list expr) tp01 tp02: *)
-  (*   locales_equiv_from tp1 tp2 <-> locales_of_list tp1 = locales_of_list tp2. *)
-  (* Proof using. *)
 
   (* TODO: move *)
   Lemma locales_of_cfg_step c1 τ c2
