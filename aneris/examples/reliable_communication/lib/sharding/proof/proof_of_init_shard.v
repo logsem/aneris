@@ -60,7 +60,15 @@ Section proof.
     wp_apply ("run_shard" with "[] [$ShardInit $∅ $free $shard_si]"); last done.
     iIntros (reqv reqd Ψ) "!>pre HΨ".
     wp_pures.
-    wp_apply (server_request_handler_at_shard_spec with "[$pre $lock]").
+    wp_apply (server_request_handler_at_shard_spec with "[pre $lock]").
+    { iDestruct "pre" as "[(%x&%y&%z&%t&H1&H2&H3&H4&H5&H6)
+                          |(%x&%y&%z&H1&H2&H3&H4&H5&H6)]".
+      - iLeft.
+        iExists x, y, z, t.
+        iFrame "H1 H2 H3 H4 H5 H6".
+      - iRight.
+        iExists x, y, z.
+        iFrame "H1 H2 H3 H4 H5 H6". }
     iIntros (res).
     iApply "HΨ".
   Qed.

@@ -344,12 +344,12 @@ Section Implication.
       iModIntro.
       iIntros "Hhyp".
       iApply "Hrc_read''".
+      iNext.
       iMod "Hhyp" as "[%vo [%V (([%V' (%H_or_eq & Hloc_key & Hfrag)] & 
                       [%V'' (%Hsub' & Hmem_key & Hauth)]) & Hhyp_later)]]".
       iModIntro.
       iExists vo, V''.
       iSplitL "Hloc_key Hmem_key"; first iFrame.
-      iNext.
       iIntros (wo) "(Hloc_key & Hmem_key & Hdisj)".
       iApply "Hhyp_later".
       simpl.
@@ -384,12 +384,12 @@ Section Implication.
       iModIntro.
       iIntros "Hhyp".
       iApply "Hrc_write''".
+      iNext.
       iMod "Hhyp" as "[%vo [%V (([%V' (%H_or_eq & Hloc_key & Hfrag)] & 
                       [%V'' (%Hsub'' & Hmem_key & Hauth)]) & Hhyp_later)]]".
       iModIntro.
       iExists vo.
       iSplitL "Hloc_key"; first iFrame.
-      iNext.
       iIntros "Hloc_key".
       iInv KVS_InvName as ">Hown_inv" "Hclose".
       iDestruct (ownSetAdd _ _ _ (v.(SV_val)) with "[$Hown_inv $Hauth]") 
@@ -422,6 +422,7 @@ Section Implication.
       iModIntro.
       iIntros "Hhyp".
       iApply "Hrc_start''".
+      iNext.
       iMod "Hhyp" as "[%m ((Hstate & Hmem_keys) & Hhyp_later)]".
       iModIntro.
       simpl.
@@ -430,7 +431,6 @@ Section Implication.
       iFrame.
       iDestruct (rewrite_maps_2 with "[$Hmem_keys]") as "(Hauth_keys & Hmem_keys)".
       iFrame.
-      iNext.
       iIntros "(Hstate & Hmem_keys & Hloc_keys)".
       iDestruct (rewrite_maps_3 _ _ _ Hdom with "[$Hmem_keys] [$Hauth_keys]") as "Hmem_keys".
       iInv KVS_InvName as ">Hinv_res" "Hinv_close".
@@ -494,6 +494,7 @@ Section Implication.
     iModIntro.
     iIntros "Hhyp".
     iApply "Hrc_com''".
+    iNext.
     iMod "Hhyp" as "[%s [%mc [%m ((Hstate & %Hdom1 & %Hdom2 & Hloc_keys & Hmem_keys) & Hhyp_later)]]]".
     iModIntro.
     simpl.
@@ -510,7 +511,6 @@ Section Implication.
         set_solver.
       - iFrame.
     }
-    iNext.
     iIntros (b) "(Hstate & Hdisj)".
     iDestruct "Hdisj" as "[(_ & Hmem_keys) | (_ & Hmem_keys)]".
     - iAssert (([∗ map] k↦vo ∈ mc, emp)%I) as "Hemp_keys"; first done.

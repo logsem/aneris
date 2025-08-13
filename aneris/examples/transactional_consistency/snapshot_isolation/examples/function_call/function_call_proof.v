@@ -70,7 +70,7 @@ Section proof_of_code.
     iExists {[ "x" := h ]}.
     iFrame.
     iSplitL "x_h"; first iApply (big_sepM_singleton with "x_h").
-    iIntros "!>(Active & mem & cache & _)".
+    iIntros "(Active & mem & cache & _)".
     iPoseProof (big_sepM_insert with "mem") as "(x_h & _)"; first done.
     iMod ("close" with "[x_h]") as "_".
     { iNext. by iExists h. }
@@ -81,7 +81,6 @@ Section proof_of_code.
     iModIntro.
     iExists _, _.
     iFrame.
-    iNext.
     iIntros "(x_42 & x_upd)".
     iModIntro.
     wp_pures.
@@ -98,7 +97,7 @@ Section proof_of_code.
       iApply big_sepM_singleton.
       iFrame.
     }
-    iIntros "!>(CanStart & [(_ & mem)|(_ & mem)])".
+    iIntros "(CanStart & [(_ & mem)|(_ & mem)])".
     {
       iPoseProof (big_sepM2_insert with "mem") as "((x_42 & _) & _)";
         [done..|].
@@ -123,7 +122,7 @@ Section proof_of_code.
       transaction2 cst f @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (cst f sa hy) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) 
+    iIntros (cst f sa hy) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom)
       #f_spec #inv %Φ !>(CanStart & #HiC & y_hy) HΦ".
     rewrite/transaction2.
     wp_pures.
@@ -138,7 +137,7 @@ Section proof_of_code.
       iFrame.
       iApply (big_sepM_singleton with "y_hy").
     }
-    iIntros "!>(Active & mem & cache & _)".
+    iIntros "(Active & mem & cache & _)".
     iPoseProof (big_sepM_insert with "mem") as "(x_hx & mem)"; first done.
     iPoseProof (big_sepM_insert with "mem") as "(y_hy & _)"; first done.
     iMod ("close" with "[x_hx]") as "_".
@@ -156,7 +155,6 @@ Section proof_of_code.
     iModIntro.
     iExists _, _.
     iFrame.
-    iNext.
     iIntros "(cache_y & y_upd)".
     iModIntro.
     wp_pures.
@@ -174,7 +172,7 @@ Section proof_of_code.
       by iSplitL "x_hx' y_hy";
         repeat (iApply big_sepM_insert; first done; iFrame).
     }
-    iIntros "!>(CanStart & [(_ & mem) | (_ & mem)])".
+    iIntros "(CanStart & [(_ & mem) | (_ & mem)])".
     {
       iPoseProof (big_sepM2_insert with "mem") as "((mem_x & _) & _)";
           [done..|].
@@ -251,7 +249,7 @@ Section proof_of_code.
       server #KVS_address @[ip_of_address KVS_address]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) 
+    iIntros "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom)
       %Φ !> (KVS_Init & ∅ & free & #KVS_si) HΦ".
     rewrite/server.
     wp_pures.
@@ -282,7 +280,6 @@ Section proof_of_runner.
     iModIntro.
     iExists _.
     iFrame.
-    iNext.
     iIntros "k_vo".
     iModIntro.
     wp_pures.
@@ -403,4 +400,4 @@ Proof.
   do 2 (rewrite big_sepS_union; [|set_solver];
   rewrite !big_sepS_singleton;
   iDestruct "Hips" as "[Hips ?]"; iFrame).
-Qed. 
+Qed.

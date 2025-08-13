@@ -54,7 +54,7 @@ Section proof.
     2 : by apply lookup_singleton_ne.
     rewrite big_sepM_empty.
     iSplitL "Hks Hkd"; first iFrame.
-    iNext. iIntros "(Hcstate & (Hks & Hkd & _) & ((Hcs1 & Hcs2) & (Hcd1 & Hcd2) & _) & _)".
+    iIntros "(Hcstate & (Hks & Hkd & _) & ((Hcs1 & Hcs2) & (Hcd1 & Hcd2) & _) & _)".
     iMod ("Hclose" with "[Hks Hkd]") as "_".
     { iNext. iExists _,_ ,_ , _. iFrame. }
     iModIntro. wp_pures.
@@ -62,7 +62,6 @@ Section proof.
     iModIntro.
     iExists _.
     iFrame.
-    iNext.
     iIntros "Hcs1".
     iModIntro.
     do 2 rewrite last_snoc.
@@ -74,7 +73,6 @@ Section proof.
       iModIntro.
       iExists _, _.
       iFrame.
-      iNext.
       iIntros "(Hcs1 & Hcs2)".
       iModIntro.
       wp_pures.
@@ -82,7 +80,6 @@ Section proof.
       iModIntro.
       iExists _.
       iFrame.
-      iNext.
       iIntros "Hcd1".
       iModIntro.
       wp_pures.
@@ -90,7 +87,6 @@ Section proof.
       iModIntro.
       iExists _, _.
       iFrame.
-      iNext.
       iIntros "(Hcd1 & Hcd2)".
       iModIntro.
       wp_pures.
@@ -111,7 +107,7 @@ Section proof.
           rewrite !big_sepM_insert; try set_solver.
           rewrite !big_sepM_empty. iFrame.
           by apply lookup_singleton_ne.
-        + iNext. iIntros "[_ HBig]".
+        + iIntros "[_ HBig]".
           iMod ("Hclose" with "[HBig]") as "_".
           * iNext. 
             iDestruct "HBig" as "[(_ & Hkeys)|(_ & Hkeys)]".
@@ -153,7 +149,7 @@ Section proof.
           rewrite !big_sepM_insert; try set_solver.
           rewrite !big_sepM_empty. iFrame.
           by apply lookup_singleton_ne.
-        + iNext. iIntros "[_ HBig]".
+        + iIntros "[_ HBig]".
           iMod ("Hclose" with "[HBig]") as "_".
           * iNext. iExists _, _, _, _.
             iDestruct "HBig" as "[(_ & Hkeys)|(_ & Hkeys)]".
@@ -181,3 +177,4 @@ Section proof.
   Qed.
 
 End proof.
+

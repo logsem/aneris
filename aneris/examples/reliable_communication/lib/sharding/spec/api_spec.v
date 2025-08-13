@@ -23,7 +23,7 @@ Section Spec.
       wr $k $v @[ip_of_address sa] E
     <<<▷ RET #(); k ↦ₖ Some v >>>.
 
-  Definition simplified_write_spec (wr : val) sa : iProp Σ := 
+  Definition simplified_write_spec (wr : val) sa : iProp Σ :=
     ∀ v old (k : Key), ⌜k ∈ DB_keys⌝ -∗
     {{{ k ↦ₖ old }}}
       wr $k $v @[ip_of_address sa]
@@ -37,7 +37,7 @@ Section Spec.
     iModIntro.
     iExists old.
     iFrame.
-    iIntros "!>k_v".
+    iIntros "k_v".
     iApply ("HΦ" with "k_v").
   Qed.
 
@@ -49,7 +49,7 @@ Section Spec.
       rd $k @[ip_of_address sa] E
     <<<▷ RET $v; k ↦ₖ v >>>.
 
-  Definition simplified_read_spec (rd : val) sa : iProp Σ := 
+  Definition simplified_read_spec (rd : val) sa : iProp Σ :=
     ∀ (k : Key) v, ⌜k ∈ DB_keys⌝ -∗
     {{{ k ↦ₖ v }}}
       rd $k @[ip_of_address sa]
@@ -63,7 +63,7 @@ Section Spec.
     iModIntro.
     iExists v.
     iFrame.
-    iIntros "!>k_v".
+    iIntros "k_v".
     iApply ("HΦ" with "k_v").
   Qed.
 
@@ -84,7 +84,7 @@ Section Spec.
       SrvInit ∗
       DB_addr ⤳ (∅, ∅) ∗
       free_ports (ip_of_address DB_addr) {[port_of_address DB_addr]} ∗
-      ([∗ list] i↦sa ∈ DB_addrs, unallocated {[ (fst sa) ]}) ∗ 
+      ([∗ list] i↦sa ∈ DB_addrs, unallocated {[ (fst sa) ]}) ∗
       ([∗ list] i↦sa ∈ DB_addrs, (fst sa) ⤳ (∅, ∅)) ∗
       ([∗ list] i↦sa ∈ DB_addrs,
             free_ports (ip_of_address (fst sa)) {[port_of_address (fst sa)]})

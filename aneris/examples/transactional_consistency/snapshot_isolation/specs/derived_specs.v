@@ -147,6 +147,7 @@ Section DerivedSpecs.
     iIntros (c sa E HE) "#Hic #spec".
     iIntros (Φ) "!# Hsh".
     wp_apply ("spec" $! _ _ E with "[//][//][Hsh]").
+    iModIntro.
     iMod "Hsh".
     iModIntro.
     iDestruct "Hsh" as (m) "((Hst & Hkeys) & Hsh)".
@@ -158,7 +159,6 @@ Section DerivedSpecs.
     iDestruct "Hst" as "[(_ & Hres)|Habs]"; last first.
     { iDestruct "Habs" as (_df) "(% & _)". done. }
     iFrame.
-    iNext.
     iIntros "(Hst & Hks & (Hres & _))".
     iApply ("Hsh" with "[Hst Hks Hres]").
     iSplitL "Hst"; first eauto.
@@ -196,6 +196,7 @@ Section DerivedSpecs.
     iIntros (c sa E HE) "#Hic #spec".
     iIntros (Φ) "!# Hsh".
     wp_apply ("spec" $! _ _ E with "[//][//][Hsh]").
+    iModIntro.
     iMod "Hsh".
     iModIntro.
     iDestruct "Hsh" as (m ms_ mc) "((Hst & %HdomEq1 & %HdomEq2 & Hkeys1 & Hkeys2) & Hsh)".
@@ -208,7 +209,6 @@ Section DerivedSpecs.
     iFrame.
     iSplit.
     { iPureIntro. inversion HeqT; subst. set_solver. }
-    iNext.
     iIntros (b) "(Hst & Hpost)".  
     iApply ("Hsh" with "[Hst Hpost]").
     iSplitL "Hst".
@@ -242,8 +242,8 @@ Section DerivedSpecs.
       {{{
         ConnectionStateTxt c sa TxtCanStart ∗
         (* Viewshift for looking at the state of the database at start time *)
-        (|={⊤, E}=> ∃ m_at_start, P m_at_start ∗ ([∗ map] k ↦ vo ∈ m_at_start, OwnMemKeyVal k vo) ∗ 
-           ▷ (([∗ map] k ↦ vo ∈ m_at_start, OwnMemKeyVal k vo) ={E, ⊤}=∗ emp )) ∗
+        (▷ |={⊤, E}=> ∃ m_at_start, P m_at_start ∗ ([∗ map] k ↦ vo ∈ m_at_start, OwnMemKeyVal k vo) ∗ 
+           (([∗ map] k ↦ vo ∈ m_at_start, OwnMemKeyVal k vo) ={E, ⊤}=∗ emp )) ∗
         (* Specification for the body of the transaction *)
         (∀ (m_snap : gmap Key (option val)),
           {{{ 
@@ -255,9 +255,9 @@ Section DerivedSpecs.
             ([∗ map] k ↦ p ∈ mc, k ↦{c} p.1 ∗ KeyUpdStatus c k p.2) ∗
             (* Viewshift for looking at the state of the database at commit time after
               the transaction body has been executed *)
-            (|={⊤, E}=> ∃ m_at_commit, ([∗ map] k ↦ vo ∈ m_at_commit, OwnMemKeyVal k vo) ∗
+            (▷ |={⊤, E}=> ∃ m_at_commit, ([∗ map] k ↦ vo ∈ m_at_commit, OwnMemKeyVal k vo) ∗
                 ⌜dom m_at_commit = dom m_snap⌝ ∗ Q m_at_commit m_snap mc ∗
-                (▷(([∗ map] k↦ vo;p ∈ m_at_commit; mc, OwnMemKeyVal k (commitTxt p vo)) ∨
+                ((([∗ map] k↦ vo;p ∈ m_at_commit; mc, OwnMemKeyVal k (commitTxt p vo)) ∨
                   ([∗ map] k ↦ vo ∈ m_at_commit, OwnMemKeyVal k vo)) ={E, ⊤}=∗ emp))
           }}})
       }}}
@@ -271,7 +271,7 @@ Section DerivedSpecs.
     wp_pures. wp_apply start_spec_derived; try eauto.
     iMod "Hsh1" as (m_at_start) "(HP & Hks & Hsh1)".
     iModIntro. iExists m_at_start. iFrame.
-    iNext. iIntros "(HstA & Hmks & Hcks)".
+    iIntros "(HstA & Hmks & Hcks)".
     iMod ("Hsh1" with "[$Hmks]") as "_".
     iModIntro. wp_pures. wp_apply ("HspecBdy" with "[$HP $Hcks]").
     iIntros (mc) "(%Hdeq1 & Hcks & Hsh2)".
@@ -279,7 +279,7 @@ Section DerivedSpecs.
     iMod ("Hsh2") as (m_at_commit) "(Hks & %Hdom1 & HQ & Hsh2)".
     iModIntro. iExists _, _, _. iFrame.
     iSplit; [iPureIntro; set_solver|].
-    iNext. iIntros (b) "(HstS & Hdisj)".
+    iIntros (b) "(HstS & Hdisj)".
     iApply ("HΦ" $! m_at_commit m_at_start mc).
     iFrame. iDestruct "Hdisj" as "[Hc | Ha]".
     - iDestruct "Hc" as "(%Hbt & Hkts)".
@@ -297,8 +297,8 @@ Section DerivedSpecs.
     start_spec -∗ 
     commit_spec -∗
     IsConnected c sa -∗
-    □ (|={⊤, E}=> ∃ m_snap, ⌜dom m_snap = domain⌝ ∗ P m_snap ∗ ([∗ map] k ↦ vo ∈ m_snap, OwnMemKeyVal k vo)
-      ∗ ▷ (((∃ m_cache, Q m_cache ∗ ([∗ map] k↦ vo;p ∈ m_snap; m_cache, OwnMemKeyVal k (commitTxt p vo)))
+    □ (▷ |={⊤, E}=> ∃ m_snap, ⌜dom m_snap = domain⌝ ∗ P m_snap ∗ ([∗ map] k ↦ vo ∈ m_snap, OwnMemKeyVal k vo)
+      ∗ (((∃ m_cache, Q m_cache ∗ ([∗ map] k↦ vo;p ∈ m_snap; m_cache, OwnMemKeyVal k (commitTxt p vo)))
             ∨ (([∗ map] k ↦ vo ∈ m_snap, OwnMemKeyVal k vo))) ={E, ⊤}=∗ emp)) -∗
     (∀ m_snap,
       {{{ ([∗ map] k ↦ vo ∈ m_snap, k ↦{c} vo ∗ KeyUpdStatus c k false) ∗ P m_snap }}}
@@ -320,7 +320,6 @@ Section DerivedSpecs.
     iModIntro.
     iExists m_snap_start.
     iFrame.
-    iModIntro.
     iIntros "(H_state & H_keys & H_cache)".
     iMod ("H_shift'" with "[$H_keys]") as "_".
     iModIntro.
@@ -338,7 +337,6 @@ Section DerivedSpecs.
       iPureIntro.
       by rewrite H_dom -H_dom'.
     }
-    iModIntro.
     iIntros (b) "(H_state & [(-> & H_keys) | (-> & H_keys)])".
     - iMod ("H_shift" with "[H_keys H_Q]") as "_".
       + iLeft.

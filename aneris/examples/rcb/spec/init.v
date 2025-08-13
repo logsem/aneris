@@ -90,9 +90,9 @@ Section Specification.
     iIntros (Φ) "!> Hloc HΦ".
     iApply "Hdeliver"; [done |].
     iApply fupd_mask_intro; [set_solver |].
-    iIntros "Hcl".
+    iIntros "!> Hcl".
     iExists s; iFrame.
-    iIntros "!>" (s' vo) "[Hloc [[-> ->] |Hsome]]";
+    iIntros (s' vo) "[Hloc [[-> ->] |Hsome]]";
       iMod "Hcl"; iModIntro; iApply "HΦ".
     - eauto with iFrame.
     - iDestruct "Hsome" as (a) "(-> & ? & ? & ? & ? & Hv)".
@@ -126,9 +126,9 @@ Section Specification.
     iIntros "[Hglob Hloc] HΦ".
     iApply "Hbr"; [done |].
     iApply fupd_mask_intro; [set_solver |].
-    iIntros "Hmask".
+    iIntros "!> Hmask".
     iExists h, s. iFrame.
-    iIntros "!>" (w a) "(? & ? & ? & ? & ? & ? & ? & ? & ?)".
+    iIntros (w a) "(? & ? & ? & ? & ? & ? & ? & ? & ?)".
     iMod "Hmask". iModIntro.
     iApply "HΦ". eauto with iFrame.
   Qed.
@@ -168,9 +168,10 @@ Section DeliverBroadcastInvExample.
     iApply "Hdel"; [done |].
     (* Before we intro the mask as in the sequential case, we have to open
        the local invariant. *)
+    iNext.
     iInv LInv as "> Hloc" "Hcl". iDestruct "Hloc" as (s) "Hloc".
     iApply fupd_mask_intro; [set_solver |]. iIntros "Hmask".
-    iExists s; iFrame. iIntros "!>" (s' vo) "[Hloc Hopt]".
+    iExists s; iFrame. iIntros (s' vo) "[Hloc Hopt]".
     iMod "Hmask". iMod ("Hcl" with "[Hloc]") as "_".
     { eauto with iFrame. }
     iModIntro.
@@ -203,11 +204,12 @@ Section DeliverBroadcastInvExample.
     rewrite /broadcast_with_inv_example.
     iIntros (Hi Φ) "!> #HInv HΦ".
     iApply "Hbr"; [done |].
+    iNext.
     iInv LInv as "> Hinv" "Hcl".
     iDestruct "Hinv" as (h s) "[Hglob Hloc]".
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
     iExists h, s; iFrame.
-    iIntros "!>" (w a) "(? & ? & ? & ? & ? & ? & ? & Hloc & Hglob)".
+    iIntros (w a) "(? & ? & ? & ? & ? & ? & ? & Hloc & Hglob)".
     iMod "Hmask". iMod ("Hcl" with "[Hloc Hglob]").
     { eauto with iFrame. }
     iModIntro. iApply "HΦ".
@@ -289,7 +291,7 @@ Section Helpers.
     (deliver : val) (i : nat) (z : socket_address) :
   {{{ deliver_spec deliver i z }}}
     wait_deliver deliver @[ip_of_address z]
-  {{{ wd, RET wd; wait_deliver_spec wd i z }}}. 
+  {{{ wd, RET wd; wait_deliver_spec wd i z }}}.
   Proof.
     iIntros (Φ) "#Hdeliver HΦ".
     unfold wait_deliver. wp_pures. iApply "HΦ".
@@ -300,7 +302,7 @@ Section Helpers.
     wp_apply "Hdeliver"; [done |].
     iMod "Hvs". iModIntro.
     iDestruct "Hvs" as (s) "[Hloc Hvs]".
-    iExists s; iFrame. iModIntro.
+    iExists s; iFrame.
     iIntros (s' vo) "[Hloc' [[-> ->] | Hsome]]".
     - iMod ("Hvs" with "Hloc'") as "_".
       iModIntro. wp_match.

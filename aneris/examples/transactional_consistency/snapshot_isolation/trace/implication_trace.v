@@ -911,7 +911,6 @@ Section trace_proof.
       iFrame.
       iSplit; by iPureIntro.
     }
-    iModIntro.
     iIntros (b) "(Hconn_state & Hkeys_disj)".
     iInv "HinvExt" as ">[%T' [%exec' (Hinv_si_res' & [%t' [%lt' (Htr_is' & HOwnLin' & %HlinOf' & %Hno_empty' & %Hex' 
       & %Hvalid_trans' & %Hvalid_seq' & %Hbased' & %Hvalid_exec' & Hstate_res' & Hlin_res' & Hpost_res' & %Hopen_later')]])]]" "Hclose'".
@@ -2165,7 +2164,6 @@ Section trace_proof.
     iModIntro.
     iExists vo.
     iFrame.
-    iNext.
     iIntros "Hkey_c".
     iInv "HinvExt" as ">[%T' [%exec' (Hinv_si_res' & [%t' [%lt' (Htr_is' & HOwnLin' & %HlinOf' & %Hno_empty' & %Hex' 
       & %Hvalid_trans' & %Hvalid_seq' & %Hbased' & %Hvalid_exec' & Hstate_res' & Hlin_res' & Hpost_res' & %Hopen_later')]])]]" "Hclose'".
@@ -3113,7 +3111,6 @@ Section trace_proof.
     rewrite {1} big_sepM_sep.
     iDestruct "Hkeys" as "(Hkeys1 & Hkeys2)".
     iFrame.
-    iModIntro.
     iIntros "(Hconn_state & Hkeys1 & Hkeys_conn & #Hseen)".
     rewrite (big_sepM_sep _ (λ k _,  KeyUpdStatus c k false) m).
     iDestruct "Hkeys_conn" as "(Hkeys_conn & Hkeys_status)".
@@ -3734,7 +3731,6 @@ Section trace_proof.
     iModIntro.
     iExists vo, b.
     iFrame.
-    iNext.
     iIntros "Hkey_c".
     iInv "HinvExt" as ">[%T' [%exec' (Hinv_si_res' & [%t' [%lt' (Htr_is' & HOwnLin' & %HlinOf' & %Hno_empty' & %Hex' 
       & %Hvalid_trans' & %Hvalid_seq' & %Hbased' & %Hvalid_exec' & Hstate_res' & Hlin_res' & Hpost_res' & %Hopen_later')]])]]" "Hclose'".

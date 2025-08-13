@@ -19,13 +19,13 @@ Section API_spec.
          (P : iProp Σ) (Q : we → ghst → ghst → iProp Σ),
         ⌜↑DB_InvName ⊆ E⌝ -∗
         ⌜k ∈ DB_keys⌝ -∗
-        □ (P
-            ={⊤, E}=∗
+        □ (P -∗ ▷ 
+            |={⊤, E}=>
               ∃ (h : ghst) (a_old: option we),
                 ⌜at_key k h = a_old⌝ ∗
                 k ↦ₖ a_old ∗
                 Obs DB_addr h ∗
-                  ▷ (∀ (hf : ghst) (a_new : we),
+                  (∀ (hf : ghst) (a_new : we),
                   ⌜at_key k hf = None⌝ -∗
                   ⌜we_key a_new = k⌝ -∗
                   ⌜we_val a_new = v⌝ -∗
@@ -62,9 +62,10 @@ Section API_spec.
     iApply ("Hwr" $! E k v _ (λ _ _ _, Φ #()) with "[] [] [] Hvs");
       [ done .. | | ].
     { iIntros "!> Hvs".
+      iNext.
       iMod "Hvs" as (h a_old) "[(%Hatkey & Hk & Hobs) Hclose]".
       iModIntro. iExists _, _. iFrame. iSplit; first done.
-      iNext. iIntros (hf anew Hhf Hnk Hnv) "Hpre1 Hpre2 Hpre3".
+      iIntros (hf anew Hhf Hnk Hnv) "Hpre1 Hpre2 Hpre3".
       iApply "Hclose". eauto 10 with iFrame. }
     iIntros "!> H". iDestruct "H" as (_ _ _) "H". iApply "H".
   Qed.
@@ -109,10 +110,11 @@ Section API_spec.
     iDestruct (write_spec_write_spec_atomic with "Hwr") as "#Hswr".
     iIntros (Hk Φ) "!> HP HΦ".
     iApply "Hswr"; [done..|].
+    iNext.
     iApply fupd_mask_intro; [done|]; iIntros "Hclose".
     iDestruct "HP" as (wo) "(Hk & Hobs & %Hatkey)".
     iExists _, _. iFrame "Hk Hobs". iSplit; [done|].
-    iIntros "!>" (hf wo') "(%Hatkey'&%Hkew&%Hval&%Hle&Hk&#Hobs')".
+    iIntros (hf wo') "(%Hatkey'&%Hkew&%Hval&%Hle&Hk&#Hobs')".
     iMod "Hclose". iModIntro. iApply "HΦ".
     iExists _, _. by iFrame "#∗".
   Qed.

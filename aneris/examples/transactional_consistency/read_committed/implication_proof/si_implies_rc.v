@@ -29,13 +29,13 @@ Section Implication.
       OwnLocalKey k c vo :=  ((∃ wo h, ⌜vo = None⌝ ∗ ⌜(∃ v, wo = Some v ∧ v ∈ h) ∨ wo = None⌝ ∗
                               SI.(snapshot_isolation.specs.resources.Seen) k h ∗
                               SI.(snapshot_isolation.specs.resources.KeyUpdStatus) c k false ∗
-                              SI.(snapshot_isolation.specs.resources.OwnLocalKey) k c wo) ∨ 
+                              SI.(snapshot_isolation.specs.resources.OwnLocalKey) k c wo) ∨
                              (⌜vo ≠ None⌝ ∗
                               SI.(snapshot_isolation.specs.resources.KeyUpdStatus) c k true ∗
                               SI.(snapshot_isolation.specs.resources.OwnLocalKey) k c vo))%I;
-      ConnectionState c sa st := ((⌜st = CanStart⌝ ∗ 
-                                   SI.(snapshot_isolation.specs.resources.ConnectionState) c sa (snapshot_isolation.specs.aux_defs.CanStart)) ∨  
-                                  (∃ (m : gmap Key Hist), ⌜st = Active (dom m)⌝ ∗ 
+      ConnectionState c sa st := ((⌜st = CanStart⌝ ∗
+                                   SI.(snapshot_isolation.specs.resources.ConnectionState) c sa (snapshot_isolation.specs.aux_defs.CanStart)) ∨
+                                  (∃ (m : gmap Key Hist), ⌜st = Active (dom m)⌝ ∗
                                    SI.(snapshot_isolation.specs.resources.ConnectionState) c sa (snapshot_isolation.specs.aux_defs.Active m)))%I;
       IsConnected c sa := SI.(snapshot_isolation.specs.resources.IsConnected) c sa;
       KVS_rc := SI.(snapshot_isolation.specs.resources.KVS_si);
@@ -45,7 +45,7 @@ Section Implication.
       extract c := SI.(snapshot_isolation.specs.resources.extract) c;
     |}.
   Next Obligation.
-    iIntros (SI k cst v) "[[%V [%h (%Hfalse & _)]] | (%Hneq & Hupd & Hkey)]"; first done. 
+    iIntros (SI k cst v) "[[%V [%h (%Hfalse & _)]] | (%Hneq & Hupd & Hkey)]"; first done.
     iDestruct (SI.(snapshot_isolation.specs.resources.OwnLocalKey_serializable) with "Hkey") as "(Hkey & Hser)".
     iFrame.
     iRight.
@@ -84,7 +84,7 @@ Section Implication.
   Next Obligation.
     simpl.
     iIntros (SI sa c) "Hconn".
-    iApply (SI.(snapshot_isolation.specs.resources.Extraction_of_address) 
+    iApply (SI.(snapshot_isolation.specs.resources.Extraction_of_address)
       with "[$Hconn]").
   Qed.
   Next Obligation.
@@ -94,9 +94,9 @@ Section Implication.
   Qed.
 
   Lemma rewrite_maps_1 `{SI : !SI_resources Mdl Σ} (m : gmap Key Vals) :
-    ([∗ map] k↦V ∈ m, ∃ h : Hist, ⌜∀ v : val, v ∈ h ↔ v ∈ V⌝ ∗ 
+    ([∗ map] k↦V ∈ m, ∃ h : Hist, ⌜∀ v : val, v ∈ h ↔ v ∈ V⌝ ∗
       snapshot_isolation.specs.resources.OwnMemKey k h) -∗
-    (∃ (m' : gmap Key Hist), ⌜dom m = dom m'⌝ ∗ 
+    (∃ (m' : gmap Key Hist), ⌜dom m = dom m'⌝ ∗
       ⌜∀ (k : Key) (h : Hist) (V : Vals), (m' !! k = Some h ∧ m !! k = Some V) → (∀ (v : val), v ∈ h ↔ v ∈ V)⌝ ∗
       ([∗ map] k↦h ∈ m', snapshot_isolation.specs.resources.OwnMemKey k h)).
   Proof.
@@ -137,11 +137,11 @@ Section Implication.
   Qed.
 
   Lemma rewrite_maps_2 `{SI : !SI_resources Mdl Σ} (mc : gmap Key (option val)) (c : val) :
-    ([∗ map] k↦vo ∈ mc, 
-      (∃ (wo : option val) (h : Hist), ⌜vo = None⌝ ∗ ⌜(∃ v : val, wo = Some v ∧ v ∈ h) ∨ wo = None⌝ ∗ 
-      snapshot_isolation.specs.resources.Seen k h ∗ KeyUpdStatus c k false ∗ 
-      snapshot_isolation.specs.resources.OwnLocalKey k c wo) ∨ 
-      ⌜vo ≠ None⌝ ∗ KeyUpdStatus c k true ∗ 
+    ([∗ map] k↦vo ∈ mc,
+      (∃ (wo : option val) (h : Hist), ⌜vo = None⌝ ∗ ⌜(∃ v : val, wo = Some v ∧ v ∈ h) ∨ wo = None⌝ ∗
+      snapshot_isolation.specs.resources.Seen k h ∗ KeyUpdStatus c k false ∗
+      snapshot_isolation.specs.resources.OwnLocalKey k c wo) ∨
+      ⌜vo ≠ None⌝ ∗ KeyUpdStatus c k true ∗
       snapshot_isolation.specs.resources.OwnLocalKey k c vo) -∗
     (∃ (mc' : gmap Key (option val * bool)), ⌜dom mc = dom mc'⌝ ∗
       ⌜∀ (k : Key) (v : val), (mc' !! k = Some (Some v, true) ↔ mc !! k = Some (Some v))⌝ ∗
@@ -204,7 +204,7 @@ Section Implication.
   Qed.
 
   Lemma rewrite_maps_3 `{SI : !SI_resources Mdl Σ} (m : gmap Key Vals) (m' : gmap Key Hist) :
-    dom m = dom m' → 
+    dom m = dom m' →
     (∀ (k : Key) (h : Hist) (V : Vals), m' !! k = Some h ∧ m !! k = Some V → ∀ v : val, v ∈ h ↔ v ∈ V) →
     ([∗ map] k↦h ∈ m', snapshot_isolation.specs.resources.OwnMemKey k h) -∗
     ([∗ map] k↦V ∈ m, ∃ h : Hist, ⌜∀ v : val, v ∈ h ↔ v ∈ V⌝ ∗ snapshot_isolation.specs.resources.OwnMemKey k h).
@@ -249,17 +249,17 @@ Section Implication.
             rewrite lookup_delete_ne in Heq2; done.
   Qed.
 
-  Theorem implication_si_rc : 
+  Theorem implication_si_rc :
     SI_init → RC_init.
   Proof.
     intro SI_init.
     destruct SI_init.
     split.
     iIntros (E cli Hsub).
-    iMod (SI_init_module E cli Hsub) as 
+    iMod (SI_init_module E cli Hsub) as
       "[%Hres (Hsi_keys & Hsi_kvs_init & #Hsi_inv & Hsi_conn & #Hsi_init_kvs
        & #Hsi_init_cli & #Hsi_read & #Hsi_write & #Hsi_start & #Hsi_com)]".
-    iModIntro. 
+    iModIntro.
     iExists (RC_resources_instance Hres).
     simpl.
     iSplitL "Hsi_keys".
@@ -290,8 +290,8 @@ Section Implication.
       by iPureIntro.
     }
     iSplitL.
-    { 
-      iClear "Hsi_com Hsi_start Hsi_write Hsi_init_cli Hsi_init_kvs". 
+    {
+      iClear "Hsi_com Hsi_start Hsi_write Hsi_init_cli Hsi_init_kvs".
       unfold read_spec.
       iModIntro.
       iIntros (c sa E' k) "%Hsub' Hk_in Hconn".
@@ -301,20 +301,20 @@ Section Implication.
       iModIntro.
       iIntros "Hhyp".
       iApply "Hsi_read''".
+      iNext.
       iMod "Hhyp" as "[%vo [%V ((Hloc_key & Hkey) & Hhyp_later)]]".
       simpl.
       iDestruct "Hkey" as "[%h (%Hbi & Hkey)]".
-      iDestruct "Hloc_key" as "[[%wo [%h' (%Heq & %Hdisj & #Hseen & Hupd & Hloc_key)]] | 
+      iDestruct "Hloc_key" as "[[%wo [%h' (%Heq & %Hdisj & #Hseen & Hupd & Hloc_key)]] |
                                          (%Hneq & Hupd & Hloc_key)]".
       - iMod (snapshot_isolation.specs.resources.Seen_valid with "[$Hsi_inv][$Hkey $Hseen]") as "(Hkey & %Hsub_seen)"; first done.
         iModIntro.
-        iExists wo. 
+        iExists wo.
         iSplitL "Hloc_key"; first by iFrame.
-        iNext.
         iIntros "Hloc_key".
         iApply "Hhyp_later".
         iSplitL "Hupd Hloc_key".
-        + iLeft. 
+        + iLeft.
           iExists wo, h'.
           iSplitR; first by iPureIntro.
           iSplitR; first by iPureIntro.
@@ -335,7 +335,6 @@ Section Implication.
       - iModIntro.
         iExists vo.
         iSplitL "Hloc_key"; first by iFrame.
-        iNext.
         iIntros "Hloc_key".
         iApply "Hhyp_later".
         iSplitL "Hupd Hloc_key".
@@ -351,7 +350,7 @@ Section Implication.
     }
     iSplitL.
     {
-      iClear "Hsi_com Hsi_start Hsi_read Hsi_init_cli Hsi_init_kvs". 
+      iClear "Hsi_com Hsi_start Hsi_read Hsi_init_cli Hsi_init_kvs".
       unfold write_spec.
       iModIntro.
       iIntros (c sa E' k v) "%Hsub' Hk_in Hconn".
@@ -362,11 +361,11 @@ Section Implication.
       iIntros "Hhyp".
       iApply "Hsi_write''".
       simpl.
+      iNext.
       iMod "Hhyp" as "[%vo ([[%wo [%h (%Heq & %Hdisj & #Hseen & Hupd & Hloc_key)]] | (%Hneq & Hupd & Hloc_key)] & Hhyp_later)]".
       - iModIntro.
         iExists wo, false.
         iSplitL "Hloc_key Hupd"; first by iFrame.
-        iNext.
         iIntros "(Hloc_key & Hupd)".
         iApply "Hhyp_later".
         iRight.
@@ -375,16 +374,15 @@ Section Implication.
       - iModIntro.
         iExists vo, true.
         iSplitL "Hloc_key Hupd"; first by iFrame.
-        iNext.
         iIntros "(Hloc_key & Hupd)".
         iApply "Hhyp_later".
         iRight.
         iFrame.
         by iPureIntro.
-    } 
+    }
     iSplitL.
     {
-      iClear "Hsi_com Hsi_read Hsi_write Hsi_init_cli Hsi_init_kvs". 
+      iClear "Hsi_com Hsi_read Hsi_write Hsi_init_cli Hsi_init_kvs".
       unfold start_spec.
       iModIntro.
       iIntros (c sa E') "%Hsub' Hconn".
@@ -394,6 +392,7 @@ Section Implication.
       iModIntro.
       iIntros "Hhyp".
       iApply "Hsi_start''".
+      iNext.
       iMod "Hhyp" as "[%m ((Hstate & Hmem_keys) & Hhyp_later)]".
       iModIntro.
       simpl.
@@ -401,7 +400,6 @@ Section Implication.
       iDestruct (rewrite_maps_1 with "[$Hmem_keys]") as "[%m' (%Hdom & %Himp & Hmem_keys)]".
       iExists m'.
       iSplitL "Hstate Hmem_keys"; first iFrame.
-      iNext. 
       iIntros "(Hstate & Hmem_keys & Hloc_keys & Hseen_keys)".
       iApply "Hhyp_later".
       iSplitL "Hstate".
@@ -430,7 +428,7 @@ Section Implication.
           split; first done.
           by apply last_Some_elem_of.
     }
-    iClear "Hsi_read Hsi_start Hsi_write Hsi_init_cli Hsi_init_kvs". 
+    iClear "Hsi_read Hsi_start Hsi_write Hsi_init_cli Hsi_init_kvs".
     unfold commit_spec.
     iModIntro.
     iIntros (c sa E') "%Hsub' Hconn".
@@ -440,6 +438,7 @@ Section Implication.
     iModIntro.
     iIntros "Hhyp".
     iApply "Hsi_com''".
+    iNext.
     iMod "Hhyp" as "[%s [%mc [%m ((Hstate & %Hdom1 & %Hdom2 & Hloc_keys & Hmem_keys) & Hhyp_later)]]]".
     iModIntro.
     iDestruct "Hstate" as "[(%Hfalse & _)|[%ms (%Heq_active & Hstate)]]"; first done.
@@ -453,7 +452,6 @@ Section Implication.
       inversion Heq_active as [Heq].
       split; set_solver.
     }
-    iNext.
     iIntros (b) "(Hstate & Hdisj)".
     iApply "Hhyp_later".
     iSplitL "Hstate".
@@ -508,7 +506,7 @@ Section Implication.
           destruct o eqn:Ho.
           -- destruct b eqn:Hb.
              ++ iExists (h ++ [v]).
-                iFrame. 
+                iFrame.
                 iPureIntro.
                 intro v'.
                 destruct ov eqn:Hov.
@@ -519,7 +517,7 @@ Section Implication.
                    {
                      apply (Himp k).
                      split; last done.
-                     apply lookup_insert. 
+                     apply lookup_insert.
                    }
                    set_solver.
                 ** rewrite (Hbi k v) in Hlookup_mc'.
@@ -535,10 +533,10 @@ Section Implication.
                    inversion Hlookup_mc'.
                 ** apply (Himp k).
                    split; last done.
-                   apply lookup_insert. 
+                   apply lookup_insert.
           -- iExists h.
              iFrame.
-             iPureIntro. 
+             iPureIntro.
              intro v'.
              destruct ov eqn:Hov.
                 ++ rewrite -(Hbi k v) in Hlookup_mc.

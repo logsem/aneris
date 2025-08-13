@@ -65,7 +65,7 @@ Section proof_of_code.
     iFrame.
     iSplitL "x_hx y_hy";
         first by repeat (iApply big_sepM_insert; first done; iFrame).
-    iIntros "!>(Active & mem & cache & _)".
+    iIntros "(Active & mem & cache & _)".
     iPoseProof (big_sepM_insert with "mem") as "(x_hx & mem)"; first done.
     iPoseProof (big_sepM_insert with "mem") as "(y_hy & _)"; first done.
     iMod ("close" with "[x_hx y_hy Hinv]") as "_".
@@ -78,7 +78,6 @@ Section proof_of_code.
     iModIntro.
     iExists _, _.
     iFrame.
-    iNext.
     iIntros "(x_1 & x_upd)".
     iModIntro.
     wp_pures.
@@ -95,7 +94,7 @@ Section proof_of_code.
       by iSplitL "x_hx' y_hy'";
         repeat (iApply big_sepM_insert; first done; iFrame).
     }
-    iIntros "!>(CanStart & [(_ & mem)|(_ & mem)])".
+    iIntros "(CanStart & [(_ & mem)|(_ & mem)])".
     {
       iPoseProof (big_sepM2_insert with "mem") as "((x_1 & _) & mem)";
         [done..|].
@@ -131,11 +130,12 @@ Section proof_of_code.
     [solve_ndisj|set_solver|iFrame "#"|..].
     {
       iModIntro.
+      iNext.
       iInv "inv" as ">(%hx & %hy & x_hx & y_hy & %Hinv)" "close".
       iModIntro.
       iExists hx.
       iFrame.
-      iIntros "!>x_hx".
+      iIntros "x_hx".
       iMod ("close" with "[x_hx y_hy]") as "_"; last done.
       iNext.
       iExists hx, hy.
@@ -162,7 +162,7 @@ Section proof_of_code.
     iExists {[ "y" := hy ]}.
     iFrame.
     iSplitL "y_hy"; first by iApply big_sepM_singleton.
-    iIntros "!>(Active & kvs & cache & _)".
+    iIntros "(Active & kvs & cache & _)".
     iPoseProof (big_sepM_delete _ _ "y" hy with "kvs") as "(y_hy & _)";
       first done.
     iMod ("close" with "[x_hx y_hy]") as "_".
@@ -180,7 +180,6 @@ Section proof_of_code.
     iModIntro.
     iExists _, _.
     iFrame.
-    iNext.
     iIntros "(y_1 & y_upd)".
     iModIntro.
     wp_pures.
@@ -203,7 +202,7 @@ Section proof_of_code.
       by iSplitL "y_hy'";
         repeat (iApply big_sepM_insert; first done; iFrame).
     }
-    iIntros "!>(CanStart & [(_ & mem)|(_ & mem)])".
+    iIntros "(CanStart & [(_ & mem)|(_ & mem)])".
     {
       iPoseProof (big_sepM2_insert with "mem") as "((y_1 & _) & _)";
         [done..|].
@@ -234,11 +233,12 @@ Section proof_of_code.
     [solve_ndisj|set_solver|iFrame "#"|..].
     {
       iModIntro.
+      iNext.
       iInv "inv" as ">(%hx & %hy & x_hx & y_hy & %Hinv)" "close".
       iModIntro.
       iExists hy.
       iFrame.
-      iIntros "!>y_hy".
+      iIntros "y_hy".
       iMod ("close" with "[x_hx y_hy]") as "_"; last done.
       iNext.
       iExists hx, hy.
@@ -265,7 +265,7 @@ Section proof_of_code.
     iExists {[ "x" := hx ]}.
     iFrame.
     iSplitL "x_hx"; first by iApply big_sepM_singleton.
-    iIntros "!>(Active & kvs & cache & _)".
+    iIntros "(Active & kvs & cache & _)".
     iPoseProof (big_sepM_delete _ _ "x" hx with "kvs") as "(x_hx & _)";
       first done.
     iMod ("close" with "[x_hx y_hy]") as "_".
@@ -283,7 +283,6 @@ Section proof_of_code.
     iModIntro.
     iExists _.
     iFrame.
-    iNext.
     iIntros "x_hx".
     iModIntro.
     wp_pures.
@@ -308,7 +307,7 @@ Section proof_of_code.
       by iSplitL "x_hx'";
         repeat (iApply big_sepM_insert; first done; iFrame).
     }
-    iIntros "!>(CanStart & [(_ & mem)|(_ & mem)])".
+    iIntros "(CanStart & [(_ & mem)|(_ & mem)])".
     {
       iPoseProof (big_sepM2_insert with "mem") as "((x_hx' & _) & _)";
         [done..|].
@@ -543,4 +542,4 @@ Proof.
   do 3 (rewrite big_sepS_union; [|set_solver];
   rewrite !big_sepS_singleton;
   iDestruct "Hips" as "[Hips ?]"; iFrame).
-Qed. 
+Qed.

@@ -84,7 +84,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ}.
     rewrite big_sepM_empty.
     iSplitL "Hy Hx".
     { iFrame. }
-    iNext. iIntros "(Hcstate & [Hkx [Hky _]] & [Hcx [Hcy _]] & _)".
+    iIntros "(Hcstate & [Hkx [Hky _]] & [Hcx [Hcy _]] & _)".
     iMod ("HClose" with "[Hkx Hky]") as "_".
     { iNext. iExists h. iFrame. }
     iModIntro. wp_pures.
@@ -92,7 +92,6 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ}.
     iModIntro.
     iExists _, _.
     iFrame.
-    iNext.
     iIntros "Hcx".
     iModIntro.
     wp_pures.
@@ -100,7 +99,6 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ}.
     iModIntro.
     iExists _, _.
     iFrame.
-    iNext.
     iIntros "Hcy".
     iModIntro.
     wp_pures.
@@ -115,7 +113,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ}.
         try iPureIntro; try set_solver.
         rewrite !big_sepM_insert; try set_solver.
         rewrite !big_sepM_empty. iFrame.
-      - iNext. iIntros "[_ [[_ HBig] | [_ HBig]]]".
+      - iIntros "[_ [[_ HBig] | [_ HBig]]]".
           + iMod ("HClose" with "[HBig]") as "_".
             * iNext. iExists _.
               rewrite !(big_sepM2_insert); try set_solver.
@@ -155,7 +153,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ}.
     rewrite big_sepM_empty.
     iSplitL "Hy Hx".
     { iFrame. }
-    iNext. iIntros "(Hcstate & [Hkx [Hky _]] & [Hcx [Hcy _]] & _)".
+    iIntros "(Hcstate & [Hkx [Hky _]] & [Hcx [Hcy _]] & _)".
     iMod ("HClose" with "[Hkx Hky]") as "_".
     { iNext. iExists h. iFrame. }
     iModIntro. wp_pures.
@@ -163,7 +161,6 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ}.
     iModIntro.
     iExists _, _.
     iFrame.
-    iNext.
     iIntros "Hcx".
     iModIntro.
     wp_pures.
@@ -171,7 +168,6 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ}.
     iModIntro.
     iExists _, _.
     iFrame.
-    iNext.
     iIntros "Hcy".
     iModIntro.
     wp_pures.
@@ -186,7 +182,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ}.
         try iPureIntro; try set_solver.
         rewrite !big_sepM_insert; try set_solver.
         rewrite !big_sepM_empty. iFrame.
-      - iNext. iIntros "[_ [[_ HBig] | [_ HBig]]]".
+      - iIntros "[_ [[_ HBig] | [_ HBig]]]".
           + iMod ("HClose" with "[HBig]") as "_".
             * iNext. iExists _.
               rewrite !(big_sepM2_insert); try set_solver.
@@ -225,7 +221,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ}.
     rewrite big_sepM_empty.
     iSplitL "Hy Hx".
     { iFrame. }
-    iNext. iIntros "(Hcstate & [Hkx [Hky _]] & [[Hcx Hsx] [[Hcy Hsy] _]] & _)".
+    iIntros "(Hcstate & [Hkx [Hky _]] & [[Hcx Hsx] [[Hcy Hsy] _]] & _)".
     iMod ("HClose" with "[Hkx Hky]") as "_".
     { iNext. iExists h. iFrame. }
     iModIntro. wp_pures.
@@ -233,7 +229,6 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ}.
     iModIntro.
     iExists _.
     iFrame.
-    iNext.
     iIntros "Hcx".
     iModIntro.
     wp_pures.
@@ -241,7 +236,6 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ}.
     iModIntro.
     iExists _.
     iFrame.
-    iNext.
     iIntros "Hcy".
     iModIntro.
     wp_pures.
@@ -258,7 +252,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ}.
           try iPureIntro; try set_solver.
           rewrite !big_sepM_insert; try set_solver.
           rewrite !big_sepM_empty. iFrame.
-        + iNext. iIntros "[_ [[_ HBig] | [_ HBig]]]".
+        + iIntros "[_ [[_ HBig] | [_ HBig]]]".
             * iMod ("HClose" with "[HBig]") as "_".
               -- iNext. iExists _.
                 rewrite !(big_sepM2_insert); try set_solver.
@@ -280,7 +274,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ}.
           try iPureIntro; try set_solver.
           rewrite !big_sepM_insert; try set_solver.
           rewrite !big_sepM_empty. iFrame.
-        + iNext. iIntros "[_ [[_ HBig] | [_ HBig]]]".
+        + iIntros "[_ [[_ HBig] | [_ HBig]]]".
           * iMod ("HClose" with "[HBig]") as "_".
             -- iNext. iExists _.
               rewrite !(big_sepM2_insert); try set_solver.

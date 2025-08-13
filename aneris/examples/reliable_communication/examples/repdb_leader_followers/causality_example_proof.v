@@ -113,7 +113,6 @@ Section proof_of_code.
     iModIntro.
     iExists ([] ++ h ++ [a]), None.
     iFrame "#∗". iSplit; [done|].
-    iNext.
     iIntros (h'' a').
     iDestruct 1 as (Hatkey''' Hkey' Hval' Hle) "[Hy #Hobs'']".
     iMod (OwnMemKey_some_obs_frame with "HGinv [$Hx Hobs'']")
