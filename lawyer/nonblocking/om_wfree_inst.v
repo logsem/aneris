@@ -32,3 +32,21 @@ Notation "'l0'" := (l_wfr) : WFR_scope.
 Notation "'Degree'" := (WF_Degree) : WFR_scope.
 Notation "'Level'" := (WF_Level) : WFR_scope.
 
+
+
+From trillium.program_logic Require Import weakestpre. 
+From heap_lang Require Import heap_lang_defs lang notation.
+From lawyer.obligations Require Import obligations_resources.
+
+(* TODO: support invariants in precondition *)
+(* TODO: relax to non-trivial degrees *)
+(* TODO: remove phases? *)
+Record WaitFreeSpec (m: val) := {
+  wfs_F: nat;
+  wfs_spec:
+  forall {M: Model} {EM: ExecutionModel heap_lang M} Σ {OHE: OM_HL_Env OP_HL_WF EM Σ}
+    τ π q (a: val),
+    {{{ cp_mul π d_wfr0 wfs_F ∗ th_phase_frag τ π q }}}
+      App m a @ τ
+    {{{ v, RET v; th_phase_frag τ π q }}}
+}. 

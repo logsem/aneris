@@ -39,18 +39,6 @@ Section CallInTrace.
 End CallInTrace.
 
 
-(* TODO: support invariants in precondition *)
-(* TODO: relax to non-trivial degrees *)
-(* TODO: remove phases? *)
-Definition wait_free_spec (m: val) :=
-  exists N,
-  forall {M EM} Σ {OHE: OM_HL_Env OP_HL_WF EM Σ}
-    τ π q (a: val),
-    let _ := @IEM_irisG _ M HeapLangEM EM Σ _ in
-    {{{ cp_mul π d_wfr0 N ∗ th_phase_frag τ π q }}}
-      m a @ τ
-    {{{ v, RET v; th_phase_frag τ π q }}}.
-
 
 Section WFAdequacy.
 
