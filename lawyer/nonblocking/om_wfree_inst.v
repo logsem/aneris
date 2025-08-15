@@ -6,7 +6,7 @@ From lawyer.obligations Require Import env_helpers obligations_model .
 
 Definition WF_Degree := bounded_nat 2.
 Definition WF_Level := unit.
-Definition WF_SB := 1.
+Definition WF_SB := 2.
 
 Instance OPP_WF: ObligationsParamsPre WF_Degree WF_Level WF_SB.
 esplit; try by apply _.
