@@ -1379,7 +1379,30 @@ Section WaitFreePR.
           destruct decide as [-> | ?]; done. }
 
         destruct (decide (sf = Some τi)) as [-> | NO].
-        * simpl. symmetry in Heqsf.   
+        * simpl. symmetry in Heqsf.
+          rewrite decide_True //.
+          iDestruct "MOD" as "(% & -> & SGN & #EP)".
+          iDestruct "MOD'" as "(% & PHτi & OB & OBτi)". 
+          rewrite subseteq_empty_difference_L.
+          2: { (* !!! need to get rid of Top here *)
+            admit. }
+          rewrite subseteq_intersection_1_L.
+          2: admit.
+
+          iSpecialize ("OBLS" with "[$] [SGN OBτi] []").
+          { rewrite /obls_τi'. rewrite decide_True.
+            { iFrame "#∗". }
+            apply locale_step_step_fork_exact in STEP. rewrite STEP.
+            rewrite -FIN Heqsf. set_solver. }
+          { iIntros (? (?&?)). congruence. }
+          iFrame "OBLS".
+
+          iDestruct ("PHS" with "[$PHτi]") as "[PHS PHτi]".
+          iFrame "PHS". 
+          
+            
+               
+          
         
         
         (* pr is reestablished differently depending on whether we reach ii.
