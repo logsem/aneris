@@ -1310,8 +1310,20 @@ Section WaitFreePR.
             2: { eapply locale_step_fork_Some in STEP; eauto. tauto. }
             iMod (OU_create_sig with "[$]") as "(%sg & SGN & OB & _)".
             { rewrite /WF_SB. lia. }
-            iMod (create_ep_upd with "[$]"
-          - 
+            iDestruct (sgn_get_ex with "[$]") as "(SGN & #SGN0)". 
+            iMod (create_ep_upd with "[OBτi] SGN0") as "(#EP & _)".
+            { apply (orders_lib.ith_bn_lt 2 0 1). lia. }
+            { iFrame. }
+            iModIntro. iExists _. rewrite decide_True; [| done].
+            iFrame. iSplit; [iPureIntro; set_solver| ].
+            iApply "EP". 
+          - iModIntro. iFrame. rewrite (@decide_False _ (_ = _)); [| congruence].
+            iSplit; [done| ].
+            (* TODO: refactor *)
+            rewrite /obls_τi'.
+            apply locale_step_step_fork_exact in STEP. rewrite STEP.
+            erewrite decide_ext; [by iFrame| ].
+            rewrite -Heqsf. simpl. set_solver. }
 
         iMod "STEP". iModIntro.
         iMod "STEP". iModIntro. iNext. 
@@ -1320,13 +1332,13 @@ Section WaitFreePR.
         iIntros "STEP".
         iMod "STEP" as (δ' ℓ) "(HSI & He2 & WPS' & MOD) /=".
 
-        iDestruct "MOD" as (π') "(PH & OB & MOD')".
+        iDestruct "MOD" as (π' R) "(PH & MOD & MOD')".
 
         iAssert (@state_interp _ M _ _ (etr :tr[ Some τ ]: (t1 ++ e' :: t2 ++ efs, σ')) _)%I with "[HSI]" as "TI".
         { simpl. iDestruct "HSI" as "(?&?&?)". iFrame. }
 
-        iSpecialize ("OBLS" with "[$]").
         iSpecialize ("PHS" with "[$PH]"). 
+        (* iSpecialize ("OBLS" with "[$]"). *)
 
         iModIntro.
         do 2 iExists _.
