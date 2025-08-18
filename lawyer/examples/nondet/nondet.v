@@ -261,7 +261,7 @@ Section Nondet.
     pose proof (@create_ep_upd) as C.
     specialize C with (oGS := ohe_oGS (OP := OP) (OM_HL_Env := OHE)).
 
-    iMod (create_ep_upd with "CPS1' SGN0 PH") as "(#EP & _ & PH)".
+    iMod (create_ep_upd with "CPS1' SGN0") as "(#EP & _)".
     { apply DEG01. }
     { unfold nondet_LS_LB in LS_LB. lia. }
     BOU_burn_cp. iApply wp_value.

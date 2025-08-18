@@ -832,8 +832,7 @@ Section Termination.
     destruct (ps_obls δ1 !! τ) as [obs |] eqn:OBLS; [| done].
     destruct STEP as [[τs STEP] | STEP0].
     2: { inv_loc_step0 STEP0; destruct δ1; subst; simpl in *.
-         - red. simpl. rewrite OBLS. set_solver.
-         - red. simpl. rewrite OBLS. set_solver. }
+         all: red; simpl; rewrite OBLS; set_solver. }
     
     destruct (decide (τs = τ)) as [-> | ?].
     2: { left.

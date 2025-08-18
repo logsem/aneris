@@ -417,10 +417,10 @@ Section MotivatingClient.
       { try_solve_bounds. use_rfl_fl_sb. }
       iApply OU_BOU.
 
-      iApply (OU_wand with "[-CPSm' PH]").
-      2: { iApply (@create_ep_upd with "[$] [$] [$]").
+      iApply (OU_wand with "[-CPSm']").
+      2: { iApply (@create_ep_upd with "[$] [$]").
            apply LThm. } (* TODO: rename that hypothesis *)
-      iIntros "(EPf & _ & PH)".
+      iIntros "(EPf & _)".
       
       BOU_burn_cp.
 

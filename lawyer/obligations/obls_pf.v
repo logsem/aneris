@@ -8,11 +8,11 @@ From stdpp Require Import relations.
 
 
 Ltac inv_loc_step_of_no_exp STEP :=
-  destruct STEP as [T|[T|[T|T]]];
+  destruct STEP as [T|[T|T]];
   [destruct T as (?π&?d&T) |
     destruct T as (?l&T) |
-    destruct T as (?s&T) |
-    destruct T as (?s&?π&?d&?d'&T)
+    destruct T as (?s&T)
+    (* destruct T as (?s&?π&?d&?d'&T) *)
   ];
   inversion T; subst. 
 
@@ -26,8 +26,9 @@ Section PhaseFuel.
   Definition loc_step_of_no_exp δ1 τ δ2 :=
     (exists π δ, burns_cp δ1 τ δ2 π δ) \/
     (exists l, creates_signal δ1 τ δ2 l) \/
-    (exists s, sets_signal δ1 τ δ2 s) \/
-    (exists s π δ δ', creates_ep δ1 τ δ2 s π δ δ')
+    (exists s, sets_signal δ1 τ δ2 s)
+    (* \/ *)
+    (* (exists s π δ δ', creates_ep δ1 τ δ2 s π δ δ') *)
   .
 
   Definition loc_step_with_no_exp δ1 τ δ2 :=
@@ -37,7 +38,7 @@ Section PhaseFuel.
     (STEP: loc_step_of_no_exp δ1 τ δ2):
     loc_step_of δ1 τ δ2.
   Proof using.
-    destruct STEP as [?|[?|[?|?]]]; red; eauto.
+    destruct STEP as [?|[?|?]]; red; eauto.
   Qed.
   
   Lemma loc_step_with_split δ1 τ δ2:
@@ -47,13 +48,13 @@ Section PhaseFuel.
     rewrite /loc_step_with_no_exp. split.
     - intros [T|T]; [inv_loc_step_of T| ].
       all: try by left; left; red; eauto.
-      + left; left; red; eauto. set_solver.
+      (* + left; left; red; eauto. set_solver. *)
       + by eauto. 
       + by eauto. 
     - intros [[T|?]|?]; red; eauto.
       2: { left. red. eauto. }
       left. red.
-      destruct T as [?|[?|[?|?]]]; eauto.      
+      destruct T as [?|[?|?]]; eauto.      
   Qed.
     
   Context (tr: obls_trace).
@@ -169,8 +170,8 @@ Section PhaseFuel.
     + apply ms_le_exp_mono; [lia | reflexivity].
   Qed.
   
-  Lemma create_ep_ms_le δ1 τ δ2 k s π d d'
-    (CREATE: creates_ep δ1 τ δ2 s π d d'):
+  Lemma create_ep_ms_le δ1 δ2 k s π d d'
+    (CREATE: creates_ep δ1 δ2 s π d d'):
     ms_le deg_le (PF' (S k) δ2) (PF' k δ1).
   Proof using.
     clear -CREATE OM.
@@ -220,7 +221,8 @@ Section PhaseFuel.
   Proof using.
     clear -STEP OM.
     inv_loc_step0 STEP. 
-    - eapply exchange_cp_ms_le; eauto. 
+    - eapply exchange_cp_ms_le; eauto.
+    - eapply create_ep_ms_le; eauto.
     - inversion T; subst. destruct δ1. simpl.
       apply ms_le_disj_union; [apply _| ..].
       + apply ms_le_sub. apply mset_map_sub. mss. 
@@ -246,8 +248,8 @@ Section PhaseFuel.
       apply ms_le_disj_union; [apply _| ..].
       + apply ms_le_sub. apply mset_map_sub. mss. 
       + apply ms_le_exp_mono; [lia | reflexivity].
-    - eapply create_ep_ms_le; eauto.
     - apply loc_step0_ms_le. red. left. eauto. 
+    - eapply create_ep_ms_le; eauto.
     - apply loc_step0_ms_le. red. eauto. 
   Qed.
   

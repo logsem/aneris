@@ -145,17 +145,17 @@ Section Model.
     let new_ps := update_obls new_obls $ update_sigs new_sigs ps in
     sets_signal ps θ new_ps s.
 
-  Inductive creates_ep: PS -> Locale -> PS -> SignalId -> Phase -> Degree -> Degree -> Prop :=
-  | cep_step ps θ s π π__max δ δ'
+  Inductive creates_ep: PS (* -> Locale *) -> PS -> SignalId -> Phase -> Degree -> Degree -> Prop :=
+  | cep_step ps (* θ *) s π (* π__max *) δ δ'
       (SIG: s ∈ dom (ps_sigs ps))      
-      (LOC_PHASE: ps_phases ps !! θ = Some π__max)
-      (LE: phase_le π π__max)
+      (* (LOC_PHASE: ps_phases ps !! θ = Some π__max) *)
+      (* (LE: phase_le π π__max) *)
       (CP: (π, δ) ∈ ps_cps ps)
       (DEG_LE: deg_lt δ' δ):
     let new_cps := ps_cps ps ∖ {[+ (π, δ) +]} in
     let new_eps := ps_eps ps ∪ {[ (s, π, δ') ]} in
     let new_ps := update_eps new_eps $ update_cps new_cps ps in
-    creates_ep ps θ new_ps s π δ δ'.
+    creates_ep ps new_ps s π δ δ'.
 
   Inductive expects_ep: PS -> Locale -> PS -> SignalId -> Phase -> Degree -> Prop :=
   | eep_step ps θ s π π__max δ l
@@ -192,12 +192,12 @@ Section Model.
     (exists π δ, burns_cp ps1 θ ps2 π δ) \/
     (exists l, creates_signal ps1 θ ps2 l) \/
     (exists s, sets_signal ps1 θ ps2 s) \/
-    (exists s π δ δ', creates_ep ps1 θ ps2 s π δ δ') \/
     (exists s π δ, expects_ep ps1 θ ps2 s π δ).
 
   (** small steps that don't depend on any thread *)
   Definition loc_step0 ps1 ps2 :=
     (exists π δ δ' n, exchanges_cp ps1 ps2 π δ δ' n) \/
+    (exists s π δ δ', creates_ep ps1 ps2 s π δ δ') \/
     (increases_eb ps1 ps2).
 
   Definition loc_step_ex ps1 ps2 :=
@@ -291,18 +291,19 @@ End Model.
 
 
 Ltac inv_loc_step_of STEP :=
-  destruct STEP as [T|[T|[T|[T|T]]]];
+  destruct STEP as [T|[T|[T|T]]];
   [destruct T as (?π&?d&T) |
     destruct T as (?l&T) |
     destruct T as (?s&T) |
-    destruct T as (?s&?π&?d&?d'&T) |
     destruct T as (?s&?π&?d&T)
   ];
   inversion T; subst. 
 
 Ltac inv_loc_step0 STEP :=
-  destruct STEP as [T|T];
-  [destruct T as (?π&?d&?d'&?n&T) | ];
+  destruct STEP as [T|[T|T]];
+  [destruct T as (?π&?d&?d'&?n&T) |
+    destruct T as (?s&?π&?d&?d'&T) |
+  ];
   inversion T; subst. 
 
 Ltac inv_loc_step_ex STEP :=

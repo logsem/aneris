@@ -192,7 +192,7 @@ Section Wf.
     do 2 red. intros δ1 δ2 PHASES_CORR STEP.
     inv_loc_step_ex STEP; destruct δ1; try done; simpl in *.
     - subst new_obls0. red. subst new_ps. simpl. set_solver. 
-    - subst new_obls0. simpl. red. set_solver. 
+    - subst new_obls0. simpl. red. set_solver.
   Qed.
 
   Lemma loc_step_asg_pres: preserved_by_loc_step_ex obls_assigned.
@@ -246,36 +246,6 @@ Section Wf.
     inv_loc_step_ex STEP; destruct δ1; try done; simpl in *.
   Qed.
 
-  Lemma loc_step_epb_pres': preserved_by_loc_step_ex 
-                                (fun δ => eps_phase_bound δ /\ dom_phases_disj δ).
-  Proof using.
-    do 2 red. intros δ1 δ2 [EPB DPD] STEP.
-    split.
-    2: { eapply loc_step_dpd_pres; eauto. } 
-
-    pose proof (@loc_step_phases_pres _ _ _ eq_refl ltac:(red; eauto)) as PH. 
-    
-    add_case (ps_eps δ2 ⊆ ps_eps δ1) EPS_LE.
-    { intros LE. red. intros (τ' & π & ep & PH2 & IN & LT).
-      eapply elem_of_subseteq in IN; eauto.
-      rewrite PH in PH2. 
-      edestruct EPB; eauto. set_solver. }
-    inv_loc_step_ex STEP; destruct δ1; try done; simpl in *.
-    red. intros (τ' & π' & ep & PH2 & IN & LT).
-    subst new_ps new_eps0. simpl in IN.
-    apply elem_of_union in IN as [IN | IN].
-    { edestruct EPB; eauto. set_solver. }
-    apply elem_of_singleton in IN as ->.
-    simpl in *.
-    assert (phase_lt π' π__max) as LE'.
-    { eapply strict_transitive_l; eauto. } 
-    pose proof LE' as LE''%strict_include. 
-    eapply phases_disj_not_le in LE''; eauto.
-    eapply DPD; eauto.
-    intros ->. rewrite LOC_PHASE in PH2. inversion PH2. subst.
-    apply strict_spec_alt in LE'. tauto. 
-  Qed.
-
   Lemma loc_step_cpb_pres': preserved_by_loc_step_ex
                                 (fun δ => cps_phase_bound δ /\ dom_phases_disj δ). 
   Proof using.
@@ -290,7 +260,6 @@ Section Wf.
       edestruct CPB; eauto. set_solver. }
     
     inv_loc_step_ex STEP; destruct δ1; try done; simpl in *.
-    - apply CPS_LE. multiset_solver.
     - apply CPS_LE. multiset_solver.
     - red. simpl. intros (τ' & π' & cp & PH2 & IN & LT).
       subst new_cps0. rewrite gmultiset_elem_of_disj_union in IN.
@@ -310,6 +279,38 @@ Section Wf.
       apply gmultiset_elem_of_scalar_mul in IN as [? IN].
       apply gmultiset_elem_of_singleton in IN as ->. simpl in *.
       edestruct CPB; eauto. set_solver.
+    - apply CPS_LE. multiset_solver.
+  Qed.
+
+  Lemma loc_step_epb_pres':
+    preserved_by_loc_step_ex (fun δ => eps_phase_bound δ /\ cps_phase_bound δ /\ dom_phases_disj δ).
+  Proof using.
+    do 2 red. intros δ1 δ2 (EPB & CPB & DPD) STEP.
+    split.
+    2: { eapply loc_step_cpb_pres'; eauto. } 
+
+    pose proof (@loc_step_phases_pres _ _ _ eq_refl ltac:(red; eauto)) as PH. 
+    
+    add_case (ps_eps δ2 ⊆ ps_eps δ1) EPS_LE.
+    { intros LE. red. intros (τ' & π & ep & PH2 & IN & LT).
+      eapply elem_of_subseteq in IN; eauto.
+      rewrite PH in PH2. 
+      edestruct EPB; eauto. set_solver. }
+    inv_loc_step_ex STEP; destruct δ1; try done; simpl in *.
+    red. intros (τ' & π' & ep & PH2 & IN & LT).
+    subst new_ps new_eps0. simpl in IN.
+    apply elem_of_union in IN as [IN | IN].
+    { edestruct EPB; eauto. set_solver. }
+    apply elem_of_singleton in IN as ->.
+    simpl in *.
+
+    (* assert (phase_lt π' π__max) as LE'. *)
+    (* { eapply strict_transitive_l; eauto. }  *)
+
+    (* move EPB at bottom. red in EPB. simpl in EPB.  *)
+
+    red in CPB. simpl in CPB. edestruct CPB.
+    do 3 eexists. eauto.
   Qed.
 
   Lemma loc_step_obls_sigs_pres: preserved_by_loc_step_ex obligations_are_signals.
@@ -333,8 +334,8 @@ Section Wf.
       subst cur_loc_obls0. set_solver.
   Qed. 
 
-  Lemma loc_step_obls_disj_pres': preserved_by_loc_step_ex
-                                      (fun δ => obls_disjoint δ /\ obligations_are_signals δ).
+  Lemma loc_step_obls_disj_pres': 
+    preserved_by_loc_step_ex (fun δ => obls_disjoint δ /\ obligations_are_signals δ).
   Proof using.
     do 2 red. intros δ1 δ2 [DPI OS] STEP.
     split.
@@ -389,7 +390,8 @@ Section Wf.
     - eapply loc_step_asg_pres; eauto. apply WF1.  
     - eapply loc_step_dpd_pres; eauto. apply WF1.
     - eapply loc_step_cpb_pres'; eauto. split; apply WF1.
-    - eapply loc_step_epb_pres'; eauto. split; apply WF1.
+    - eapply loc_step_epb_pres'; eauto.
+      split; [| split]; apply WF1.
     - eapply loc_step_obls_sigs_pres; eauto. apply WF1.
     - eapply loc_step_obls_disj_pres'; eauto. split; apply WF1.
   Qed.

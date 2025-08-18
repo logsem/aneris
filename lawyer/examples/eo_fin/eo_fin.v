@@ -340,12 +340,12 @@ Section EoFin.
         + MU_by_BOU. 
           (* TODO: avoid unfolding BOU *)
           rewrite /smap_repr_eo. 
-          iPoseProof (smap_create_ep' B__eo m with "[$] [$] [$]") as "OU"; eauto.
+          iPoseProof (smap_create_ep' B__eo m with "[$] [$]") as "OU"; eauto.
           { apply elem_of_set_seq. lia. } 
           { apply d12_lt. }
           iApply OU_BOU.
           iApply (OU_wand with "[-OU]"); [| done].
-          iIntros "X". iMod "X" as "(%sw & #SW & #EP & SR & PH)".
+          iIntros "X". iMod "X" as "(%sw & #SW & #EP & SR)".
           iDestruct (ith_sig_sgn with "SN [$]") as "#EX". 
           iDestruct (ith_sig_expect B__eo with "[$] [$] [$] SW [$] []") as "OU".
           { apply Nat.ltb_irrefl. }

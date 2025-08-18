@@ -100,7 +100,7 @@ Section FiniteBranching.
   Qed.
 
   Lemma creates_ep_next_states δ d':
-    list_approx (fun δ' => exists τ s π d, creates_ep δ τ δ' s π d d'). 
+    list_approx (fun δ' => exists s π d, creates_ep δ δ' s π d d'). 
   Proof using.
     set (add_ep s_cp :=
            let '(s, (π, d)) := s_cp in
@@ -108,7 +108,7 @@ Section FiniteBranching.
            let new_eps := ps_eps δ ∪ {[ (s, π, d') ]} in
            update_eps new_eps $ update_cps new_cps δ).
     exists (map add_ep (elements $ gset_prod (dom $ ps_sigs δ) (gmultiset_dom $ ps_cps δ))).
-    intros ? (?&?&?&?& STEP). inversion STEP; subst; simpl in *. simpl.
+    intros ? (?&?&?& STEP). inversion STEP; subst; simpl in *. simpl.
     apply elem_of_list_In. apply in_map_iff.
     eexists (_, (_, _)). split; [reflexivity| ].
     apply elem_of_list_In, elem_of_elements.
@@ -190,12 +190,6 @@ Section FiniteBranching.
         destruct creates_signal_next_states; eauto.
       - do 3 right. left.
         destruct sets_signal_next_states; eauto.
-      - do 4 right. left.
-        apply elem_of_list_In, in_flat_map. setoid_rewrite <- elem_of_list_In.      
-        eexists. split.
-        { eapply elem_of_enum. Unshelve. eauto. }
-        destruct creates_ep_next_states; eauto.
-        eapply e; eauto. 
       - do 5 right. left.
         destruct expects_ep_next_states; eauto.
         eapply e; eauto.
@@ -204,6 +198,11 @@ Section FiniteBranching.
         eexists. split.
         { eapply elem_of_enum. Unshelve. eauto. }
         destruct exchanges_cp_next_states; eauto.
+      - do 4 right. left.
+        apply elem_of_list_In, in_flat_map. setoid_rewrite <- elem_of_list_In.      
+        eexists. split.
+        { eapply elem_of_enum. Unshelve. eauto. }
+        destruct creates_ep_next_states; eauto.
       - repeat right.
         destruct increases_eb_next_states; eauto.
     Qed.

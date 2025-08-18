@@ -163,7 +163,7 @@ Section Nondet.
     { apply DEG12. }
     iModIntro. 
     split_cps "CPS" 1. rewrite -cp_mul_1. 
-    iMod (create_ep_upd with "CPS' SGN0 PH") as "(#EP & _ & PH)".
+    iMod (create_ep_upd with "CPS' SGN0") as "(#EP & _)".
     { eauto. }
     split_cps "CPS" 1. rewrite -cp_mul_1. 
     iMod (exchange_cp_upd with "CPS' EB") as "CPS0".

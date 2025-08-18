@@ -177,7 +177,7 @@ Section SpawnJoin.
 
       pure_step_hl. MU_by_BOU.
       rewrite cp_weaken; [| by apply PH_LTw].
-      iMod (create_ep_upd with "CPS0 SGNh' PH") as "(#EP & _ & PH)".
+      iMod (create_ep_upd with "CPS0 SGNh'") as "(#EP & _)".
       { eauto. }
       { try_solve_bounds. }
       BOU_burn_cp. 

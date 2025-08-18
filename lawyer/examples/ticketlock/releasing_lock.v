@@ -168,17 +168,17 @@ Section RFLFromFL.
       iIntros "(?&?&?&?)". iApply BOU_intro. iFrame.
     Qed.
 
-    Lemma BOU_create_wait_owner τ π q r s:
-      th_phase_frag τ π q ∗ cp π (fl_d__h FLP) ∗ smap_repr_cl r true ∗ ith_sig r s ⊢
-      BOU ∅ 1 (th_phase_frag τ π q ∗ RR__L π (Some r) ∗ smap_repr_cl r true).
+    Lemma BOU_create_wait_owner π r s:
+      cp π (fl_d__h FLP) ∗ smap_repr_cl r true ∗ ith_sig r s ⊢
+      BOU ∅ 1 (RR__L π (Some r) ∗ smap_repr_cl r true).
     Proof using LVL_ORDo L__FL.
-      iIntros "(PH & CP & SR & #ITH)".
+      iIntros "(CP & SR & #ITH)".
       rewrite /RR__L.
       iApply OU_BOU.
       iApply (OU_wand with "[]").
-      2: { iApply (smap_create_ep (λ _, l__o) r with "[$] [$] [$] [$]").
+      2: { iApply (smap_create_ep (λ _, l__o) r with "[$] [$] [$]").
            apply fl_degs_lh. }
-      iIntros "X". iMod "X" as "(?&?&?)". iApply BOU_intro.
+      iIntros "X". iMod "X" as "(?&?)". iApply BOU_intro.
       by iFrame.
     Qed.
 
@@ -303,9 +303,9 @@ Section RFLFromFL.
                            smap_repr_cl r true))%I with "[CASES PH SR]" as "EXP".
         { iDestruct "CASES" as "[RR | CP]".
           { iApply BOU_intro. iFrame "SR". iFrame. }
-          iApply (BOU_wand with "[]").
+          iApply (BOU_wand with "[PH]").
           2: { iApply BOU_create_wait_owner; [..| iFrame "#∗"]. }
-          iIntros "(?&?&?)". iFrame. }
+          iIntros "(?&?)". iFrame. }
 
         rewrite /sb_add. iMod "EXP" as "(#RR & PH & SR)"; [lia| ].
 

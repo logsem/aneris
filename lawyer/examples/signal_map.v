@@ -214,13 +214,14 @@ Section SignalMap.
     iApply "SR'". by rewrite /ex_ith_sig SET'.
   Qed. 
 
-  Lemma smap_create_ep' i B D π q τ d__h d__l
+  Lemma smap_create_ep' i B D π (* q *) (* τ *) d__h d__l
     (LT: i ∈ D)
     (DEG_LT: deg_lt d__l d__h):
-    ⊢ smap_repr B D -∗ cp π d__h -∗ th_phase_frag τ π q -∗
-      OU (|==> ∃ s, ith_sig i s ∗ ep s π d__l ∗ smap_repr B D ∗ th_phase_frag τ π q).
+    ⊢ smap_repr B D -∗ cp π d__h -∗ (* th_phase_frag τ π q -∗ *)
+      OU (|==> ∃ s, ith_sig i s ∗ ep s π d__l ∗ smap_repr B D (* ∗ th_phase_frag τ π q *)).
   Proof using DISCR__d DISCR__l LEQUIV__l.
-    iIntros "SR CP PH".
+    (* iIntros "SR CP PH". *)
+    iIntros "SR CP".
     rewrite /smap_repr. iDestruct "SR" as "(% & AUTH & SIGS & %DOM)".
     rewrite -DOM in LT. apply elem_of_dom in LT as [s ITH].
     rewrite {2}(map_split smap i) ITH /=.
@@ -228,8 +229,7 @@ Section SignalMap.
     2: { apply map_disjoint_singleton_l_2. by apply lookup_delete. }
     iDestruct "SIGS" as "[SIG SIGS]". setoid_rewrite big_sepM_singleton.
     rewrite {1}/ex_ith_sig. 
-    iDestruct (create_ep_upd with "CP [$] [PH]") as "OU".
-    { done. }
+    iDestruct (create_ep_upd with "CP [$]") as "OU".
     { done. }
     iMod (own_update with "AUTH") as "X". 
     { apply auth_update_dfrac_alloc. 
@@ -238,7 +238,7 @@ Section SignalMap.
            simpl. reflexivity. }
       apply _. }
     iApply (OU_wand with "[-OU]"); [| by iFrame].
-    iIntros "(EP & SIG & PH)".
+    iIntros "(EP & SIG)".
     iDestruct "X" as "[? ITH]". 
     iExists _. iFrame. iModIntro.
     iSplitL; [| done].
@@ -248,12 +248,12 @@ Section SignalMap.
     rewrite big_sepM_singleton. iFrame.  
   Qed.
 
-  Lemma smap_create_ep i s B D π q τ d__h d__l
+  Lemma smap_create_ep i s B D π d__h d__l
     (DEG_LT: deg_lt d__l d__h):
-    ⊢ ith_sig i s -∗ smap_repr B D -∗ cp π d__h -∗ th_phase_frag τ π q -∗
-      OU (|==> ep s π d__l ∗ smap_repr B D ∗ th_phase_frag τ π q).
+    ⊢ ith_sig i s -∗ smap_repr B D -∗ cp π d__h -∗
+      OU (|==> ep s π d__l ∗ smap_repr B D).
   Proof using DISCR__d DISCR__l LEQUIV__l.
-    iIntros "ITH SR CP PH".
+    iIntros "ITH SR CP".
     rewrite /smap_repr. iDestruct "SR" as "(% & AUTH & SIGS & %DOM)".
     iDestruct (ith_sig_in with "[$] [$]") as %ITH.
     rewrite {2}(map_split smap i) ITH /=.
@@ -261,8 +261,7 @@ Section SignalMap.
     2: { apply map_disjoint_singleton_l_2. by apply lookup_delete. }
     iDestruct "SIGS" as "[SIG SIGS]". setoid_rewrite big_sepM_singleton.
     rewrite {1}/ex_ith_sig. 
-    iDestruct (create_ep_upd with "CP [$] [PH]") as "OU".
-    { done. }
+    iDestruct (create_ep_upd with "CP [$]") as "OU".
     { done. }
     iMod (own_update with "AUTH") as "X". 
     { apply auth_update_dfrac_alloc. 
@@ -271,7 +270,7 @@ Section SignalMap.
            simpl. reflexivity. }
       apply _. }
     iApply (OU_wand with "[-OU]"); [| by iFrame].
-    iIntros "(EP & SIG & PH)". iFrame "EP PH". 
+    iIntros "(EP & SIG)". iFrame "EP". 
     iDestruct "X" as "[? ITH_]". 
     iExists _. iFrame. iModIntro. iSplit; [| done].
     rewrite {2}(map_split smap i) ITH /=.
