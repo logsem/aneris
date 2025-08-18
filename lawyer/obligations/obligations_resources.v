@@ -1063,122 +1063,6 @@ Section ObligationsRepr.
       by iApply "bar".
     Qed.
 
-    Lemma lse_rep_phases_eq_helper δ1 δ2 n
-      (TRANSS: nsteps loc_step_ex n δ1 δ2):
-      ps_phases δ1 = ps_phases δ2.
-    Proof using.
-      symmetry. pattern δ2. 
-      eapply pres_by_loc_step_implies_rep; eauto.
-      apply loc_step_phases_pres.
-    Qed.
-
-    Lemma obls_msi_interim_progress_impl δ n τ π deg
-      (BOUND: n <= LIM_STEPS)
-      (PH: ps_phases δ !! τ = Some π):
-      ⊢ obls_msi_interim δ n -∗ cp π deg ==∗
-        ∃ δ', obls_msi δ' ∗ ⌜ progress_step δ τ δ' ⌝.
-    Proof.
-      iIntros "MSI' cp".
-      rewrite /obls_msi_interim.
-      
-      iDestruct "MSI'" as (δ__k) "(MSI&%TRANSS)".
-      iDestruct (cp_msi_unfold with "[$] [$]") as "[MSI (%π' & CP & [%IN %LE])]".
-      
-      iMod (burn_cp_upd_impl with "[$] [CP]") as "X".
-      2: { iExists _. iFrame. done. }
-      { eexists. split; [| reflexivity].
-        erewrite <- lse_rep_phases_eq_helper; eauto. }
-      iDestruct "X" as "(%δ' & MSI & [%π__b %BURNS])". 
-      iModIntro. iExists _. iFrame.
-
-      iPureIntro. eexists. split; eauto.
-      eexists. split; eauto.
-    Qed.
-    
-    Lemma obls_msi_interim_progress δ E τ π q P:
-      ⊢ obls_msi δ -∗ BOU E LIM_STEPS (∃ d, cp π d ∗ th_phase_frag τ π q ∗ P)
-         ={E}=∗ ∃ δ', obls_msi δ' ∗ ⌜ progress_step δ τ δ' ⌝ ∗ th_phase_frag τ π q ∗ P.
-    Proof using.
-      iIntros "MSI BOU".
-      rewrite /BOU. iMod ("BOU" with "[MSI]") as (n) "(MSI & %BOUND & (%d & CP & PH & P))".
-      { rewrite /obls_msi_interim. iExists _. iFrame.
-        iPureIntro. by apply nsteps_0. }
-      iFrame "P".
-      rewrite /obls_msi_interim. iDestruct "MSI" as (?) "(MSI & %STEPS)".
-      iDestruct (th_phase_msi_frag with "[$] [$]") as "%PH".
-      iFrame "PH".
-      iApply (obls_msi_interim_progress_impl with "[MSI] [$]").
-      3: { iExists _. by iFrame. }
-      { lia. }
-      erewrite lse_rep_phases_eq_helper; eauto.
-    Qed.
-
-    Lemma obls_msi_interim_omtrans_fork_impl δ n τ τ' π deg R R'
-      (BOUND: n <= LIM_STEPS)
-      (FRESH: τ' ∉ dom $ ps_phases δ)
-      (DPO: dom_phases_obls δ)
-      :
-      ⊢ obls_msi_interim δ n -∗ cp π deg  -∗ obls τ R -∗ th_phase_eq τ π ==∗
-        ∃ δ' π1 π2,
-          obls_msi δ' ∗
-            obls τ (R ∖ R') ∗ th_phase_eq τ π1 ∗
-            obls τ' (R ∩ R') ∗ th_phase_eq τ' π2 ∗
-            ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝ ∗
-                                ⌜ rel_compose (flip progress_step τ) (fork_step_of τ) δ δ' ⌝.
-    Proof using.
-      clear H1 H0 H.
-      iIntros "MSI' CP OB PH".
-      rewrite /obls_msi_interim. 
-      iDestruct "MSI'" as (δ__k) "(MSI&%TRANSS)".
-      iDestruct (th_phase_msi_frag with "[$] [$]") as "%PH".
-
-      pose proof TRANSS as PH_EQ. 
-      unshelve eapply (pres_by_loc_step_implies_rep _ _ _ _ _) in PH_EQ.
-      { eapply loc_step_phases_pres. }
-      2: reflexivity.
-      
-      iMod (obls_msi_interim_progress_impl _ _ τ with "[MSI] [$]") as (?) "(MSI&%PSTEP)".
-      3: { iExists _. iFrame. eauto. }
-      { eauto. }
-      { by rewrite -PH_EQ. }
-
-      iMod (fork_locale_upd_impl with "[$] [$] [$]") as "Y"; eauto.
-      { unshelve eapply (pres_by_loc_step_implies_progress _ _ _ _ _) in PSTEP.
-        { eapply loc_step_phases_pres. }
-        3: reflexivity.
-        2: { rewrite -PSTEP in FRESH. apply FRESH. }
-      }
-      { eapply pres_by_loc_step_implies_progress; eauto.
-        apply loc_step_dpo_pres. }
-      
-      iDestruct "Y" as "(%δ'' & %π1 & %π2 & MSI & PH1 & PH3 & OB1 & OB2 & %FORKS & [%LT1 %LT2])".
-      iModIntro. do 3 iExists _. iFrame. iPureIntro. split; eauto.
-      eexists. split; eauto.
-      red. eauto.
-    Qed.
-
-    Lemma obls_msi_interim_omtrans_fork δ E τ τ' π R R' P
-      (FRESH: τ' ∉ dom $ ps_phases δ)
-      (DPO: dom_phases_obls δ)
-      :
-      ⊢ obls_msi δ -∗
-        BOU E LIM_STEPS (∃ d, cp π d ∗ obls τ R ∗ th_phase_eq τ π ∗ P) ={E}=∗
-        ∃ δ' π1 π2,
-          obls_msi δ' ∗
-            obls τ (R ∖ R') ∗ th_phase_eq τ π1 ∗
-            obls τ' (R ∩ R') ∗ th_phase_eq τ' π2 ∗
-            ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝ ∗
-            ⌜ rel_compose (flip progress_step τ) (fork_step_of τ) δ δ' ⌝ ∗ P. 
-    Proof using.
-      iIntros "MSI BOU".
-      rewrite /BOU. iMod ("BOU" with "[MSI]") as (n) "(MSI & %BOUND & (%d & PHN & OB & CP & P))".
-      { rewrite /obls_msi_interim. iExists _. iFrame.
-        iPureIntro. by apply nsteps_0. }
-      iFrame "P".
-      iApply (obls_msi_interim_omtrans_fork_impl with "[$] [$] [$] [$]"); try done.
-      lia.
-    Qed.
-      
     Lemma BOU_intro E b (P : iProp Σ):
       ⊢ P -∗ BOU E b P.
     Proof using.
@@ -1277,6 +1161,146 @@ Section ObligationsRepr.
       iModIntro. iExists _. iFrame. iPureIntro. lia. 
     Qed.
 
+    Lemma lse_rep_phases_eq_helper δ1 δ2 n
+      (TRANSS: nsteps loc_step_ex n δ1 δ2):
+      ps_phases δ1 = ps_phases δ2.
+    Proof using.
+      symmetry. pattern δ2. 
+      eapply pres_by_loc_step_implies_rep; eauto.
+      apply loc_step_phases_pres.
+    Qed.
+
+    Lemma obls_msi_interim_progress_impl δ n τ π deg
+      (BOUND: n <= LIM_STEPS)
+      (PH: ps_phases δ !! τ = Some π):
+      ⊢ obls_msi_interim δ n -∗ cp π deg ==∗
+        ∃ δ', obls_msi δ' ∗ ⌜ progress_step δ τ δ' ⌝.
+    Proof.
+      iIntros "MSI' cp".
+      rewrite /obls_msi_interim.
+      
+      iDestruct "MSI'" as (δ__k) "(MSI&%TRANSS)".
+      iDestruct (cp_msi_unfold with "[$] [$]") as "[MSI (%π' & CP & [%IN %LE])]".
+      
+      iMod (burn_cp_upd_impl with "[$] [CP]") as "X".
+      2: { iExists _. iFrame. done. }
+      { eexists. split; [| reflexivity].
+        erewrite <- lse_rep_phases_eq_helper; eauto. }
+      iDestruct "X" as "(%δ' & MSI & [%π__b %BURNS])". 
+      iModIntro. iExists _. iFrame.
+
+      iPureIntro. eexists. split; eauto.
+      eexists. split; eauto.
+    Qed.
+    
+    Lemma obls_msi_interim_progress δ E τ π q P:
+      ⊢ obls_msi δ -∗ BOU E LIM_STEPS (∃ d, cp π d ∗ th_phase_frag τ π q ∗ P)
+         ={E}=∗ ∃ δ', obls_msi δ' ∗ ⌜ progress_step δ τ δ' ⌝ ∗ th_phase_frag τ π q ∗ P.
+    Proof using.
+      iIntros "MSI BOU".
+      rewrite /BOU. iMod ("BOU" with "[MSI]") as (n) "(MSI & %BOUND & (%d & CP & PH & P))".
+      { rewrite /obls_msi_interim. iExists _. iFrame.
+        iPureIntro. by apply nsteps_0. }
+      iFrame "P".
+      rewrite /obls_msi_interim. iDestruct "MSI" as (?) "(MSI & %STEPS)".
+      iDestruct (th_phase_msi_frag with "[$] [$]") as "%PH".
+      iFrame "PH".
+      iApply (obls_msi_interim_progress_impl with "[MSI] [$]").
+      3: { iExists _. by iFrame. }
+      { lia. }
+      erewrite lse_rep_phases_eq_helper; eauto.
+    Qed.
+
+    Lemma obls_msi_interim_omtrans_fork_impl δ n τ τ' π deg R R'
+      (BOUND: n <= LIM_STEPS)
+      (FRESH: τ' ∉ dom $ ps_phases δ)
+      (DPO: dom_phases_obls δ)
+      :
+      ⊢ obls_msi_interim δ n -∗ cp π deg  -∗ obls τ R -∗ th_phase_eq τ π ==∗
+        ∃ δ' π1 π2,
+          obls_msi δ' ∗
+            obls τ (R ∖ R') ∗ th_phase_eq τ π1 ∗
+            obls τ' (R ∩ R') ∗ th_phase_eq τ' π2 ∗
+            ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝ ∗
+                                ⌜ rel_compose (flip progress_step τ) (fork_step_of τ) δ δ' ⌝.
+    Proof using.
+      clear H1 H0 H.
+      iIntros "MSI' CP OB PH".
+      rewrite /obls_msi_interim. 
+      iDestruct "MSI'" as (δ__k) "(MSI&%TRANSS)".
+      iDestruct (th_phase_msi_frag with "[$] [$]") as "%PH".
+
+      pose proof TRANSS as PH_EQ. 
+      unshelve eapply (pres_by_loc_step_implies_rep _ _ _ _ _) in PH_EQ.
+      { eapply loc_step_phases_pres. }
+      2: reflexivity.
+      
+      iMod (obls_msi_interim_progress_impl _ _ τ with "[MSI] [$]") as (?) "(MSI&%PSTEP)".
+      3: { iExists _. iFrame. eauto. }
+      { eauto. }
+      { by rewrite -PH_EQ. }
+
+      iMod (fork_locale_upd_impl with "[$] [$] [$]") as "Y"; eauto.
+      { unshelve eapply (pres_by_loc_step_implies_progress _ _ _ _ _) in PSTEP.
+        { eapply loc_step_phases_pres. }
+        3: reflexivity.
+        2: { rewrite -PSTEP in FRESH. apply FRESH. }
+      }
+      { eapply pres_by_loc_step_implies_progress; eauto.
+        apply loc_step_dpo_pres. }
+      
+      iDestruct "Y" as "(%δ'' & %π1 & %π2 & MSI & PH1 & PH3 & OB1 & OB2 & %FORKS & [%LT1 %LT2])".
+      iModIntro. do 3 iExists _. iFrame. iPureIntro. split; eauto.
+      eexists. split; eauto.
+      red. eauto.
+    Qed.
+
+    Lemma obls_msi_interim_omtrans_fork_strong δ E τ τ' π RR R' P
+      (FRESH: τ' ∉ dom $ ps_phases δ)
+      (DPO: dom_phases_obls δ)
+      :
+      ⊢ obls_msi δ -∗
+        BOU E LIM_STEPS (∃ d R, cp π d ∗ obls τ R ∗ th_phase_eq τ π ∗ P ∗ ⌜ RR R ⌝) ={E}=∗
+        ∃ δ' π1 π2 R,
+          obls_msi δ' ∗
+            obls τ (R ∖ R') ∗ th_phase_eq τ π1 ∗
+            obls τ' (R ∩ R') ∗ th_phase_eq τ' π2 ∗
+            ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝ ∗
+            ⌜ rel_compose (flip progress_step τ) (fork_step_of τ) δ δ' ⌝ ∗ P ∗
+            ⌜ RR R ⌝. 
+    Proof using.
+      iIntros "MSI BOU".
+      rewrite /BOU. iMod ("BOU" with "[MSI]") as (n) "(MSI & %BOUND & (%d & %R & PHN & OB & CP & P & %RRR))".
+      { rewrite /obls_msi_interim. iExists _. iFrame.
+        iPureIntro. by apply nsteps_0. }
+      iFrame "P".
+      iDestruct (obls_msi_interim_omtrans_fork_impl with "[$] [$] [$] [$]") as "UPD"; try done.
+      { lia. }
+      iMod "UPD" as "(%&%&%&?&?&?&?&?&?&?)".
+      iModIntro. repeat iExists _. by iFrame.
+    Qed.
+
+    Lemma obls_msi_interim_omtrans_fork δ E τ τ' π R R' P
+      (FRESH: τ' ∉ dom $ ps_phases δ)
+      (DPO: dom_phases_obls δ)
+      :
+      ⊢ obls_msi δ -∗
+        BOU E LIM_STEPS (∃ d, cp π d ∗ obls τ R ∗ th_phase_eq τ π ∗ P) ={E}=∗
+        ∃ δ' π1 π2,
+          obls_msi δ' ∗
+            obls τ (R ∖ R') ∗ th_phase_eq τ π1 ∗
+            obls τ' (R ∩ R') ∗ th_phase_eq τ' π2 ∗
+            ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝ ∗
+            ⌜ rel_compose (flip progress_step τ) (fork_step_of τ) δ δ' ⌝ ∗ P. 
+    Proof using.
+      iIntros "MSI BOU".
+      iMod (obls_msi_interim_omtrans_fork_strong _ _ _ _ _ (eq R) with "[$] [BOU]") as "UPD"; try set_solver.
+      { iApply (BOU_wand with "[] [$]"). iIntros "(%&?&?&?&P)". iFrame.
+        iSplit; try done. iApply "P". }
+      iDestruct "UPD" as "(%&%&%&%&?&?&?&?&?&?&?&?&->)".
+      iModIntro. iFrame. 
+    Qed.
+    
     Lemma OU_BOU E P b:
       ⊢ OU (BOU E b P) -∗ BOU E (S b) P.
     Proof using.
