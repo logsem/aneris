@@ -878,6 +878,17 @@ Section WaitFreePR.
     iModIntro. iFrame "#∗".
   Qed.
 
+  (* TODO: move *)
+  Lemma leb_eq_equiv a b c d:
+    (a <=? b) = (c <=? d) <-> (a <= b <-> c <= d).
+  Proof using.
+    clear. 
+    intros.
+    destruct (c <=? d) eqn:LE.
+    - rewrite Nat.leb_le. apply leb_complete in LE. lia. 
+    - rewrite Nat.leb_nle. apply leb_complete_conv in LE. lia.
+  Qed.
+
   Program Definition PR_wfree {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}:
     @ProgressResource heap_lang M Σ (@iem_invGS _ _ _ _ _ Hinv)
       state_interp wfree_trace_inv
@@ -951,8 +962,7 @@ Section WaitFreePR.
          iPureIntro. intros. by apply NSTUCK'. }
 
     simpl.
-    (* rewrite /obls_asem_mti. *)
-    (* iDestruct "TI" as "(%EV & PHYS & MSI)". *)
+
     inversion STEP as
         [?? e σ e' σ' efs t1 t2 -> -> PSTEP | ].
     2: { done. }
@@ -963,18 +973,6 @@ Section WaitFreePR.
     rewrite /pr_pr_wfree. iDestruct "PR" as "(WPS & CPS & PH & OB)".
 
     iUnfold wptp_wfree in "WPS".
-
-    (* iDestruct (wptp_from_gen_upd_2 _ *)
-    
-    (* iDestruct (wptp_from_gen_take_2 _ _ _ _ τ with "WPS") as "WPS". *)
-    (* { rewrite FIN. simpl. rewrite -H3. *)
-    (*   rewrite locales_of_list_locales. *)
-    (*   eapply elem_of_fmap. eexists (_, _). split; eauto. *)
-    (*   apply prefixes_from_spec. eauto. } *)
-
-    (* simpl. iDestruct "WPS" as (Φ e_) "(%Φ_IN & %FIN_ & WP & WPS)". *)
-    (* rewrite FIN in FIN_. rewrite -H3 /= in FIN_. *)
-    (* rewrite from_locale_from_locale_of in FIN_. inversion FIN_. subst e_. clear FIN_. *)
 
     red in FIN. iEval (rewrite FIN; simpl) in "WPS".
     iDestruct (wptp_gen_split_1 with "WPS") as %X.
@@ -995,10 +993,6 @@ Section WaitFreePR.
     - subst τ.
       rewrite /wp_tc.
 
-      (* iDestruct (cur_phases_take _ τi with "PH") as "(%π & PH & PHS)". *)
-      (* { eapply locales_of_cfg_Some. *)
-      (*   rewrite FIN. rewrite e0. *)
-      (*   by apply locale_step_from_locale_src in STEP. } *)
       iDestruct (cur_phases_τi_step with "[$]") as "(PH & PHS)".
       { by rewrite e0 FIN. }
       iDestruct "PH" as "(%π & PH)". 
@@ -1042,15 +1036,11 @@ Section WaitFreePR.
         iAssert (@state_interp _ M _ _ (etr :tr[ Some τi ]: (t1 ++ e' :: t2 ++ efs, σ')) _)%I with "[HSI]" as "TI".
         { simpl. iDestruct "HSI" as "(?&?&?)". iFrame. }
 
-        (* iSpecialize ("OBLS" with "[OB SGN EP]"); [by iFrame| ]. *)
-
         iModIntro.
         do 2 iExists _.
-        (* rewrite bi.sep_comm. rewrite -bi.sep_assoc. *)
         iSplitL "TI".
         { simpl. rewrite e0. iFrame. }
 
-        (* iAssert (wp_tc s e' (S (trace_length etr) <=? ii) Φ -∗ *)
         iAssert (wp_tc s e' (S (trace_length etr) <=? ii) Φ -∗
                  wptp_wfree s
                  (etr :tr[ Some (locale_of t1 e) ]: (t1 ++ e' :: t2 ++ efs, σ'))
@@ -1300,7 +1290,6 @@ Section WaitFreePR.
         iDestruct "PH" as (π) "PH". rewrite H3. 
 
         remember (step_fork (trace_last etr) (t1 ++ e' :: t2 ++ efs, σ')) as sf.
-        (* rewrite -Heqsf. *)
 
         iDestruct (@pwp_MU_ctx_take_step _ _ _ Hinv with "TI [CP PH OB OBτi] WP") as "STEP".
         1-2: by eauto.
@@ -1726,8 +1715,6 @@ Section WaitFreePR.
              2: { simpl in SHORT. lia. }
              red in FIT. destruct FIT as (?& IN & ?&?).
              move IN at bottom. rewrite FIN /= e0 in IN.
-             (* replace (locale_of ((t1 ++ e' :: t2) ++ take i efs) x) with (locale_of ((t1 ++ e :: t2) ++ take i efs) x) in IN. *)
-             (* 2: { rewrite /locale_of !length_app. simpl. done. } *)
              apply from_locale_lookup in IN.
              apply lookup_lt_Some in IN.
              rewrite /locale_of !length_app /= in IN. lia. } 
@@ -1743,23 +1730,16 @@ Section WaitFreePR.
           rewrite !prefixes_from_app.
           eapply Forall2_app; [apply adequacy_utils.locales_equiv_refl| ].
           simpl. by constructor. }
-
-        (* TODO: Make a lemma *)
-        assert (forall a b c d, (a <=? b) = (c <=? d) <-> (a <= b <-> c <= d)) as LE.
-        { intros.
-          destruct (c0 <=? d) eqn:LE.
-          - rewrite Nat.leb_le. apply leb_complete in LE. lia. 
-          - rewrite Nat.leb_nle. apply leb_complete_conv in LE. lia. } 
           
         (* TODO: Make a lemma *)
         iApply (big_sepL2_impl with "[$]").
         iModIntro. 
         iIntros (i pfi Φi PFith Φith).
         rewrite /thread_pr.
-        erewrite (proj2 (LE _ _ _ _)).
+        erewrite (proj2 (leb_eq_equiv _ _ _ _)).
         { by iIntros "$". }
         simpl in *. lia. 
 
-  Admitted. 
+  Admitted.
   
 End WaitFreePR.
