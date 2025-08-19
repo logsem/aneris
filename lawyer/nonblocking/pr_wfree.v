@@ -550,41 +550,41 @@ Section WaitFreePR.
     iFrame.
   Qed.
 
-  Lemma MU_burn_cp_fork {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} τ π0 d τ' R' Q:
+  Lemma MU_burn_cp_fork {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} τ π0 d τ' Q:
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
-    ⊢ BOU ∅ WF_SB (∃ R0, cp π0 d ∗ th_phase_eq τ π0 ∗ obls τ R0 ∗ Q R0) -∗
+    ⊢ BOU ∅ WF_SB (∃ R1 R2, cp π0 d ∗ th_phase_eq τ π0 ∗ obls τ (R1 ∪ R2) ∗ Q R1 R2 ∗ ⌜ R1 ## R2 ⌝) -∗
       let hGS: @heapGS Σ M EM := {| heap_iemgs := Hinv |} in
       @MU__f _ EM Σ hGS ⊤ τ τ'
-        (∃ π π' R0, th_phase_eq τ π ∗ th_phase_eq τ' π' ∗ obls τ (R0 ∖ R') ∗ obls τ' (R0 ∩ R') ∗ Q R0).
+        (∃ π π' R1 R2, th_phase_eq τ π ∗ th_phase_eq τ' π' ∗ obls τ R1 ∗ obls τ' R2 ∗ Q R1 R2 ∗ ⌜ R1 ## R2 ⌝).
   Proof using.
     simpl. iIntros "BOU".
     iApply AMU_lift_top; [(try rewrite nclose_nroot); done| ].
     iApply (BOU_AMU__f'_strong _ _ _ _ Q). iApply (BOU_weaken with "[] [$]"); try done. 
-    iIntros "(%R0 & CP & PH & OB & Q)".
+    iIntros "(%R1 & %R2 & CP & PH & OB & Q &?)".
     iFrame. 
-    iIntros "(%&%&%&?&?&?&?&?&?)".
+    iIntros "(%&%&%&%&?&?&?&?&?&?)".
     iFrame. 
   Qed.
 
-  Lemma MU_burn_cp {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} τ π0 d R' oτ' Q:
+  Lemma MU_burn_cp {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} τ π0 d oτ' Q:
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
-    ⊢ BOU ∅ WF_SB (∃ R0, cp π0 d ∗ th_phase_eq τ π0 ∗ obls τ R0 ∗ Q R0) -∗
+    ⊢ BOU ∅ WF_SB (∃ R1 R2, cp π0 d ∗ th_phase_eq τ π0 ∗ obls τ (R1 ∪ R2) ∗ Q R1 R2 ∗ ⌜ R1 ## R2 ⌝) -∗
       let hGS: @heapGS Σ M EM := {| heap_iemgs := Hinv |} in
       @MU_impl _ EM Σ hGS oτ' ⊤ τ
-        (∃ π R0, th_phase_eq τ π ∗ Q R0 ∗
-         from_option (fun τ' => ∃ π', th_phase_eq τ' π' ∗ obls τ (R0 ∖ R') ∗ obls τ' (R0 ∩ R')) (obls τ R0) oτ').
+        (∃ π R1 R2, th_phase_eq τ π ∗ Q R1 R2 ∗ ⌜ R1 ## R2 ⌝ ∗
+         from_option (fun τ' => ∃ π', th_phase_eq τ' π' ∗ obls τ R1 ∗ obls τ' R2) (obls τ (R1 ∪ R2)) oτ').
   Proof using.
     simpl. iIntros "BOU".
     destruct oτ'.
     - iPoseProof (MU_burn_cp_fork with "[$]") as "foo".
       iApply (MU__f_wand with "[] [$]"). simpl.
-      iIntros "(%&%&%&?&?&?&?&?)". by iFrame.
+      iIntros "(%&%&%&%&?&?&?&?&?)". by iFrame.
     - simpl.
       iApply (MU_wand with "[-BOU]").
       2: { iApply MU_burn_cp_nofork. iMod "BOU".
-           rewrite -!bi.sep_exist_l. 
+           repeat setoid_rewrite <- bi.sep_exist_l. 
            iModIntro. iFrame. }
-      iIntros "[$ X]". by iDestruct "X" as "(%&$&?)". 
+      iIntros "[$ X]". by iDestruct "X" as "(%&%&$&?)". 
   Qed.
 
   (* TODO: move *)
@@ -1020,8 +1020,10 @@ Section WaitFreePR.
         { red. rewrite FIN. erewrite ectx_fill_emp. reflexivity. }
         { done. }
         { rewrite (cp_weaken _ π); [| by apply phase_le_init].
-          iApply (MU_burn_cp _ _ _ ∅ _ (fun R => (⌜ R = {[ si ]} ⌝)%I) with "[$CP $PH OB]").
-          iModIntro. iFrame. done. }
+          iApply (MU_burn_cp _ _ _ _ (fun R1 R2 => (⌜ R1 = {[ si ]} /\ R2 = ∅ ⌝)%I) with "[$CP $PH OB]").
+          iModIntro. do 2 iExists _. iSplit.
+          2: { iPureIntro. split; [split| ]; try reflexivity. done. }
+          by rewrite union_empty_r_L. }
           
         iMod "STEP". iModIntro.
         iMod "STEP". iModIntro. iNext. 
@@ -1030,8 +1032,8 @@ Section WaitFreePR.
         iIntros "STEP".
         iMod "STEP" as (δ' ℓ) "(HSI & He2 & WPS' & MOD) /=".
 
-        iDestruct "MOD" as (π' ?) "(PH & -> & MOD')".
-        rewrite difference_empty_L intersection_empty_r_L.
+        iDestruct "MOD" as (π' ??) "(PH & [->->] & _ & MOD')".
+        rewrite union_empty_r_L. 
 
         iAssert (@state_interp _ M _ _ (etr :tr[ Some τi ]: (t1 ++ e' :: t2 ++ efs, σ')) _)%I with "[HSI]" as "TI".
         { simpl. iDestruct "HSI" as "(?&?&?)". iFrame. }
@@ -1299,15 +1301,19 @@ Section WaitFreePR.
           rewrite (cp_weaken _ π); [| by apply phase_le_init].
           rewrite /obls_τi' /obls_τi. 
 
-          set (upd := fun (R: gset SignalId) => let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
+          set (upd := fun (R1 R2: gset SignalId) => let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
+                        (⌜ R1 = ∅ ⌝ ∗ 
                         if (decide (sf = Some τi))
-                        then (∃ s, ⌜ R = {[ s ]} ⌝ ∗ sgn s l0 (Some false) ∗ ep s π0 d0)%I
-                        else (⌜ R = ∅ ⌝ ∗ obls_τi' (t1 ++ e' :: t2 ++ efs, σ'))%I). 
-          iApply (MU_burn_cp _ _ _ ⊤ _ upd with "[-]").
+                        then (∃ s, ⌜ R2 = {[ s ]} ⌝ ∗ sgn s l0 (Some false) ∗ ep s π0 d0)%I
+                        else (⌜ R2 = ∅ ⌝ ∗ obls_τi' (t1 ++ e' :: t2 ++ efs, σ')))%I). 
+          iApply (MU_burn_cp _ _ _ _ upd with "[-]").
           iFrame "CP PH". subst upd. simpl.
           rewrite -FIN in STEP.
           destruct sf; simpl. 
-          2: { iFrame. iModIntro. iSplit; [done| ].
+          2: { iModIntro. do 2 iExists _.
+               iSplitL "OB".
+               { erewrite union_empty_r_L. iFrame. }
+               repeat (iSplit; try done). 
                iApply obls_τi'_next; [| done].
                apply locale_step_step_fork_exact in STEP.
                rewrite -Heqsf in STEP. set_solver. }
@@ -1320,11 +1326,12 @@ Section WaitFreePR.
             iMod (create_ep_upd with "[OBτi] SGN0") as "(#EP & _)".
             { apply (orders_lib.ith_bn_lt 2 0 1). lia. }
             { iFrame. }
-            iModIntro. iExists _. rewrite decide_True; [| done].
-            iFrame. iSplit; [iPureIntro; set_solver| ].
-            iApply "EP". 
-          - iModIntro. iFrame. rewrite (@decide_False _ (_ = _)); [| congruence].
-            iSplit; [done| ].
+            iModIntro. do 2 iExists _. rewrite decide_True; [| done].
+            iFrame. iFrame "#∗". iPureIntro. set_solver. 
+          - iModIntro. iFrame.
+            setoid_rewrite (@decide_False _ (Some l = _)); [| congruence].
+            do 2 iExists _. erewrite union_empty_r_L. iFrame. 
+            repeat iSplit; try done. 
             (* TODO: refactor *)
             rewrite /obls_τi'.
             apply locale_step_step_fork_exact in STEP. rewrite STEP.
@@ -1338,8 +1345,9 @@ Section WaitFreePR.
         iIntros "STEP".
         iMod "STEP" as (δ' ℓ) "(HSI & He2 & WPS' & MOD) /=".
 
-        iDestruct "MOD" as (π' R) "(PH & MOD & MOD')".
-
+        iDestruct "MOD" as (π' R1 R2) "(PH & (-> & MOD) & %DISJ12 & MOD')".        
+        rewrite union_empty_l_L. 
+        
         iAssert (@state_interp _ M _ _ (etr :tr[ Some τ ]: (t1 ++ e' :: t2 ++ efs, σ')) _)%I with "[HSI]" as "TI".
         { simpl. iDestruct "HSI" as "(?&?&?)". iFrame. }
 
@@ -1389,11 +1397,6 @@ Section WaitFreePR.
           rewrite decide_True //.
           iDestruct "MOD" as "(% & -> & SGN & #EP)".
           iDestruct "MOD'" as "(% & PHτi & OB & OBτi)". 
-          rewrite subseteq_empty_difference_L.
-          2: { (* !!! need to get rid of Top here *)
-            admit. }
-          rewrite subseteq_intersection_1_L.
-          2: admit.
 
           iSpecialize ("OBLS" with "[$] [SGN OBτi] []").
           { rewrite /obls_τi'. rewrite decide_True.
@@ -1484,8 +1487,6 @@ Section WaitFreePR.
              iApply (wp_stuck_mono with "[$]"). done.
 
         * rewrite decide_False; [| done]. iDestruct "MOD" as "(-> & OBτi)".
-          rewrite subseteq_empty_difference_L; [| done].
-          rewrite intersection_empty_r_L. 
 
           iAssert (let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
                    obls τ ∅ ∗
@@ -1656,9 +1657,12 @@ Section WaitFreePR.
         { red. rewrite FIN. erewrite ectx_fill_emp. reflexivity. }
         { done. }
         { rewrite -Heqsf. 
-          iApply (MU_burn_cp _ _ _ ∅ _ (fun (R: gset SignalId) => (⌜ R = ∅ ⌝ ∗ obls_τi)%I) with "[-]").
-          iMod (BOU_wait_τi with "[$] [$] [$]") as "(?&?&?&?)".
-          iModIntro. iFrame. iSplit; [done| ]. iFrame. }
+          iApply (MU_burn_cp _ _ _ _ (fun (R1 R2: gset SignalId) => (⌜ R1 = ∅ /\ R2 = ∅⌝ ∗ obls_τi)%I) with "[-]").
+          iMod (BOU_wait_τi with "[$] [$] [$]") as "(?&?&OB&?)".
+          iModIntro. do 2 iExists _. iFrame.  
+          iSplitL "OB".
+          { by erewrite union_empty_l_L. }
+          iFrame. iPureIntro. set_solver. }          
           
         iMod "STEP". iModIntro.
         iMod "STEP". iModIntro. iNext. 
@@ -1667,9 +1671,8 @@ Section WaitFreePR.
         iIntros "STEP".
         iMod "STEP" as (δ' ℓ) "(HSI & He2 & WPS' & MOD) /=".
 
-        iDestruct "MOD" as (π' R) "(PH & (-> & OBτi) & MOD')".
-        rewrite subseteq_empty_difference_L; [| done].
-        rewrite intersection_empty_r_L.         
+        iDestruct "MOD" as (π' R1 R2) "(PH & ((-> & ->) & OBτi) & %DISJ12 & MOD')".
+        rewrite union_empty_l_L. 
 
         iAssert (@state_interp _ M _ _ (etr :tr[ Some τ ]: (t1 ++ e' :: t2 ++ efs, σ')) _)%I with "[HSI]" as "TI".
         { simpl. iDestruct "HSI" as "(?&?&?)". iFrame. }
@@ -1739,7 +1742,6 @@ Section WaitFreePR.
         erewrite (proj2 (leb_eq_equiv _ _ _ _)).
         { by iIntros "$". }
         simpl in *. lia. 
-
-  Admitted.
+  Qed.
   
 End WaitFreePR.

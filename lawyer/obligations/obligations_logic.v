@@ -91,13 +91,13 @@ Section ProgramLogic.
       simpl. eexists. split; eauto. by right.
     Qed.
 
-    Lemma BOU_AMU__f_strong E ζ ζ' π Q R':
+    Lemma BOU_AMU__f_strong E ζ ζ' π Q:
       ⊢
-        BOU E LIM_STEPS (∃ d R0, cp π d ∗ obls ζ R0 ∗ th_phase_eq ζ π ∗ Q R0) -∗
-        AMU__f E ζ ζ' obls_act (∃ π1 π2 R0,
-            th_phase_eq ζ π1 ∗ obls ζ (R0 ∖ R') ∗ 
-            th_phase_eq ζ' π2 ∗ obls ζ' (R0 ∩ R') ∗
-            ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝ ∗ Q R0) (aeGS := oGS').
+        BOU E LIM_STEPS (∃ d R1 R2, cp π d ∗ obls ζ (R1 ∪ R2) ∗ th_phase_eq ζ π ∗ Q R1 R2 ∗ ⌜ R1 ## R2 ⌝) -∗
+        AMU__f E ζ ζ' obls_act (∃ π1 π2 R1 R2,
+            th_phase_eq ζ π1 ∗ obls ζ R1 ∗ 
+            th_phase_eq ζ' π2 ∗ obls ζ' R2 ∗
+            ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝ ∗ Q R1 R2 ∗ ⌜ R1 ## R2 ⌝) (aeGS := oGS').
     Proof using.
       clear H1 H0 H. 
       rewrite /AMU__f /AMU_impl. iIntros "BOU" (etr' mtr) "TI'".
@@ -107,12 +107,12 @@ Section ProgramLogic.
       iDestruct "MSI" as "(MSI&%OBLS&%DPO)".
       iMod (obls_msi_interim_omtrans_fork_strong with "[$] [BOU]") as "X".
       3: { iApply (BOU_wand with "[-BOU] [$]"); try done.
-           iIntros "(%&%&?&?&?&?)".
+           iIntros "(%&%&%&?&?&?&?&?)".
            iFrame. iAccu. }
       { eapply locale_step_fork_Some in FORK; eauto.
         apply proj2 in FORK. rewrite OBLS -DPO in FORK. eauto. }
       { eauto. }
-      iDestruct "X" as (δ'' π1 π2 R) "(SI & OB1 & PH1 & OB2 & PH3 & ((%PH1 & %PH2) & %TRANS & Q))".
+      iDestruct "X" as (δ'' π1 π2 R1 R2) "(SI & OB1 & PH1 & OB2 & PH3 & ((%PH1 & %PH2) & %TRANS & Q & ?))".
       iModIntro. repeat setoid_rewrite bi.sep_exist_l.
       iDestruct (th_phase_msi_frag with "[$] PH3") as %PH_NEW.
       iExists _, (obls_act, Some ζ). do 2 iExists _. iFrame. iPureIntro.
@@ -150,13 +150,13 @@ Section ProgramLogic.
       eexists. split; eauto. by left.  
     Qed.
 
-    Lemma BOU_AMU__f'_strong E ζ ζ' π Q R' P:
+    Lemma BOU_AMU__f'_strong E ζ ζ' π Q P:
       ⊢
-        let om_fork_post := ∃ π1 π2 R0,
-            th_phase_eq ζ π1 ∗ obls ζ (R0 ∖ R') ∗ 
-            th_phase_eq ζ' π2 ∗ obls ζ' (R0 ∩ R') ∗
-            ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝ ∗ Q R0 in
-        BOU E LIM_STEPS ((om_fork_post -∗ P) ∗ ∃ d R0, cp π d ∗ obls ζ R0 ∗ th_phase_eq ζ π ∗ Q R0) -∗
+        let om_fork_post := ∃ π1 π2 R1 R2,
+            th_phase_eq ζ π1 ∗ obls ζ R1 ∗ 
+            th_phase_eq ζ' π2 ∗ obls ζ' R2 ∗
+            ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝ ∗ Q R1 R2 ∗ ⌜ R1 ## R2 ⌝ in
+        BOU E LIM_STEPS ((om_fork_post -∗ P) ∗ ∃ d R1 R2, cp π d ∗ obls ζ (R1 ∪ R2) ∗ th_phase_eq ζ π ∗ Q R1 R2 ∗ ⌜ R1 ## R2 ⌝) -∗
         AMU__f E ζ ζ' obls_act P (aeGS := oGS').
     Proof using.
       simpl. iIntros "BOU".
@@ -164,11 +164,11 @@ Section ProgramLogic.
       iApply AMU_impl_wand.
       2: { iApply (BOU_AMU__f_strong with "[BOU]").
            iApply (BOU_wand with "[] [$]").
-           iIntros "(IMPL & (%&%&?&?&?&?))".
+           iIntros "(IMPL & (%&%&%&?&?&?&?&?))".
            do 2 iExists _. iFrame.
            iAccu. }
       iIntros "IMPL".
-      iDestruct "IMPL" as "(%&%&%&?&?&?&?&?&IMPL&?)".
+      iDestruct "IMPL" as "(%&%&%&%&?&?&?&?&?&(IMPL&?)&?)".
       iApply "IMPL". iFrame. 
     Qed.
 
@@ -182,10 +182,14 @@ Section ProgramLogic.
     Proof using.
       clear H1 H0 H.
       iIntros "BOU".
-      iApply (BOU_AMU__f'_strong _ _ _ _ (fun R => ( ⌜ R = R0 ⌝)%I)).
+      iApply (BOU_AMU__f'_strong _ _ _ _ (fun R1 R2 => ( ⌜ R1 = R0 ∖ R' /\ R2 = R0 ∩ R' ⌝)%I)).
       iApply (BOU_wand with "[] [$]"). iIntros "(P & (%&?&?&?))".
-      iFrame. iSplit; [| done].
-      iIntros "(%&%&%&?&?&?&?&?&->)".
+      iFrame. iSplitR.
+      2: { do 2 iExists _. iSplitL.
+           2: { iPureIntro. split; [split| ]; try reflexivity. set_solver. }
+           iApply (obls_proper with "[$]").
+           by rewrite difference_union_intersection. }
+      iIntros "(%&%&%&%&?&?&?&?&?&[-> ->]&?)".
       iFrame. 
     Qed.
 

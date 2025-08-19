@@ -1255,28 +1255,34 @@ Section ObligationsRepr.
       red. eauto.
     Qed.
 
-    Lemma obls_msi_interim_omtrans_fork_strong δ E τ τ' π Q R'
+    Lemma obls_msi_interim_omtrans_fork_strong δ E τ τ' π
+      (Q: gset SignalId -> gset SignalId -> iProp Σ)
       (FRESH: τ' ∉ dom $ ps_phases δ)
       (DPO: dom_phases_obls δ)
       :
       ⊢ obls_msi δ -∗
-        BOU E LIM_STEPS (∃ d R, cp π d ∗ obls τ R ∗ th_phase_eq τ π ∗ Q R) ={E}=∗
-        ∃ δ' π1 π2 R,
+        BOU E LIM_STEPS (∃ d R1 R2, cp π d ∗ obls τ (R1 ∪ R2) ∗ th_phase_eq τ π ∗ Q R1 R2 ∗ ⌜ R1 ## R2 ⌝) ={E}=∗
+        ∃ δ' π1 π2 R1 R2,
           obls_msi δ' ∗
-            obls τ (R ∖ R') ∗ th_phase_eq τ π1 ∗
-            obls τ' (R ∩ R') ∗ th_phase_eq τ' π2 ∗
+            obls τ R1 ∗ th_phase_eq τ π1 ∗
+            obls τ' R2 ∗ th_phase_eq τ' π2 ∗
             ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝ ∗
             ⌜ rel_compose (flip progress_step τ) (fork_step_of τ) δ δ' ⌝ ∗
-            Q R.
+            Q R1 R2 ∗ ⌜ R1 ## R2 ⌝.
     Proof using.
+      clear H1 H0 H. 
       iIntros "MSI BOU".
-      rewrite /BOU. iMod ("BOU" with "[MSI]") as (n) "(MSI & %BOUND & (%d & %R & PHN & OB & CP & Q))".
+      rewrite /BOU. iMod ("BOU" with "[MSI]") as (n) "(MSI & %BOUND & (%d & %R1 & %R2 & PHN & OB & CP & Q & %DISJ))".
       { rewrite /obls_msi_interim. iExists _. iFrame.
         iPureIntro. by apply nsteps_0. }
       iDestruct (obls_msi_interim_omtrans_fork_impl with "[$] [$] [$] [$]") as "UPD"; try done.
       { lia. }
       iMod "UPD" as "(%&%&%&?&?&?&?&?&?&?)".
-      iModIntro. repeat iExists _. by iFrame.
+      iModIntro. repeat iExists _. iFrame.
+      Unshelve. 2: exact R2.
+      assert ((R1 ∪ R2) ∖ R2 = R1 /\ (R1 ∪ R2) ∩ R2 = R2) as [-> ->].
+      { set_solver. }
+      iSplit; done. 
     Qed.
 
     Lemma obls_msi_interim_omtrans_fork δ E τ τ' π R R' P
@@ -1292,11 +1298,17 @@ Section ObligationsRepr.
             ⌜ phase_lt π π1 /\ phase_lt π π2 ⌝ ∗
             ⌜ rel_compose (flip progress_step τ) (fork_step_of τ) δ δ' ⌝ ∗ P. 
     Proof using.
+      clear H1 H0 H.
       iIntros "MSI BOU".
-      iMod (obls_msi_interim_omtrans_fork_strong _ _ _ _ _ (fun R_ => (P ∗ ⌜ R_ = R ⌝)%I)
+      iMod (obls_msi_interim_omtrans_fork_strong _ _ _ _ _ (fun R1 R2 => (P ∗ ⌜ R1 = R ∖ R' /\ R2 = R ∩ R'⌝)%I)
             with "[$] [BOU]") as "UPD"; try set_solver.
-      { iApply (BOU_wand with "[] [$]"). iIntros "(%&?&?&?&P)". by iFrame. }
-      iDestruct "UPD" as "(%&%&%&%&?&?&?&?&?&?&?&?&->)".
+      { iApply (BOU_wand with "[] [$]"). iIntros "(%&?&?&?&P)".
+        do 3 iExists _. iFrame. iSplit.
+        2: { iPureIntro. split; [split| ]; try reflexivity. set_solver. }
+        iApply (obls_proper with "[$]").
+        by rewrite difference_union_intersection. }
+        
+      iDestruct "UPD" as "(%&%&%&%&%&?&?&?&?&?&?&?&(?&[-> ->])&?)".
       iModIntro. iFrame. 
     Qed.
     
