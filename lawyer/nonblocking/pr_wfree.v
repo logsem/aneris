@@ -861,6 +861,23 @@ Section WaitFreePR.
     rewrite /obls_τi'. by rewrite SAME.
   Qed.
 
+  Lemma BOU_wait_τi `{!ObligationsGS Σ} `{invGS_gen HasNoLc Σ} τ π:
+    obls τ ∅ -∗ th_phase_eq τ π -∗ obls_τi -∗
+      BOU ∅ WF_SB (cp π d0 ∗ th_phase_eq τ π ∗ obls τ ∅ ∗ obls_τi). 
+  Proof using.
+    clear m WFS F. 
+    iIntros "OB PH OBτi".
+    rewrite /obls_τi. iDestruct "OBτi" as "(%s & OBτi & SGN & #EP)".    
+    iMod (expect_sig_upd with "[] [$] OB [] [$]") as "(?&?&?&?)".
+    { iApply (ep_weaken with "[$]"). apply (phase_le_init π). } 
+    { (* TODO: Make a lemma *)
+      rewrite /sgns_level_gt. rewrite /sgns_levels_gt'.
+      rewrite /sgns_levels_rel.
+      set_solver. }
+    { rewrite /WF_SB. lia. }
+    iModIntro. iFrame "#∗".
+  Qed.
+
   Program Definition PR_wfree {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}:
     @ProgressResource heap_lang M Σ (@iem_invGS _ _ _ _ _ Hinv)
       state_interp wfree_trace_inv
@@ -1624,7 +1641,124 @@ Section WaitFreePR.
              rewrite CTX.
              simpl. rewrite -H. 
              iApply (wp_stuck_mono with "[$]"). done.
-      + 
+      + apply leb_complete_conv in LEN. simpl in LEN. 
+
+        iClear "CPS".
+        iAssert (extra_fuel (etr :tr[ Some τ ]: (t1 ++ e' :: t2 ++ efs, σ'))) as "CPS'".
+        { rewrite /extra_fuel. rewrite leb_correct_conv; [done| ].
+          simpl. lia. }
+        
+        iDestruct (cur_obls_sigs_other_step with "[$]") as "(OB & OBτi & OBLS)".
+        { by rewrite FIN. }
+        { congruence. }
+        iDestruct (cur_phases_other_step with "[$]") as "(PH & PHS)"; eauto.
+        { rewrite FIN. subst τ. eauto. }
+        iDestruct "PH" as (π) "PH". rewrite H3.
+
+        rewrite {1}/obls_τi'.
+        rewrite decide_True.
+        2: { apply fic_has_τi; eauto. eapply fits_inf_call_prev; eauto. }
+
+        remember (step_fork (trace_last etr) (t1 ++ e' :: t2 ++ efs, σ')) as sf.
+        (* rewrite -Heqsf. *)
+
+        iDestruct (@pwp_MU_ctx_take_step _ _ _ Hinv with "TI [OB PH OBτi] WP") as "STEP".
+        1-2: by eauto.
+        { red. rewrite FIN. erewrite ectx_fill_emp. reflexivity. }
+        { done. }
+        { rewrite -Heqsf. 
+          iApply (MU_burn_cp _ _ _ ∅ _ (fun (R: gset SignalId) => (⌜ R = ∅ ⌝ ∗ obls_τi)%I) with "[-]").
+          iMod (BOU_wait_τi with "[$] [$] [$]") as "(?&?&?&?)".
+          iModIntro. iFrame. iSplit; [done| ]. iFrame. }
+          
+        iMod "STEP". iModIntro.
+        iMod "STEP". iModIntro. iNext. 
+        iMod "STEP". iModIntro.
+        iApply (step_fupdN_wand with "[STEP]"); first by iApply "STEP".
+        iIntros "STEP".
+        iMod "STEP" as (δ' ℓ) "(HSI & He2 & WPS' & MOD) /=".
+
+        iDestruct "MOD" as (π' R) "(PH & (-> & OBτi) & MOD')".
+        rewrite subseteq_empty_difference_L; [| done].
+        rewrite intersection_empty_r_L.         
+
+        iAssert (@state_interp _ M _ _ (etr :tr[ Some τ ]: (t1 ++ e' :: t2 ++ efs, σ')) _)%I with "[HSI]" as "TI".
+        { simpl. iDestruct "HSI" as "(?&?&?)". iFrame. }
+
+        iFrame "TI". iFrame "CPS'". iClear "CPS'".
+
+        iAssert (let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
+                 obls τ ∅ ∗
+                 from_option (λ τ', obls τ' ∅) ⌜ True ⌝ sf ∗
+                 from_option (λ τ', ∃ π'0, th_phase_eq τ' π'0) ⌜ True ⌝ sf)%I with "[MOD']" as "(OB & OB' & PH')".
+        { destruct sf; simpl. 
+          - iDestruct "MOD'" as (?) "(?&?&?)". iFrame.
+          - by iFrame. }
+
+        iSpecialize ("OBLS" with "[$] [OBτi] [OB']").
+        { rewrite /obls_τi'. rewrite decide_True; [done| ].
+          apply fic_has_τi in FIT; [done| ].
+          simpl. lia. }
+        { by iIntros (? [-> ?]). }
+        iFrame "OBLS".
+
+        iDestruct ("PHS" with "[$PH] [$]") as "[PHS _]". iFrame "PHS".
+        iModIntro.
+        rewrite app_comm_cons app_assoc. 
+        iApply wptp_from_gen_app. iSplitR "WPS'".
+        2: { simpl.
+             replace (newposts (t1 ++ e :: t2) ((t1 ++ e' :: t2) ++ efs)) with
+               (newposts (t1 ++ e' :: t2) ((t1 ++ e' :: t2) ++ efs)).
+             2: { apply adequacy_utils.newposts_locales_equiv.
+                  apply locales_equiv_middle. done. }
+             rewrite -new_threads_wptp_from_gen.
+             iApply (big_sepL_impl with "[$]").
+             iModIntro. 
+             iIntros (i x ITH).
+             rewrite /thread_pr.
+             destruct decide.
+             2: { simpl. list_simplifier.
+                  rewrite /locale_of. rewrite !length_app /=.
+                  by iIntros "$". }
+
+             apply fits_inf_call_prev, fits_inf_call_last_or_short in FIT.
+             destruct FIT as [(ec & FIT) | SHORT].
+             2: { simpl in SHORT. lia. }
+             red in FIT. destruct FIT as (?& IN & ?&?).
+             move IN at bottom. rewrite FIN /= e0 in IN.
+             (* replace (locale_of ((t1 ++ e' :: t2) ++ take i efs) x) with (locale_of ((t1 ++ e :: t2) ++ take i efs) x) in IN. *)
+             (* 2: { rewrite /locale_of !length_app. simpl. done. } *)
+             apply from_locale_lookup in IN.
+             apply lookup_lt_Some in IN.
+             rewrite /locale_of !length_app /= in IN. lia. } 
+
+        simpl.
+        iAssert (wptp_from_gen (thread_pr s (trace_length etr)) [] (t1 ++ e' :: t2) Φs)%I with "[-]" as "WPS".
+        { rewrite -EQ. iApply wptp_from_gen_app. iSplitL "WPS1"; [done| ].
+          simpl. rewrite -EQ'. iApply wptp_from_gen_cons. iSplitR "WPS2".
+          { rewrite /thread_pr. rewrite decide_False; [| done].
+            rewrite -H3. done. }
+          iApply (wptp_from_gen_locales_equiv_1 with "[$]").
+          (* TODO: make a lemma and use it above *)
+          rewrite !prefixes_from_app.
+          eapply Forall2_app; [apply adequacy_utils.locales_equiv_refl| ].
+          simpl. by constructor. }
+
+        (* TODO: Make a lemma *)
+        assert (forall a b c d, (a <=? b) = (c <=? d) <-> (a <= b <-> c <= d)) as LE.
+        { intros.
+          destruct (c0 <=? d) eqn:LE.
+          - rewrite Nat.leb_le. apply leb_complete in LE. lia. 
+          - rewrite Nat.leb_nle. apply leb_complete_conv in LE. lia. } 
+          
+        (* TODO: Make a lemma *)
+        iApply (big_sepL2_impl with "[$]").
+        iModIntro. 
+        iIntros (i pfi Φi PFith Φith).
+        rewrite /thread_pr.
+        erewrite (proj2 (LE _ _ _ _)).
+        { by iIntros "$". }
+        simpl in *. lia. 
 
   Admitted. 
   
