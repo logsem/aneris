@@ -161,4 +161,20 @@ Section Arithmetic.
     apply negb_prop_intro in O. rewrite Nat.negb_even in O. tauto.
   Qed.
 
+  Lemma leb_eq_equiv a b c d:
+    (a <=? b) = (c <=? d) <-> (a <= b <-> c <= d).
+  Proof using.
+    intros.
+    destruct (c <=? d) eqn:LE.
+    - rewrite Nat.leb_le. apply leb_complete in LE. lia. 
+    - rewrite Nat.leb_nle. apply leb_complete_conv in LE. lia.
+  Qed.
+
+  (* TODO: any simpler way? *)
+  Lemma half_inv2: (/2)%Qp = (1/2)%Qp.
+  Proof using. 
+    apply (Qp.mul_inj_r 2%Qp).
+    by rewrite Qp.mul_div_r Qp.mul_inv_r.
+  Qed.
+
 End Arithmetic.

@@ -369,3 +369,15 @@ Section SetMax.
   Qed.   
 
 End SetMax.
+
+
+Lemma set_seq_uniq2 s l1 l2:
+  (set_seq s l1: gset nat) = set_seq s l2 <-> l1 = l2.
+Proof using.
+  split; [| congruence]. 
+  intros EQ. rewrite set_eq in EQ.
+  repeat setoid_rewrite elem_of_set_seq in EQ.
+  destruct (Nat.lt_trichotomy l1 l2) as [LT | [? | LT]]; try done.
+  - specialize (EQ (s + l1)). lia.
+  - specialize (EQ (s + l2)). lia.
+Qed.

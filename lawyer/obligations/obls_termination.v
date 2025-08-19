@@ -523,10 +523,6 @@ Section Termination.
     eapply elem_of_dom; eauto.
   Qed.
 
-  Lemma update_cps_same_sigs δ cps':
-    ps_sigs (update_cps cps' δ) = ps_sigs δ.
-  Proof using. by destruct δ. Qed.
-
   Lemma owm_loc_step_ms_le
   (πτ : Phase)
   (τ : Locale)

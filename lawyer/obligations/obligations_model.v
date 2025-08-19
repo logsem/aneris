@@ -87,6 +87,14 @@ Section Model.
   Definition update_eb eb '(Build_ProgressState a b c d e _) :=
     Build_ProgressState a b c d e eb.
 
+  Lemma phases_update_phases πs δ:
+    ps_phases (update_phases πs δ) = πs.
+  Proof using. by destruct δ. Qed.
+
+  Lemma update_cps_same_sigs δ cps':
+    ps_sigs (update_cps cps' δ) = ps_sigs δ.
+  Proof using. by destruct δ. Qed.
+
   Definition lt_locale_obls l θ ps: Prop :=
     let obls: gset SignalId := default ∅ (ps_obls ps !! θ) in
     let levels': gset (option Level) :=
@@ -234,6 +242,11 @@ Section Model.
     {| mtrans := om_trans |}.
 
   Definition π0: Phase := nil.
+
+  Lemma phase_le_init π: phase_le π0 π.
+  Proof using.
+    red. rewrite /π0. apply suffix_nil.
+  Qed.
 
   Lemma loc_step_with_ex δ1 τ δ2
     (WITH: loc_step_with δ1 τ δ2):

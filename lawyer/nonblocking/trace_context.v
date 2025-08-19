@@ -1,6 +1,7 @@
 From trillium.traces Require Import exec_traces trace_lookup. 
 From trillium.program_logic Require Import language adequacy.
 
+
 Section TraceContext.
   Context `{EqDecision (locale Λ)}.
 
