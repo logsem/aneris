@@ -70,3 +70,18 @@ Section XX.
     end. 
 
 End XX.
+
+
+(* TODO: move to trillium *)
+Lemma prefixes_lookup_orig {A: Type}: 
+  forall (ll0 l: list A) i p a,
+  prefixes_from ll0 l !! i = Some (p, a) ->
+  l !! i = Some a.
+Proof using.
+  intros ll0 l. revert ll0. induction l.
+  { intros. simpl in *. set_solver. }
+  intros ???? ITH. simpl in *.
+  destruct i.
+  { simpl in ITH. inversion ITH. subst. eauto. }
+  simpl in ITH. apply IHl in ITH. eauto.
+Qed.

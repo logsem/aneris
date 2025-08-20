@@ -178,3 +178,14 @@ Section Arithmetic.
   Qed.
 
 End Arithmetic.
+
+
+(* TODO: find existing*)
+Lemma nth_error_lookup {A: Type} (l: list A) i:
+  nth_error l i = l !! i.
+Proof using.
+  rewrite /lookup. 
+  generalize dependent i. induction l.
+  { simpl. intros. by destruct i. }
+  intros. destruct i; try done. simpl. eauto.
+Qed.

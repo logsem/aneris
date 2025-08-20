@@ -1,4 +1,4 @@
-From fairness Require Import locales_helpers utils_sets.
+From fairness Require Import locales_helpers utils.
 From heap_lang Require Export lang tactics notation.
 
 Close Scope Z. 
@@ -13,8 +13,8 @@ Proof.
     destruct (decide (locale_of tp0 e1 = tid)).
     + intros ?; simplify_eq. rewrite /locale_of /= Nat.sub_diag.
       split; [done|lia].
-    + intros [H Hlen]%IH. rewrite app_length /= in H.
-      rewrite app_length /= in Hlen.
+    + intros [H Hlen]%IH. rewrite length_app /= in H.
+      rewrite length_app /= in Hlen.
       destruct tid as [|tid]; first lia.
       assert (Heq1 : (length tp0 + 1 = S (length tp0))%nat) by lia.
       rewrite Heq1 in Hlen.
@@ -31,8 +31,8 @@ Proof.
     + intros [Hlk Hlen]. assert (length tp0 < tid)%nat as Hle by lia.
       simpl. rewrite decide_False //. apply IH. split.
       * assert (tid - length tp0 = S ((tid - 1) - length tp0))%nat as Heq by lia.
-        rewrite Heq /= in Hlk. rewrite -Hlk app_length /=. f_equal; lia.
-      * rewrite app_length /=. apply Nat.le_succ_l in Hle. rewrite Nat.add_comm //.
+        rewrite Heq /= in Hlk. rewrite -Hlk length_app /=. f_equal; lia.
+      * rewrite length_app /=. apply Nat.le_succ_l in Hle. rewrite Nat.add_comm //.
 Qed.
 
   
@@ -53,7 +53,7 @@ Proof.
   revert es'. induction es; [done|]; intros es'.
   rewrite locales_of_list_from_cons=> /=. rewrite /locale_of.
   f_equiv; [lia|]. rewrite IHes. apply imap_ext.
-  intros x ? Hin. rewrite app_length=> /=. lia.
+  intros x ? Hin. rewrite length_app=> /=. lia.
 Qed.
 
 Lemma locales_of_list_indexes (es : list expr) :
@@ -71,7 +71,7 @@ Qed.
 
 Lemma length_upd_middle {A: Type} (x y: A) l1 l2:
   length (l1 ++ x :: l2) = length (l1 ++ y :: l2).
-Proof.  intros. rewrite !app_length. simpl. lia. Qed.
+Proof.  intros. rewrite !length_app. simpl. lia. Qed.
 
 Lemma locale_step_sub c1 c2 τ
   (STEP: locale_step c1 (Some τ) c2):
@@ -80,7 +80,7 @@ Proof.
   inversion STEP. subst.
   
   rewrite !locales_of_cfg_simpl. 
-  rewrite app_comm_cons. rewrite app_assoc. rewrite (app_length _ efs). 
+  rewrite app_comm_cons. rewrite app_assoc. rewrite (length_app _ efs). 
   rewrite -!list_to_set_seq. rewrite seq_app.
   rewrite list_to_set_app.
   rewrite (length_upd_middle e1 e2). set_solver.
@@ -280,4 +280,37 @@ Lemma locale_step_fork_Some c1 τ c2 τ'
 Proof using.
   apply gset_pick_Some in FORK.
   eapply locale_step_fresh_exact in FORK; eauto.
+Qed.
+
+
+Lemma thread_pool_split (tp: list expr) (τ: locale heap_lang):
+  exists tp1 tp2 tp', tp = tp1 ++ tp' ++ tp2 /\ (tp' = [] \/ exists e, tp' = [e] /\ τ = locale_of tp1 e) /\
+    τ ∉ locales_of_list_from [] tp1 /\ τ ∉ locales_of_list_from (tp1 ++ tp') tp2.
+Proof using.
+  destruct (decide (τ ∈ (locales_of_list tp))).
+  2: { exists tp, [], []. split; [by list_simplifier| ].
+       split.
+       { tauto. }
+       split; auto. rewrite app_nil_r. simpl. set_solver. }
+  apply elem_of_list_In, In_nth_error in e. destruct e as (i & ITH).
+  rewrite locales_of_list_locales in ITH.
+  rewrite nth_error_map in ITH.
+  destruct nth_error as [[??]|] eqn:ITH'; [| done]. simpl in ITH.
+  inversion ITH. clear ITH. 
+  rewrite nth_error_lookup in ITH'.
+  pose proof ITH' as ITH%prefixes_lookup_orig.
+  pose proof ITH as (tp1 & tp2 & EQ & LEN1)%elem_of_list_split_length.
+  apply prefixes_ith_length in ITH'. simpl in ITH'.
+  exists tp1, tp2, [e]. split; [done| ]. split.
+  { right. eexists. split; eauto.
+    revert H0. rewrite /locale_of.
+    congruence. }
+  split.
+  - intros IN. rewrite /locale_of locales_of_list_from_indexes /= in IN.
+    apply elem_of_lookup_imap in IN as (?&?&?&?).
+    subst. apply lookup_lt_Some in H1. lia.
+  - intros IN. rewrite /locale_of locales_of_list_from_indexes /= in IN.
+    apply elem_of_lookup_imap in IN as (?&?&?&?).
+    subst. rewrite length_app /= in H. 
+    apply lookup_lt_Some in H1. lia.
 Qed.

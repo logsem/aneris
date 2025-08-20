@@ -702,20 +702,6 @@ Section WaitFreePR.
     iModIntro. iFrame "#∗".
   Qed.
 
-  Lemma prefixes_lookup_orig {A: Type} (ll0 l: list A) i p a
-    (ITH: prefixes_from ll0 l !! i = Some (p, a)):
-    l !! i = Some a.
-  Proof using.
-    generalize dependent ll0. generalize dependent i.
-    generalize dependent p. generalize dependent a.
-    induction l.
-    { intros. simpl in *. set_solver. }
-    intros. simpl in *.
-    destruct i.
-    { simpl in ITH. inversion ITH. subst. eauto. }
-    simpl in ITH. apply IHl in ITH. eauto.
-  Qed.
-
   Lemma wptp_wfree_other_simpl {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
     s (etr: execution_trace heap_lang) tp0 tp Φs
     (OTHER: τi ∉ locales_of_list_from tp0 tp):
@@ -746,42 +732,22 @@ Section WaitFreePR.
     iModIntro. by iFrame.
   Qed.
 
-  (* TODO: move, find existing*)
-  Lemma nth_error_lookup {A: Type} (l: list A) i:
-    nth_error l i = l !! i.
-  Proof using.
-    rewrite /lookup. 
-    generalize dependent i. induction l.
-    { simpl. intros. by destruct i. }
-    intros. destruct i; try done. simpl. eauto.
-  Qed.    
-
-  Program Definition PR_wfree {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}:
-    @ProgressResource heap_lang M Σ (@iem_invGS _ _ _ _ _ Hinv)
-      state_interp wfree_trace_inv
-
-      (* fork_post *)
-      (fun _ _ =>
-         let _ := IEM_irisG HeapLangEM EM in
-         ⌜ True ⌝%I: iProp Σ) (* because upon forks we only obtain pwp .. { True } *)
-
-      (fits_inf_call ic m ai) :=
-    {| pr_pr := pr_pr_wfree |}.
-  Next Obligation.
-    intros ??? etr Φs FIT.
+  Lemma wptp_wfree_posts {Σ: gFunctors} (Hinv : IEMGS HeapLangEM EM Σ)
+    (s : stuckness) (etr: execution_trace heap_lang) (Φs : list (val → iProp Σ))
+    (FIT: fits_inf_call ic m ai etr):
+    let Ps := adequacy_utils.posts_of (trace_last etr).1 Φs in
+    pr_pr_wfree s etr Φs -∗ |~~| Ps ∗ (Ps -∗ pr_pr_wfree s etr Φs).
+  Proof using. 
+    simpl. 
     set (Ps := adequacy_utils.posts_of (trace_last etr).1 Φs). simpl. 
     iUnfold pr_pr_wfree.
     iIntros "(WPS & CPS & PH & OB)".
 
     iAssert (pre_step top top (Ps ∗ (Ps -∗ wptp_wfree s etr Φs)) (irisG0 := {|
       iris_invGS :=
-        @iem_invGS heap_lang
-          (AM2M
-             (@ObligationsAM (@sigO natO (λ i : nat, i < 2)) unitO
-                (locale heap_lang) WF_SB OP Nat.inhabited))
-          HeapLangEM EM Σ Hinv;
+        @iem_invGS heap_lang (AM2M _) HeapLangEM EM Σ Hinv;
       state_interp :=
-        @state_interp heap_lang M Σ (@IEM_irisG heap_lang M HeapLangEM EM Σ Hinv);
+        @state_interp heap_lang M Σ _;
       fork_post := λ (_ : locale heap_lang) (_ : language.val heap_lang), True        
     |}))%I with "[WPS]" as "CLOS".
     2: { iMod "CLOS". iModIntro. by iFrame. }
@@ -791,36 +757,7 @@ Section WaitFreePR.
 
     destruct (trace_last etr) as [tp σ] eqn:LAST. simpl. 
 
-    assert (exists tp1 tp2 tp', 
-               tp = tp1 ++ tp' ++ tp2 /\ (tp' = [] \/ exists e, tp' = [e] /\ τi = locale_of tp1 e) /\
-               τi ∉ locales_of_list_from [] tp1 /\ τi ∉ locales_of_list_from (tp1 ++ tp') tp2).
-    { destruct (decide (τi ∈ (locales_of_list tp))).
-      2: { exists tp, [], []. split; [by list_simplifier| ].
-           split.
-           { tauto. }
-           split; auto. rewrite app_nil_r. simpl. set_solver. }
-      apply elem_of_list_In, In_nth_error in e. destruct e as (i & ITH).
-      rewrite locales_of_list_locales in ITH.
-      rewrite nth_error_map in ITH.
-      destruct nth_error as [[??]|] eqn:ITH'; [| done]. simpl in ITH.
-      inversion ITH. clear ITH. 
-      rewrite nth_error_lookup in ITH'.
-      pose proof ITH' as ITH%prefixes_lookup_orig.
-      pose proof ITH as (tp1 & tp2 & EQ & LEN1)%elem_of_list_split_length.
-      apply prefixes_ith_length in ITH'. simpl in ITH'.
-      exists tp1, tp2, [e]. split; [done| ]. split.
-      { right. eexists. split; eauto.
-        revert H0. rewrite /locale_of.
-        congruence. }
-      split.
-      - intros IN. rewrite /locale_of locales_of_list_from_indexes /= in IN.
-        apply elem_of_lookup_imap in IN as (?&?&?&?).
-        subst. apply lookup_lt_Some in H1. lia.
-      - intros IN. rewrite /locale_of locales_of_list_from_indexes /= in IN.
-        apply elem_of_lookup_imap in IN as (?&?&?&?).
-        subst. rewrite length_app /= in H. 
-        apply lookup_lt_Some in H1. lia. }
-    destruct H as (tp1 & tp2 & tp' & -> & TP' & NO1 & NO2).
+    pose proof (thread_pool_split tp τi) as (tp1 & tp2 & tp' & -> & TP' & NO1 & NO2).
 
     iDestruct (wptp_gen_split_1 with "WPS") as %X.
     destruct X as (Φs1 & Φs' & <- & LEN1 & LEN').
@@ -874,17 +811,44 @@ Section WaitFreePR.
     { by rewrite wptp_wfree_other_simpl. }
     simpl. iApply wptp_from_gen_app. iFrame.
     by rewrite wptp_wfree_other_simpl.
-  Qed. 
-  Next Obligation.
-    iIntros "* %VALID %END %FIT SI PR".
+  Qed.    
+
+  Lemma wptp_wfree_not_stuck {Σ : gFunctors} (Hinv : IEMGS HeapLangEM EM Σ) 
+    (s : stuckness) (ex : execution_trace heap_lang) 
+    (Φs : list (language.val heap_lang → iProp Σ)) 
+    (σ : language.state heap_lang) (atr : auxiliary_trace M) 
+    (tp trest : list (language.expr heap_lang))
+    (VALID: valid_exec ex)
+    (LAST: trace_ends_in ex (tp ++ trest, σ))
+    (FIT: fits_inf_call ic m ai ex):
+    state_interp ex atr -∗ pr_pr_wfree s ex Φs ={⊤}=∗
+    state_interp ex atr ∗ pr_pr_wfree s ex Φs ∗
+    ⌜∀ e: expr, e ∈ tp → s = NotStuck → not_stuck e (trace_last ex).2⌝ .
+  Proof using.
+    iIntros "SI PR".
     rewrite /pr_pr_wfree. iDestruct "PR" as "(WPS &X&Y&Z)".
     iFrame "X Y Z".
     iApply (wptp_wfre_not_stuck with "[$] [$]"); eauto.
   Qed.
-  Final Obligation.
-    intros ??? etr Φs c oτ c' mtr VALID FIN STEP.
-    (* Set Printing Implicit. *)
-    iIntros "_ TI #INV PR %FIT". (* cwp is not needed*)
+
+  Lemma wptp_wfree_take_step {Σ} (Hinv : IEMGS HeapLangEM EM Σ) (s : stuckness) 
+    (etr : execution_trace heap_lang) (Φs : list (language.val heap_lang → iProp Σ)) 
+    (c : cfg heap_lang) (oτ : olocale heap_lang) (c' : cfg heap_lang) 
+    (mtr : auxiliary_trace M)
+    (VALID: valid_exec etr)
+    (FIN: trace_ends_in etr c)
+    (STEP: locale_step c oτ c')
+    (FIT: fits_inf_call ic m ai (etr :tr[ oτ ]: c')):
+    state_interp etr mtr -∗ wfree_trace_inv etr mtr -∗
+    pr_pr_wfree s etr Φs 
+    ={⊤,∅}=∗ |={∅}▷=>^(S (trace_length etr)) |={∅,⊤}=>
+    ⌜∀ e2: expr, s = NotStuck → e2 ∈ c'.1 → not_stuck e2 c'.2⌝ ∗
+    ∃ (δ' : M) (ℓ : mlabel M),
+      state_interp (etr :tr[ oτ ]: c') (mtr :tr[ ℓ ]: δ') ∗
+      wfree_trace_inv (etr :tr[ oτ ]: c') (mtr :tr[ ℓ ]: δ') ∗
+      pr_pr_wfree s (etr :tr[ oτ ]: c') (Φs ++ newposts c.1 c'.1).
+  Proof using.
+    iIntros "TI #INV PR".
 
     (* our PR instance in fact implies this not-stuck property *)
     (* TODO: ? move this property to definition of PR? *)
@@ -1693,6 +1657,29 @@ Section WaitFreePR.
         erewrite (proj2 (leb_eq_equiv _ _ _ _)).
         { by iIntros "$". }
         simpl in *. lia. 
+  Qed.
+  
+  Program Definition PR_wfree {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}:
+    @ProgressResource heap_lang M Σ (@iem_invGS _ _ _ _ _ Hinv)
+      state_interp wfree_trace_inv
+
+      (* fork_post *)
+      (fun _ _ =>
+         let _ := IEM_irisG HeapLangEM EM in
+         ⌜ True ⌝%I: iProp Σ) (* because upon forks we only obtain pwp .. { True } *)
+
+      (fits_inf_call ic m ai) :=
+    {| pr_pr := pr_pr_wfree |}.
+  Next Obligation.
+    apply @wptp_wfree_posts. 
+  Qed.
+  Next Obligation.
+    apply @wptp_wfree_not_stuck. 
+  Qed.
+  Final Obligation.
+    intros ??? etr Φs c oτ c' mtr VALID FIN STEP.
+    iIntros "_ TI #INV PR %FIT". (* cwp is not needed*)
+    iApply (wptp_wfree_take_step with "[$] [$] [$]"); eauto.  
   Qed.
 
 End WaitFreePR.
