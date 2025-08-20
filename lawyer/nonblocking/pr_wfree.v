@@ -1,7 +1,6 @@
 From iris.proofmode Require Import tactics.
 From trillium.traces Require Import inftraces trace_lookup exec_traces trace_len. 
 From fairness Require Import fairness locales_helpers.
-(* From lawyer.examples Require Import orders_lib obls_tactics. *)
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am obls_termination obligations_wf.
 From lawyer.nonblocking Require Import trace_context om_wfree_inst wptp_gen pwp wfree_traces.
 From trillium.program_logic Require Import execution_model weakestpre adequacy_utils adequacy_cond simulation_adequacy_em_cond. 
@@ -103,11 +102,12 @@ Section WaitFreePR.
     ex atr σ tp trest s Φs :
     valid_exec ex →
     trace_ends_in ex (tp ++ trest, σ) →
+    fits_inf_call ic m ai ex ->
     state_interp ex atr -∗ wptp_wfree s ex Φs ={⊤}=∗
     state_interp ex atr ∗ wptp_wfree s ex Φs ∗
     ⌜∀ e, e ∈ tp → s = NotStuck → not_stuck e (trace_last ex).2⌝.
   Proof.
-    iIntros (Hexvalid Hex) "HSI Ht".
+    iIntros (Hexvalid Hex FIT) "HSI Ht".
     rewrite assoc.
     iApply fupd_plain_keep_r; iFrame.
     iIntros "[HSI Ht]".
@@ -130,16 +130,14 @@ Section WaitFreePR.
       { simpl. rewrite /phys_SI. simpl.
         by iDestruct "HSI" as "(?&?&?)". }
       simpl. by rewrite Hex.
-    - assert (fits_inf_call ic m ai ex) as FITS.
-      { admit. }
-      apply fits_inf_call_last_or_short in FITS as [(ec & FITS) | SHORT].
+    - apply fits_inf_call_last_or_short in FIT as [(ec & FIT) | SHORT].
       2: { apply Nat.leb_gt in LEN. 
            exfalso. clear -LEN SHORT.
            (* TODO: why lia doesn't work? *)
            by apply Nat.lt_nge in LEN. }
-      rewrite Hex in FITS.
+      rewrite Hex in FIT.
 
-      eapply runs_call_helper in FITS; eauto. destruct FITS as (CUR & NVAL).
+      eapply runs_call_helper in FIT; eauto. destruct FIT as (CUR & NVAL).
 
       rewrite CUR.
       pose proof CUR as <-%under_ctx_spec. 
@@ -161,7 +159,7 @@ Section WaitFreePR.
       simpl. by rewrite Hex in NS.
     (* TODO: get rid of this? *)
     Unshelve. all: by apply trace_singleton. 
-  Admitted.
+  Qed. 
 
   Definition extra_fuel `{!ObligationsGS Σ} (etr: execution_trace heap_lang) :=
     let len := trace_length etr in
@@ -742,14 +740,11 @@ Section WaitFreePR.
     admit.
   Admitted.
   Next Obligation.
-    iIntros "* %VALID %END SI PR".
+    iIntros "* %VALID %END %FIT SI PR".
     rewrite /pr_pr_wfree. iDestruct "PR" as "(WPS &X&Y&Z)".
     iFrame "X Y Z".
-    (* TODO: we can probably weaken this obligation,
-       since t0 is never used? *)
-    assert (t0 = []) as -> by admit. simpl in END.
     iApply (wptp_wfre_not_stuck with "[$] [$]"); eauto.
-  Admitted. 
+  Qed.
   Final Obligation.
     intros ??? etr Φs c oτ c' mtr VALID FIN STEP.
     (* Set Printing Implicit. *)
