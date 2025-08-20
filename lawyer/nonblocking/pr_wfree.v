@@ -702,6 +702,67 @@ Section WaitFreePR.
     iModIntro. iFrame "#∗".
   Qed.
 
+  Lemma prefixes_lookup_orig {A: Type} (ll0 l: list A) i p a
+    (ITH: prefixes_from ll0 l !! i = Some (p, a)):
+    l !! i = Some a.
+  Proof using.
+    generalize dependent ll0. generalize dependent i.
+    generalize dependent p. generalize dependent a.
+    induction l.
+    { intros. simpl in *. set_solver. }
+    intros. simpl in *.
+    destruct i.
+    { simpl in ITH. inversion ITH. subst. eauto. }
+    simpl in ITH. apply IHl in ITH. eauto.
+  Qed.
+
+  Lemma wptp_wfree_other_simpl {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
+    s (etr: execution_trace heap_lang) tp0 tp Φs
+    (OTHER: τi ∉ locales_of_list_from tp0 tp):
+    wptp_from_gen (thread_pr s (trace_length etr)) tp0 tp Φs ⊣⊢
+    let _ := iris_OM_into_Looping (EM := EM) in
+    wptp_from tp0 s tp Φs.
+  Proof using.
+    rewrite /wptp_from_gen.
+    iApply big_sepL2_proper; try done.
+    intros ? [??] ? IN IN'. rewrite /thread_pr. simpl.
+    rewrite decide_False; [done| ].
+    intros ->. apply OTHER.
+    rewrite /locale_of. rewrite locales_of_list_from_indexes.
+    pose proof IN as ITH%prefixes_lookup_orig. 
+    apply prefixes_from_ith_length in IN. simpl in IN.
+    apply elem_of_lookup_imap. eauto.
+  Qed.
+
+  (* TODO: move, ? generalize *)
+  Lemma pre_step_looping_wfree_elim {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
+    (P: iProp Σ):
+    (let _ := iris_OM_into_Looping (EM := EM) in |~~| P) -∗ (|~~| P).
+  Proof using.
+    simpl. iIntros "P".
+    rewrite !weakestpre.pre_step_unseal. rewrite /pre_step_def. simpl. 
+    iIntros (etr atr) "(%EVOL & PHYS & MSI)". simpl.
+    iMod ("P" $! etr looping_trace with "PHYS") as "(PHYS & P)".
+    iModIntro. by iFrame.
+  Qed.
+
+  (* TODO: move *)
+  Lemma under_ctx_val_Some_inv (e ec: expr) K
+    (CTX: under_ctx K e = Some ec)
+    (VAL: is_Some (language.to_val e)):
+    K = ectx_emp /\ ec = e.
+  Proof using. Admitted.
+
+  (* TODO: move, find existing*)
+  Lemma nth_error_lookup {A: Type} (l: list A) i:
+    nth_error l i = l !! i.
+  Proof using.
+    rewrite /lookup. 
+    generalize dependent i. induction l.
+    { simpl. intros. by destruct i. }
+    intros. destruct i; try done. simpl. eauto.
+  Qed.    
+
   Program Definition PR_wfree {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}:
     @ProgressResource heap_lang M Σ (@iem_invGS _ _ _ _ _ Hinv)
       state_interp wfree_trace_inv
@@ -714,11 +775,12 @@ Section WaitFreePR.
       (fits_inf_call ic m ai) :=
     {| pr_pr := pr_pr_wfree |}.
   Next Obligation.
-    intros.
+    intros ??? etr Φs FIT.
+    set (Ps := adequacy_utils.posts_of (trace_last etr).1 Φs). simpl. 
     iUnfold pr_pr_wfree.
     iIntros "(WPS & CPS & PH & OB)".
 
-    iAssert (pre_step top top (Ps ∗ (Ps -∗ wptp_wfree s ex Φs)) (irisG0 := {|
+    iAssert (pre_step top top (Ps ∗ (Ps -∗ wptp_wfree s etr Φs)) (irisG0 := {|
       iris_invGS :=
         @iem_invGS heap_lang
           (AM2M
@@ -733,12 +795,93 @@ Section WaitFreePR.
     rewrite /wptp_wfree.
     iDestruct (big_sepL2_length with "[$]") as "%LENS".
     rewrite adequacy_utils.prefixes_from_length in LENS.
-(*    (* split thread pool into three parts, 
-       "frame" the outer two using wptp_of_val_post,
-       prove the remaining wp/pwp part for τi *) *)
-    (* now it's trivial, due to True postconditions? *)
-    admit.
-  Admitted.
+
+    destruct (trace_last etr) as [tp σ] eqn:LAST. simpl. 
+
+    assert (exists tp1 tp2 tp', 
+               tp = tp1 ++ tp' ++ tp2 /\ (tp' = [] \/ exists e, tp' = [e] /\ τi = locale_of tp1 e) /\
+               τi ∉ locales_of_list_from [] tp1 /\ τi ∉ locales_of_list_from (tp1 ++ tp') tp2).
+    { destruct (decide (τi ∈ (locales_of_list tp))).
+      2: { exists tp, [], []. split; [by list_simplifier| ].
+           split.
+           { tauto. }
+           split; auto. rewrite app_nil_r. simpl. set_solver. }
+      apply elem_of_list_In, In_nth_error in e. destruct e as (i & ITH).
+      rewrite locales_of_list_locales in ITH.
+      rewrite nth_error_map in ITH.
+      destruct nth_error as [[??]|] eqn:ITH'; [| done]. simpl in ITH.
+      inversion ITH. clear ITH. 
+      rewrite nth_error_lookup in ITH'.
+      pose proof ITH' as ITH%prefixes_lookup_orig.
+      pose proof ITH as (tp1 & tp2 & EQ & LEN1)%elem_of_list_split_length.
+      apply prefixes_ith_length in ITH'. simpl in ITH'.
+      exists tp1, tp2, [e]. split; [done| ]. split.
+      { right. eexists. split; eauto.
+        revert H0. rewrite /locale_of.
+        congruence. }
+      split.
+      - intros IN. rewrite /locale_of locales_of_list_from_indexes /= in IN.
+        apply elem_of_lookup_imap in IN as (?&?&?&?).
+        subst. apply lookup_lt_Some in H1. lia.
+      - intros IN. rewrite /locale_of locales_of_list_from_indexes /= in IN.
+        apply elem_of_lookup_imap in IN as (?&?&?&?).
+        subst. rewrite length_app /= in H. 
+        apply lookup_lt_Some in H1. lia. }
+    destruct H as (tp1 & tp2 & tp' & -> & TP' & NO1 & NO2).
+
+    iDestruct (wptp_gen_split_1 with "WPS") as %X.
+    destruct X as (Φs1 & Φs' & <- & LEN1 & LEN').
+    iDestruct (wptp_from_gen_app' with "[$]") as "[WPS1 WPS'] /="; [done| ].
+
+    rewrite wptp_wfree_other_simpl; [| done]. simpl. 
+    iPoseProof (wptp_of_val_post with "WPS1") as "foo".
+
+    iDestruct (wptp_gen_split_1 with "WPS'") as %X.
+    destruct X as (Φs_ & Φs2 & <- & LEN2 & LEN'').
+    iDestruct (wptp_from_gen_app' with "WPS'") as "[WPS' WPS2]"; [done| ].
+    
+    erewrite wptp_wfree_other_simpl with (tp0 := tp1 ++ tp'); [| done].
+    iPoseProof (wptp_of_val_post with "WPS2") as "bar".
+
+    iAssert (|~~| adequacy_utils.posts_of tp' Φs_ ∗ (adequacy_utils.posts_of tp' Φs_ -∗ wptp_from_gen (thread_pr s (trace_length etr)) tp1 tp' Φs_))%I with "[WPS']" as "WPS'".
+    { destruct TP' as [-> | (e & -> & EQ)].
+      { iModIntro. rewrite /adequacy_utils.posts_of. simpl. set_solver. }
+      destruct Φs_ as [ | ? [|] ].
+      1, 3: simpl in LEN2; lia.
+      rewrite wptp_gen_singleton.
+      rewrite /adequacy_utils.posts_of. simpl.
+      destruct (to_val e) eqn:VAL; simpl.
+      2: { iFrame. iModIntro. set_solver. }
+      rewrite /thread_pr. rewrite decide_True; [| done].
+      pose proof (language.of_to_val e _ VAL) as EV. rewrite -EV.        
+      rewrite /wp_tc. destruct leb eqn:LEN.
+      - iPoseProof (wp_value_inv' with "WPS'") as "foo".
+        iMod (pre_step_looping_wfree_elim with "foo") as "foo".
+        iModIntro. iFrame. iIntros "(? & _)".
+        by iApply @wp_value'.
+      - apply fits_inf_call_last_or_short in FIT. destruct FIT as [(ec & RUNS) | SHORT].
+        2: { apply leb_complete_conv in LEN. simpl in SHORT. lia. }
+        red in RUNS. destruct RUNS as (e_ & TI & CTX & NVAL).
+        rewrite LAST /= in TI. fold τi in TI. rewrite EQ in TI.
+        rewrite /from_locale in TI. rewrite from_locale_from_locale_of in TI.
+        inversion TI. subst e_.
+        simpl in EV. subst.  
+        apply under_ctx_val_Some_inv in CTX as [? ->]; eauto.
+        congruence. }
+      
+    iMod (pre_step_looping_wfree_elim with "foo") as "[P1 WPS1]". 
+    iMod (pre_step_looping_wfree_elim with "bar") as "[P2 WPS2]".
+    iMod "WPS'" as "[P' WPS']".  
+
+    iModIntro. subst Ps. iSimpl.
+    rewrite -!posts_of_app; try done. iFrame "P1 P2 P'".
+    iIntros "(P1 & P' & P2)".
+    iSpecialize ("WPS1" with "P1"). iSpecialize ("WPS2" with "P2"). iSpecialize ("WPS'" with "P'").
+    iApply wptp_from_gen_app. iSplitL "WPS1".
+    { by rewrite wptp_wfree_other_simpl. }
+    simpl. iApply wptp_from_gen_app. iFrame.
+    by rewrite wptp_wfree_other_simpl.
+  Qed. 
   Next Obligation.
     iIntros "* %VALID %END %FIT SI PR".
     rewrite /pr_pr_wfree. iDestruct "PR" as "(WPS &X&Y&Z)".
