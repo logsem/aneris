@@ -144,7 +144,7 @@ Section WaitFreePR.
       iSimpl in "W". 
       iMod (wp_not_stuck _ _ Ki with "[$] W") as "(_ & _ & %NS)";
       [done|  | .. ].
-      { erewrite (proj1 (under_ctx_spec _ _ _)); eauto. }
+      { simpl. erewrite (proj1 (under_ctx_spec _ _ _)); eauto. }
       { done. }      
       iPureIntro. simpl in *. intros.
       specialize (NS ltac:(done)).
@@ -745,13 +745,6 @@ Section WaitFreePR.
     iMod ("P" $! etr looping_trace with "PHYS") as "(PHYS & P)".
     iModIntro. by iFrame.
   Qed.
-
-  (* TODO: move *)
-  Lemma under_ctx_val_Some_inv (e ec: expr) K
-    (CTX: under_ctx K e = Some ec)
-    (VAL: is_Some (language.to_val e)):
-    K = ectx_emp /\ ec = e.
-  Proof using. Admitted.
 
   (* TODO: move, find existing*)
   Lemma nth_error_lookup {A: Type} (l: list A) i:
@@ -1701,5 +1694,5 @@ Section WaitFreePR.
         { by iIntros "$". }
         simpl in *. lia. 
   Qed.
-  
+
 End WaitFreePR.
