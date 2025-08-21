@@ -307,10 +307,16 @@ Section WFAdequacy.
       destruct lookup; done.
   Qed.
 
+  From iris.algebra Require Import auth gmap gset excl gmultiset big_op mono_nat gmap_view.
+
   (** for simplicity, we forget about the specific phases *)
   Lemma init_wfree_resources_weak `{!ObligationsGS Σ} c:
     obls_init_resource (init_om_wfree_state c) () -∗
-    cp_mul π0 d0 F ∗ cp_mul π0 d0 ii ∗ cp π0 d0.
+    (cp_mul π0 d0 F ∗ cp_mul π0 d0 ii ∗ cp π0 d1) ∗
+    (⌜ τi ∈ locales_of_cfg c ⌝ →
+     ∃ s, sgn s l0 (Some false) ∗ obls τi {[ s ]} ∗ ep s π0 d0) ∗
+    ([∗ set] τ ∈ locales_of_cfg c ∖ {[ τi ]}, obls τ ∅) ∗
+    ([∗ set] τ ∈ locales_of_cfg c, ∃ π, th_phase_eq τ π).  
     (* closed_pre_helper {Σ: gFunctors} {oGS: ObligationsGS Σ} *)
     (*       (e: expr) (k: nat) (d: Degree) (σ: state) (b: nat): *)
     (* obls_init_resource (init_om_state ([e], σ) (k *: {[+ d +]}) b) ()  ⊢ *)
@@ -320,9 +326,61 @@ Section WFAdequacy.
     iIntros "INIT". 
     rewrite /obls_init_resource /init_om_wfree_state. simpl.
     rewrite union_empty_r_L map_union_empty. 
+    iDestruct "INIT" as "(CPS & SIGS & OB & EPS & PH & EB)".
+    iSplitL "CPS".
+    { rewrite mset_map_disj_union. rewrite mset_map_mul.
+      iDestruct (big_sepMS_disj_union with "CPS") as "[CPS0 CP1]".
+      rewrite !mset_map_singleton.
+      rewrite big_sepMS_singleton. iFrame.
+      rewrite -cp_mul_split. by iApply cp_mul_alt. }
+    rewrite bi.sep_assoc. 
+    iSplitL "SIGS OB EPS".
+    { rewrite /obls_map_repr. 
+      destruct decide.
+      2: { rewrite difference_disjoint_L; [| set_solver].
+           iSplitR.
+           { by iIntros (?). }
+           rewrite fmap_gset_to_gmap.
+           rewrite -gmap.big_opS_gset_to_gmap_L.
+           rewrite big_opS_auth_frag.
+           destruct (decide (locales_of_cfg c = ∅)). 
+           { rewrite e. set_solver. }
+           rewrite big_opS_own; [| done]. 
+           iApply (big_sepS_impl with "OB").
+           iModIntro. set_solver. }
+      rewrite fmap_insert.
+      foobar. 
+      rewrite insert_union_singleton_l.
+      rewrite map_union_comm. 
+      erewrite <- (union_delete_insert _ {[ τi := _ ]}).
+      2: { apply lookup_singleton_Some. eauto. }  
+      rewrite -gmap_disj_op_union. 
+      iFrame "SIGS". 
+           
+
+           
+
+           rewrite -H. 
+
+           ospecialize (H (locale heap_lang) _ _).
+           unshelve ospecialize (H _).
+           { esplit. 2: apply (@excl.excl_cmra_mixin (gset SignalId)). 
+
+                          (locales_of_cfg c) (excl.Excl (∅: gset SignalId))). 
+           rewrite
+           
+      iIntros (IN). rewrite decide_True; [| done].
+      iExists 0. iFrame. }
+    
+ 
+      
+    iApply cp_mul_weaken.
+    { apply phase_lt_fork. }
+    { reflexivity. }
+    rewrite cp_mul_alt mset_map_singleton. done.     
+ 
     rewrite init_phases_helper. simpl.
     rewrite locales_of_cfg_simpl. simpl.
-    iDestruct "INIT" as "(CPS & SIGS & OB & EPS & PH & EB)".
     rewrite union_empty_r_L !gset_to_gmap_singleton.
     rewrite big_sepM_singleton. iFrame.
     rewrite mset_map_mul.
