@@ -2,10 +2,10 @@ From iris.proofmode Require Import tactics.
 From trillium.traces Require Import inftraces trace_lookup exec_traces trace_len. 
 From trillium.program_logic Require Import execution_model weakestpre adequacy simulation_adequacy_em_cond. 
 From trillium.prelude Require Import classical.
-From fairness Require Import fairness.
+From fairness Require Import fairness locales_helpers.
 From lawyer Require Import program_logic sub_action_em action_model.
 From lawyer.examples Require Import orders_lib obls_tactics.
-From lawyer.nonblocking Require Import trace_context om_wfree_inst mk_ref pr_wfree.
+From lawyer.nonblocking Require Import trace_context om_wfree_inst mk_ref pr_wfree wfree_traces. 
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am obls_termination.
 From heap_lang Require Import lang.
 
@@ -58,10 +58,13 @@ Section WFAdequacy.
   Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} _ _ => ⌜ True ⌝%I).
 
   Context (ic: @trace_ctx heap_lang).
-  Context (m: val).
+  Let ii := tctx_index ic.
+  Let Ki := tctx_ctx ic.
+  Let τi := tctx_tid ic.
+  Context (m ai: val).
 
   Definition no_extra_obls (_: cfg heap_lang) (δ: mstate M) :=
-    forall τ', default ∅ (ps_obls δ !! τ') ≠ ∅ -> τ' = tctx_tid ic.
+    forall τ', default ∅ (ps_obls δ !! τ') ≠ ∅ -> τ' = τi.
 
   Definition obls_sim_rel_wfree extr omtr :=
     obls_sim_rel extr omtr /\ no_extra_obls (trace_last extr) (trace_last omtr).
@@ -70,22 +73,55 @@ Section WFAdequacy.
     (extr: execution_trace heap_lang) (omtr: auxiliary_trace M): iProp Σ :=
     ⌜ no_extra_obls (trace_last extr) (trace_last omtr) ⌝.
 
-  (* Definition fits_inf_call: execution_trace heap_lang → Prop. *)
-  (* Admitted. *)
   Context (F: nat). 
 
-  Definition fits_inf_call := fits_inf_call ic m F. 
+  Let fic := fits_inf_call ic m ai.
 
-  (* Definition PR_wfree {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} *)
-  (*   (iG := IEM_irisG HeapLangEM EM) *)
-  (*   : ProgressResource state_interp wfree_trace_inv fork_post fits_inf_call. *)
-  (* Admitted. *)
+  (* TODO: move *)
+  Instance runs_call_dec: forall tc e c, Decision (runs_call tc e c).
+  Proof using.
+    intros [i τ K] ??. rewrite /runs_call /=.
+    destruct (from_locale c.1 τ) as [eτ| ] eqn:T; rewrite T. 
+    2: { right. set_solver. }
+    destruct (decide (under_ctx K eτ = Some e)). 
+    2: { right. set_solver. }
+    destruct (to_val e) eqn:V.
+    { right. set_solver. }
+    left. eauto. 
+  Qed.
 
-  Instance fic_dec: ∀ ex, Decision (fits_inf_call ex).
-  Proof. Admitted.
+  (* TODO: move *)
+  Instance fic_dec: ∀ etr, Decision (fits_inf_call ic m ai etr).
+  Proof using.
+    intros. rewrite /fits_inf_call.
+    apply and_dec.
+    { destruct (etr !! (tctx_index ic)); solve_decision. }
+    apply Decision_iff_impl with (P := Forall (fun j => from_option (λ c, ∃ ec : expr, runs_call ic ec c) True (etr !! j)) (seq ii (trace_length etr - tctx_index ic))).
+    2: { apply Forall_dec. intros. destruct (etr !! x); try solve_decision.
+         simpl. apply ex_fin_dec with
+           (l := from_option
+                   (fun e => from_option (flip cons nil) [] (under_ctx (tctx_ctx ic) e))
+                   [] (from_locale c.1 (tctx_tid ic))); [apply _| ].
+         intros ? RUNS. red in RUNS. destruct RUNS as (?&->&?&?).
+         simpl. rewrite H. simpl. tauto. }
+    rewrite List.Forall_forall. simpl.
+    apply forall_proper. intros i.
+    rewrite in_seq.
+    split; intros X II.
+    2: { apply X. lia. }
+    destruct (etr !! i) eqn:ITH; try done. apply X.
+    split; auto.
+    apply trace_lookup_lt_Some_1 in ITH. 
+    rewrite -Nat.le_add_sub; [done| ]. 
+    edestruct Nat.le_gt_cases as [LE | GT]; [by apply LE| ].
+    simpl in *. lia. 
+  Qed.
 
-  Lemma fic_fpc: filter_pref_closed fits_inf_call.
-  Proof. Admitted.
+  (* TODO: move, remove duplicate *)
+  Lemma fic_fpc: filter_pref_closed (fits_inf_call ic m ai).
+  Proof using.
+    red. apply fits_inf_call_prev. 
+  Qed.
 
   Definition obls_st_rel_wfree c δ := obls_st_rel c δ /\ no_extra_obls c δ. 
 
@@ -100,14 +136,14 @@ Section WFAdequacy.
         (Hvex : extrace_valid extr)
         (Hexfirst : trfirst extr = (es, σ1))
         (LEN: length es ≥ 1):
-    PR_premise_multiple obls_sim_rel_wfree fits_inf_call Σ s es σ1 s1 (p: @em_init_param _ _ EM) ->
+    PR_premise_multiple obls_sim_rel_wfree (fits_inf_call ic m ai) Σ s es σ1 s1 (p: @em_init_param _ _ EM) ->
     (∃ omtr, obls_om_traces_match_wfree extr omtr ∧ trfirst omtr = s1) \/
-    (exists k, ¬ fits_inf_call (trace_take_fwd k extr)).
+    (exists k, ¬ (fits_inf_call ic m ai) (trace_take_fwd k extr)).
   Proof using.
     intros PREM.
 
     unshelve epose proof (@PR_strong_simulation_adequacy_traces_multiple _ _ EM 
-                            HeapLangEM obls_sim_rel_wfree fits_inf_call
+                            HeapLangEM obls_sim_rel_wfree (fits_inf_call ic m ai)
                             _ _ _ _ _ 
                             s es σ1 s1 p
                 extr
@@ -141,22 +177,106 @@ Section WFAdequacy.
     done.
   Qed.
 
-  Definition init_om_wfree_state (c: cfg heap_lang): ProgressState.
-  Admitted.
+  Open Scope WFR_scope. 
 
-  Lemma init_om_wfree_is_init c:
-    obls_is_init_st c (init_om_wfree_state c).
-  Proof using. Admitted. 
+  (* Program Definition init_om_wfree_state (c: cfg heap_lang): ProgressState := *)
+  (*  let d := bool_decide (τi ∈ locales_of_cfg c) in *)
+  (*  let s0 := (0: SignalId) in *)
+  (*  {| ps_cps := (F + tctx_index ic) *: {[+ (π0, d0) +]} ⊎ {[+ (π0, d1) +]}; *)
+  (*     ps_sigs := if d then {[ s0 := (l0, false) ]} else ∅;  |} *)
+  (*     ps_obls := let obs0 := gset_to_gmap *)
+  (*     ps_eps : gset ExpectPermission; *)
+  (*     ps_phases : gmap Locale Phase; *)
+  (*     ps_exc_bound : nat |}. *)
+
+
+  Definition init_om_wfree_state
+    (* (F: nat) (TI: nat) (d0 d1: Degree) (τi: locale Λ) (l0: Level) (ii: nat) *)
+    (c: cfg heap_lang): ProgressState :=
+    let CPS := (F + ii) *: {[+ d0 +]} ⊎ {[+ d1 +]} in
+    let δ0 := init_om_state c CPS 0 in
+    let s0 := (0: SignalId) in
+    let obls' := if (decide (τi ∈ locales_of_cfg c))
+                 then (<[ τi := {[ s0 ]} ]> (ps_obls δ0)) else ps_obls δ0 in
+    let sigs' := (if (decide (τi ∈ locales_of_cfg c)) then {[ s0 := (l0, false) ]} else ∅)
+                 ∪ ps_sigs δ0 in
+    let eps' := (if (decide (ii = 0)) then {[ (s0, π0, d0) ]} else ∅)
+                ∪ ps_eps δ0 in
+    update_obls obls' $ update_sigs sigs' $ update_eps eps' δ0. 
+
+  Lemma init_om_wfree_is_init
+    (* F TI d0 d1 τi l0 ii *)
+    c:
+    obls_is_init_st c (init_om_wfree_state 
+                         (* F TI d0 d1 τi l0 ii  *)
+                         c).
+  Proof using.
+    clear. 
+    red. rewrite /init_om_wfree_state. split.
+    { destruct decide.
+      2: { destruct c. apply init_om_state_init_multiple. }
+      simpl. rewrite dom_insert_L dom_gset_to_gmap. set_solver. }
+    split; simpl. 
+    - red. simpl.
+      (* TODO: fix stupid error with implicit params *)
+      (* rewrite dom_ipa. *)
+      (* destruct (decide (τi ∈ locales_of_cfg c)); [| done]. *)
+      (* rewrite dom_insert_L !dom_gset_to_gmap. *)
+      (* set_solver. *)
+      admit. 
+    - red. simpl.
+      rewrite map_union_empty.
+      destruct decide. 
+      2: { by rewrite map_filter_empty. }
+      rewrite map_filter_singleton /= dom_singleton_L.
+      rewrite map_img_insert_L flatten_gset_union. set_solver.
+    - eapply dpd_ipa; eauto. 
+    - eapply cpb_init_phases_π0; eauto. 
+    - red. simpl.
+      destruct decide; [| set_solver].
+      rewrite union_empty_r_L. setoid_rewrite elem_of_singleton. 
+      intros (?& π &?&?&->&LT). simpl in *.
+      pose proof (phase_le_init π) as GE. 
+      by apply strict_spec, proj2 in LT.
+    - red. simpl. rewrite map_union_empty.
+      destruct decide. 
+      2: {
+        (* TODO: fix stupid error with implicit params *)
+        (* rewrite flatten_gset_map_img_gtg_empty. *)
+        (* done. *)
+        admit. 
+      }
+      rewrite map_img_insert_L.
+      rewrite -gset_to_gmap_difference_singleton.
+      rewrite flatten_gset_union.
+      (* rewrite flatten_gset_map_img_gtg_empty flatten_gset_singleton. *)
+      (* set_solver.  *)
+      admit. 
+    - red. simpl. 
+      intros ???.
+      destruct (_ !! τ1) eqn:X, (_ !! τ2) eqn:Y; simpl; try done.
+      destruct decide. 
+      2: { apply lookup_gset_to_gmap_Some in X as [? <-]. 
+           apply lookup_gset_to_gmap_Some in Y as [? <-].
+           done. }
+      rewrite lookup_insert_Some in X. rewrite lookup_insert_Some in Y.
+      destruct X as [[<- <-] | [NEQX X]], Y as [[<- <-] | [NEQY Y]];
+        (try apply lookup_gset_to_gmap_Some in X as [? <-]);
+        (try apply lookup_gset_to_gmap_Some in Y as [? <-]);
+        done.
+  Admitted.
 
   Lemma PR_premise_wfree `{hPre: @heapGpreS Σ M EM} c
         (ETR0: exists e0, c.1 = [subst "m" m e0])
-        (SPEC: wait_free_spec m):
-  PR_premise_multiple obls_sim_rel_wfree fits_inf_call Σ MaybeStuck c.1 c.2
+        (SPEC: WaitFreeSpec m):
+  PR_premise_multiple obls_sim_rel_wfree (fits_inf_call ic m ai)
+    Σ MaybeStuck c.1 c.2
     (init_om_wfree_state c) ((): @em_init_param _ _ EM).
   Proof using.    
     red. iIntros (Hinv) "(PHYS & MOD)". simpl.
     iModIntro.
     iExists wfree_trace_inv.
+    foobar. 
     iExists (PR_wfree ic m F). simpl. 
 
     rewrite !bi.sep_assoc. iSplitL.
