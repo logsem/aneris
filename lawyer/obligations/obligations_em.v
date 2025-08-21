@@ -126,7 +126,10 @@ Section ObligationsEM.
     |}.
 
   Definition init_phases (n: nat): list Phase :=
-    (fun i => ext_phase π0 i) <$> seq 0 n. 
+    (fun i => ext_phase π0 i) <$> seq 0 n.
+
+  Definition init_phases_asg (c: cfg Λ) :=
+    zip (elements $ locales_of_cfg c) (init_phases (size $ locales_of_cfg c)). 
 
   Definition init_om_state (c: cfg Λ) (degs: gmultiset Degree) (eb: nat)
     : mstate OM := {|
@@ -134,7 +137,7 @@ Section ObligationsEM.
       ps_sigs := ∅;
       ps_obls := gset_to_gmap ∅ (locales_of_cfg c);
       ps_eps := ∅;
-      ps_phases := list_to_map $ zip (elements $ locales_of_cfg c) (init_phases (size $ locales_of_cfg c));
+      ps_phases := list_to_map $ init_phases_asg c;
       ps_exc_bound := eb;
   |}.
 
@@ -144,22 +147,32 @@ Section ObligationsEM.
     red. simpl. by rewrite dom_gset_to_gmap.
   Qed.
 
-  Lemma init_om_dpo (c: cfg Λ) ds eb:
-    dom_phases_obls (init_om_state c ds eb).
-  Proof.
-    red. simpl. rewrite dom_list_to_map_L. simpl.
-    rewrite fst_zip.
-    { by rewrite list_to_set_elements_L dom_gset_to_gmap. }
-    rewrite /init_phases. rewrite length_fmap.
-    rewrite seq_length. rewrite length_size. lia.
+  Lemma len_init_phases_cfg c:
+    length (init_phases (size (locales_of_cfg c))) = length (elements (locales_of_cfg c)).
+  Proof using. 
+     rewrite /init_phases. rewrite length_fmap.
+     by rewrite length_size List.length_seq.
   Qed.
 
+  Lemma dom_ipa (c: cfg Λ):
+  @dom _ _ _
+    (@list_to_map (locale Λ) Phase _ _
+       (@gmap_empty (locale Λ) _ _ Phase) (init_phases_asg c)) =
+  @dom _ _ _
+    (@gset_to_gmap (locale Λ) _ _
+       (@gset SignalId Nat.eq_dec nat_countable) ∅
+       (@locales_of_cfg Λ _ _ c)).
+  Proof using. 
+    rewrite dom_list_to_map_L. simpl.
+    rewrite fst_zip.
+    { by rewrite list_to_set_elements_L dom_gset_to_gmap. }
+    by rewrite len_init_phases_cfg. 
+  Qed. 
+
   Lemma init_phases_helper e σ:
-    list_to_map $ zip 
-      (elements (locales_of_cfg ([e], σ)))
-      (init_phases (size (locales_of_cfg ([e], σ)))) 
-    = ({[locale_of [] e := ext_phase π0 0]}: gmap Locale Phase).
+    list_to_map $ init_phases_asg ([e], σ) = ({[locale_of [] e := ext_phase π0 0]}: gmap Locale Phase).
   Proof using.
+    rewrite /init_phases_asg. 
     rewrite locales_of_cfg_singleton. rewrite size_singleton.
     rewrite elements_singleton. simpl.
     set_solver.
@@ -176,72 +189,105 @@ Section ObligationsEM.
     apply IHi in H. done.
   Qed.
 
-  Lemma init_om_state_init_multiple es σ ds eb:
-    obls_is_init_st (es, σ) (init_om_state ((es, σ)) ds eb).
-  Proof.
-    red. 
-    rewrite dom_gset_to_gmap. split; eauto. 
-    
-    assert (NoDup (zip (elements (locales_of_cfg (es, σ)))
-                     (init_phases (size (locales_of_cfg (es, σ))))).*1) as ND1.
-    { rewrite fst_zip.
-      { apply NoDup_elements. }
-      rewrite /init_phases. rewrite length_fmap.
-      by rewrite length_size List.length_seq. }
-    assert (NoDup (zip (elements (locales_of_cfg (es, σ)))
-                     (init_phases (size (locales_of_cfg (es, σ))))).*2) as ND2.
-    { rewrite snd_zip; cycle 1. 
-      { rewrite /init_phases. rewrite length_fmap.
-        by rewrite length_size List.length_seq. }
-      rewrite /init_phases.
+  Lemma ipa_NoDup1 c: NoDup (init_phases_asg c).*1.
+  Proof using. 
+    rewrite fst_zip.
+    - apply NoDup_elements.
+    - by rewrite len_init_phases_cfg.
+  Qed.
+
+  Lemma ipa_NoDup2 c: NoDup (init_phases_asg c).*2. 
+  Proof using.
+    rewrite snd_zip.
+    - rewrite /init_phases.
       apply NoDup_fmap_2; try apply _.
-      apply NoDup_seq. }
-   
+      apply NoDup_seq.
+    - by rewrite len_init_phases_cfg.
+  Qed.
+
+  Lemma dpd_ipa c δ
+    (PHS: ps_phases δ = list_to_map $ init_phases_asg c):
+    dom_phases_disj δ.
+  Proof using.
+    red. destruct δ. simpl in *. rewrite PHS.
+    destruct c as (es, σ). 
+    pose proof (ipa_NoDup1 (es, σ)). pose proof (ipa_NoDup2 (es, σ)). 
+    red. simpl. intros ????? X%elem_of_list_to_map Y%elem_of_list_to_map; eauto.
+    apply elem_of_list_lookup_1 in X as (i&X).
+    apply elem_of_list_lookup_1 in Y as (j&Y).
+    apply zip_lookup_Some_1 in X as [? X].  
+    apply zip_lookup_Some_1 in Y as [? Y]. 
+    destruct (decide (i = j)).
+    { congruence. }
+    rewrite /init_phases in X, Y.
+    apply list_lookup_fmap_Some in X as (?&?&->). 
+    apply list_lookup_fmap_Some in Y as (?&?&->).
+    apply phases_disj_forks.
+    intros <-.
+    pose proof (NoDup_seq 0 (size (locales_of_cfg (es, σ)))) as ND. eapply NoDup_alt in ND; eauto.
+  Qed.
+
+  Lemma cpb_init_phases_π0 c δ ds
+    (PHS: ps_phases δ = list_to_map $ init_phases_asg c)
+    (CPS: ps_cps δ = mset_map (pair π0) ds):
+    cps_phase_bound δ.
+  Proof using.
+    red. destruct δ. simpl in *. rewrite PHS CPS. 
+    intros (?&?&[??]& P). revert P. simpl.   
+    rewrite elem_of_mset_map. simpl.
+    intros (? & (?&[=]&?) & LT). subst.
+    apply elem_of_list_to_map in H2.
+    2: { apply ipa_NoDup1. }
+    apply elem_of_zip_r in H2.
+    rewrite /init_phases in H2. apply elem_of_list_fmap in H2 as (?&->&?).  
+    pose proof (phase_lt_fork π0 x1) as LT'.
+    apply strict_spec in LT.
+    rewrite strict_spec in LT. destruct LT as [? N].
+    apply N. apply LT'.
+  Qed.
+
+  (* TODO: move *)
+  Lemma flatten_gset_map_img_gtg_empty (ts: gset (locale Λ)):
+    flatten_gset $ map_img $ gset_to_gmap ∅ ts = (∅: gset SignalId).
+  Proof using.
+    clear. 
+    pattern ts. apply set_ind; clear ts.
+    { red. intros ????. set_solver. }
+    { done. }
+    intros. rewrite gset_to_gmap_union_singleton.
+    rewrite map_img_insert_L. rewrite delete_notin.
+    2: { by apply lookup_gset_to_gmap_None. }
+    rewrite flatten_gset_union flatten_gset_singleton. set_solver.
+  Qed.    
+
+  Lemma init_om_st_wf c ds eb:
+    om_st_wf (init_om_state c ds eb).
+  Proof using.
+    clear. 
+    destruct c as [es σ].
     rewrite /init_om_state. split.
-    - apply init_om_dpo.
+    - red. simpl. by rewrite dom_ipa. 
     - red. simpl.
       trans (∅: gset nat); set_solver. 
-    - red. simpl. intros ????? X%elem_of_list_to_map Y%elem_of_list_to_map; eauto.
-      remember (locales_of_cfg (es, σ)) as ts. clear Heqts.
-      apply elem_of_list_lookup_1 in X as (i&X).
-      apply elem_of_list_lookup_1 in Y as (j&Y).
-      apply zip_lookup_Some_1 in X as [? X].  
-      apply zip_lookup_Some_1 in Y as [? Y]. 
-      destruct (decide (i = j)).
-      { congruence. }
-      rewrite /init_phases in X, Y.
-      apply list_lookup_fmap_Some in X as (?&?&->). 
-      apply list_lookup_fmap_Some in Y as (?&?&->).
-      apply phases_disj_forks.
-      intros <-.
-      pose proof (NoDup_seq 0 (size ts)) as ND. eapply NoDup_alt in ND; eauto.  
-    - intros (?&?&[??]& P). revert P. simpl.   
-      rewrite elem_of_mset_map. simpl.
-      intros (? & (?&[=]&?) & LT). subst.
-      apply elem_of_list_to_map in H2; [| done]. 
-      apply elem_of_zip_r in H2.
-      rewrite /init_phases in H2. apply elem_of_list_fmap in H2 as (?&->&?).  
-      pose proof (phase_lt_fork π0 x1) as LT'.
-      apply strict_spec in LT.
-      rewrite strict_spec in LT. destruct LT as [? N].
-      apply N. apply LT'. 
+    - eapply dpd_ipa; eauto. 
+    - eapply cpb_init_phases_π0; eauto. 
     - red. simpl. set_solver.
     - red. simpl.
-      remember (locales_of_cfg (es, σ)) as ts eqn:foo. clear foo.
-      clear ND1 ND2. 
-      pattern ts. apply set_ind; clear ts.
-      { red. intros ????. set_solver. }
-      { done. }
-      intros. rewrite gset_to_gmap_union_singleton.
-      rewrite map_img_insert_L. rewrite delete_notin.
-      2: { by apply lookup_gset_to_gmap_None. }
-      rewrite flatten_gset_union flatten_gset_singleton. set_solver. 
+      rewrite flatten_gset_map_img_gtg_empty. done.  
     - red. simpl. 
       intros ???.
       destruct (_ !! τ1) eqn:X, (_ !! τ2) eqn:Y; simpl; try done.
       apply lookup_gset_to_gmap_Some in X as [? <-]. 
       apply lookup_gset_to_gmap_Some in Y as [? <-].
       done. 
+  Qed. 
+
+  Lemma init_om_state_init_multiple es σ ds eb:
+    obls_is_init_st (es, σ) (init_om_state ((es, σ)) ds eb).
+  Proof.
+    red. 
+    rewrite dom_gset_to_gmap. split; eauto. 
+    apply init_om_st_wf. 
   Qed.
 
   Lemma init_om_state_init e σ ds eb:
@@ -249,7 +295,7 @@ Section ObligationsEM.
   Proof.
     apply init_om_state_init_multiple.
   Qed.
-    
+
   From lawyer Require Import sub_action_em obligations_am action_model. 
   Context `{Inhabited Locale}. 
   Let OAM := ObligationsAM. 
