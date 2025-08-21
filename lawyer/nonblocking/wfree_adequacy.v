@@ -69,9 +69,9 @@ Section WFAdequacy.
   Definition obls_sim_rel_wfree extr omtr :=
     obls_sim_rel extr omtr /\ no_extra_obls (trace_last extr) (trace_last omtr).
 
-  Definition wfree_trace_inv `{Hinv : @IEMGS _ _ HeapLangEM EM Σ}
-    (extr: execution_trace heap_lang) (omtr: auxiliary_trace M): iProp Σ :=
-    ⌜ no_extra_obls (trace_last extr) (trace_last omtr) ⌝.
+  (* Definition wfree_trace_inv `{Hinv : @IEMGS _ _ HeapLangEM EM Σ} *)
+  (*   (extr: execution_trace heap_lang) (omtr: auxiliary_trace M): iProp Σ := *)
+  (*   ⌜ no_extra_obls (trace_last extr) (trace_last omtr) ⌝. *)
 
   Context (F: nat). 
 
@@ -96,25 +96,42 @@ Section WFAdequacy.
     intros. rewrite /fits_inf_call.
     apply and_dec.
     { destruct (etr !! (tctx_index ic)); solve_decision. }
-    apply Decision_iff_impl with (P := Forall (fun j => from_option (λ c, ∃ ec : expr, runs_call ic ec c) True (etr !! j)) (seq ii (trace_length etr - tctx_index ic))).
-    2: { apply Forall_dec. intros. destruct (etr !! x); try solve_decision.
-         simpl. apply ex_fin_dec with
-           (l := from_option
-                   (fun e => from_option (flip cons nil) [] (under_ctx (tctx_ctx ic) e))
-                   [] (from_locale c.1 (tctx_tid ic))); [apply _| ].
-         intros ? RUNS. red in RUNS. destruct RUNS as (?&->&?&?).
-         simpl. rewrite H. simpl. tauto. }
-    rewrite List.Forall_forall. simpl.
-    apply forall_proper. intros i.
-    rewrite in_seq.
-    split; intros X II.
-    2: { apply X. lia. }
-    destruct (etr !! i) eqn:ITH; try done. apply X.
-    split; auto.
-    apply trace_lookup_lt_Some_1 in ITH. 
-    rewrite -Nat.le_add_sub; [done| ]. 
-    edestruct Nat.le_gt_cases as [LE | GT]; [by apply LE| ].
-    simpl in *. lia. 
+    apply and_dec; cycle 1. 
+    - apply Decision_iff_impl with
+        (P := Forall (fun i => from_option (fun e => to_val e = None) True
+                        (from_option (fun c => from_locale c.1 τi) None (etr !! i)))
+                (seq 0 (trace_length etr))).
+      2: { apply Forall_dec. intros i.
+           destruct lookup; try solve_decision. simpl.
+           destruct from_locale; solve_decision. }
+      rewrite List.Forall_forall.
+      simpl.
+      apply forall_proper. intros i.
+      rewrite in_seq. simpl.
+      fold τi. split; auto.
+      intros.
+      destruct lookup eqn:ITH; try done. simpl in *.
+      apply H. split; [lia| ].
+      eapply trace_lookup_lt_Some_1; eauto. 
+    - apply Decision_iff_impl with (P := Forall (fun j => from_option (λ c, ∃ ec : expr, runs_call ic ec c) True (etr !! j)) (seq ii (trace_length etr - tctx_index ic))).
+      2: { apply Forall_dec. intros. destruct (etr !! x); try solve_decision.
+           simpl. apply ex_fin_dec with
+             (l := from_option
+                     (fun e => from_option (flip cons nil) [] (under_ctx (tctx_ctx ic) e))
+                     [] (from_locale c.1 (tctx_tid ic))); [apply _| ].
+           intros ? RUNS. red in RUNS. destruct RUNS as (?&->&?&?).
+           simpl. rewrite H. simpl. tauto. }
+      rewrite List.Forall_forall. simpl.
+      apply forall_proper. intros i.
+      rewrite in_seq.
+      split; intros X II.
+      2: { apply X. lia. }
+      destruct (etr !! i) eqn:ITH; try done. apply X.
+      split; auto.
+      apply trace_lookup_lt_Some_1 in ITH. 
+      rewrite -Nat.le_add_sub; [done| ]. 
+      edestruct Nat.le_gt_cases as [LE | GT]; [by apply LE| ].
+      simpl in *. lia. 
   Qed.
 
   (* TODO: move, remove duplicate *)
@@ -266,6 +283,63 @@ Section WFAdequacy.
         done.
   Admitted.
 
+  Lemma obls_τi_enabled c δ
+    (NOOBS': pr_wfree.no_extra_obls ic c δ)
+    (NVAL: from_option (λ e : expr, to_val e = None) True
+             (from_locale c.1 (tctx_tid ic)))
+    (TH_OWN: locales_of_cfg c = dom (ps_obls δ))
+    (τ : nat)
+    (OBS : has_obls τ δ):
+  locale_enabled τ (c.1, c.2).
+  Proof using.
+    red.
+    pose proof OBS as OBS_. apply NOOBS' in OBS_. subst τ.
+    simpl. destruct from_locale eqn:LOC.
+    { eauto. }
+    simpl in NVAL.
+    eapply set_eq in TH_OWN.
+    apply not_iff_compat, proj1 in TH_OWN.
+    edestruct TH_OWN.
+    - intros ?%locales_of_cfg_Some; eauto.
+      + erewrite LOC in H. by destruct H.
+      + apply inhabitant.
+    - eapply elem_of_dom; eauto. red in OBS.
+      destruct lookup; done.
+  Qed.
+
+  (** for simplicity, we forget about the specific phases *)
+  Lemma init_wfree_resources_weak `{!ObligationsGS Σ} c:
+    obls_init_resource (init_om_wfree_state c) () -∗
+    cp_mul π0 d0 F ∗ cp_mul π0 d0 ii ∗ cp π0 d0.
+    (* closed_pre_helper {Σ: gFunctors} {oGS: ObligationsGS Σ} *)
+    (*       (e: expr) (k: nat) (d: Degree) (σ: state) (b: nat): *)
+    (* obls_init_resource (init_om_state ([e], σ) (k *: {[+ d +]}) b) ()  ⊢ *)
+    (*   th_phase_eq (locale_of [] e) (ext_phase π0 0)  ∗ *)
+    (*   cp_mul (ext_phase π0 0) d k ∗ obls (locale_of [] e) ∅. *)
+  Proof using.
+    iIntros "INIT". 
+    rewrite /obls_init_resource /init_om_wfree_state. simpl.
+    rewrite union_empty_r_L map_union_empty. 
+    rewrite init_phases_helper. simpl.
+    rewrite locales_of_cfg_simpl. simpl.
+    iDestruct "INIT" as "(CPS & SIGS & OB & EPS & PH & EB)".
+    rewrite union_empty_r_L !gset_to_gmap_singleton.
+    rewrite big_sepM_singleton. iFrame.
+    rewrite mset_map_mul.
+    iApply cp_mul_weaken.
+    { apply phase_lt_fork. }
+    { reflexivity. }
+    rewrite cp_mul_alt mset_map_singleton. done.     
+  Qed.
+
+    rewrite /obls_init_resource.
+  "MOD" : ([∗ mset] '(π, d) ∈ ps_cps (init_om_wfree_state c), cp π d) ∗
+          own obls_sigs (◯ sig_map_repr (ps_sigs (init_om_wfree_state c))) ∗
+          own obls_obls (◯ obls_map_repr (ps_obls (init_om_wfree_state c))) ∗
+          own obls_eps (◯ eps_repr (ps_eps (init_om_wfree_state c))) ∗
+          ([∗ map] τ↦π ∈ ps_phases (init_om_wfree_state c), th_phase_eq τ π) ∗
+          exc_lb (ps_exc_bound (init_om_wfree_state c))
+
   Lemma PR_premise_wfree `{hPre: @heapGpreS Σ M EM} c
         (ETR0: exists e0, c.1 = [subst "m" m e0])
         (SPEC: WaitFreeSpec m):
@@ -275,11 +349,11 @@ Section WFAdequacy.
   Proof using.    
     red. iIntros (Hinv) "(PHYS & MOD)". simpl.
     iModIntro.
-    iExists wfree_trace_inv.
-    foobar. 
-    iExists (PR_wfree ic m F). simpl. 
+    iExists (wfree_trace_inv ic).
+    
+    iExists (PR_wfree ic SPEC ai). simpl. 
 
-    rewrite !bi.sep_assoc. iSplitL.
+    do 2 rewrite bi.sep_assoc. iSplitL.
     2: { rewrite /adequacy_cond.rel_always_holds_with_trace_inv.
 
          iIntros (extr omtr [tp σ] EXTRA FIN NSTUCK).
@@ -287,9 +361,8 @@ Section WFAdequacy.
          red in EXTRA. destruct EXTRA as (VALID & EX0 & OM0 & CONT_SIM). 
          iApply fupd_mask_intro_discard; [done| ].
 
-         rewrite /wfree_trace_inv. iDestruct "INV" as %NOOBS'.
-         rewrite /obls_sim_rel_wfree. iSplit; [| done].  
-
+         rewrite /wfree_trace_inv. iDestruct "INV" as %(NOOBS' & NVAL).
+         rewrite /obls_sim_rel_wfree. iSplit; [| done].
 
          destruct extr.
          { iPureIntro.
@@ -300,18 +373,7 @@ Section WFAdequacy.
            simpl.
 
            split; [done| ]. simpl. red.
-           (* (* apply om_live_tids_init. *) *)
-           (* apply LIVE0.  *)
-
-           (* should follow from init_om_wfree_state def *)
-           admit.  
-         }
-         
-         (* Unset Printing Notations. *)
-
-         (* rewrite prefixes_simpl. *)
-         (* rewrite -map_app. rewrite -seq_app. *)
-         (* rewrite -Nat.le_add_sub.  *)
+           red. simpl. eapply @obls_τi_enabled; eauto. }
          
          simpl in VALID_STEP. inversion VALID. subst. simpl in *.
          (* red in EX_FIN. simpl in EX_FIN. subst. simpl. *)
@@ -321,13 +383,39 @@ Section WFAdequacy.
          simpl. rewrite /obls_st_rel.
 
          iPureIntro.
-         red. simpl. intros τ OB.
-         red in NOOBS'. red in OB. specialize (NOOBS' _ OB).
-         admit. (* can also enforce with trace invariant *)
-         (* iApply (no_obls_live_tids_multiple with "[$] [$]"); try done. *)
-         (* eapply valid_exec_length. *)
-         (* { eapply valid_system_trace_valid_exec_trace; eauto. } *)
-         (* all: eauto.          *)
+         red. simpl.
+         eapply @obls_τi_enabled; eauto. }
+
+    rewrite -surjective_pairing. 
+    iSplitL.
+    2: { rewrite /wfree_trace_inv. iPureIntro. split.
+         - simpl. red. rewrite /init_om_wfree_state. simpl.
+           intros τ NEMPTY. destruct decide.
+           2: { rewrite lookup_gset_to_gmap option_guard_decide in NEMPTY.
+                destruct decide; simpl in NEMPTY; done. }
+           destruct lookup eqn:L; try done. 
+           apply lookup_insert_Some in L. destruct L as [| [? L]]; [set_solver| ].
+           apply lookup_gset_to_gmap_Some in L. set_solver.
+         - simpl.
+           (* need to assume that we don't start with value under τi *)
+           admit. }
+
+    iSplitR.
+    { simpl.
+      admit. (* find / extract the fact that it's trivial for heap_lang *) }
+    rewrite /pr_pr_wfree. simpl.
+
+    rewrite /obls_init_resource.
+  "MOD" : ([∗ mset] '(π, d) ∈ ps_cps (init_om_wfree_state c), cp π d) ∗
+          own obls_sigs (◯ sig_map_repr (ps_sigs (init_om_wfree_state c))) ∗
+          own obls_obls (◯ obls_map_repr (ps_obls (init_om_wfree_state c))) ∗
+          own obls_eps (◯ eps_repr (ps_eps (init_om_wfree_state c))) ∗
+          ([∗ map] τ↦π ∈ ps_phases (init_om_wfree_state c), th_phase_eq τ π) ∗
+          exc_lb (ps_exc_bound (init_om_wfree_state c))
+ 
+    iSplitL.
+    { (* simpl. *)
+    
          
   Admitted.
 

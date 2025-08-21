@@ -127,14 +127,16 @@ Section CallInTrace.
 
   Definition fits_inf_call (etr: execution_trace heap_lang): Prop :=
     from_option (runs_call (m ai)) True (etr !! ii) /\
-    forall j, ii <= j -> from_option (fun c => exists ec, runs_call ec c) True (etr !! j).
+    (forall j, ii <= j -> from_option (fun c => exists ec, runs_call ec c) True (etr !! j)) /\
+    (forall i, from_option (fun e => to_val e = None) True
+            (from_option (fun c => from_locale c.1 τi) None (etr !! i))).
 
   Lemma fits_inf_call_last_or_short etr
     (FITS: fits_inf_call etr):
     (exists ec, runs_call ec (trace_last etr)) \/ trace_length etr <= ii. 
   Proof using.
     edestruct Nat.lt_ge_cases as [LT| ]; [| by eauto].
-    red in FITS. apply proj2 in FITS. red in LT.
+    red in FITS. apply proj2, proj1 in FITS. red in LT.
     ospecialize * (FITS (trace_length etr - 1)).
     { lia. }
     rewrite trace_lookup_last in FITS.
@@ -151,15 +153,20 @@ Section CallInTrace.
       rewrite trace_lookup_extend_lt; [done| ]. 
       by apply trace_lookup_lt_Some. }
     red.
-    destruct FITS as [II FITS]. split.
-    { destruct (etr !! ii) eqn:ITH; rewrite ITH; [| done].
+    destruct FITS as (II & FITS & NVAL). split; [| split]. 
+    - destruct (etr !! ii) eqn:ITH; rewrite ITH; [| done].
       apply LOOKUP in ITH.
-      by rewrite ITH in II. }
-    intros ? LE.
-    specialize (FITS _ LE).
-    destruct (etr !! j) eqn:JTH; rewrite JTH; [| by eauto]. simpl.
-    apply LOOKUP in JTH.
-    by rewrite JTH in FITS. 
+      by rewrite ITH in II.
+    - intros ? LE.
+      specialize (FITS _ LE).
+      destruct (etr !! j) eqn:JTH; rewrite JTH; [| by eauto]. simpl.
+      apply LOOKUP in JTH.
+      by rewrite JTH in FITS.
+    - intros.
+      destruct (etr !! i) eqn:ITH; rewrite ITH /=; [| done].
+      destruct (from_locale c0.1 τi) eqn:TT; rewrite TT /=; [| done].
+      specialize (NVAL i). erewrite LOOKUP in NVAL; eauto.
+      by rewrite /= TT in NVAL.
   Qed.
 
   Lemma runs_call_helper t1 t2 e ec σ
@@ -182,7 +189,7 @@ Section CallInTrace.
     τi ∈ locales_of_cfg (trace_last etr).
   Proof using.
     red in FITS. 
-    destruct FITS as [_ NEXT].
+    destruct FITS as (_ & NEXT & _).
     ospecialize (NEXT (trace_length etr - 1) _).
     { lia. }
     rewrite trace_lookup_last in NEXT.

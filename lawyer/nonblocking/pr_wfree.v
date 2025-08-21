@@ -64,8 +64,9 @@ Section WaitFreePR.
 
   Definition wfree_trace_inv `{Hinv : @IEMGS _ _ HeapLangEM EM Σ}
     (extr: execution_trace heap_lang) (omtr: auxiliary_trace M): iProp Σ :=
-    ⌜ no_extra_obls (trace_last extr) (trace_last omtr) ⌝.
-
+    ⌜ no_extra_obls (trace_last extr) (trace_last omtr) /\
+      from_option (fun e => to_val e = None) True (from_locale (trace_last extr).1 τi) ⌝.
+  
   Context (ai: val). 
 
   Definition wp_tc {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
@@ -312,28 +313,38 @@ Section WaitFreePR.
   Qed.
 
   Lemma reestablish_wfree_inv {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
-    etr mtr:
+    etr mtr
+    (FIT: fits_inf_call ic m ai etr)
+    :
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
     cur_obls_sigs etr -∗ state_interp etr mtr -∗ wfree_trace_inv etr mtr.
   Proof using.
     simpl. iIntros "OB TI".
-    clear. 
+    clear -FIT. 
     rewrite /wfree_trace_inv. simpl.
     rewrite /no_extra_obls. simpl.
     iDestruct "TI" as "(_&_&MSI)". rewrite /obls_asem_mti. simpl.
     rewrite /obls_si. iDestruct "MSI" as "(MSI & %CORR')".
-    iIntros (τ' OBS).
-    rewrite /cur_obls_sigs.
-    destruct (decide (τ' = τi)); [done| ].
-    simpl. 
-    iDestruct "OB" as "(OB & _)".
-    iDestruct (big_sepS_elem_of with "[$]") as "OB".
-    { apply elem_of_difference. rewrite not_elem_of_singleton. split; [| done].
-      rewrite (proj1 CORR').
-      destruct (ps_obls (trace_last mtr) !! τ') eqn:TT; rewrite TT in OBS; [| done]. 
-      eapply elem_of_dom; eauto. }
-    iDestruct (obls_msi_exact with "[$] [$]") as %NOOBS.
-    by rewrite NOOBS in OBS.
+    iSplit. 
+    - iIntros (τ' OBS).
+      rewrite /cur_obls_sigs.
+      destruct (decide (τ' = τi)); [done| ].
+      simpl. 
+      iDestruct "OB" as "(OB & _)".
+      iDestruct (big_sepS_elem_of with "[$]") as "OB".
+      { apply elem_of_difference. rewrite not_elem_of_singleton. split; [| done].
+        rewrite (proj1 CORR').
+        destruct (ps_obls (trace_last mtr) !! τ') eqn:TT; rewrite TT in OBS; [| done]. 
+        eapply elem_of_dom; eauto. }
+      iDestruct (obls_msi_exact with "[$] [$]") as %NOOBS.
+      by rewrite NOOBS in OBS.
+    - iPureIntro.
+      red in FIT. do 2 (apply proj2 in FIT).
+      ospecialize (FIT (trace_length etr - 1)).
+      erewrite (trace_lookup_last etr) in FIT.
+      2: { simpl. rewrite -Nat.sub_succ_l; [lia| ].
+           destruct etr; simpl; lia. }
+      done. 
   Qed.
 
   Lemma split_trace_fuel {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
@@ -866,7 +877,8 @@ Section WaitFreePR.
          iMod (wptp_wfre_not_stuck with "TI WPS") as "(TI & WPS & %NSTUCK')"; eauto.
          { econstructor; eauto. }
          { erewrite app_nil_r. red. simpl. apply surjective_pairing. }
-         iDestruct (reestablish_wfree_inv with "[$] [$]") as "#INV'". 
+         iDestruct (reestablish_wfree_inv with "[$] [$]") as "#INV'".
+         { done. }
          iModIntro. iFrame. iSplit; [| done].
          iPureIntro. intros. by apply NSTUCK'. }
 
