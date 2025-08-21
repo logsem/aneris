@@ -67,7 +67,7 @@ Section LFCAdequacy.
     forward eapply @obls_match_impl with
       (cps_degs := 5 *: {[+ d1 +]})
       (eb := 0); eauto.
-    1-5: by apply _.
+    1-2: by apply _.
     2: { intros (omtr & MATCH & TR_WF & FIRST).
          eapply traces_match_preserves_termination; eauto.
          apply always_term_wo_lvls; eauto.

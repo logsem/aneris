@@ -63,7 +63,7 @@ Section ConstTermAdequacy.
     forward eapply @obls_match_impl with
       (cps_degs := bound *: {[+ () +]})
       (eb := 0); eauto.
-    1-5: by apply _.
+    1-2: by apply _.
     2: { intros (mtr & MATCH & OM_WF & FIRST).
 
          enough (trace_len_le mtr (bound + 1)).

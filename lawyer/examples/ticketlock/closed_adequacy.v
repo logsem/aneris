@@ -127,7 +127,7 @@ Section Adequacy.
     eapply @obls_terminates_impl with
       (cps_degs := 4 *: {[+ d__r +]})
       (eb := 70); eauto.
-    1-5: by apply _.
+    1-2: by apply _.
     1-2: by apply fin_wf.
 
     iIntros (?) "[HEAP INIT]".

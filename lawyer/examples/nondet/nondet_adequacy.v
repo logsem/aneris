@@ -63,7 +63,7 @@ Section NondetAdequacy.
     eapply @obls_terminates_impl with
       (cps_degs := 2 *: {[+ d1 +]})
       (eb := 0); eauto.
-    1-5: by apply _.
+    1-2: by apply _.
     { apply unit_WF. }
     { apply fin_wf. }
 
