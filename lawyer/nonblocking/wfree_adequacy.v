@@ -5,7 +5,7 @@ From trillium.prelude Require Import classical.
 From fairness Require Import fairness locales_helpers utils.
 From lawyer Require Import program_logic sub_action_em action_model.
 From lawyer.examples Require Import orders_lib obls_tactics.
-From lawyer.nonblocking Require Import trace_context om_wfree_inst mk_ref pr_wfree wfree_traces. 
+From lawyer.nonblocking Require Import trace_context om_wfree_inst mk_ref pr_wfree wfree_traces wptp_gen pwp.
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am obls_termination.
 From heap_lang Require Import lang.
 
@@ -72,8 +72,6 @@ Section WFAdequacy.
   (* Definition wfree_trace_inv `{Hinv : @IEMGS _ _ HeapLangEM EM Σ} *)
   (*   (extr: execution_trace heap_lang) (omtr: auxiliary_trace M): iProp Σ := *)
   (*   ⌜ no_extra_obls (trace_last extr) (trace_last omtr) ⌝. *)
-
-  Context (F: nat). 
 
   Let fic := fits_inf_call ic m ai.
 
@@ -205,6 +203,9 @@ Section WFAdequacy.
   (*     ps_eps : gset ExpectPermission; *)
   (*     ps_phases : gmap Locale Phase; *)
   (*     ps_exc_bound : nat |}. *)
+
+  Context (SPEC: WaitFreeSpec m).
+  Let F := wfs_F _ SPEC.
 
   Definition init_om_wfree_state
     (* (F: nat) (TI: nat) (d0 d1: Degree) (τi: locale Λ) (l0: Level) (ii: nat) *)
@@ -390,9 +391,94 @@ Section WFAdequacy.
     iApply big_sepM_dom. iApply (big_sepM_impl with "[$]"). set_solver.  
   Qed.
 
+  (* TODO: move *)
+  Lemma locales_of_list_from_app (tp0 tp1 tp2: list expr):
+    adequacy_utils.locales_of_list_from tp0 (tp1 ++ tp2) =
+    adequacy_utils.locales_of_list_from tp0 tp1 ++
+    adequacy_utils.locales_of_list_from (tp0 ++ tp1) tp2.
+  Proof using.
+    rewrite /adequacy_utils.locales_of_list_from.
+    rewrite !prefixes_from_app.
+    by rewrite !fmap_app.
+  Qed.
+
+  (* TODO: move *)
+  Lemma wptp_from_gen_nil {Σ : gFunctors}
+    (W: expr → locale heap_lang → (val → iPropI Σ) → iProp Σ)
+    tp0:
+    ⊢ wptp_from_gen W tp0 [] [].
+  Proof using. clear. rewrite /wptp_from_gen. set_solver. Qed.
+
+  Lemma init_pwp `{!irisG heap_lang LoopingModel Σ} τ e0:
+    ⊢ pwp.pwp MaybeStuck ⊤ τ (subst "m" m e0) (λ _, True).
+  Proof using.
+    (* should follow from FTLR and specification for m.
+       Need to assume/derive logrel for m (besides its Lawyer spec)
+     *)
+  Admitted.
+
+  Lemma init_wptp_wfree_pwps `{Hinv: @IEMGS _ _ HeapLangEM EM Σ} tp0 tp N
+    (NO: τi ∉ locales_of_list_from tp0 tp)
+    (SUBST: Forall (λ e, ∃ e0, e = subst "m" m e0) tp):
+  ⊢ wptp_from_gen (thread_pr ic MaybeStuck N) tp0 tp
+      (map (λ (_ : nat) (_ : val), ⌜ True ⌝%I)
+         (adequacy_utils.locales_of_list_from tp0 tp)).
+  Proof using.
+    iInduction tp as [|e tp] "IH" forall (tp0 NO).
+    { simpl. iApply wptp_from_gen_nil. }
+    rewrite adequacy_utils.locales_of_list_from_cons. 
+    rewrite map_cons. iApply wptp_from_gen_cons. iSplitR.
+    2: { simpl. iApply "IH".
+         - iPureIntro. by inversion SUBST. 
+         - iPureIntro. set_solver. }
+    rewrite /thread_pr. rewrite decide_False.
+    2: { intros EQ. apply NO. rewrite locales_of_list_from_locales.
+         rewrite /τi EQ. set_solver. }
+    inversion SUBST as [| ?? [? ->]]. subst. 
+    iApply init_pwp.
+  Qed.
+
+  Lemma init_wptp_wfree `{Hinv: @IEMGS _ _ HeapLangEM EM Σ} c
+    (SUBST: Forall (fun e => exists e0, e = subst "m" m e0) c.1):
+    let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
+    (⌜ ii = 0 ⌝ → ∃ π, cp π0 d1 ∗ th_phase_frag τi π (/2)%Qp) -∗
+    wptp_wfree ic MaybeStuck {tr[ c ]}
+      (map (λ _ _, True) (adequacy_utils.locales_of_list c.1)).
+  Proof using.
+    simpl. iIntros "T".
+    rewrite /wptp_wfree. simpl. 
+    destruct (thread_pool_split c.1 τi) as (tp1 & tp2 & tp' & EQ & TP' & NO1 & NO2).
+    rewrite EQ. rewrite !locales_of_list_from_app. rewrite !map_app /=. 
+    rewrite EQ in SUBST. 
+    iApply wptp_from_gen_app. iSplitR.
+    { iApply init_wptp_wfree_pwps.
+      - done. 
+      - by apply Forall_app, proj1 in SUBST. }
+    simpl. iApply wptp_from_gen_app. iSplitL.
+    2: { iApply init_wptp_wfree_pwps.
+         - done. 
+         - by do 2 (apply Forall_app, proj2 in SUBST). }
+
+    destruct TP' as [-> | (e & -> & LOC)].
+    { simpl. iApply wptp_from_gen_nil. }
+    simpl. iApply wptp_gen_singleton.
+    rewrite /thread_pr. rewrite decide_True; [| done].
+    rewrite /wp_tc.
+    destruct (tctx_index ic) eqn:TI.
+    2: { rewrite leb_correct; [| lia].
+         apply Forall_app, proj2 in SUBST.
+         apply Forall_app, proj1 in SUBST.
+         inversion SUBST as [| ?? [? ->]]. subst.
+         iApply init_pwp. }
+    rewrite leb_correct_conv; [| lia].
+    iDestruct ("T" with "[//]") as (π) "[CP1 PH]".
+    foobar. 
+    
+    
+
+
   Lemma PR_premise_wfree `{hPre: @heapGpreS Σ M EM} c
-        (ETR0: exists e0, c.1 = [subst "m" m e0])
-        (SPEC: WaitFreeSpec m):
+        (ETR0: exists e0, c.1 = [subst "m" m e0]):
   PR_premise_multiple obls_sim_rel_wfree (fits_inf_call ic m ai)
     Σ MaybeStuck c.1 c.2
     (init_om_wfree_state c) ((): @em_init_param _ _ EM).
@@ -455,16 +541,20 @@ Section WFAdequacy.
       admit. (* find / extract the fact that it's trivial for heap_lang *) }
     rewrite /pr_pr_wfree. simpl.
 
-    rewrite /obls_init_resource.
-  "MOD" : ([∗ mset] '(π, d) ∈ ps_cps (init_om_wfree_state c), cp π d) ∗
-          own obls_sigs (◯ sig_map_repr (ps_sigs (init_om_wfree_state c))) ∗
-          own obls_obls (◯ obls_map_repr (ps_obls (init_om_wfree_state c))) ∗
-          own obls_eps (◯ eps_repr (ps_eps (init_om_wfree_state c))) ∗
-          ([∗ map] τ↦π ∈ ps_phases (init_om_wfree_state c), th_phase_eq τ π) ∗
-          exc_lb (ps_exc_bound (init_om_wfree_state c))
- 
-    iSplitL.
-    { (* simpl. *)
+    iDestruct (init_wfree_resources_weak with "[$]") as "(CPS & OB' & OBLS & PHS)".
+    iFrame.
+    rewrite -{2}(difference_union_intersection_L (locales_of_cfg c) {[ τi ]}).    
+    rewrite big_sepS_union.
+    2: { set_solver. }
+    iDestruct "PHS" as "[$ PH]".
+    #[local] Arguments Nat.leb _ _ : simpl nomatch.    
+    rewrite /extra_fuel. simpl.
+    iDestruct "CPS" as "(CPS_PRE & CPS0 & CP1)". 
+    rewrite Nat.sub_0_r. fold ii.
+    rewrite bi.sep_comm. rewrite -bi.sep_assoc. iSplitL "CPS0 CPS_PRE".
+    { destruct leb; [| done]. iFrame. }
+    rewrite /obls_τi'. 
+    
     
          
   Admitted.
