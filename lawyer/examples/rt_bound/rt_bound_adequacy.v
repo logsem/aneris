@@ -78,7 +78,7 @@ Section RTBAdequacy.
     eapply @obls_terminates_impl with
       (cps_degs := 7 *: {[+ d2 +]})
       (eb := 0); eauto.
-    1-5: by apply _.
+    1, 2: by apply _.
     1, 2: by apply fin_wf.
 
     iIntros (?) "[HEAP INIT]".
