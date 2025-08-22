@@ -155,17 +155,11 @@ Section ObligationsEM.
   Qed.
 
   Lemma dom_ipa (c: cfg Λ):
-  @dom _ _ _
-    (@list_to_map (locale Λ) Phase _ _
-       (@gmap_empty (locale Λ) _ _ Phase) (init_phases_asg c)) =
-  @dom _ _ _
-    (@gset_to_gmap (locale Λ) _ _
-       (@gset SignalId Nat.eq_dec nat_countable) ∅
-       (@locales_of_cfg Λ _ _ c)).
+    dom (list_to_map (init_phases_asg c): gmap (locale Λ) Phase) = locales_of_cfg c.
   Proof using. 
     rewrite dom_list_to_map_L. simpl.
     rewrite fst_zip.
-    { by rewrite list_to_set_elements_L dom_gset_to_gmap. }
+    { by rewrite list_to_set_elements_L. }
     by rewrite len_init_phases_cfg. 
   Qed. 
 
@@ -266,7 +260,7 @@ Section ObligationsEM.
     clear. 
     destruct c as [es σ].
     rewrite /init_om_state. split.
-    - red. simpl. by rewrite dom_ipa. 
+    - red. simpl. rewrite dom_ipa dom_gset_to_gmap. done. 
     - red. simpl.
       trans (∅: gset nat); set_solver. 
     - eapply dpd_ipa; eauto. 

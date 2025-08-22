@@ -2,7 +2,7 @@ From iris.proofmode Require Import tactics.
 From trillium.traces Require Import inftraces trace_lookup exec_traces trace_len. 
 From trillium.program_logic Require Import execution_model weakestpre adequacy simulation_adequacy_em_cond. 
 From trillium.prelude Require Import classical.
-From fairness Require Import fairness locales_helpers.
+From fairness Require Import fairness locales_helpers utils.
 From lawyer Require Import program_logic sub_action_em action_model.
 From lawyer.examples Require Import orders_lib obls_tactics.
 From lawyer.nonblocking Require Import trace_context om_wfree_inst mk_ref pr_wfree wfree_traces. 
@@ -206,7 +206,6 @@ Section WFAdequacy.
   (*     ps_phases : gmap Locale Phase; *)
   (*     ps_exc_bound : nat |}. *)
 
-
   Definition init_om_wfree_state
     (* (F: nat) (TI: nat) (d0 d1: Degree) (τi: locale Λ) (l0: Level) (ii: nat) *)
     (c: cfg heap_lang): ProgressState :=
@@ -217,7 +216,15 @@ Section WFAdequacy.
                  then (<[ τi := {[ s0 ]} ]> (ps_obls δ0)) else ps_obls δ0 in
     let sigs' := (if (decide (τi ∈ locales_of_cfg c)) then {[ s0 := (l0, false) ]} else ∅)
                  ∪ ps_sigs δ0 in
-    let eps' := (if (decide (ii = 0)) then {[ (s0, π0, d0) ]} else ∅)
+(*    (** it's easier to create ep regardless of whether it's needed initially.
+        Well-formedness of OM state doesn't require (yet?) the ep's signal to be actually present.
+        If we change it, the ep would only be created along with the signal
+     *) 
+    (** let eps' := (if (decide (ii = 0)) then {[ (s0, π0, d0) ]} else ∅) *)
+    (**             ∪ ps_eps δ0 in *)
+*)
+    (* let eps' := {[ (s0, π0, d0) ]} ∪ ps_eps δ0 in *)
+    let eps' := (if (decide (τi ∈ locales_of_cfg c)) then {[ (s0, π0, d0) ]} else ∅)
                 ∪ ps_eps δ0 in
     update_obls obls' $ update_sigs sigs' $ update_eps eps' δ0. 
 
@@ -235,12 +242,11 @@ Section WFAdequacy.
       simpl. rewrite dom_insert_L dom_gset_to_gmap. set_solver. }
     split; simpl. 
     - red. simpl.
-      (* TODO: fix stupid error with implicit params *)
-      (* rewrite dom_ipa. *)
-      (* destruct (decide (τi ∈ locales_of_cfg c)); [| done]. *)
-      (* rewrite dom_insert_L !dom_gset_to_gmap. *)
-      (* set_solver. *)
-      admit. 
+      pose proof (dom_ipa c) as D. simpl in D. rewrite D. 
+      destruct decide. 
+      2: { by rewrite dom_gset_to_gmap. } 
+      rewrite dom_insert_L !dom_gset_to_gmap.
+      set_solver.
     - red. simpl.
       rewrite map_union_empty.
       destruct decide. 
@@ -257,18 +263,13 @@ Section WFAdequacy.
       by apply strict_spec, proj2 in LT.
     - red. simpl. rewrite map_union_empty.
       destruct decide. 
-      2: {
-        (* TODO: fix stupid error with implicit params *)
-        (* rewrite flatten_gset_map_img_gtg_empty. *)
-        (* done. *)
-        admit. 
-      }
+      2: { pose proof (flatten_gset_map_img_gtg_empty (locales_of_cfg c)) as D. simpl in D. rewrite D.
+        done. }
       rewrite map_img_insert_L.
       rewrite -gset_to_gmap_difference_singleton.
       rewrite flatten_gset_union.
-      (* rewrite flatten_gset_map_img_gtg_empty flatten_gset_singleton. *)
-      (* set_solver.  *)
-      admit. 
+      pose proof (flatten_gset_map_img_gtg_empty (locales_of_cfg c ∖ {[τi]})) as D. simpl in D. rewrite D.
+      rewrite flatten_gset_singleton. set_solver.
     - red. simpl. 
       intros ???.
       destruct (_ !! τ1) eqn:X, (_ !! τ2) eqn:Y; simpl; try done.
@@ -281,7 +282,7 @@ Section WFAdequacy.
         (try apply lookup_gset_to_gmap_Some in X as [? <-]);
         (try apply lookup_gset_to_gmap_Some in Y as [? <-]);
         done.
-  Admitted.
+  Qed.
 
   Lemma obls_τi_enabled c δ
     (NOOBS': pr_wfree.no_extra_obls ic c δ)
@@ -308,6 +309,39 @@ Section WFAdequacy.
   Qed.
 
   From iris.algebra Require Import auth gmap gset excl gmultiset big_op mono_nat gmap_view.
+
+  (* TODO: move *)
+  Lemma gmap_insert_delete_union `{Countable K} {A: Type} k a (mm: gmap K A):
+        <[ k := a ]> mm = {[ k := a ]} ∪ delete k mm.
+  Proof using.
+    apply map_eq. intros k'.
+    destruct (decide (k' = k)) as [-> | ?].
+    { rewrite lookup_insert.
+      erewrite lookup_union_Some_l; eauto.
+      by apply lookup_singleton_Some. }
+    rewrite lookup_insert_ne; [| done].
+    rewrite lookup_union_r.
+    2: { by apply lookup_singleton_None. }
+    symmetry. by apply lookup_delete_ne.
+  Qed.    
+
+  Lemma empty_obls_helper `{!ObligationsGS Σ} (T: gset (locale heap_lang)):
+  @own Σ _
+           (@obls_pre_obls _ _ _ _ OP _ _)
+           (@obls_obls _ _ _ _ OP _ _)
+           (◯ (Excl <$> @gset_to_gmap nat _ _ _ ∅ T)) -∗
+  [∗ set] τ ∈ T, obls τ ∅.
+  Proof using.
+    iIntros "OB".
+    rewrite fmap_gset_to_gmap.
+    rewrite -gmap.big_opS_gset_to_gmap_L.
+    rewrite big_opS_auth_frag.
+    destruct (decide (T = ∅)).
+    { rewrite e. set_solver. }
+    rewrite big_opS_own; [| done].
+    iApply (big_sepS_impl with "OB").
+    iModIntro. set_solver.
+  Qed.
 
   (** for simplicity, we forget about the specific phases *)
   Lemma init_wfree_resources_weak `{!ObligationsGS Σ} c:
@@ -340,63 +374,21 @@ Section WFAdequacy.
       2: { rewrite difference_disjoint_L; [| set_solver].
            iSplitR.
            { by iIntros (?). }
-           rewrite fmap_gset_to_gmap.
-           rewrite -gmap.big_opS_gset_to_gmap_L.
-           rewrite big_opS_auth_frag.
-           destruct (decide (locales_of_cfg c = ∅)). 
-           { rewrite e. set_solver. }
-           rewrite big_opS_own; [| done]. 
-           iApply (big_sepS_impl with "OB").
-           iModIntro. set_solver. }
-      rewrite fmap_insert.
-      foobar. 
-      rewrite insert_union_singleton_l.
-      rewrite map_union_comm. 
-      erewrite <- (union_delete_insert _ {[ τi := _ ]}).
-      2: { apply lookup_singleton_Some. eauto. }  
-      rewrite -gmap_disj_op_union. 
-      iFrame "SIGS". 
-           
+           by iApply empty_obls_helper. }
+      rewrite gmap_insert_delete_union. 
+      rewrite map_fmap_union.
+      rewrite -gset_to_gmap_difference_singleton.
+      rewrite -gmap_disj_op_union.
+      2: { apply map_disjoint_dom. do 2 rewrite dom_fmap.
+           rewrite dom_singleton_L dom_gset_to_gmap. set_solver. }
+      rewrite auth_frag_op own_op.
+      iDestruct "OB" as "[OB OB']". iDestruct (empty_obls_helper with "[$]") as "$".
+      iIntros (?).
+      rewrite map_fmap_singleton. by iFrame. }
 
-           
-
-           rewrite -H. 
-
-           ospecialize (H (locale heap_lang) _ _).
-           unshelve ospecialize (H _).
-           { esplit. 2: apply (@excl.excl_cmra_mixin (gset SignalId)). 
-
-                          (locales_of_cfg c) (excl.Excl (∅: gset SignalId))). 
-           rewrite
-           
-      iIntros (IN). rewrite decide_True; [| done].
-      iExists 0. iFrame. }
-    
- 
-      
-    iApply cp_mul_weaken.
-    { apply phase_lt_fork. }
-    { reflexivity. }
-    rewrite cp_mul_alt mset_map_singleton. done.     
- 
-    rewrite init_phases_helper. simpl.
-    rewrite locales_of_cfg_simpl. simpl.
-    rewrite union_empty_r_L !gset_to_gmap_singleton.
-    rewrite big_sepM_singleton. iFrame.
-    rewrite mset_map_mul.
-    iApply cp_mul_weaken.
-    { apply phase_lt_fork. }
-    { reflexivity. }
-    rewrite cp_mul_alt mset_map_singleton. done.     
+    pose proof (dom_ipa c) as D. simpl in D. rewrite -D. 
+    iApply big_sepM_dom. iApply (big_sepM_impl with "[$]"). set_solver.  
   Qed.
-
-    rewrite /obls_init_resource.
-  "MOD" : ([∗ mset] '(π, d) ∈ ps_cps (init_om_wfree_state c), cp π d) ∗
-          own obls_sigs (◯ sig_map_repr (ps_sigs (init_om_wfree_state c))) ∗
-          own obls_obls (◯ obls_map_repr (ps_obls (init_om_wfree_state c))) ∗
-          own obls_eps (◯ eps_repr (ps_eps (init_om_wfree_state c))) ∗
-          ([∗ map] τ↦π ∈ ps_phases (init_om_wfree_state c), th_phase_eq τ π) ∗
-          exc_lb (ps_exc_bound (init_om_wfree_state c))
 
   Lemma PR_premise_wfree `{hPre: @heapGpreS Σ M EM} c
         (ETR0: exists e0, c.1 = [subst "m" m e0])
