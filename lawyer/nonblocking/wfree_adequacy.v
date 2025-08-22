@@ -14,26 +14,26 @@ Close Scope Z.
 
 
 Section CallInTrace.
-  Context (tr: extrace heap_lang). 
+  Context (tr: extrace heap_lang).
   Context (m: val). (** the method under consideration *)
   
   Definition expr_under '(TraceCtx i τ K) (e: expr) :=
     exists c, tr S!! i = Some c /\ from_locale c.1 τ = Some (ectx_fill K e).
 
   Definition call_at tc (a: val) :=
-    expr_under tc (App (of_val m) (of_val a)). 
+    expr_under tc (App (of_val m) (of_val a)).
 
   Definition return_at tc (r: val) :=
     expr_under tc (of_val r).
 
   (* TODO: rename *)
   Definition expr_under_expr tc :=
-    exists e, expr_under tc e /\ to_val e = None. 
+    exists e, expr_under tc e /\ to_val e = None.
   
   Definition has_return '(TraceCtx i τ K as tc) :=
     exists j r, i <= j /\ return_at (TraceCtx j τ K) r.
 
-  Definition always_returns := 
+  Definition always_returns :=
     forall tc a, fair_ex (tctx_tid tc) tr -> call_at tc a -> has_return tc.
   
 End CallInTrace.
@@ -392,17 +392,6 @@ Section WFAdequacy.
   Qed.
 
   (* TODO: move *)
-  Lemma locales_of_list_from_app (tp0 tp1 tp2: list expr):
-    adequacy_utils.locales_of_list_from tp0 (tp1 ++ tp2) =
-    adequacy_utils.locales_of_list_from tp0 tp1 ++
-    adequacy_utils.locales_of_list_from (tp0 ++ tp1) tp2.
-  Proof using.
-    rewrite /adequacy_utils.locales_of_list_from.
-    rewrite !prefixes_from_app.
-    by rewrite !fmap_app.
-  Qed.
-
-  (* TODO: move *)
   Lemma wptp_from_gen_nil {Σ : gFunctors}
     (W: expr → locale heap_lang → (val → iPropI Σ) → iProp Σ)
     tp0:
@@ -441,14 +430,14 @@ Section WFAdequacy.
   Lemma init_wptp_wfree `{Hinv: @IEMGS _ _ HeapLangEM EM Σ} c
     (SUBST: Forall (fun e => exists e0, e = subst "m" m e0) c.1):
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
-    (⌜ ii = 0 ⌝ → ∃ π, cp π0 d1 ∗ th_phase_frag τi π (/2)%Qp) -∗
+    (⌜ ii = 0 ⌝ → ∃ π, cp_mul π0 d0 F ∗ th_phase_frag τi π (/2)%Qp) -∗
     wptp_wfree ic MaybeStuck {tr[ c ]}
       (map (λ _ _, True) (adequacy_utils.locales_of_list c.1)).
   Proof using.
     simpl. iIntros "T".
     rewrite /wptp_wfree. simpl. 
     destruct (thread_pool_split c.1 τi) as (tp1 & tp2 & tp' & EQ & TP' & NO1 & NO2).
-    rewrite EQ. rewrite !locales_of_list_from_app. rewrite !map_app /=. 
+    rewrite EQ. rewrite !locales_of_list_from_app'. rewrite !map_app /=. 
     rewrite EQ in SUBST. 
     iApply wptp_from_gen_app. iSplitR.
     { iApply init_wptp_wfree_pwps.
@@ -471,11 +460,10 @@ Section WFAdequacy.
          inversion SUBST as [| ?? [? ->]]. subst.
          iApply init_pwp. }
     rewrite leb_correct_conv; [| lia].
-    iDestruct ("T" with "[//]") as (π) "[CP1 PH]".
-    foobar. 
-    
-    
-
+    iDestruct ("T" with "[//]") as (π) "[CPS PH]".
+    rewrite half_inv2. 
+    iPoseProof (get_call_wp _ SPEC ai with "[$] [$]") as "WP".
+    foobar.     
 
   Lemma PR_premise_wfree `{hPre: @heapGpreS Σ M EM} c
         (ETR0: exists e0, c.1 = [subst "m" m e0]):
