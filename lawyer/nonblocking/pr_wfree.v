@@ -842,6 +842,45 @@ Section WaitFreePR.
     iApply (wptp_wfre_not_stuck with "[$] [$]"); eauto.
   Qed.
 
+  Lemma wptp_wfree_upd_other `{Hinv : @IEMGS _ _ HeapLangEM EM Σ} s N tp0 tp Φs
+    (OTHER: τi ∉ locales_of_list_from tp0 tp):
+    wptp_from_gen (thread_pr s N) tp0 tp Φs -∗
+    wptp_from_gen (thread_pr s (S N)) tp0 tp Φs.
+  Proof using.
+    iIntros "WPS". iApply (big_sepL2_impl with "[$]").
+    iModIntro. iIntros (i pfi Φi PFith Φith).
+    rewrite /thread_pr.
+    destruct decide; [| set_solver].
+    destruct OTHER.
+    rewrite locales_of_list_from_locales.
+    apply elem_of_list_In, in_map_iff.
+    eexists (_, _). split; eauto.
+    rewrite -surjective_pairing.
+    apply elem_of_list_In. eapply elem_of_list_lookup; eauto.
+  Qed.
+
+  (* TODO: move *)
+  Lemma locales_of_list_from_app' (tp0 tp1 tp2: list expr):
+    adequacy_utils.locales_of_list_from tp0 (tp1 ++ tp2) =
+    adequacy_utils.locales_of_list_from tp0 tp1 ++
+    adequacy_utils.locales_of_list_from (tp0 ++ tp1) tp2.
+  Proof using.
+    rewrite /adequacy_utils.locales_of_list_from.
+    rewrite !prefixes_from_app.
+    by rewrite !fmap_app.
+  Qed.
+
+  (* TODO: move, get rid of duplicates *)
+  Lemma locales_of_list_from_app (tp0 tp1 tp2: list expr):
+    locales_of_list_from tp0 (tp1 ++ tp2) =
+    locales_of_list_from tp0 tp1 ++
+    locales_of_list_from (tp0 ++ tp1) tp2.
+  Proof using.
+    rewrite /locales_of_list_from.
+    rewrite !prefixes_from_app.
+    by rewrite !fmap_app.
+  Qed.
+
   Lemma wptp_wfree_take_step {Σ} (Hinv : IEMGS HeapLangEM EM Σ) (s : stuckness) 
     (etr : execution_trace heap_lang) (Φs : list (language.val heap_lang → iProp Σ)) 
     (c : cfg heap_lang) (oτ : olocale heap_lang) (c' : cfg heap_lang) 
@@ -890,6 +929,28 @@ Section WaitFreePR.
     simpl in *. 
     destruct oτ as [τ| ]; [| done]. inversion H0. clear H0.
     rewrite H3 in STEP, FIT. rewrite H3.
+
+    assert (τ ∉ locales_of_list_from [] t1 /\ τ ∉ locales_of_list_from (t1 ++ [e']) t2 /\ τ ∉ locales_of_list_from (t1 ++ [e'] ++ t2) efs) as (NO1 & NO2 & NO').
+    { pose proof (thread_pool_split c'.1 τ) as SPLIT.
+      rewrite -H1 /= in SPLIT. destruct SPLIT as (tp1 & tp2 & tp' & EQ & TP' & NO1 & NO2).
+      destruct TP' as [-> | (e_ & -> & LOC)].
+      { simpl in EQ.
+        assert (τ ∈ locales_of_list c'.1) as IN. 
+        { rewrite -H1 /=.
+          rewrite locales_of_list_from_app /=. rewrite locales_of_list_from_cons.
+          set_solver. }
+        rewrite -H1 /= EQ in IN.
+        rewrite locales_of_list_from_app /= in IN.
+        rewrite app_nil_r in NO2.
+        exfalso. 
+        apply elem_of_app in IN as [?|?]; eauto. }
+      rewrite -H3 /locale_of in LOC.
+      apply app_inj_1 in EQ as [EQ1 EQ2]; eauto.
+      simpl in EQ2. inversion EQ2. subst.
+      split; eauto.
+      apply Decidable.not_or. intros IN. destruct NO2.
+      rewrite locales_of_list_from_app. apply elem_of_app.
+      by rewrite -app_assoc. }    
 
     rewrite /pr_pr_wfree. iDestruct "PR" as "(WPS & CPS & PH & OB)".
 
@@ -997,20 +1058,8 @@ Section WaitFreePR.
                  rewrite /locale_of. rewrite !length_app. simpl. lia. } 
           
           rewrite -EQ. iApply wptp_from_gen_app. iSplitL "WPS1".
-          { iApply (big_sepL2_impl with "[$]").
-            iModIntro. iIntros (i pfi Φi PFith Φith).
-            rewrite /thread_pr.
-            destruct decide.
-            2: { set_solver. }
-
-            rewrite e1 in e0.
-            simpl in e0.
-            rewrite /locale_of in e0.
-
-            pose proof PFith as ?%prefixes_from_ith_length.
-            simpl in H0. rewrite H0 in e0. subst.
-            apply lookup_lt_Some in PFith.
-            rewrite adequacy_utils.prefixes_from_length in PFith. lia. }
+          { iApply (wptp_wfree_upd_other with "[$]").
+            by rewrite e0. }
 
           simpl. rewrite -EQ'. iApply wptp_from_gen_cons.
           iSplitL "WP".
@@ -1018,26 +1067,11 @@ Section WaitFreePR.
                2: { rewrite !prefixes_from_app.
                     eapply Forall2_app; [apply adequacy_utils.locales_equiv_refl| ].
                     simpl. by constructor. }
-               iApply (big_sepL2_impl with "[$]").
-               iModIntro. iIntros (i pfi Φi PFith Φith).
-               rewrite /thread_pr.
-               destruct decide.
-               2: { set_solver. }
+               iApply (wptp_wfree_upd_other with "[$]").
+               by rewrite e0. }
                
-               rewrite e1 in e0.
-               simpl in e0.
-               rewrite /locale_of in e0.
-               
-               pose proof PFith as ?%prefixes_from_ith_length.
-               simpl in H0. rewrite H0 in e0. subst.
-               apply lookup_lt_Some in PFith.
-               rewrite adequacy_utils.prefixes_from_length in PFith.
-               rewrite !length_app /= in e0. lia. }
-               
-          rewrite /thread_pr. rewrite decide_True.
-          2: { rewrite e0. done. }
-          
-          done. }
+          rewrite /thread_pr. rewrite decide_True; [done| ]. 
+          rewrite e0. done. }
 
         (* pr is reestablished differently depending on whether we reach ii.
            TODO: try to unify it *)
@@ -1140,16 +1174,8 @@ Section WaitFreePR.
         {
           rewrite /wptp_wfree. 
           rewrite -EQ. iApply wptp_from_gen_app. iSplitL "WPS1".
-          { simpl.
-            rewrite /wptp_from_gen.
-            iApply (big_sepL2_impl with "[$]").
-            iModIntro. iIntros (i pfi Φi PFith Φith).
-            rewrite /thread_pr.
-            destruct decide.
-            2: { set_solver. }
-            rewrite leb_correct_conv; [| lia].
-            rewrite leb_correct_conv; [| lia].
-            set_solver. }
+          { simpl. iApply (wptp_wfree_upd_other with "[$]").
+            by rewrite e0. }
           simpl. rewrite -EQ'.
           iApply (wptp_from_gen_app _ _ [_] [_]).
           iSplitL "He2".
@@ -1158,25 +1184,16 @@ Section WaitFreePR.
             rewrite /wp_tc. rewrite leb_correct_conv.
             2: { lia. }
             rewrite under_ctx_fill. rewrite e0. done. }
-          (* TODO: make a lemma, use it above too *)
-          { simpl.
-            erewrite wptp_from_gen_locales_equiv_1 with (t0' := (t1 ++ [fill Ki x])).
-            2: { rewrite !prefixes_from_app.
-                 eapply Forall2_app; [apply adequacy_utils.locales_equiv_refl| ].
-                 simpl. by constructor. }
-            rewrite /wptp_from_gen.
-            iApply (big_sepL2_impl with "[$]").
-            iModIntro. iIntros (i pfi Φi PFith Φith).
-            rewrite /thread_pr.
-            destruct decide.
-            2: { set_solver. }
-            rewrite e1 in e0.
-            simpl in e0.
-            rewrite /locale_of in e0.
 
-            pose proof PFith as ?%prefixes_from_ith_length.
-            rewrite length_app in H3. simpl in H3. lia. }
-        }
+          erewrite wptp_from_gen_locales_equiv_1 with (t0' := (t1 ++ [fill Ki x])).
+          2: { rewrite !prefixes_from_app.
+               eapply Forall2_app; [apply adequacy_utils.locales_equiv_refl| ].
+               simpl. by constructor. }
+          simpl. iApply (wptp_wfree_upd_other with "[$]").
+          erewrite (proj1 (locales_equiv_from_of_list_from _ _ _ _)).
+          { rewrite e0. apply NO2. }
+          apply adequacy_utils.locales_equiv_from_refl. 
+          apply locales_equiv_from_middle with (t2 := []). done. }
         
         iAssert (@state_interp _ M _ _ (etr :tr[ Some τi ]: (t1 ++ fill Ki x :: t2, σ')) _)%I with "[HEAP MSI]" as "TI".
         { simpl. by iFrame. }
@@ -1304,10 +1321,10 @@ Section WaitFreePR.
           simpl. rewrite -EQ'. iApply wptp_from_gen_cons.          
           iSplitL "He2".
           2: { erewrite wptp_from_gen_locales_equiv_1 with (t0' := (t1 ++ [e'])).
-               2: { rewrite !prefixes_from_app.
-                    eapply Forall2_app; [apply adequacy_utils.locales_equiv_refl| ].
-                    simpl. by constructor. }
-               done. }
+               { done. }
+               rewrite !prefixes_from_app.
+               eapply Forall2_app; [apply adequacy_utils.locales_equiv_refl| ].
+               simpl. by constructor. }
                
           rewrite /thread_pr.
           rewrite /wp_tc. rewrite leb_correct; [| done].
@@ -1337,7 +1354,6 @@ Section WaitFreePR.
           ** iClear "PHτi". 
              iSpecialize ("CPS" with "[$CPP]"); [done| ].
              iFrame "CPS".
-
 
              rewrite /wptp_wfree /wptp_gen /wptp_from_gen.
              simpl. iApply (big_sepL2_impl with "[$]").
@@ -1369,23 +1385,12 @@ Section WaitFreePR.
              { (** just drop the pwp for the newly forked τi *)
                iDestruct (wptp_from_gen_app' with "[$]") as "[WPS _]".
                { rewrite -EQ -EQ'. rewrite !length_app. simpl. lia. }
-
-               iApply (big_sepL2_impl with "[$]").
-               iModIntro. 
-               iIntros (i pfi Φi PFith Φith).
-               rewrite /thread_pr.
-               destruct decide.
-               2: { by iIntros "$". }
-               rewrite /locale_of in e0.
-
-               pose proof PFith as ?%prefixes_from_ith_length.
-               simpl in H2.
-               apply lookup_lt_Some in PFith.
-               rewrite adequacy_utils.prefixes_from_length in PFith.
-               rewrite /locale_of in H3. subst.
-               rewrite -H4 in e0.
-               rewrite /locale_of in e0. rewrite !length_app in e0.
-               simpl in *. rewrite !length_app /= in PFith. lia. }
+               simpl. iApply (wptp_wfree_upd_other with "[$]").
+               rewrite locales_of_list_from_indexes.
+               intros (?&?&->&?)%elem_of_lookup_imap.
+               rewrite /locale_of /= in H4. rewrite -H4 in H3.
+               apply lookup_lt_Some in H3.
+               rewrite !length_app /= in H3. lia. }
 
              rewrite /newposts.
              rewrite newelems_app_drop.
@@ -1507,18 +1512,8 @@ Section WaitFreePR.
              clear CUR_. 
 
              iApply wptp_from_gen_app. iSplitR "WPS'".
-             2: { simpl. 
-                  iApply (big_sepL2_impl with "[$]").
-                  iModIntro. 
-                  iIntros (i pfi Φi PFith Φith).
-                  rewrite /thread_pr.
-                  destruct decide.
-                  2: { by iIntros "$". }
-                  destruct NONEW. rewrite locales_of_list_from_locales.
-                  apply elem_of_list_In, in_map_iff.
-                  eexists (_, _). split; eauto.
-                  apply elem_of_list_In. apply elem_of_list_lookup.
-                  eexists. rewrite -surjective_pairing. eauto. } 
+             2: { simpl.
+                  iApply (wptp_wfree_upd_other with "[$]"). done. }
 
              (*****)
              remember (t1 ++ e' :: t2) as tp'.
@@ -1529,28 +1524,23 @@ Section WaitFreePR.
              destruct X as (Φs1 & Φs2 & <- & LEN1 & LEN2).
              iDestruct (wptp_from_gen_app' with "[$]") as "[WPS1 WPS]"; [done| ].
              iApply wptp_from_gen_app. iSplitL "WPS1".
-             { iApply (big_sepL2_impl with "[$]").
-               iModIntro. 
-               iIntros (i pfi Φi PFith Φith).
-               rewrite /thread_pr.
-               destruct decide; [| set_solver].
-               apply prefixes_from_ith_length in PFith.
-               rewrite /locale_of in e. rewrite -e in PFith.
-               rewrite H in PFith. simpl in PFith.
-               apply lookup_lt_Some in Φith. lia. }
+             { iApply (wptp_wfree_upd_other with "[$]").
+               rewrite H. 
+               rewrite locales_of_list_from_indexes.
+               intros (?&?&?&?)%elem_of_lookup_imap.
+               apply lookup_lt_Some in H3. simpl in *. lia. }
              simpl. destruct Φs2; [done| ].
              (* drop the existing pwp for τi *)
              rewrite wptp_from_gen_cons. iDestruct "WPS"  as "[_ WPS2]". 
              iApply wptp_from_gen_cons. iSplitR "WPS2".
-             2: { iApply (big_sepL2_impl with "[$]").
-                  iModIntro. 
-                  iIntros (i pfi Φi PFith Φith).
-                  rewrite /thread_pr.
-                  destruct decide; [| set_solver].
-                  apply prefixes_from_ith_length in PFith.
-                  rewrite /locale_of in e. rewrite -e in PFith.
-                  rewrite H in PFith. simpl in PFith.
-                  rewrite length_app /= in PFith. lia. }
+             2: { iApply (wptp_wfree_upd_other with "[$]").
+                  rewrite H. 
+                  rewrite locales_of_list_from_indexes.
+                  intros (?&?&?&?)%elem_of_lookup_imap.
+                  apply lookup_lt_Some in H3.
+                  rewrite length_app /= in H1. 
+                  lia. }
+                  
              rewrite /thread_pr. rewrite !decide_True; try done.
              rewrite /wp_tc. rewrite leb_correct_conv; [| simpl in *; lia].
              rewrite CTX.
