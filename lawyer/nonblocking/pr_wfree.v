@@ -23,8 +23,9 @@ Section WaitFreePR.
 
   Context (ic: @trace_ctx heap_lang).
   Let ii := tctx_index ic.
-  Let Ki := tctx_ctx ic.
-  Let τi := tctx_tid ic.
+  Let tc := tctx_tpctx ic. 
+  Let Ki := tpctx_ctx tc.
+  Let τi := tpctx_tid tc. 
 
   Context `(WFS: WaitFreeSpec m).
   Let F := wfs_F _ WFS. 
@@ -131,14 +132,16 @@ Section WaitFreePR.
       { simpl. rewrite /phys_SI. simpl.
         by iDestruct "HSI" as "(?&?&?)". }
       simpl. by rewrite Hex.
-    - apply fits_inf_call_last_or_short in FIT as [(ec & FIT) | SHORT].
+    - apply fits_inf_call_last_or_short in FIT as [NVAL | SHORT].
       2: { apply Nat.leb_gt in LEN. 
            exfalso. clear -LEN SHORT.
            (* TODO: why lia doesn't work? *)
            by apply Nat.lt_nge in LEN. }
-      rewrite Hex in FIT.
+      rewrite Hex in NVAL.
 
-      eapply runs_call_helper in FIT; eauto. destruct FIT as (CUR & NVAL).
+      (* red in NVAL. rewrite /expr_at in NVAL.  *)
+      eapply runs_call_helper in NVAL; eauto.
+      destruct NVAL as (ec & CUR & NVAL).
 
       rewrite CUR.
       pose proof CUR as <-%under_ctx_spec. 
@@ -607,10 +610,10 @@ Section WaitFreePR.
            2: { simpl in *. lia. }
            simpl in FITS.
            iSpecialize ("PHτi" with "[]").
-           { iPureIntro. red in FITS. destruct FITS as (?&IN&_).
+           { iPureIntro. red in FITS. 
              pose proof STEP as EQ%locale_step_step_fork_exact.
-             rewrite SF /= union_empty_r_L in EQ. rewrite -EQ. 
-             eapply locales_of_cfg_Some; eauto. }
+             rewrite SF /= union_empty_r_L in EQ. rewrite -EQ.
+             eapply expr_at_in_locales; eauto. }
            iDestruct "PHτi" as (?) "PH".
            rewrite leb_correct; [| simpl in *; lia].
            iDestruct (th_phase_frag_halve with "PH") as "[PH PH_]".
@@ -661,13 +664,12 @@ Section WaitFreePR.
       2: { simpl in *. lia. }
       simpl in FITS.
       iSpecialize ("PHτi" with "[]").
-      { iPureIntro. red in FITS. destruct FITS as (?&IN&_).
+      { iPureIntro. red in FITS. 
         pose proof STEP as EQ%locale_step_step_fork_exact.
-        rewrite SF /= in EQ. 
-        apply mk_is_Some in IN.
-        eapply locales_of_cfg_Some in IN.
-        rewrite <- surjective_pairing in IN.
-        rewrite EQ in IN. set_solver. }
+        rewrite SF /= in EQ.
+        apply expr_at_in_locales in FITS. rewrite EQ in FITS.
+        apply elem_of_union in FITS as [|]; eauto.
+        set_solver. }
       iDestruct "PHτi" as (?) "PH".
       rewrite leb_correct; [| simpl in *; lia].
       iDestruct (th_phase_frag_halve with "PH") as "[PH PH_]".
@@ -686,7 +688,6 @@ Section WaitFreePR.
       destruct (decide (trace_length etr <= ii)) as [LE | GT]. 
       + by do 2 (rewrite leb_correct; [| lia]).
       + by do 2 (rewrite leb_correct_conv; [| lia]).
-   Unshelve. exact inhabitant. 
   Qed.
 
   Lemma obls_τi'_next `{!ObligationsGS Σ} c c'
@@ -800,13 +801,11 @@ Section WaitFreePR.
         iMod (pre_step_looping_wfree_elim with "foo") as "foo".
         iModIntro. iFrame. iIntros "(? & _)".
         by iApply @wp_value'.
-      - apply fits_inf_call_last_or_short in FIT. destruct FIT as [(ec & RUNS) | SHORT].
+      - apply fits_inf_call_last_or_short in FIT. destruct FIT as [RUNS | SHORT].
         2: { apply leb_complete_conv in LEN. simpl in SHORT. lia. }
-        red in RUNS. destruct RUNS as (e_ & TI & CTX & NVAL).
-        rewrite LAST /= in TI. fold τi in TI. rewrite EQ in TI.
-        rewrite /from_locale in TI. rewrite from_locale_from_locale_of in TI.
-        inversion TI. subst e_.
-        simpl in EV. subst.  
+
+        rewrite LAST /= in RUNS. apply runs_call_helper in RUNS; eauto.  
+        destruct RUNS as (e_ & CTX & NVAL).
         apply under_ctx_val_Some_inv in CTX as [? ->]; eauto.
         congruence. }
       
@@ -880,6 +879,10 @@ Section WaitFreePR.
     rewrite !prefixes_from_app.
     by rewrite !fmap_app.
   Qed.
+
+  Local Lemma ic_helper:
+    tctx_tpctx ic = {| tpctx_ctx := Ki; tpctx_tid := τi |}.
+  Proof using. by destruct ic as [? []]. Qed.
 
   Lemma wptp_wfree_take_step {Σ} (Hinv : IEMGS HeapLangEM EM Σ) (s : stuckness) 
     (etr : execution_trace heap_lang) (Φs : list (language.val heap_lang → iProp Σ)) 
@@ -1106,16 +1109,16 @@ Section WaitFreePR.
             iPoseProof (get_call_wp with "[$] [$]") as "WP".
             red in FIT. apply proj1 in FIT.
             rewrite trace_lookup_extend in FIT; [| done].
-            simpl in FIT. red in FIT.
-            destruct FIT as (e_ & CUR_ & CTX & ?).
-            rewrite /τi in e0. 
-            rewrite e0 /= in CUR_.
-            replace (locale_of t1 e) with (locale_of t1 e') in CUR_.
+            simpl in FIT. do 2 red in FIT. rewrite ic_helper /= in FIT.
+            (* destruct FIT as (e_ & CUR_ & CTX & ?). *)
+            rewrite e0 /= in FIT.
+            replace (locale_of t1 e) with (locale_of t1 e') in FIT.
             2: { done. }
-            rewrite /from_locale from_locale_from_locale_of in CUR_.
-            inversion CUR_. subst e_. clear CUR_.
-            rewrite CTX. simpl.
-            iApply (wp_stuck_mono with "[$]"). done. }
+            rewrite /from_locale from_locale_from_locale_of in FIT.
+            inversion FIT. subst e'. 
+            erewrite (proj2 (under_ctx_spec _ _ _)). 
+            { simpl. iApply (wp_stuck_mono with "[$]"). done. }
+            reflexivity. }
 
           iFrame "WPS".
           iSpecialize ("CPS" with "[]").
@@ -1138,10 +1141,10 @@ Section WaitFreePR.
           iFrame.            
       + apply Nat.leb_gt in LEN. 
         apply fits_inf_call_prev in FIT.
-        apply fits_inf_call_last_or_short in FIT as [(ec & FIT) | SHORT].
+        apply fits_inf_call_last_or_short in FIT as [NVAL | SHORT].
         2: { simpl in SHORT. lia. }
-        rewrite FIN in FIT. eapply runs_call_helper in FIT; eauto.
-        destruct FIT as (CUR & NVAL).
+        rewrite FIN in NVAL. apply runs_call_helper in NVAL; eauto.
+        destruct NVAL as (e_ & CUR & NVAL).
 
         rewrite CUR. simpl.
         apply under_ctx_spec in CUR.
@@ -1402,16 +1405,16 @@ Section WaitFreePR.
              2: { simpl in *. lia. }
              simpl.
 
-             destruct FIT as (e_ & CUR_ & CTX & ?).
-             rewrite /τi in H4. 
-             rewrite -H4 /= in CUR_.
-             rewrite app_comm_cons app_assoc in CUR_. 
+             red in FIT. rewrite ic_helper /= in FIT.
+             rewrite /τi /= in H4. 
+             rewrite /τi -H4 /= in FIT. 
+             rewrite app_comm_cons app_assoc in FIT. 
              assert (locale_of (t1 ++ e :: t2) x = locale_of (t1 ++ e' :: t2) x) as RR. 
              { rewrite /locale_of !length_app. done. }
-             rewrite /= RR in CUR_. 
-             rewrite /from_locale from_locale_from_locale_of in CUR_.
-             inversion CUR_. subst e_. clear CUR_.
-             rewrite CTX. simpl. rewrite H4. 
+             rewrite /= RR in FIT. 
+             rewrite /from_locale from_locale_from_locale_of in FIT.
+             inversion FIT. subst x. clear FIT.
+             rewrite under_ctx_fill. simpl. rewrite H4. 
              iApply (wp_stuck_mono with "[$]"). done.
 
         * rewrite decide_False; [| done]. iDestruct "MOD" as "(-> & OBτi)".
@@ -1466,7 +1469,7 @@ Section WaitFreePR.
              rewrite trace_lookup_last in FIT.
              2: { simpl in *. lia. }
              simpl in FIT. red in FIT.
-             destruct FIT as (e_ & CUR_ & CTX & ?).
+             red in FIT. rewrite ic_helper /= in FIT. 
 
              assert (τi ∉ locales_of_list_from (t1 ++ e' :: t2) efs) as NONEW.
              { rewrite locales_of_list_from_locales.
@@ -1477,17 +1480,17 @@ Section WaitFreePR.
                apply prefixes_from_ith_length in IN. 
                rewrite !length_app /= in IN. rewrite /locale_of in LOC.
 
-               apply from_locale_lookup in CUR_.
-               apply lookup_lt_Some in CUR_. simpl in CUR_.
+               apply from_locale_lookup in FIT.
+               apply lookup_lt_Some in FIT. simpl in FIT.
                rewrite /τi in LOC.
-               rewrite -LOC IN in CUR_. 
-               repeat rewrite !length_app /= in CUR_.
-               simpl in CUR_.
+               rewrite /τi -LOC IN in FIT. 
+               repeat rewrite !length_app /= in FIT.
+               simpl in FIT.
 
                subst τ. 
                apply step_fork_hl in STEP as [[? ->] | (?&->&?)].
-               { simpl. simpl in CUR_. lia. }
-               simpl in CUR_. destruct i; [| lia].
+               { simpl. simpl in FIT. lia. }
+               simpl in FIT. destruct i; [| lia].
                simpl in X. inversion X.
                subst. simpl in e0.
                rewrite app_comm_cons app_assoc in NO.
@@ -1498,18 +1501,18 @@ Section WaitFreePR.
                  rewrite /locale_of !length_app in NO. done. }
                apply locales_equiv_middle. done. }
 
-             assert (from_locale (t1 ++ e' :: t2) τi = Some e_) as CUR.
+             assert (from_locale (t1 ++ e' :: t2) τi = Some (fill Ki (m ai))) as CUR.
              { apply from_locale_from_lookup. split; [| simpl; lia].
                simpl. rewrite Nat.sub_0_r.
-               simpl in CUR_. apply from_locale_from_lookup, proj1 in CUR_.
-               rewrite /= Nat.sub_0_r in CUR_.
-               rewrite app_comm_cons app_assoc in CUR_.
-               apply lookup_app_Some in CUR_. destruct CUR_ as [? | [OVER ?]].
+               simpl in FIT. apply from_locale_from_lookup, proj1 in FIT.
+               rewrite /= Nat.sub_0_r in FIT.
+               rewrite app_comm_cons app_assoc in FIT.
+               apply lookup_app_Some in FIT. destruct FIT as [? | [OVER ?]].
                { done. }
                destruct NONEW. rewrite locales_of_list_from_indexes.
                apply elem_of_lookup_imap.
-              exists (τi - length (t1 ++ e' :: t2)), e_. split; [lia| done]. }
-             clear CUR_. 
+              eexists (τi - length (t1 ++ e' :: t2)), _. split; [lia| done]. }
+             clear FIT.
 
              iApply wptp_from_gen_app. iSplitR "WPS'".
              2: { simpl.
@@ -1528,7 +1531,7 @@ Section WaitFreePR.
                rewrite H. 
                rewrite locales_of_list_from_indexes.
                intros (?&?&?&?)%elem_of_lookup_imap.
-               apply lookup_lt_Some in H3. simpl in *. lia. }
+               apply lookup_lt_Some in H2. simpl in *. lia. }
              simpl. destruct Φs2; [done| ].
              (* drop the existing pwp for τi *)
              rewrite wptp_from_gen_cons. iDestruct "WPS"  as "[_ WPS2]". 
@@ -1537,14 +1540,13 @@ Section WaitFreePR.
                   rewrite H. 
                   rewrite locales_of_list_from_indexes.
                   intros (?&?&?&?)%elem_of_lookup_imap.
-                  apply lookup_lt_Some in H3.
+                  apply lookup_lt_Some in H2.
                   rewrite length_app /= in H1. 
                   lia. }
                   
              rewrite /thread_pr. rewrite !decide_True; try done.
              rewrite /wp_tc. rewrite leb_correct_conv; [| simpl in *; lia].
-             rewrite CTX.
-             simpl. rewrite -H. 
+             rewrite under_ctx_fill /= -H. 
              iApply (wp_stuck_mono with "[$]"). done.
       + apply leb_complete_conv in LEN. simpl in LEN. 
 
@@ -1629,15 +1631,18 @@ Section WaitFreePR.
                   by iIntros "$". }
 
              apply fits_inf_call_prev, fits_inf_call_last_or_short in FIT.
-             destruct FIT as [(ec & FIT) | SHORT].
+             destruct FIT as [NVAL | SHORT].
              2: { simpl in SHORT. lia. }
-             red in FIT. destruct FIT as (?& IN & ?&?).
-             move IN at bottom.
-             rewrite /τi in e0. 
-             rewrite FIN /= e0 in IN.
-             apply from_locale_lookup in IN.
-             apply lookup_lt_Some in IN.
-             rewrite /locale_of !length_app /= in IN. lia. } 
+             (* red in FIT. destruct FIT as (?& IN & ?&?). *)
+             move NVAL at bottom.
+             rewrite /τi in e0.
+             red in NVAL. destruct NVAL as (?&EXPR&NVAL).
+             red in EXPR. rewrite ic_helper in EXPR. 
+             rewrite FIN /= in EXPR.
+             rewrite /τi e0 in EXPR. 
+             apply from_locale_lookup in EXPR. 
+             apply lookup_lt_Some in EXPR.
+             rewrite /locale_of !length_app /= in EXPR. lia. } 
 
         simpl.
         iAssert (wptp_from_gen (thread_pr s (trace_length etr)) [] (t1 ++ e' :: t2) Φs)%I with "[-]" as "WPS".

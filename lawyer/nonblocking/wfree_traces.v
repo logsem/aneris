@@ -117,23 +117,24 @@ Section CallInTrace.
 
   Context (ic: @trace_ctx heap_lang).
   Let ii := tctx_index ic.
-  Let Ki := tctx_ctx ic.
-  Let τi := tctx_tid ic.
-
-  Definition runs_call (ec: expr) (c: cfg heap_lang): Prop :=
-    exists e, from_locale c.1 τi = Some e /\ under_ctx Ki e = Some ec /\ to_val ec = None.
+  Let tc := tctx_tpctx ic. 
+  Let Ki := tpctx_ctx tc.
+  Let τi := tpctx_tid tc. 
+  (* Context (tpc: @tpool_ctx heap_lang). *)
+  (* Let Ki := tpctx_ctx tpc.  *)
+  (* Let τi := tpctx_tid tpc.  *)
 
   Context (m: val) (ai: val). 
 
   Definition fits_inf_call (etr: execution_trace heap_lang): Prop :=
-    from_option (runs_call (m ai)) True (etr !! ii) /\
-    (forall j, ii <= j -> from_option (fun c => exists ec, runs_call ec c) True (etr !! j)) /\
+    from_option (fun c => call_at tc c m ai (APP := App)) True (etr !! ii) /\
+    (forall j, ii <= j -> from_option (nval_at tc) True (etr !! j)) /\
     (forall i, from_option (fun e => to_val e = None) True
             (from_option (fun c => from_locale c.1 τi) None (etr !! i))).
 
   Lemma fits_inf_call_last_or_short etr
     (FITS: fits_inf_call etr):
-    (exists ec, runs_call ec (trace_last etr)) \/ trace_length etr <= ii. 
+    (nval_at tc (trace_last etr)) \/ trace_length etr <= ii. 
   Proof using.
     edestruct Nat.lt_ge_cases as [LT| ]; [| by eauto].
     red in FITS. apply proj2, proj1 in FITS. red in LT.
@@ -144,23 +145,30 @@ Section CallInTrace.
     simpl in FITS. by left.
   Qed.
 
+  (* TODO: move *)
+  Lemma ft_lookup_old {St L: Type} (tr: finite_trace St L) s l i c
+    (ITH: tr !! i = Some c):
+    (tr :tr[ l ]: s) !! i = Some c.
+  Proof using. 
+    rewrite trace_lookup_extend_lt; [done| ]. 
+    by apply trace_lookup_lt_Some.
+  Qed.
+
   Lemma fits_inf_call_prev etr τ c
     (FITS: fits_inf_call (etr :tr[τ]: c)):
     fits_inf_call etr.
   Proof using.
-    assert (forall j cj, etr !! j = Some cj -> (etr :tr[ τ ]: c) !! j = Some cj) as LOOKUP.
-    { intros. simpl.
-      rewrite trace_lookup_extend_lt; [done| ]. 
-      by apply trace_lookup_lt_Some. }
     red.
+    pose proof (ft_lookup_old etr c τ) as LOOKUP.  
     destruct FITS as (II & FITS & NVAL). split; [| split]. 
     - destruct (etr !! ii) eqn:ITH; rewrite ITH; [| done].
-      apply LOOKUP in ITH.
-      by rewrite ITH in II.
+      simpl. 
+      eapply LOOKUP in ITH.
+      rewrite ITH in II. eauto.
     - intros ? LE.
       specialize (FITS _ LE).
       destruct (etr !! j) eqn:JTH; rewrite JTH; [| by eauto]. simpl.
-      apply LOOKUP in JTH.
+      eapply LOOKUP in JTH.
       by rewrite JTH in FITS.
     - intros.
       destruct (etr !! i) eqn:ITH; rewrite ITH /=; [| done].
@@ -169,18 +177,18 @@ Section CallInTrace.
       by rewrite /= TT in NVAL.
   Qed.
 
-  Lemma runs_call_helper t1 t2 e ec σ
+  Lemma runs_call_helper t1 t2 e σ
     (EQ: τi = locale_of t1 e)
-    (RUNS: runs_call ec (t1 ++ e :: t2, σ)):
-    under_ctx Ki e = Some ec /\ to_val ec = None.
+    (RUNS: nval_at tc (t1 ++ e :: t2, σ)):
+    exists ec, under_ctx Ki e = Some ec /\ to_val ec = None.
   Proof using.
-    red in RUNS. destruct RUNS as (e_ & TIth & CUR & NVAL).
-    simpl in TIth.
+    red in RUNS. destruct tc. simpl in RUNS. 
     pose proof (from_locale_from_Some [] (t1 ++ e :: t2) t1 e) as X.
     ospecialize (X _).
     { apply prefixes_from_spec. eauto. }
-    simpl in X. rewrite EQ /from_locale in TIth. 
-    rewrite TIth in X. inversion X. subst. eauto.
+    simpl in X. subst τi. simpl in EQ. rewrite EQ /from_locale in RUNS.
+    rewrite X in RUNS. destruct RUNS as (?&?&?).
+    inversion H. subst. rewrite under_ctx_fill. eauto. 
   Qed.
 
   Lemma fic_has_τi etr
@@ -194,9 +202,10 @@ Section CallInTrace.
     { lia. }
     rewrite trace_lookup_last in NEXT.
     2: { lia. }
-    simpl in NEXT. rewrite /runs_call in NEXT.
-    destruct NEXT as (?&?&IN&?).
+    simpl in NEXT. rewrite /nval_at /expr_at in NEXT.
+    destruct NEXT as (?&IN&?).
     eapply locales_of_cfg_Some; eauto.
+    destruct tc. eauto.  
     Unshelve. exact inhabitant.
   Qed.
 

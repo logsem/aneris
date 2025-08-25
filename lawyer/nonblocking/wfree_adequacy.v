@@ -12,31 +12,31 @@ From heap_lang Require Import lang simulation_adequacy.
 
 Close Scope Z.
 
-
-Section CallInTrace.
-  Context (tr: extrace heap_lang).
-  Context (m: val). (** the method under consideration *)
+(* foobar.  *)
+(* Section CallInTrace. *)
+(*   Context (tr: extrace heap_lang). *)
+(*   Context (m: val). (** the method under consideration *) *)
   
-  Definition expr_under '(TraceCtx i τ K) (e: expr) :=
-    exists c, tr S!! i = Some c /\ from_locale c.1 τ = Some (ectx_fill K e).
+(*   Definition expr_under '(TraceCtx i τ K) (e: expr) := *)
+(*     exists c, tr S!! i = Some c /\ from_locale c.1 τ = Some (ectx_fill K e). *)
 
-  Definition call_at tc (a: val) :=
-    expr_under tc (App (of_val m) (of_val a)).
+(*   Definition call_at tc (a: val) := *)
+(*     expr_under tc (App (of_val m) (of_val a)). *)
 
-  Definition return_at tc (r: val) :=
-    expr_under tc (of_val r).
+(*   Definition return_at tc (r: val) := *)
+(*     expr_under tc (of_val r). *)
 
-  (* TODO: rename *)
-  Definition expr_under_expr tc :=
-    exists e, expr_under tc e /\ to_val e = None.
+(*   (* TODO: rename *) *)
+(*   Definition expr_under_expr tc := *)
+(*     exists e, expr_under tc e /\ to_val e = None. *)
   
-  Definition has_return '(TraceCtx i τ K as tc) :=
-    exists j r, i <= j /\ return_at (TraceCtx j τ K) r.
+(*   Definition has_return '(TraceCtx i τ K as tc) := *)
+(*     exists j r, i <= j /\ return_at (TraceCtx j τ K) r. *)
 
-  Definition always_returns :=
-    forall tc a, fair_ex (tctx_tid tc) tr -> call_at tc a -> has_return tc.
+(*   Definition always_returns := *)
+(*     forall tc a, fair_ex (tctx_tid tc) tr -> call_at tc a -> has_return tc. *)
   
-End CallInTrace.
+(* End CallInTrace. *)
 
 
 
