@@ -479,13 +479,6 @@ Section OblsAdequacy.
   Qed.
 
   (* TODO: move *)
-  Lemma hl_config_wp `{irisG heap_lang M Σ}: ⊢ config_wp.
-  Proof using.
-    rewrite /config_wp. iIntros "!> **".
-    done.
-  Qed.
-
-  (* TODO: move *)
   Lemma indexes_seq {A: Type} (l: list A):
     indexes l = seq 0 (length l).
   Proof using.

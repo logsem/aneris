@@ -10,6 +10,14 @@ From heap_lang Require Export heap_lang_defs lang.
 Definition heap_lang_extrace : Type := extrace heap_lang.
 
 
+(* TODO: move? *)
+Lemma hl_config_wp `{irisG heap_lang M Σ}: ⊢ config_wp.
+Proof using.
+  rewrite /config_wp. iIntros "!> **".
+  done.
+Qed.
+
+
 Section adequacy.
 
   (* TODO: remove? *)
