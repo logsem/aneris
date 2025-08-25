@@ -12,32 +12,21 @@ From heap_lang Require Import lang simulation_adequacy.
 
 Close Scope Z.
 
-(* foobar.  *)
-(* Section CallInTrace. *)
-(*   Context (tr: extrace heap_lang). *)
-(*   Context (m: val). (** the method under consideration *) *)
+Section CallInTrace.
+  Context (tr: extrace heap_lang).
+  Context (m: val). (** the method under consideration *)
   
-(*   Definition expr_under '(TraceCtx i τ K) (e: expr) := *)
-(*     exists c, tr S!! i = Some c /\ from_locale c.1 τ = Some (ectx_fill K e). *)
+  Definition has_return '(TraceCtx i tpc as tc) :=
+    exists j r cj, i <= j /\ tr S!! j = Some cj /\ return_at tpc cj r.
 
-(*   Definition call_at tc (a: val) := *)
-(*     expr_under tc (App (of_val m) (of_val a)). *)
-
-(*   Definition return_at tc (r: val) := *)
-(*     expr_under tc (of_val r). *)
-
-(*   (* TODO: rename *) *)
-(*   Definition expr_under_expr tc := *)
-(*     exists e, expr_under tc e /\ to_val e = None. *)
+  Definition always_returns :=    
+    forall tc a ci, let '(TraceCtx i tpc) := tc in
+      fair_ex (tpctx_tid tpc) tr ->
+      tr S!! i = Some ci ->
+      call_at tpc ci m a (APP := App) ->
+      has_return tc.
   
-(*   Definition has_return '(TraceCtx i τ K as tc) := *)
-(*     exists j r, i <= j /\ return_at (TraceCtx j τ K) r. *)
-
-(*   Definition always_returns := *)
-(*     forall tc a, fair_ex (tctx_tid tc) tr -> call_at tc a -> has_return tc. *)
-  
-(* End CallInTrace. *)
-
+End CallInTrace.
 
 
 Section WFAdequacy.
@@ -59,8 +48,9 @@ Section WFAdequacy.
 
   Context (ic: @trace_ctx heap_lang).
   Let ii := tctx_index ic.
-  Let Ki := tctx_ctx ic.
-  Let τi := tctx_tid ic.
+  Let tc := tctx_tpctx ic. 
+  Let Ki := tpctx_ctx tc.
+  Let τi := tpctx_tid tc. 
   Context (m ai: val).
 
   Definition no_extra_obls (_: cfg heap_lang) (δ: mstate M) :=
@@ -74,19 +64,6 @@ Section WFAdequacy.
   (*   ⌜ no_extra_obls (trace_last extr) (trace_last omtr) ⌝. *)
 
   Let fic := fits_inf_call ic m ai.
-
-  (* TODO: move *)
-  Instance runs_call_dec: forall tc e c, Decision (runs_call tc e c).
-  Proof using.
-    intros [i τ K] ??. rewrite /runs_call /=.
-    destruct (from_locale c.1 τ) as [eτ| ] eqn:T; rewrite T. 
-    2: { right. set_solver. }
-    destruct (decide (under_ctx K eτ = Some e)). 
-    2: { right. set_solver. }
-    destruct (to_val e) eqn:V.
-    { right. set_solver. }
-    left. eauto. 
-  Qed.
 
   (* TODO: move *)
   Instance fic_dec: ∀ etr, Decision (fits_inf_call ic m ai etr).
@@ -111,14 +88,8 @@ Section WFAdequacy.
       destruct lookup eqn:ITH; try done. simpl in *.
       apply H. split; [lia| ].
       eapply trace_lookup_lt_Some_1; eauto. 
-    - apply Decision_iff_impl with (P := Forall (fun j => from_option (λ c, ∃ ec : expr, runs_call ic ec c) True (etr !! j)) (seq ii (trace_length etr - tctx_index ic))).
-      2: { apply Forall_dec. intros. destruct (etr !! x); try solve_decision.
-           simpl. apply ex_fin_dec with
-             (l := from_option
-                     (fun e => from_option (flip cons nil) [] (under_ctx (tctx_ctx ic) e))
-                     [] (from_locale c.1 (tctx_tid ic))); [apply _| ].
-           intros ? RUNS. red in RUNS. destruct RUNS as (?&->&?&?).
-           simpl. rewrite H. simpl. tauto. }
+    - apply Decision_iff_impl with (P := Forall (fun j => from_option (nval_at tc) True (etr !! j)) (seq ii (trace_length etr - tctx_index ic))).
+      2: { apply Forall_dec. intros. destruct lookup; solve_decision. }
       rewrite List.Forall_forall. simpl.
       apply forall_proper. intros i.
       rewrite in_seq.
@@ -269,8 +240,7 @@ Section WFAdequacy.
 
   Lemma obls_τi_enabled c δ
     (NOOBS': pr_wfree.no_extra_obls ic c δ)
-    (NVAL: from_option (λ e : expr, to_val e = None) True
-             (from_locale c.1 (tctx_tid ic)))
+    (NVAL: from_option (λ e : expr, to_val e = None) True (from_locale c.1 τi))
     (TH_OWN: locales_of_cfg c = dom (ps_obls δ))
     (τ : nat)
     (OBS : has_obls τ δ):
@@ -627,11 +597,15 @@ Section WFAdequacy.
   Instance wfree_pre: @heapGpreS wfreeΣ M EM.
   Admitted. 
 
+  Local Lemma ic_helper:
+    tctx_tpctx ic = {| tpctx_ctx := Ki; tpctx_tid := τi |}.
+  Proof using. clear. by destruct ic as [? []]. Qed.
+
   Theorem simple_om_simulation_adequacy_terminate_multiple_waitfree extr
         (ETR0: exists e0, (trfirst extr).1 = [subst "m" m e0])
     :
     extrace_valid extr -> 
-    fair_ex (tctx_tid ic) extr ->
+    fair_ex τi extr ->
     terminating_trace extr \/ 
     exists k, ¬ fits_inf_call ic m ai (trace_take_fwd k extr).
   Proof.
@@ -643,7 +617,7 @@ Section WFAdequacy.
     { apply impl_dec; [apply _| ].
       (* TODO: make a lemma + definition *)
       apply ex_fin_dec with
-             (l := from_option (flip cons nil) [] (from_locale (trfirst extr).1 (tctx_tid ic))).
+             (l := from_option (flip cons nil) [] (from_locale (trfirst extr).1 τi)).
       { solve_decision. }
       intros ? (RUNS & ?).
       simpl. rewrite RUNS. simpl. tauto. }
@@ -653,8 +627,9 @@ Section WFAdequacy.
          fold ii in FITS.
          rewrite trace_take_fwd_0_first in FITS.
          rewrite II /= in FITS.
-         red in FITS. edestruct FITS as (?&?&?&?). 
-         eauto. }
+         red in FITS. simpl in FITS. eauto.
+         red in FITS. rewrite ic_helper in FITS.
+         eexists. split; eauto. by rewrite under_ctx_fill. }
     destruct (@decide (∀ e, from_locale (trfirst extr).1 τi = Some e → to_val e = None)) as [E0| ].
     { destruct (from_locale (trfirst extr).1 τi) eqn:E.
       2: { left. set_solver. }
@@ -691,7 +666,7 @@ Section WFAdequacy.
  
     assert (forall τ, obls_trace_fair τ omtr) as OM_FAIR.
     { intros.
-      destruct (decide (τ = tctx_tid ic)) as [-> | NEQ].
+      destruct (decide (τ = τi)) as [-> | NEQ].
       { eapply exec_om_fairness_preserved; eauto. }
       red. apply fair_by_equiv. red. intros n OB.
       destruct (omtr S!! n) eqn:NTH; rewrite NTH in OB; [| done].
@@ -753,6 +728,7 @@ Section WFAdequacy.
       erewrite IHtr. done.      
   Qed.
 
+  (* TODO: move *)
   Lemma trace_take_fwd_lookup_Some (etr: extrace heap_lang) n i c
     (ITH: trace_take_fwd n etr !! i = Some c):
     etr S!! i = Some c.
@@ -770,20 +746,94 @@ Section WFAdequacy.
     rewrite ft_prepend_lookup_S in ITH. eauto.
   Qed.
 
-  (* TODO: refactor definitions about calls in this file and wfree_traces *)
-  Lemma call_continues_or_returns tc c1 c2 τ
-    (RUNS: exists ec1, runs_call tc ec1 c1)
+  (* TODO: move, use in pr_wfree? *)
+  Lemma from_locale_from_app_Some tp0 tp1 tp2 τ e:
+    from_locale_from tp0 (tp1 ++ tp2) τ = Some e <->
+    from_locale_from tp0 tp1 τ = Some e \/ from_locale_from (tp0 ++ tp1) tp2 τ = Some e.
+  Proof using.
+    clear. 
+    rewrite !from_locale_from_lookup.
+    rewrite lookup_app. rewrite !length_app.
+    destruct (tp1 !! (τ - length tp0)) eqn:L1.
+    - split; try tauto. intros [? | [EQ2 LEN2]]; [done| ].
+      apply lookup_lt_Some in L1, EQ2. lia.
+    - etrans.
+      2: { rewrite Morphisms_Prop.or_iff_morphism; [..| reflexivity].
+           2: apply iff_False_helper; set_solver. 
+           reflexivity. }
+      rewrite False_or. rewrite Nat.sub_add_distr.
+      apply iff_and_pre. intros ?%lookup_lt_Some.
+      apply lookup_ge_None in L1. lia.
+  Qed.
+
+  (* TODO: move *)
+  Lemma from_locale_from_Some_app' tp0 tp tp' ζ e :
+    from_locale_from (tp0 ++ tp) tp' ζ = Some e ->
+    from_locale_from tp0 (tp ++ tp') ζ = Some e.
+  Proof.
+    intros EQ. rewrite from_locale_from_app_Some. eauto. 
+  Qed.
+
+  (* (* TODO: move to Trillium, replace the original version? *) *)
+  (* Lemma from_locale_from_equiv_strong tp0 tp0' tp tp' ζ : *)
+  (*   locales_equiv tp0 tp0' -> *)
+  (*   locales_equiv_from tp0 tp0' tp tp' -> *)
+  (*   from_locale_from tp0 tp ζ = from_locale_from tp0' tp' ζ. *)
+  (* Proof. *)
+  (*   revert tp0 tp0' tp'. induction tp as [|e tp IH]; intros tp0 tp0' tp' Heq0 Heq. *)
+  (*   { destruct tp' as [|e' tp']; try by apply Forall2_length in Heq. } *)
+  (*   simpl in *. *)
+
+  (*   destruct (prefixes_from tp0' tp') as [| [??]] eqn:P'. *)
+  (*   { inversion Heq. } *)
+  (*   inversion Heq. subst. *)
+    
+  (*   destruct (decide (locale_of tp0 e = ζ)). *)
+  (*   - symmetry. apply from_locale_from_lookup. erewrite <- IH; eauto. *)
+  (*     2: {  *)
+  (*     rewrite decide_True //; eauto. erewrite <-locale_equiv =>//. *)
+  (*   - rewrite decide_False; last by erewrite <-locale_equiv. *)
+  (*     apply Forall2_cons_1 in Heq as [Hlocs ?]. *)
+  (*     rewrite decide_False // in Heζ; last by erewrite Hlocs, <-locale_equiv =>//. *)
+  (*     apply (IH (tp0 ++ [e])); eauto. *)
+  (*     apply locales_equiv_snoc =>//. *)
+  (* Qed. *)
+
+  Lemma call_continues_or_returns tpc c1 c2 τ
+    (NVAL: nval_at tpc c1)
     (STEP: locale_step c1 (Some τ) c2):
-    (exists ec2, runs_call tc ec2 c2) \/
-    (exists e2 (r: val), from_locale c2.1 τ = Some e2 /\ under_ctx (tctx_ctx tc) e2 = Some (of_val r)).
-  Proof using. 
-    destruct RUNS as (ec1 & RUNS).
+    nval_at tpc c2 \/ exists r, return_at tpc c2 r.
+  Proof using.
+    red in NVAL. destruct NVAL as (e & EXPR & NVAL).
+    pose proof EXPR as [eτi TI]%expr_at_in_locales%locales_of_cfg_Some.
+    2: by apply c1. 
+    red in EXPR. destruct tpc as [K' τ'].  
+    (* pose proof EXPR as [eτi TI]%expr_at_in_locales%locales_of_cfg_Some. *)
+    (* 2: { by apply c1. } *)
     inversion STEP. subst. inversion H3. subst. simpl in *.
-    destruct (decide (tctx_tid tc = locale_of t1 (fill K e1'))).
-    2: { left. red in RUNS. destruct RUNS as (e & IN & CTX & NVAL).
-         exists ec1. red. eexists. split; eauto.
-         rewrite -IN. simpl.
-         admit. }
+    destruct (decide (τ' = locale_of t1 (fill K e1'))).
+    2: { left. exists e. split; auto.
+         red. rewrite -EXPR. simpl. 
+         apply from_locale_from_app_Some in EXPR as [IN1 | IN2].
+         { rewrite /from_locale. repeat erewrite from_locale_from_Some_app; eauto. }
+         simpl in IN2. rewrite decide_False in IN2; [| done].
+         rewrite /from_locale.
+         symmetry. rewrite (app_assoc _ ([_])).
+         erewrite from_locale_from_Some_app'; eauto.
+         symmetry. apply from_locale_from_Some_app'. simpl.
+         rewrite decide_False; [| done].
+         apply from_locale_from_Some_app.
+         apply from_locale_from_lookup in IN2 as (?&?). 
+         eapply from_locale_from_lookup. split.
+         - rewrite -H. rewrite !length_app /=. done.
+         - etrans; [| apply H0]. rewrite !length_app /=. done. }
+
+    subst τ'.
+    rewrite /from_locale from_locale_from_locale_of in EXPR. inversion EXPR as [FILL'].
+    rewrite FILL' in H3.
+    apply fill_step_inv in H3; eauto. simpl in *.
+    foobar. 
+
   Admitted.
     
 

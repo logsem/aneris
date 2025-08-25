@@ -32,6 +32,13 @@ Section ThreadPoolContext.
     eapply locales_of_cfg_Some; eauto.
   Qed.
 
+  Global Instance expr_at_dec `{EqDecision (expr Λ)}:
+    forall tc c e, Decision (expr_at tc c e).
+  Proof using.
+    intros [K τ] ??. rewrite /expr_at. 
+    destruct (from_locale c.1 τ) as [eτ| ]; solve_decision.  
+  Qed.
+
 End ThreadPoolContext.
 
 

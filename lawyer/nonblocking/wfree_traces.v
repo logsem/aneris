@@ -1,5 +1,5 @@
 From iris.proofmode Require Import tactics.
-From fairness Require Import locales_helpers.
+From fairness Require Import locales_helpers utils.
 From lawyer.nonblocking Require Import trace_context.
 From heap_lang Require Import lang notation.
 
@@ -108,6 +108,19 @@ Section UnderCtx.
     rewrite fill_not_val in VAL.
     { by destruct VAL. }
     by destruct e0. 
+  Qed.
+
+  (** specific to heap_lang, as it requires under_ctx *)
+  Global Instance nval_at_dec:
+    forall tc c, Decision (nval_at tc c).
+  Proof using.
+    intros [K τ] ?. rewrite /nval_at /expr_at.
+    apply ex_fin_dec with
+             (l := from_option
+                     (fun e => from_option (flip cons nil) [] (under_ctx K e))
+                     [] (from_locale c.1 τ)); [apply _| ].
+    intros ec (IN & NVAL).
+    rewrite IN. simpl. rewrite under_ctx_fill. simpl. tauto.  
   Qed.
 
 End UnderCtx.
