@@ -210,7 +210,7 @@ Section WFAdequacy.
   Definition init_om_wfree_state
     (* (F: nat) (TI: nat) (d0 d1: Degree) (τi: locale Λ) (l0: Level) (ii: nat) *)
     (c: cfg heap_lang): ProgressState :=
-    let CPS := (F + ii) *: {[+ d0 +]} ⊎ {[+ d1 +]} in
+    let CPS := (2 * F + ii) *: {[+ d0 +]} ⊎ {[+ d1 +]} in
     let δ0 := init_om_state c CPS 0 in
     let s0 := (0: SignalId) in
     let obls' := if (decide (τi ∈ locales_of_cfg c))
@@ -347,9 +347,9 @@ Section WFAdequacy.
   (** for simplicity, we forget about the specific phases *)
   Lemma init_wfree_resources_weak `{!ObligationsGS Σ} c:
     obls_init_resource (init_om_wfree_state c) () -∗
-    (cp_mul π0 d0 F ∗ cp_mul π0 d0 ii ∗ cp π0 d1) ∗
+    (cp_mul π0 d0 (2 * F) ∗ cp_mul π0 d0 ii ∗ cp π0 d1) ∗
     (⌜ τi ∈ locales_of_cfg c ⌝ →
-     ∃ s, sgn s l0 (Some false) ∗ obls τi {[ s ]} ∗ ep s π0 d0) ∗
+     ∃ s, obls τi {[ s ]} ∗ sgn s l0 (Some false) ∗ ep s π0 d0) ∗
     ([∗ set] τ ∈ locales_of_cfg c ∖ {[ τi ]}, obls τ ∅) ∗
     ([∗ set] τ ∈ locales_of_cfg c, ∃ π, th_phase_eq τ π).  
     (* closed_pre_helper {Σ: gFunctors} {oGS: ObligationsGS Σ} *)
@@ -427,8 +427,13 @@ Section WFAdequacy.
     iApply init_pwp.
   Qed.
 
+  Definition tpool_init_restr (tp: list expr) :=
+    Forall (fun e => exists e0, e = subst "m" m e0) tp /\
+    (ii = 0 -> exists e, from_locale tp τi = Some e /\ under_ctx Ki e = Some (m ai)) /\
+    (forall e, from_locale tp τi = Some e -> to_val e = None). 
+
   Lemma init_wptp_wfree `{Hinv: @IEMGS _ _ HeapLangEM EM Σ} c
-    (SUBST: Forall (fun e => exists e0, e = subst "m" m e0) c.1):
+    (ETR0: tpool_init_restr c.1):
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
     (⌜ ii = 0 ⌝ → ∃ π, cp_mul π0 d0 F ∗ th_phase_frag τi π (/2)%Qp) -∗
     wptp_wfree ic MaybeStuck {tr[ c ]}
@@ -437,36 +442,92 @@ Section WFAdequacy.
     simpl. iIntros "T".
     rewrite /wptp_wfree. simpl. 
     destruct (thread_pool_split c.1 τi) as (tp1 & tp2 & tp' & EQ & TP' & NO1 & NO2).
-    rewrite EQ. rewrite !locales_of_list_from_app'. rewrite !map_app /=. 
-    rewrite EQ in SUBST. 
+    rewrite EQ. rewrite !locales_of_list_from_app'. rewrite !map_app /=.
+    destruct ETR0 as (TP & II0 & NVAL0).
+    rewrite EQ in TP.
     iApply wptp_from_gen_app. iSplitR.
     { iApply init_wptp_wfree_pwps.
       - done. 
-      - by apply Forall_app, proj1 in SUBST. }
+      - by apply Forall_app, proj1 in TP. }
     simpl. iApply wptp_from_gen_app. iSplitL.
     2: { iApply init_wptp_wfree_pwps.
          - done. 
-         - by do 2 (apply Forall_app, proj2 in SUBST). }
+         - by do 2 (apply Forall_app, proj2 in TP). }
 
     destruct TP' as [-> | (e & -> & LOC)].
     { simpl. iApply wptp_from_gen_nil. }
     simpl. iApply wptp_gen_singleton.
     rewrite /thread_pr. rewrite decide_True; [| done].
     rewrite /wp_tc.
-    destruct (tctx_index ic) eqn:TI.
+    destruct ii eqn:TI.
     2: { rewrite leb_correct; [| lia].
-         apply Forall_app, proj2 in SUBST.
-         apply Forall_app, proj1 in SUBST.
-         inversion SUBST as [| ?? [? ->]]. subst.
+         apply Forall_app, proj2 in TP.
+         apply Forall_app, proj1 in TP.
+         inversion TP as [| ?? [? ->]]. subst.
          iApply init_pwp. }
     rewrite leb_correct_conv; [| lia].
     iDestruct ("T" with "[//]") as (π) "[CPS PH]".
     rewrite half_inv2. 
     iPoseProof (get_call_wp _ SPEC ai with "[$] [$]") as "WP".
-    foobar.     
+    destruct (II0 eq_refl) as (e_ & IN & CTX).
+    rewrite LOC EQ /= in IN.
+    rewrite /from_locale in IN. rewrite from_locale_from_locale_of in IN.
+    inversion IN. subst e_.
+    rewrite CTX. simpl.
+    iApply (wp_stuck_mono with "[$]"). done.
+  Qed.
+
+  (* TODO: move, use in other places *)
+  Lemma elem_of_locales_of_list_from_from_locale_from tp0 τ tp:
+    τ ∈ locales_of_list_from tp0 tp <-> exists e, from_locale_from tp0 tp τ = Some e.
+  Proof using.
+    clear. 
+    rewrite locales_of_list_from_locales.
+    rewrite elem_of_list_In in_map_iff.
+    rewrite ex_prod. rewrite ex2_comm.
+    apply exist_proper. intros e.
+    rewrite from_locale_from_lookup.
+    rewrite /locale_of.
+    setoid_rewrite <- elem_of_list_In.
+    setoid_rewrite elem_of_list_lookup.  
+    split.
+    - intros (pf & <- & (i & IN)).
+      pose proof IN as ?%prefixes_lookup_orig.
+      pose proof IN as ?%prefixes_from_ith_length. simpl in *.
+      split; [| lia]. rewrite -H. f_equal. lia.
+    - intros (IN & LEN).
+      eexists. split.
+      2: { eexists. eapply prefixes_from_lookup; eauto. }
+      rewrite length_app.
+      apply lookup_lt_Some in IN. simpl in *. 
+      rewrite firstn_length_le; lia.
+  Qed.
+
+  (* (* TODO: move *) *)
+  Lemma from_locale_from_elem_of tp0 tp τ e
+    (IN: from_locale_from tp0 tp τ = Some e):
+    e ∈ tp.
+  Proof using.
+    apply from_locale_from_lookup in IN.
+    destruct IN as [IN _].
+    eapply elem_of_list_lookup; eauto.
+  Qed.    
+
+  Lemma tp_init_in tp τ
+    (IN: τ ∈ locales_of_list tp)
+    (ETR0: tpool_init_restr tp):
+    exists e0, from_locale tp τ = Some (subst "m" m e0).
+  Proof using.
+    destruct ETR0 as [TP _].
+    apply elem_of_locales_of_list_from_from_locale_from in IN as (e & IN).
+    rewrite /from_locale IN.
+    apply Forall_forall with (x := e) in TP; [set_solver| ].
+    eapply from_locale_from_elem_of; eauto.
+  Qed.
 
   Lemma PR_premise_wfree `{hPre: @heapGpreS Σ M EM} c
-        (ETR0: exists e0, c.1 = [subst "m" m e0]):
+    (ETR0: tpool_init_restr c.1)
+    :
   PR_premise_multiple obls_sim_rel_wfree (fits_inf_call ic m ai)
     Σ MaybeStuck c.1 c.2
     (init_om_wfree_state c) ((): @em_init_param _ _ EM).
@@ -521,9 +582,10 @@ Section WFAdequacy.
            apply lookup_insert_Some in L. destruct L as [| [? L]]; [set_solver| ].
            apply lookup_gset_to_gmap_Some in L. set_solver.
          - simpl.
-           (* need to assume that we don't start with value under τi *)
-           admit. }
-
+           destruct (from_locale c.1 τi) eqn:IN; rewrite IN; [| done].
+           destruct ETR0 as (_&_&NVAL0).
+           by apply NVAL0 in IN. }
+    
     iSplitR.
     { simpl.
       admit. (* find / extract the fact that it's trivial for heap_lang *) }
@@ -537,15 +599,46 @@ Section WFAdequacy.
     iDestruct "PHS" as "[$ PH]".
     #[local] Arguments Nat.leb _ _ : simpl nomatch.    
     rewrite /extra_fuel. simpl.
-    iDestruct "CPS" as "(CPS_PRE & CPS0 & CP1)". 
+    iDestruct "CPS" as "(CPS_PRE & CPS0 & CP1)".
+    iDestruct (cp_mul_split with "CPS_PRE") as "[CPS_PRE CPS_PRE']". rewrite Nat.add_0_r.
     rewrite Nat.sub_0_r. fold ii.
     rewrite bi.sep_comm. rewrite -bi.sep_assoc. iSplitL "CPS0 CPS_PRE".
     { destruct leb; [| done]. iFrame. }
-    rewrite /obls_τi'. 
-    
-    
-         
-  Admitted.
+    rewrite /obls_τi'.
+
+    rewrite -bi.sep_assoc. 
+    iAssert (_%I ∗ (⌜ ii = 0 ⌝ →
+                    let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
+                    ∃ π, th_phase_frag τi π (/ 2)%Qp))%I with "[PH]" as "[X PHτi]".
+    2: iSplitL "X"; [by iApply "X"| ].
+    { destruct (decide (τi ∈ locales_of_cfg c)).
+      2: { iSplitL.
+           - by iIntros (?).
+           - iIntros (II0). destruct ETR0 as (?&IN&?).
+             destruct (IN II0) as (?&E&?). destruct n.
+             eapply locales_of_cfg_Some; eauto.
+             Unshelve. apply c. }
+      rewrite intersection_comm_L subseteq_intersection_1_L.
+      2: set_solver.
+      rewrite big_sepS_singleton.
+      fold τi.
+      destruct ii eqn:II.
+      - rewrite leb_correct_conv; [| lia].
+        setoid_rewrite th_phase_frag_halve at 1. iDestruct "PH" as (?) "(PH&?)".
+        rewrite half_inv2. 
+        iSplitL "PH"; iIntros (?); iExists _; iFrame.
+      - iSplitL.
+        2: { iIntros (?). lia. }
+        iIntros (?). iFrame. }
+
+    iSplitR "PHτi CPS_PRE'".
+    { destruct decide.
+      - iSpecialize ("OB'" with "[//]"). iFrame.
+      - iFrame. }
+
+    iApply init_wptp_wfree; [done| ].
+    iFrame. 
+  Qed. 
 
   Definition wfreeΣ: gFunctors.
   Admitted.
