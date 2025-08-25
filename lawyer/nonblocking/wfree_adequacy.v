@@ -7,7 +7,7 @@ From lawyer Require Import program_logic sub_action_em action_model.
 From lawyer.examples Require Import orders_lib obls_tactics.
 From lawyer.nonblocking Require Import trace_context om_wfree_inst mk_ref pr_wfree wfree_traces wptp_gen pwp.
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am obls_termination.
-From heap_lang Require Import lang.
+From heap_lang Require Import lang simulation_adequacy.
 
 
 Close Scope Z.
@@ -194,16 +194,6 @@ Section WFAdequacy.
 
   Open Scope WFR_scope. 
 
-  (* Program Definition init_om_wfree_state (c: cfg heap_lang): ProgressState := *)
-  (*  let d := bool_decide (τi ∈ locales_of_cfg c) in *)
-  (*  let s0 := (0: SignalId) in *)
-  (*  {| ps_cps := (F + tctx_index ic) *: {[+ (π0, d0) +]} ⊎ {[+ (π0, d1) +]}; *)
-  (*     ps_sigs := if d then {[ s0 := (l0, false) ]} else ∅;  |} *)
-  (*     ps_obls := let obs0 := gset_to_gmap *)
-  (*     ps_eps : gset ExpectPermission; *)
-  (*     ps_phases : gmap Locale Phase; *)
-  (*     ps_exc_bound : nat |}. *)
-
   Context (SPEC: WaitFreeSpec m).
   Let F := wfs_F _ SPEC.
 
@@ -217,14 +207,6 @@ Section WFAdequacy.
                  then (<[ τi := {[ s0 ]} ]> (ps_obls δ0)) else ps_obls δ0 in
     let sigs' := (if (decide (τi ∈ locales_of_cfg c)) then {[ s0 := (l0, false) ]} else ∅)
                  ∪ ps_sigs δ0 in
-(*    (** it's easier to create ep regardless of whether it's needed initially.
-        Well-formedness of OM state doesn't require (yet?) the ep's signal to be actually present.
-        If we change it, the ep would only be created along with the signal
-     *) 
-    (** let eps' := (if (decide (ii = 0)) then {[ (s0, π0, d0) ]} else ∅) *)
-    (**             ∪ ps_eps δ0 in *)
-*)
-    (* let eps' := {[ (s0, π0, d0) ]} ∪ ps_eps δ0 in *)
     let eps' := (if (decide (τi ∈ locales_of_cfg c)) then {[ (s0, π0, d0) ]} else ∅)
                 ∪ ps_eps δ0 in
     update_obls obls' $ update_sigs sigs' $ update_eps eps' δ0. 
@@ -587,8 +569,7 @@ Section WFAdequacy.
            by apply NVAL0 in IN. }
     
     iSplitR.
-    { simpl.
-      admit. (* find / extract the fact that it's trivial for heap_lang *) }
+    { simpl. iApply hl_config_wp. }
     rewrite /pr_pr_wfree. simpl.
 
     iDestruct (init_wfree_resources_weak with "[$]") as "(CPS & OB' & OBLS & PHS)".
@@ -648,13 +629,44 @@ Section WFAdequacy.
 
   Theorem simple_om_simulation_adequacy_terminate_multiple_waitfree extr
         (ETR0: exists e0, (trfirst extr).1 = [subst "m" m e0])
-        (SPEC: wait_free_spec m):
+    :
     extrace_valid extr -> 
     fair_ex (tctx_tid ic) extr ->
-    terminating_trace extr \/ exists k, ¬ fits_inf_call (trace_take_fwd k extr).
+    terminating_trace extr \/ 
+    exists k, ¬ fits_inf_call ic m ai (trace_take_fwd k extr).
   Proof.
     intros VALID FAIR.
     destruct ETR0 as [e0 ETR0]. 
+
+    destruct (@decide (ii = 0 → ∃ e,
+                    from_locale (trfirst extr).1 τi = Some e ∧ under_ctx Ki e = Some (m ai))) as [II0| ].
+    { apply impl_dec; [apply _| ].
+      (* TODO: make a lemma + definition *)
+      apply ex_fin_dec with
+             (l := from_option (flip cons nil) [] (from_locale (trfirst extr).1 (tctx_tid ic))).
+      { solve_decision. }
+      intros ? (RUNS & ?).
+      simpl. rewrite RUNS. simpl. tauto. }
+    2: { apply Classical_Prop.imply_to_and in n as (II & NO0).
+         right. exists 0. intros FITS. apply NO0.
+         red in FITS. apply proj1 in FITS.
+         fold ii in FITS.
+         rewrite trace_take_fwd_0_first in FITS.
+         rewrite II /= in FITS.
+         red in FITS. edestruct FITS as (?&?&?&?). 
+         eauto. }
+    destruct (@decide (∀ e, from_locale (trfirst extr).1 τi = Some e → to_val e = None)) as [E0| ].
+    { destruct (from_locale (trfirst extr).1 τi) eqn:E.
+      2: { left. set_solver. }
+      destruct (to_val e) eqn:V.
+      { right. set_solver. }
+      left. set_solver. }
+    2: { apply not_forall_exists_not in n as [e VAL].
+         apply Classical_Prop.imply_to_and in VAL as [E VAL].
+         right. exists 0. intros FITS. apply VAL.
+         red in FITS. do 2 apply proj2 in FITS.
+         specialize (FITS 0). rewrite trace_take_fwd_0_first /= in FITS.
+         rewrite E in FITS. done. }
 
     opose proof (om_simulation_adequacy_model_trace_multiple_waitfree
                 wfreeΣ _ (trfirst extr).1 _ _ _ _ _ VALID _ _ _) as ADEQ.
@@ -662,7 +674,13 @@ Section WFAdequacy.
     { apply surjective_pairing. }
     { rewrite ETR0. simpl. lia. } 
     { rewrite -surjective_pairing. 
-      eapply PR_premise_wfree; eauto. }
+      eapply PR_premise_wfree; eauto.
+
+      split; [| split].
+      - (* TODO: can generalize to more than 1 initial thread *)
+        rewrite ETR0. constructor; [| done]. eauto.
+      - eauto.
+      - eauto. }
     
     destruct ADEQ as [(mtr & MATCH & OM0) | RET]. 
     2: { right. done. } 
@@ -694,23 +712,119 @@ Section WFAdequacy.
     + apply fin_wf.
   Qed.
 
+  (* TODO: move *)
+  Lemma ft_prepend_lookup_0 {St L: Type} (tr: finite_trace St L) s l:
+    ft_prepend tr s l !! 0 = Some s.
+  Proof using.
+    induction tr.
+    { done. }
+    simpl.
+    rewrite trace_lookup_extend_lt; [done| ]. 
+    by apply trace_lookup_lt_Some.
+  Qed.
+
+  (* TODO: move *)
+  Lemma ft_prepend_length  {St L: Type} (tr: finite_trace St L) s l:
+    trace_length (ft_prepend tr s l) = S (trace_length tr).
+  Proof using.
+    clear dependent ic. clear dependent m. 
+    generalize dependent s. generalize dependent l. induction tr.
+    { simpl. lia. }
+    intros. simpl. rewrite IHtr. lia.
+  Qed.
+
+  (* TODO: move *)
+  Lemma ft_prepend_lookup_S {St L: Type} (tr: finite_trace St L) s l i:
+    ft_prepend tr s l !! (S i) = tr !! i.
+  Proof using.
+    clear dependent ic. clear dependent m. 
+    generalize dependent i. induction tr.
+    { simpl. rewrite /lookup /trace_lookup. simpl.
+      destruct i; done. }
+    intros. simpl.
+    
+    simpl. rewrite /lookup. rewrite /trace_lookup. simpl.
+    replace (trace_length (ft_prepend tr s l)) with (S (trace_length tr)).
+    2: { by rewrite ft_prepend_length. } 
+
+    destruct (decide (trace_length tr = i)). 
+    - rewrite !bool_decide_true; try lia. done.
+    - rewrite !bool_decide_false; try lia.
+      erewrite IHtr. done.      
+  Qed.
+
+  Lemma trace_take_fwd_lookup_Some (etr: extrace heap_lang) n i c
+    (ITH: trace_take_fwd n etr !! i = Some c):
+    etr S!! i = Some c.
+  Proof using.
+    generalize dependent c. generalize dependent n. generalize dependent etr.
+    induction i.
+    { intros [|] ??; destruct n; simpl; try done.
+      rewrite state_lookup_0. simpl.
+      by rewrite ft_prepend_lookup_0. } 
+    intros. destruct etr.
+    { destruct n; done. }
+    simpl. destruct n; [done| ].
+    rewrite state_lookup_cons.
+    simpl in ITH.
+    rewrite ft_prepend_lookup_S in ITH. eauto.
+  Qed.
+
+  (* TODO: refactor definitions about calls in this file and wfree_traces *)
+  Lemma call_continues_or_returns tc c1 c2 τ
+    (RUNS: exists ec1, runs_call tc ec1 c1)
+    (STEP: locale_step c1 (Some τ) c2):
+    (exists ec2, runs_call tc ec2 c2) \/
+    (exists e2 (r: val), from_locale c2.1 τ = Some e2 /\ under_ctx (tctx_ctx tc) e2 = Some (of_val r)).
+  Proof using. 
+    destruct RUNS as (ec1 & RUNS).
+    inversion STEP. subst. inversion H3. subst. simpl in *.
+    destruct (decide (tctx_tid tc = locale_of t1 (fill K e1'))).
+    2: { left. red in RUNS. destruct RUNS as (e & IN & CTX & NVAL).
+         exists ec1. red. eexists. split; eauto.
+         rewrite -IN. simpl.
+         admit. }
+  Admitted.
+    
+
   (* TODO: rename *)
   Lemma obls_terminates_impl_multiple_waitfree
-    (extr : extrace heap_lang) a
+    (extr : extrace heap_lang)
     (ETR0: exists e0, (trfirst extr).1 = [subst "m" m e0])
     (VALID: extrace_valid extr)
     (FAIR: fair_ex (tctx_tid ic) extr)
-    (CALL: call_at extr m ic a)
-    (SPEC: wait_free_spec m)
+    (CALL: call_at extr m ic ai)
+    (* (SPEC: wait_free_spec m) *)
     :
     terminating_trace extr \/ has_return extr ic. 
   Proof.
     opose proof * (simple_om_simulation_adequacy_terminate_multiple_waitfree) as ADEQ; eauto.
 
-    destruct ADEQ; [tauto| ].
-    right. red.
-    destruct ic. simpl in *.
-
+    destruct ADEQ as [| [n NFIT]]; [tauto| ].
+    right. red. simpl in *.
+    rewrite /fits_inf_call in NFIT.
+    apply Classical_Prop.not_and_or in NFIT as [NFIT | X].
+    2: apply Classical_Prop.not_and_or in X as [NFIT | NFIT].
+    - destruct (trace_take_fwd n extr !! tctx_index ic) eqn:II; rewrite II /= // in NFIT.
+      destruct NFIT.
+      red in CALL. eauto. red.
+      red in CALL. simpl in CALL.
+      destruct ic. simpl in *. destruct CALL as (?&?&?).
+      apply trace_take_fwd_lookup_Some in II.
+      rewrite II in H. inversion H. subst x.
+      eexists. do 2 (split; eauto).
+      by rewrite under_ctx_fill.
+    - apply not_forall_exists_not in NFIT. destruct NFIT as [r NFIT].
+      apply Classical_Prop.imply_to_and in NFIT as [GE NFIT].
+      destruct (trace_take_fwd n extr !! r) eqn:RR; rewrite RR /= // in NFIT.
+      (* generalize call_continues_or_returns to sequence of transitions,
+         use it from ic *)
+      admit.
+    - apply not_forall_exists_not in NFIT. destruct NFIT as [k NFIT].
+      destruct (trace_take_fwd n extr !! k) eqn:KK; rewrite KK /= // in NFIT.
+      destruct (from_locale c.1 (tctx_tid ic)) eqn:EE; rewrite EE /= // in NFIT.
+      (* if k < n, it contradicts the call, as value won't reduce further *)
+      (* otherwise, the context must be preserved, and it must be the return *)
   Admitted.
      
 End WFAdequacy.
