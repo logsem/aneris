@@ -144,6 +144,28 @@ Section OblsAdequacy.
     by rewrite ITH in VALID. 
   Qed.
 
+  (* TODO: move to Trillium*)
+Lemma traces_match_impl_strong {S1 S2 L1 L2}
+      (Rℓ1: L1 -> L2 -> Prop) (Rs1: S1 -> S2 -> Prop)
+      (Rℓ2: L1 -> L2 -> Prop) (Rs2: S1 -> S2 -> Prop)
+      (trans1 trans1': S1 -> L1 -> S1 -> Prop)
+      (trans2 trans2': S2 -> L2 -> S2 -> Prop)
+      tr1 tr2 :
+  (∀ ℓ1 ℓ2, Rℓ1 ℓ1 ℓ2 → Rℓ2 ℓ1 ℓ2) →
+  (∀ s1 s2, Rs1 s1 s2 → Rs2 s1 s2) →
+  (forall s ℓ s', trans1 s ℓ s' -> trans1' s ℓ s') ->
+  (forall s ℓ s', trans2 s ℓ s' -> trans2' s ℓ s') ->
+  traces_match Rℓ1 Rs1 trans1 trans2 tr1 tr2 →
+  traces_match Rℓ2 Rs2 trans1' trans2' tr1 tr2.
+Proof.
+  intros HRℓ HRs T1 T2. revert tr1 tr2. cofix IH. intros tr1 tr2 Hmatch.
+  inversion Hmatch; simplify_eq.
+  - constructor 1. by apply HRs.
+  - constructor 2; [by apply HRℓ|by apply HRs|..].
+    3: by apply IH.
+    all: eauto. 
+Qed.
+
   Lemma obls_matching_traces_OM SR extr mtr
     (SR_LIVE: forall c δ, SR c δ -> obls_st_rel c δ)
     (MATCH: obls_om_traces_match_gen SR extr mtr)
@@ -187,13 +209,16 @@ Section OblsAdequacy.
         eapply SR_LIVE; eauto. }
 
     eexists. split; eauto. split_and !.
-    - admit. (* TODO: strenghten traces_match_impl *)       
+    - eapply traces_match_impl_strong. 
+      5: by apply MATCH'.
+      all: eauto.
+      simpl. set_solver. 
     - eapply om_st_wf_tr.
       + eapply traces_match_valid2; eauto.
       + apply traces_match_first in MATCHo.
         by rewrite MATCHo in WF0.
     - by apply traces_match_first in MATCHo.
-  Admitted. 
+  Qed.
 
   Lemma exec_om_fairness_preserved extr omtr τ:
       exec_OM_traces_match extr omtr ->
