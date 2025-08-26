@@ -597,7 +597,7 @@ Section WFAdequacy.
   Instance wfree_pre: @heapGpreS wfreeΣ M EM.
   Admitted. 
 
-  Local Lemma ic_helper:
+  Local Lemma tc_helper:
     tctx_tpctx ic = {| tpctx_ctx := Ki; tpctx_tid := τi |}.
   Proof using. clear. by destruct ic as [? []]. Qed.
 
@@ -628,7 +628,7 @@ Section WFAdequacy.
          rewrite trace_take_fwd_0_first in FITS.
          rewrite II /= in FITS.
          red in FITS. simpl in FITS. eauto.
-         red in FITS. rewrite ic_helper in FITS.
+         red in FITS. rewrite tc_helper in FITS.
          eexists. split; eauto. by rewrite under_ctx_fill. }
     destruct (@decide (∀ e, from_locale (trfirst extr).1 τi = Some e → to_val e = None)) as [E0| ].
     { destruct (from_locale (trfirst extr).1 τi) eqn:E.
@@ -774,34 +774,39 @@ Section WFAdequacy.
     intros EQ. rewrite from_locale_from_app_Some. eauto. 
   Qed.
 
-  (* (* TODO: move to Trillium, replace the original version? *) *)
-  (* Lemma from_locale_from_equiv_strong tp0 tp0' tp tp' ζ : *)
-  (*   locales_equiv tp0 tp0' -> *)
-  (*   locales_equiv_from tp0 tp0' tp tp' -> *)
-  (*   from_locale_from tp0 tp ζ = from_locale_from tp0' tp' ζ. *)
-  (* Proof. *)
-  (*   revert tp0 tp0' tp'. induction tp as [|e tp IH]; intros tp0 tp0' tp' Heq0 Heq. *)
-  (*   { destruct tp' as [|e' tp']; try by apply Forall2_length in Heq. } *)
-  (*   simpl in *. *)
+  (* TODO: move  *)
+  Lemma locale_of_hl_expr_irrel tp e e':
+    locale_of tp e = locale_of tp e'.
+  Proof using. done. Qed. 
 
-  (*   destruct (prefixes_from tp0' tp') as [| [??]] eqn:P'. *)
-  (*   { inversion Heq. } *)
-  (*   inversion Heq. subst. *)
-    
-  (*   destruct (decide (locale_of tp0 e = ζ)). *)
-  (*   - symmetry. apply from_locale_from_lookup. erewrite <- IH; eauto. *)
-  (*     2: {  *)
-  (*     rewrite decide_True //; eauto. erewrite <-locale_equiv =>//. *)
-  (*   - rewrite decide_False; last by erewrite <-locale_equiv. *)
-  (*     apply Forall2_cons_1 in Heq as [Hlocs ?]. *)
-  (*     rewrite decide_False // in Heζ; last by erewrite Hlocs, <-locale_equiv =>//. *)
-  (*     apply (IH (tp0 ++ [e])); eauto. *)
-  (*     apply locales_equiv_snoc =>//. *)
-  (* Qed. *)
+  (* TODO: move, find existing, generalize? *)
+  Lemma locale_step_other_same c1 oτ c2 τ' e'
+    (EXPR: from_locale c1.1 τ' = Some e')
+    (STEP: locale_step c1 oτ c2)
+    (OTHER: oτ ≠ Some τ'):
+    from_locale c2.1 τ' = Some e'.
+  Proof using.
+    rewrite -EXPR. simpl.
+    inversion STEP; subst; simpl in *.
+    2: { done. }
+    apply from_locale_from_app_Some in EXPR as [IN1 | IN2].
+    { rewrite /from_locale. repeat erewrite from_locale_from_Some_app; eauto. }
+    simpl in IN2. rewrite decide_False in IN2; [| set_solver].
+    rewrite /from_locale.
+    symmetry. rewrite (app_assoc _ ([_])).
+    erewrite from_locale_from_Some_app'; eauto.
+    symmetry. apply from_locale_from_Some_app'. simpl.
+    rewrite decide_False; [| set_solver].
+    apply from_locale_from_Some_app.
+    apply from_locale_from_lookup in IN2 as (?&?). 
+    eapply from_locale_from_lookup. split.
+    - rewrite -H. rewrite !length_app /=. done.
+    - etrans; [| apply H0]. rewrite !length_app /=. done.
+  Qed.    
 
-  Lemma call_continues_or_returns tpc c1 c2 τ
+  Lemma call_continues_or_returns tpc c1 c2 oτ
     (NVAL: nval_at tpc c1)
-    (STEP: locale_step c1 (Some τ) c2):
+    (STEP: locale_step c1 oτ c2):
     nval_at tpc c2 \/ exists r, return_at tpc c2 r.
   Proof using.
     red in NVAL. destruct NVAL as (e & EXPR & NVAL).
@@ -810,40 +815,116 @@ Section WFAdequacy.
     red in EXPR. destruct tpc as [K' τ'].  
     (* pose proof EXPR as [eτi TI]%expr_at_in_locales%locales_of_cfg_Some. *)
     (* 2: { by apply c1. } *)
-    inversion STEP. subst. inversion H3. subst. simpl in *.
+    inversion STEP. subst. inversion H1.
+    2: { by subst. }
+
+    subst. simpl in *.
     destruct (decide (τ' = locale_of t1 (fill K e1'))).
     2: { left. exists e. split; auto.
-         red. rewrite -EXPR. simpl. 
-         apply from_locale_from_app_Some in EXPR as [IN1 | IN2].
-         { rewrite /from_locale. repeat erewrite from_locale_from_Some_app; eauto. }
-         simpl in IN2. rewrite decide_False in IN2; [| done].
-         rewrite /from_locale.
-         symmetry. rewrite (app_assoc _ ([_])).
-         erewrite from_locale_from_Some_app'; eauto.
-         symmetry. apply from_locale_from_Some_app'. simpl.
-         rewrite decide_False; [| done].
-         apply from_locale_from_Some_app.
-         apply from_locale_from_lookup in IN2 as (?&?). 
-         eapply from_locale_from_lookup. split.
-         - rewrite -H. rewrite !length_app /=. done.
-         - etrans; [| apply H0]. rewrite !length_app /=. done. }
+         red. eapply locale_step_other_same; set_solver. } 
 
     subst τ'.
     rewrite /from_locale from_locale_from_locale_of in EXPR. inversion EXPR as [FILL'].
-    rewrite FILL' in H3.
-    apply fill_step_inv in H3; eauto. simpl in *.
-    foobar. 
+    rewrite FILL' in H1.
+    apply fill_step_inv in H1; eauto. simpl in *.
+    destruct H1 as (e' & EQ2 & STEP'). rewrite FILL' EQ2.
 
-  Admitted.
-    
+    rewrite /nval_at. simpl.
+    erewrite locale_of_hl_expr_irrel.
+    rewrite /from_locale. erewrite (from_locale_from_locale_of nil t1).
+
+    destruct (to_val e') eqn:VAL; [| by eauto]. 
+    right. exists v. Set Printing Coercions.
+    erewrite of_to_val; eauto.
+  Qed.
+
+  Lemma call_returns_if_not_continues tpc i j ci cj etr
+    (VALID: extrace_valid etr)
+    (ITH: etr S!! i = Some ci)
+    (CALL : nval_at tpc ci)
+    (LE: i <= j)
+    (JTH: etr S!! j = Some cj)
+    (NOCONT: ¬ nval_at tpc cj)
+    :
+    exists k r ck, i < k <= j /\ etr S!! k = Some ck /\ return_at tpc ck r. 
+  Proof using.
+    clear dependent ic. clear dependent m. 
+    apply Nat.le_sum in LE as [d ->].    
+    generalize dependent i. generalize dependent ci.
+    induction d.
+    { simpl. setoid_rewrite Nat.add_0_r. intros.
+      rewrite ITH in JTH. inversion JTH. by subst. }
+    intros.
+    pose proof JTH as X.
+    apply mk_is_Some, state_lookup_prev with (j := S i) in X as [ci' ITH']; [| lia].
+    pose proof ITH' as [oτ ITHl]%mk_is_Some%label_lookup_states'.
+    rewrite -Nat.add_1_r in ITH'.
+    opose proof * (trace_valid_steps'' _ _ _ i) as STEP; eauto.
+    { apply extrace_valid_alt in VALID; eauto. }
+    eapply call_continues_or_returns in STEP; eauto.
+    destruct STEP as [NVAL | [r RET]].
+    2: { do 3 eexists. split; eauto. lia. }
+    ospecialize (IHd _ NVAL _ ITH' _).
+    { rewrite -JTH. f_equal. lia. }
+    destruct IHd as (?&?&?&?&?&?).
+    do 3 eexists. split; eauto. lia.
+  Qed.
+
+  (* TODO: move *)
+  Lemma call_nval_at tpc c mm a
+    (CALL: call_at tpc c mm a (APP := App)):
+  nval_at tpc c.
+  Proof using.
+    red. eexists. split; eauto.
+  Qed.
+
+  Local Lemma ic_helper:
+    ic = {| tctx_tpctx := tc; tctx_index := ii |}.
+  Proof using. clear.  by destruct ic. Qed.
+
+  Lemma locale_step_val_preserved c1 oτ c2 τv v
+    (VAL: from_locale c1.1 τv = Some (of_val v))
+    (STEP: locale_step c1 oτ c2):
+    from_locale c2.1 τv = Some (of_val v).
+  Proof using.
+    destruct (decide (oτ = Some τv)) as [-> | ].
+    2: { erewrite locale_step_other_same; eauto. }
+    inversion STEP. subst. simpl in *.
+    rewrite /from_locale from_locale_from_locale_of in VAL.
+    inversion VAL. subst e1.
+    inversion H3. subst.
+    apply ectx_language.val_head_stuck in H1.
+    eapply ectx_language.fill_not_val in H1.
+    by erewrite <- H in H1.
+  Qed.
+
+  Lemma val_preserved_trace etr v i ci τv j 
+    (VALID: extrace_valid etr)
+    (ITH: etr S!! i = Some ci)
+    (VAL: from_locale ci.1 τv = Some (of_val v))
+    (LE: i <= j):
+    from_option (fun cj => from_locale cj.1 τv = Some (of_val v)) True (etr S!! j).
+  Proof using.
+    clear dependent ic. clear dependent m. 
+    apply Nat.le_sum in LE as [d ->]. induction d.
+    { rewrite Nat.add_0_r. by rewrite ITH. }
+    destruct (etr S!! (i + S d)) eqn:JTH; [| done]. simpl.
+    rewrite Nat.add_succ_r in JTH.
+    pose proof JTH as [[? JTH'] [? JTHl]]%mk_is_Some%next_state_lookup.
+    rewrite JTH' /= in IHd.
+    eapply locale_step_val_preserved; eauto.
+    eapply trace_valid_steps''; eauto. 
+    { by apply extrace_valid_alt. }
+    rewrite -JTH. f_equal. lia.
+  Qed.
 
   (* TODO: rename *)
   Lemma obls_terminates_impl_multiple_waitfree
     (extr : extrace heap_lang)
     (ETR0: exists e0, (trfirst extr).1 = [subst "m" m e0])
     (VALID: extrace_valid extr)
-    (FAIR: fair_ex (tctx_tid ic) extr)
-    (CALL: call_at extr m ic ai)
+    (FAIR: fair_ex τi extr)
+    (CALL: from_option (fun c => call_at tc c m ai (APP := App)) False (extr S!! ii))
     (* (SPEC: wait_free_spec m) *)
     :
     terminating_trace extr \/ has_return extr ic. 
@@ -853,29 +934,55 @@ Section WFAdequacy.
     destruct ADEQ as [| [n NFIT]]; [tauto| ].
     right. red. simpl in *.
     rewrite /fits_inf_call in NFIT.
+    destruct (extr S!! ii) as [ci | ] eqn:ITH; rewrite ITH /= in CALL; [| done]. 
     apply Classical_Prop.not_and_or in NFIT as [NFIT | X].
     2: apply Classical_Prop.not_and_or in X as [NFIT | NFIT].
     - destruct (trace_take_fwd n extr !! tctx_index ic) eqn:II; rewrite II /= // in NFIT.
       destruct NFIT.
-      red in CALL. eauto. red.
-      red in CALL. simpl in CALL.
-      destruct ic. simpl in *. destruct CALL as (?&?&?).
       apply trace_take_fwd_lookup_Some in II.
-      rewrite II in H. inversion H. subst x.
-      eexists. do 2 (split; eauto).
-      by rewrite under_ctx_fill.
+      fold ii in II. rewrite II in ITH. inversion ITH. 
+      eauto. 
     - apply not_forall_exists_not in NFIT. destruct NFIT as [r NFIT].
       apply Classical_Prop.imply_to_and in NFIT as [GE NFIT].
       destruct (trace_take_fwd n extr !! r) eqn:RR; rewrite RR /= // in NFIT.
-      (* generalize call_continues_or_returns to sequence of transitions,
-         use it from ic *)
-      admit.
-    - apply not_forall_exists_not in NFIT. destruct NFIT as [k NFIT].
-      destruct (trace_take_fwd n extr !! k) eqn:KK; rewrite KK /= // in NFIT.
-      destruct (from_locale c.1 (tctx_tid ic)) eqn:EE; rewrite EE /= // in NFIT.
-      (* if k < n, it contradicts the call, as value won't reduce further *)
-      (* otherwise, the context must be preserved, and it must be the return *)
-  Admitted.
+      
+      eapply call_returns_if_not_continues in NFIT; eauto.
+      3: by apply trace_take_fwd_lookup_Some in RR.
+      2: by eapply call_nval_at.
+      rename r into b. 
+      destruct NFIT as (k & r & ck & RANGE & KTH & RETk).
+      rewrite ic_helper.
+      exists k, r, ck. split; eauto. lia.  
+    - apply not_forall_exists_not in NFIT. destruct NFIT as [j NFIT].
+      destruct (trace_take_fwd n extr !! j) eqn:JJ; rewrite JJ /= // in NFIT.
+      destruct (from_locale c.1 τi) eqn:EE; rewrite EE /= // in NFIT.
+
+      apply trace_take_fwd_lookup_Some in JJ. 
+
+      destruct (Nat.le_gt_cases j ii) as [LE | GT].
+      + destruct (to_val e) eqn:V; [| done].
+        apply of_to_val in V. rewrite -V in EE.
+        eapply val_preserved_trace in LE; eauto.
+        rewrite ITH /= in LE.
+
+        (* TODO: lemma? *)
+        do 2 red in CALL. rewrite /tc tc_helper in CALL.
+        rewrite LE in CALL. inversion CALL.
+        apply Some_inj in CALL. 
+        apply (@f_equal _ _ to_val) in CALL.
+        erewrite fill_not_val in CALL; done. 
+      + apply Nat.lt_le_incl in GT.
+        eapply call_returns_if_not_continues in GT; eauto.
+        2: by eapply call_nval_at.
+        2: { intros NVAL. apply NFIT.
+             destruct NVAL as (?&EXPR&?).
+             do 2 red in EXPR. rewrite tc_helper in EXPR.
+             rewrite EE in EXPR. inversion_clear EXPR.
+             eapply fill_not_val; eauto. }
+        destruct GT as (k & r & ck & RANGE & KTH & RETk).
+        rewrite ic_helper.
+        exists k, r, ck. split; eauto. lia.
+  Qed.
      
 End WFAdequacy.
 
