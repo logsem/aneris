@@ -992,26 +992,84 @@ Definition wait_free (m: val) := forall etr,
     extrace_valid etr ->
     always_returns etr m.
 
+(* TODO: move *)
+Lemma from_locale_trace etr i ci τ j
+  (VALID: extrace_valid etr)
+  (ITH: etr S!! i = Some ci)
+  (VAL: is_Some (from_locale ci.1 τ))
+  (LE: i <= j):
+  from_option (fun cj => is_Some (from_locale cj.1 τ)) True (etr S!! j).
+Proof using.
+  apply Nat.le_sum in LE as [d ->]. induction d.
+  { rewrite Nat.add_0_r. by rewrite ITH. }
+  destruct (etr S!! (i + S d)) eqn:JTH; [| done]. simpl.
+  rewrite Nat.add_succ_r in JTH.
+  pose proof JTH as [[[??] JTH'] [? JTHl]]%mk_is_Some%next_state_lookup.
+  rewrite JTH' /= in IHd.
+  eapply from_locale_step; eauto. 
+  eapply trace_valid_steps''; eauto. 
+  { by apply extrace_valid_alt. }
+  erewrite <- surjective_pairing, <-JTH. f_equal. lia.
+Qed.
+                        
+
 Theorem wfree_is_wait_free m
-  (SPEC: wait_free_spec m):
+  (SPEC: WaitFreeSpec m):
   wait_free m. 
 Proof using.
   red. intros etr ETR0 VALID.
-  red. intros tc a FAIR CALL. 
+  red. intros [i tpc] a ci FAIR ITH CALL. 
 
-  eapply simple_om_simulation_adequacy_terminate_multiple_waitfree in ETR0; eauto.
-  destruct ETR0 as [TERM | NO_INF_CALL].
-  - (** if it's finite, then τ should've reduced to a value *)
-    admit. 
-  - (** if it's finite, see above *)
-    (** if it's infinite, there must've been return at k *)
-    admit. 
-Admitted.
+  opose proof * (obls_terminates_impl_multiple_waitfree (TraceCtx i tpc)) as ADEQ; eauto.
+  { simpl. by rewrite ITH. }
+  destruct ADEQ as [TERM| ?]; [| done]. 
+
+  pose proof (trace_has_len etr) as [? LEN].
+  eapply terminating_trace_equiv in TERM as [len EQ]; eauto. subst.
+  opose proof (proj2 (state_lookup_dom _ _ LEN (len - 1)) _) as [c LAST].
+  { apply trace_len_gt_0 in LEN. simpl in *. lia. }
+  
+  assert (i <= len - 1) as DOM.
+  { pose proof ITH as DOM.
+    eapply mk_is_Some, state_lookup_dom in DOM; eauto. simpl in DOM.
+    lia. }
+  
+  pose proof DOM as EE. eapply from_locale_trace in EE; eauto.
+  2: { eapply locales_of_cfg_Some. eapply expr_at_in_locales.
+       erewrite <- surjective_pairing. eauto. }
+  rewrite LAST /= in EE. destruct EE as [e EE].
+  
+  destruct (decide (nval_at tpc c)) as [NVAL | VAL]. 
+  + red in FAIR. apply fair_by_equiv in FAIR.
+    red in FAIR. ospecialize (FAIR (len - 1)).
+    
+    assert (locale_enabled (tpctx_tid tpc) c) as EN. 
+    { red. eexists. split; eauto.
+      (* TODO: make lemma, use above *)
+      destruct NVAL as (?&EXPR&?).
+      red in EXPR. destruct tpc. simpl in *. 
+      rewrite EE in EXPR. inversion_clear EXPR.
+      eapply fill_not_val; eauto. }
+    rewrite LAST /= in FAIR. specialize (FAIR EN).      
+    destruct FAIR as (k & ? & NEXT & FAIR).
+    red in FAIR. destruct FAIR as [DIS | (? & LBL & STEP)].
+    2: { eapply mk_is_Some, label_lookup_dom in LBL; eauto.
+         simpl in *. lia. }
+    destruct k.
+    { rewrite Nat.add_0_r in NEXT. rewrite LAST in NEXT. set_solver. }
+    eapply mk_is_Some, state_lookup_dom in NEXT; eauto.
+    simpl in *. lia.
+  + eapply call_returns_if_not_continues in DOM; eauto.
+    2: by eapply call_nval_at.
+    destruct DOM as (k & r & ck & RANGE & KTH & RETk).
+    red. exists k, r, ck. split; eauto. lia.
+Qed.
 
 
-Lemma mk_ref_WF_spec: wait_free_spec mk_ref.
+Lemma mk_ref_WF_spec: WaitFreeSpec mk_ref.
 Proof using.
-  red. exists 5. intros.
+  esplit. 
+  intros.
   iIntros "(CPS & PH) POST".
   iApply (mk_ref_spec with "[-POST]").
   { iFrame. }
