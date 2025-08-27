@@ -29,7 +29,27 @@ Section Preservation.
       out_step
       (@mtrans OM).
 
-  Definition out_fair := fair_by out_lbl_prop eq. 
+  Definition out_fair := fair_by out_lbl_prop eq.
+
+  Lemma fairness_sat_ex_om_helper extr omtr τ (n m : nat) (c' : So)
+    (MATCH : out_om_traces_match extr omtr)    
+    (MTH : extr S!! (n + m) = Some c')
+    (STEP : fairness_sat out_lbl_prop eq (lift_locale τ) c' (extr L!! (n + m))):
+  ∃ d s', omtr S!! (n + d) = Some s' ∧
+            fairness_sat has_obls eq τ s' (omtr L!! (n + d)).
+  Proof using LIFT_INJ.
+    generalize (traces_match_state_lookup_1 _ _ _ _ MATCH MTH).
+    intros (δ' & MTH' & LIVE').
+    do 2 eexists. split; eauto.
+    red. rewrite /has_obls.
+    destruct (ps_obls δ' !! τ) as [R'| ] eqn:OBS'; [| tauto].
+    simpl. destruct (decide (R' = ∅)); [tauto| ].
+    right. red in LIVE'. specialize (LIVE' τ ltac:(red; rewrite OBS'; done)).
+    red in STEP. destruct STEP as [| (?&STEP& EQ)]; [done| ].
+    subst x. 
+    generalize (traces_match_label_lookup_1 _ _ _ _ MATCH STEP).
+    clear -LIFT_INJ. intros (?&?&?%LIFT_INJ). eauto. 
+  Qed.
 
   Lemma out_om_fairness_preserved_single (extr: out_trace) (omtr: obls_trace) 
     (τ: Locale):
@@ -48,17 +68,7 @@ Section Preservation.
     red in FAIR. apply fair_by_equiv in FAIR. red in FAIR.
     specialize (FAIR n ltac:(rewrite NTH; done)).
     destruct FAIR as (m & c' & MTH & STEP).
-    generalize (traces_match_state_lookup_1 _ _ _ _ MATCH MTH).
-    intros (δ' & MTH' & LIVE').
-    do 2 eexists. split; eauto.
-    red. rewrite /has_obls.
-    destruct (ps_obls δ' !! τ) as [R'| ] eqn:OBS'; [| tauto].
-    simpl. destruct (decide (R' = ∅)); [tauto| ].
-    right. red in LIVE'. specialize (LIVE' τ ltac:(red; rewrite OBS'; done)).
-    red in STEP. destruct STEP as [| (?&STEP& EQ)]; [done| ].
-    subst x. 
-    generalize (traces_match_label_lookup_1 _ _ _ _ MATCH STEP).
-    clear -LIFT_INJ. intros (?&?&?%LIFT_INJ). eauto. 
+    eapply fairness_sat_ex_om_helper; eauto. 
   Qed.
 
   Lemma out_om_fairness_preserved (extr: out_trace) (omtr: obls_trace):

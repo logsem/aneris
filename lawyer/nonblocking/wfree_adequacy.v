@@ -16,12 +16,32 @@ Section CallInTrace.
   Context (tr: extrace heap_lang).
   Context (m: val). (** the method under consideration *)
   
-  Definition has_return '(TraceCtx i tpc as tc) :=
-    exists j r cj, i <= j /\ tr S!! j = Some cj /\ return_at tpc cj r.
+  Definition has_return_at '(TraceCtx i tpc as tc) j :=
+    exists r cj, i <= j /\ tr S!! j = Some cj /\ return_at tpc cj r.
+
+  Definition has_return tc := exists j, has_return_at tc j. 
+
+  (* Definition call_between a r i j (tpc: tpool_ctx) := *)
+  (*   i <= j /\ *)
+  (*   exists ci cj, *)
+  (*     tr S!! i = Some ci /\  *)
+  (*     tr S!! j = Some cj /\  *)
+  (*     call_at tpc ci m a (APP := App) /\ *)
+  (*     return_at tpc cj r /\ *)
+  (*     forall k ck, i <= k < j -> tr S!! k = Some ck -> nval_at tpc ck.  *)
+
+  Definition fair_call '(TpoolCtx K τ as tpc) i :=
+    forall k ck, i <= k -> 
+            tr S!! k = Some ck ->
+            locale_enabled τ ck ->
+            ¬ (exists j, j <= k /\ has_return_at (TraceCtx i tpc) j) ->
+    exists d cd, tr S!! (k + d) = Some cd /\
+            fairness_sat locale_enabled tid_match τ cd (tr L!! (k + d)). 
 
   Definition always_returns :=    
     forall tc a ci, let '(TraceCtx i tpc) := tc in
-      fair_ex (tpctx_tid tpc) tr ->
+      (* fair_ex (tpctx_tid tpc) tr -> *)
+      fair_call tpc i ->
       tr S!! i = Some ci ->
       call_at tpc ci m a (APP := App) ->
       has_return tc.
@@ -48,9 +68,9 @@ Section WFAdequacy.
 
   Context (ic: @trace_ctx heap_lang).
   Let ii := tctx_index ic.
-  Let tc := tctx_tpctx ic. 
-  Let Ki := tpctx_ctx tc.
-  Let τi := tpctx_tid tc. 
+  Let tpc := tctx_tpctx ic. 
+  Let Ki := tpctx_ctx tpc.
+  Let τi := tpctx_tid tpc. 
   Context (m ai: val).
 
   Definition no_extra_obls (_: cfg heap_lang) (δ: mstate M) :=
@@ -88,7 +108,7 @@ Section WFAdequacy.
       destruct lookup eqn:ITH; try done. simpl in *.
       apply H. split; [lia| ].
       eapply trace_lookup_lt_Some_1; eauto. 
-    - apply Decision_iff_impl with (P := Forall (fun j => from_option (nval_at tc) True (etr !! j)) (seq ii (trace_length etr - tctx_index ic))).
+    - apply Decision_iff_impl with (P := Forall (fun j => from_option (nval_at tpc) True (etr !! j)) (seq ii (trace_length etr - tctx_index ic))).
       2: { apply Forall_dec. intros. destruct lookup; solve_decision. }
       rewrite List.Forall_forall. simpl.
       apply forall_proper. intros i.
@@ -601,90 +621,16 @@ Section WFAdequacy.
     tctx_tpctx ic = {| tpctx_ctx := Ki; tpctx_tid := τi |}.
   Proof using. clear. by destruct ic as [? []]. Qed.
 
-  Theorem simple_om_simulation_adequacy_terminate_multiple_waitfree extr
-        (ETR0: exists e0, (trfirst extr).1 = [subst "m" m e0])
-    :
-    extrace_valid extr -> 
-    fair_ex τi extr ->
-    terminating_trace extr \/ 
-    exists k, ¬ fits_inf_call ic m ai (trace_take_fwd k extr).
-  Proof.
-    intros VALID FAIR.
-    destruct ETR0 as [e0 ETR0]. 
+  Local Lemma ic_helper:
+    ic = {| tctx_tpctx := tpc; tctx_index := ii |}.
+  Proof using. clear.  by destruct ic. Qed.
 
-    destruct (@decide (ii = 0 → ∃ e,
-                    from_locale (trfirst extr).1 τi = Some e ∧ under_ctx Ki e = Some (m ai))) as [II0| ].
-    { apply impl_dec; [apply _| ].
-      (* TODO: make a lemma + definition *)
-      apply ex_fin_dec with
-             (l := from_option (flip cons nil) [] (from_locale (trfirst extr).1 τi)).
-      { solve_decision. }
-      intros ? (RUNS & ?).
-      simpl. rewrite RUNS. simpl. tauto. }
-    2: { apply Classical_Prop.imply_to_and in n as (II & NO0).
-         right. exists 0. intros FITS. apply NO0.
-         red in FITS. apply proj1 in FITS.
-         fold ii in FITS.
-         rewrite trace_take_fwd_0_first in FITS.
-         rewrite II /= in FITS.
-         red in FITS. simpl in FITS. eauto.
-         red in FITS. rewrite tc_helper in FITS.
-         eexists. split; eauto. by rewrite under_ctx_fill. }
-    destruct (@decide (∀ e, from_locale (trfirst extr).1 τi = Some e → to_val e = None)) as [E0| ].
-    { destruct (from_locale (trfirst extr).1 τi) eqn:E.
-      2: { left. set_solver. }
-      destruct (to_val e) eqn:V.
-      { right. set_solver. }
-      left. set_solver. }
-    2: { apply not_forall_exists_not in n as [e VAL].
-         apply Classical_Prop.imply_to_and in VAL as [E VAL].
-         right. exists 0. intros FITS. apply VAL.
-         red in FITS. do 2 apply proj2 in FITS.
-         specialize (FITS 0). rewrite trace_take_fwd_0_first /= in FITS.
-         rewrite E in FITS. done. }
-
-    opose proof (om_simulation_adequacy_model_trace_multiple_waitfree
-                wfreeΣ _ (trfirst extr).1 _ _ _ _ _ VALID _ _ _) as ADEQ.
-    { apply init_om_wfree_is_init. }
-    { apply surjective_pairing. }
-    { rewrite ETR0. simpl. lia. } 
-    { rewrite -surjective_pairing. 
-      eapply PR_premise_wfree; eauto.
-
-      split; [| split].
-      - (* TODO: can generalize to more than 1 initial thread *)
-        rewrite ETR0. constructor; [| done]. eauto.
-      - eauto.
-      - eauto. }
-    
-    destruct ADEQ as [(mtr & MATCH & OM0) | RET]. 
-    2: { right. done. } 
-    left. 
-    opose proof (obls_matching_traces_OM _ _ _ _ MATCH _) as (omtr & MATCH'' & SR & OM_WF & FIRST'').
-    { intros ?? X. apply X. }
-    { eapply obls_init_wf. rewrite OM0. apply init_om_wfree_is_init. }
- 
-    assert (forall τ, obls_trace_fair τ omtr) as OM_FAIR.
-    { intros.
-      destruct (decide (τ = τi)) as [-> | NEQ].
-      { eapply exec_om_fairness_preserved; eauto. }
-      red. apply fair_by_equiv. red. intros n OB.
-      destruct (omtr S!! n) eqn:NTH; rewrite NTH in OB; [| done].
-      simpl in OB.
-      eapply traces_match_state_lookup_2 in NTH; eauto.
-      destruct NTH as (?&NTH'& NOOBS).
-      red in NOOBS. destruct NOOBS as [_ NOOBS].
-      red in NOOBS. ospecialize (NOOBS τ _).
-      { red in OB. by destruct lookup. }
-      subst. tauto. }
-
-    pose proof (traces_match_valid2 _ _ _ _ _ _ MATCH'') as OM_VALID.
-    pose proof (obls_fair_trace_terminate _ OM_VALID OM_FAIR) as OM_TERM.
-
-    eapply (traces_match_preserves_termination _ _ _ _ _ _ MATCH'').
-    apply OM_TERM; eauto.
-    + apply unit_WF.
-    + apply fin_wf.
+  Lemma max_plus_consume n mm k:
+    exists d, n `max` mm + k = n + d.
+  Proof using.
+    edestruct (Nat.max_spec_le n mm) as [[LE ->] | [LE ->]]; eauto.
+    apply Nat.le_sum in LE as [? ->].
+    rewrite -Nat.add_assoc. eauto.
   Qed.
 
   (* TODO: move *)
@@ -746,6 +692,54 @@ Section WFAdequacy.
     rewrite ft_prepend_lookup_S in ITH. eauto.
   Qed.
 
+  (* TODO: move *)
+  Lemma trace_take_fwd_lookup_Some' (etr: extrace heap_lang) n i c
+    (ITH: etr S!! i = Some c)
+    (LE: i <= n):
+    trace_take_fwd n etr !! i = Some c. 
+  Proof using.
+    clear dependent ic. clear dependent m. 
+    generalize dependent c. generalize dependent n. generalize dependent etr.
+    induction i.
+    { intros [|] ??; destruct n; simpl; try done.
+      rewrite state_lookup_0. simpl.
+      by rewrite ft_prepend_lookup_0. } 
+    intros. destruct etr.
+    { destruct n; done. }
+    simpl. destruct n.
+    { lia. }
+    rewrite state_lookup_cons in ITH.
+    simpl. 
+    rewrite ft_prepend_lookup_S.
+    eapply IHi; eauto. lia. 
+  Qed.
+
+  (* TODO: move *)
+  Lemma not_return_nval tpc_ c r
+    (RET: return_at tpc_ c r)
+    (NVAL: nval_at tpc_ c):
+    False.
+  Proof using.
+    red in RET, NVAL. unfold expr_at in RET, NVAL. destruct tpc_.
+    rewrite RET in NVAL.  
+    destruct NVAL as (? & EQ & NVAL).
+    apply Some_inj, ectx_fill_inj in EQ.
+    rewrite -EQ in NVAL. done.
+  Qed.    
+
+  (* TODO: move *)
+  Global Instance locale_enabled_dec {Λ: language} `{EqDecision (locale Λ)}
+    τ (c: cfg Λ):
+    Decision (locale_enabled τ c).
+  Proof using.
+    rewrite /locale_enabled.
+    destruct (from_locale c.1 τ) as [e| ] eqn:E.
+    2: { right. set_solver. }
+    destruct (language.to_val e) eqn:V.
+    - right. set_solver.
+    - left. eauto.
+  Qed.
+
   (* TODO: move, use in pr_wfree? *)
   Lemma from_locale_from_app_Some tp0 tp1 tp2 τ e:
     from_locale_from tp0 (tp1 ++ tp2) τ = Some e <->
@@ -804,15 +798,199 @@ Section WFAdequacy.
     - etrans; [| apply H0]. rewrite !length_app /=. done.
   Qed.    
 
-  Lemma call_continues_or_returns tpc c1 c2 oτ
-    (NVAL: nval_at tpc c1)
+  (* TODO: ? generalize *)
+  Lemma enabled_disabled_step_between etr i j ci cj τ
+    (ITH: etr S!! i = Some ci)
+    (JTH: etr S!! j = Some cj)
+    (LE: i <= j)
+    (ENi: locale_enabled τ ci)
+    (DISj: ¬ locale_enabled τ cj)
+    (VALID: extrace_valid etr):
+    exists k, i <= k < j /\ etr L!! k = Some $ Some τ.
+  Proof using.
+    clear dependent ic. clear dependent m. 
+    apply Nat.le_sum in LE as [d ->].
+    edestruct @decide as [EX | NO].
+    2: { by apply EX. }
+    { apply ex_fin_dec with (l := seq i d).
+      { solve_decision. }
+      intros ? [??]. by apply in_seq. }
+    destruct DISj. generalize dependent ci. generalize dependent i.
+    induction d.
+    { setoid_rewrite Nat.add_0_r. set_solver. }
+    intros.
+    pose proof JTH as JTH'. 
+    apply mk_is_Some, state_lookup_prev with (j := S i) in JTH as [ci' ITH']; [| lia].
+    pose proof ITH' as [oτ ITHl]%mk_is_Some%label_lookup_states'.
+    rewrite -Nat.add_1_r in ITH'.
+    opose proof * (trace_valid_steps'' _ _ _ i) as STEP; eauto.
+    { apply extrace_valid_alt in VALID; eauto. }
+    red in ENi. destruct ENi as (? & EE & ?).
+    eapply locale_step_other_same in STEP; eauto.
+    2: { intros [=->]. destruct NO. eexists. split; eauto. lia. }
+    eapply IHd; eauto.
+    { rewrite -JTH'. f_equal. lia. }
+    { intros (?&?&?). destruct NO. eexists. split; eauto. lia. }
+    red. eauto.
+  Qed.
+
+  Theorem simple_om_simulation_adequacy_terminate_multiple_waitfree extr
+        (ETR0: exists e0, (trfirst extr).1 = [subst "m" m e0])
+    :
+    extrace_valid extr -> 
+    (* fair_ex τi extr -> *)
+    fair_call extr tpc ii ->
+    terminating_trace extr \/ 
+    exists k, ¬ fits_inf_call ic m ai (trace_take_fwd k extr).
+  Proof.
+    intros VALID FAIR.
+    destruct ETR0 as [e0 ETR0]. 
+
+    destruct (@decide (ii = 0 → ∃ e,
+                    from_locale (trfirst extr).1 τi = Some e ∧ under_ctx Ki e = Some (m ai))) as [II0| ].
+    { apply impl_dec; [apply _| ].
+      (* TODO: make a lemma + definition *)
+      apply ex_fin_dec with
+             (l := from_option (flip cons nil) [] (from_locale (trfirst extr).1 τi)).
+      { solve_decision. }
+      intros ? (RUNS & ?).
+      simpl. rewrite RUNS. simpl. tauto. }
+    2: { apply Classical_Prop.imply_to_and in n as (II & NO0).
+         right. exists 0. intros FITS. apply NO0.
+         red in FITS. apply proj1 in FITS.
+         fold ii in FITS.
+         rewrite trace_take_fwd_0_first in FITS.
+         rewrite II /= in FITS.
+         red in FITS. simpl in FITS. eauto.
+         red in FITS. rewrite tc_helper in FITS.
+         eexists. split; eauto. by rewrite under_ctx_fill. }
+
+    destruct (@decide (∀ e, from_locale (trfirst extr).1 τi = Some e → to_val e = None)) as [E0| ].
+    { destruct (from_locale (trfirst extr).1 τi) eqn:E.
+      2: { left. set_solver. }
+      destruct (to_val e) eqn:V.
+      { right. set_solver. }
+      left. set_solver. }
+    2: { apply not_forall_exists_not in n as [e VAL].
+         apply Classical_Prop.imply_to_and in VAL as [E VAL].
+         right. exists 0. intros FITS. apply VAL.
+         red in FITS. do 2 apply proj2 in FITS.
+         specialize (FITS 0). rewrite trace_take_fwd_0_first /= in FITS.
+         rewrite E in FITS. done. }
+
+    opose proof (om_simulation_adequacy_model_trace_multiple_waitfree
+                wfreeΣ _ (trfirst extr).1 _ _ _ _ _ VALID _ _ _) as ADEQ.
+    { apply init_om_wfree_is_init. }
+    { apply surjective_pairing. }
+    { rewrite ETR0. simpl. lia. } 
+    { rewrite -surjective_pairing. 
+      eapply PR_premise_wfree; eauto.
+
+      split; [| split].
+      - (* TODO: can generalize to more than 1 initial thread *)
+        rewrite ETR0. constructor; [| done]. eauto.
+      - eauto.
+      - eauto. }
+    
+    destruct ADEQ as [(mtr & MATCH & OM0) | RET]. 
+    2: { right. done. } 
+
+    opose proof (obls_matching_traces_OM _ _ _ _ MATCH _) as (omtr & MATCH'' & SR & OM_WF & FIRST'').
+    { intros ?? X. apply X. }
+    { eapply obls_init_wf. rewrite OM0. apply init_om_wfree_is_init. }
+
+    destruct (Classical_Prop.classic (∃ j, has_return_at extr ic j)) as [[j RET]| NORET].
+    {
+      red in RET. rewrite ic_helper in RET. destruct RET as (r & cj & ? & JTH & RET).
+
+      right. exists j. rewrite /fits_inf_call.
+      apply Classical_Prop.or_not_and. right. 
+      apply Classical_Prop.or_not_and. left.
+      intros NVALS.
+      specialize (NVALS _ H).
+      erewrite trace_take_fwd_lookup_Some' in NVALS; eauto.
+      simpl in NVALS.
+      edestruct not_return_nval; eauto. }
+
+    destruct (extr S!! ii) as [ci | ] eqn:IITH.
+    2: { left.
+         pose proof (trace_has_len extr) as [??]. 
+         eapply state_lookup_dom_neg in IITH; eauto.
+         eapply terminating_trace_equiv; eauto.
+         destruct x; try done. eauto. } 
+ 
+    assert (forall τ, obls_trace_fair τ omtr) as OM_FAIR.
+    { intros.
+      destruct (decide (τ = τi)) as [-> | NEQ].
+      (* { eapply exec_om_fairness_preserved; eauto. } *)
+      2: { red. apply fair_by_equiv. red. intros n OB.
+           destruct (omtr S!! n) eqn:NTH; rewrite NTH in OB; [| done].
+           simpl in OB.
+           eapply traces_match_state_lookup_2 in NTH; eauto.
+           destruct NTH as (?&NTH'& NOOBS).
+           red in NOOBS. destruct NOOBS as [_ NOOBS].
+           red in NOOBS. ospecialize (NOOBS τ _).
+           { red in OB. by destruct lookup. }
+           subst. tauto. }
+
+      red. apply fair_by_equiv. red. intros n OB.
+      destruct (omtr S!! n) eqn:NTH; rewrite NTH in OB; [| done].
+      simpl in OB.
+      eapply traces_match_state_lookup_2 in NTH; eauto.
+      destruct NTH as (?&NTH'& NOOBS).
+      red in NOOBS. apply proj1 in NOOBS. do 2 red in NOOBS.
+      specialize (NOOBS _ OB). simpl in NOOBS. 
+
+      red in FAIR. move FAIR at bottom. 
+      rewrite /tpc tc_helper in FAIR.
+
+      rewrite -tc_helper -ic_helper in FAIR.
+
+      assert (exists cm: cfg heap_lang, extr S!! (max n ii) = Some cm) as [cm MTH].
+      { edestruct (Nat.max_spec_le n ii) as [[? ->] | [? ->]]; eauto. }
+      destruct (decide (locale_enabled τi cm)) as [ENm | DISm].
+      2: { (* there must've been a step between n and m*)
+        opose proof * (enabled_disabled_step_between extr n) as STEP; eauto.
+        { lia. }
+        destruct STEP as (k & [LE BOUND] & STEP).
+        apply Nat.le_sum in LE as [d ->].
+        pose proof STEP as [[??] _]%mk_is_Some%label_lookup_states. 
+        eapply obls_fairness_preservation.fairness_sat_ex_om_helper; eauto.
+        { apply _. }
+        rewrite STEP. simpl. red. right. eauto. } 
+      
+      ospecialize (FAIR _ _ _ MTH ENm _).
+      { lia. }
+      { intros (?&?&?). eauto. }
+
+      destruct FAIR as (d & FAIR).
+      destruct (max_plus_consume n ii d) as [? EQ]. rewrite EQ in FAIR. 
+      destruct FAIR as (c' & DTH & STEP).
+      eapply obls_fairness_preservation.fairness_sat_ex_om_helper; eauto; try congruence.
+      simpl.
+
+      red. red in STEP. simpl. rewrite /tid_match in STEP. set_solver. }
+
+    left.
+
+    pose proof (traces_match_valid2 _ _ _ _ _ _ MATCH'') as OM_VALID.
+    pose proof (obls_fair_trace_terminate _ OM_VALID OM_FAIR) as OM_TERM.
+
+    eapply (traces_match_preserves_termination _ _ _ _ _ _ MATCH'').
+    apply OM_TERM; eauto.
+    + apply unit_WF.
+    + apply fin_wf.
+  Qed.
+
+  Lemma call_continues_or_returns tpc_ c1 c2 oτ
+    (NVAL: nval_at tpc_ c1)
     (STEP: locale_step c1 oτ c2):
-    nval_at tpc c2 \/ exists r, return_at tpc c2 r.
+    nval_at tpc_ c2 \/ exists r, return_at tpc_ c2 r.
   Proof using.
     red in NVAL. destruct NVAL as (e & EXPR & NVAL).
     pose proof EXPR as [eτi TI]%expr_at_in_locales%locales_of_cfg_Some.
     2: by apply c1. 
-    red in EXPR. destruct tpc as [K' τ'].  
+    red in EXPR. destruct tpc_ as [K' τ'].  
     (* pose proof EXPR as [eτi TI]%expr_at_in_locales%locales_of_cfg_Some. *)
     (* 2: { by apply c1. } *)
     inversion STEP. subst. inversion H1.
@@ -838,15 +1016,15 @@ Section WFAdequacy.
     erewrite of_to_val; eauto.
   Qed.
 
-  Lemma call_returns_if_not_continues tpc i j ci cj etr
+  Lemma call_returns_if_not_continues tpc_ i j ci cj etr
     (VALID: extrace_valid etr)
     (ITH: etr S!! i = Some ci)
-    (CALL : nval_at tpc ci)
+    (CALL : nval_at tpc_ ci)
     (LE: i <= j)
     (JTH: etr S!! j = Some cj)
-    (NOCONT: ¬ nval_at tpc cj)
+    (NOCONT: ¬ nval_at tpc_ cj)
     :
-    exists k r ck, i < k <= j /\ etr S!! k = Some ck /\ return_at tpc ck r. 
+    exists k r ck, i < k <= j /\ etr S!! k = Some ck /\ return_at tpc_ ck r. 
   Proof using.
     clear dependent ic. clear dependent m. 
     apply Nat.le_sum in LE as [d ->].    
@@ -871,16 +1049,12 @@ Section WFAdequacy.
   Qed.
 
   (* TODO: move *)
-  Lemma call_nval_at tpc c mm a
-    (CALL: call_at tpc c mm a (APP := App)):
-  nval_at tpc c.
+  Lemma call_nval_at tpc_ c mm a
+    (CALL: call_at tpc_ c mm a (APP := App)):
+  nval_at tpc_ c.
   Proof using.
     red. eexists. split; eauto.
   Qed.
-
-  Local Lemma ic_helper:
-    ic = {| tctx_tpctx := tc; tctx_index := ii |}.
-  Proof using. clear.  by destruct ic. Qed.
 
   Lemma locale_step_val_preserved c1 oτ c2 τv v
     (VAL: from_locale c1.1 τv = Some (of_val v))
@@ -923,9 +1097,9 @@ Section WFAdequacy.
     (extr : extrace heap_lang)
     (ETR0: exists e0, (trfirst extr).1 = [subst "m" m e0])
     (VALID: extrace_valid extr)
-    (FAIR: fair_ex τi extr)
-    (CALL: from_option (fun c => call_at tc c m ai (APP := App)) False (extr S!! ii))
-    (* (SPEC: wait_free_spec m) *)
+    (* (FAIR: fair_ex τi extr) *)
+    (FAIR: fair_call extr tpc ii)
+    (CALL: from_option (fun c => call_at tpc c m ai (APP := App)) False (extr S!! ii))
     :
     terminating_trace extr \/ has_return extr ic. 
   Proof.
@@ -966,7 +1140,7 @@ Section WFAdequacy.
         rewrite ITH /= in LE.
 
         (* TODO: lemma? *)
-        do 2 red in CALL. rewrite /tc tc_helper in CALL.
+        do 2 red in CALL. rewrite /tpc tc_helper in CALL.
         rewrite LE in CALL. inversion CALL.
         apply Some_inj in CALL. 
         apply (@f_equal _ _ to_val) in CALL.
@@ -1033,6 +1207,9 @@ Proof using.
   { pose proof ITH as DOM.
     eapply mk_is_Some, state_lookup_dom in DOM; eauto. simpl in DOM.
     lia. }
+
+  edestruct @Classical_Prop.classic as [RET | NORET]; [by apply RET| ].   
+  
   
   pose proof DOM as EE. eapply from_locale_trace in EE; eauto.
   2: { eapply locales_of_cfg_Some. eapply expr_at_in_locales.
@@ -1040,17 +1217,21 @@ Proof using.
   rewrite LAST /= in EE. destruct EE as [e EE].
   
   destruct (decide (nval_at tpc c)) as [NVAL | VAL]. 
-  + red in FAIR. apply fair_by_equiv in FAIR.
-    red in FAIR. ospecialize (FAIR (len - 1)).
+  + 
+    red in FAIR. destruct tpc as [K τ]. 
+    ospecialize (FAIR (len - 1)).
     
-    assert (locale_enabled (tpctx_tid tpc) c) as EN. 
+    assert (locale_enabled τ c) as EN. 
     { red. eexists. split; eauto.
       (* TODO: make lemma, use above *)
       destruct NVAL as (?&EXPR&?).
-      red in EXPR. destruct tpc. simpl in *. 
+      red in EXPR. simpl in *. 
       rewrite EE in EXPR. inversion_clear EXPR.
       eapply fill_not_val; eauto. }
-    rewrite LAST /= in FAIR. specialize (FAIR EN).      
+    rewrite LAST /= in FAIR. ospecialize (FAIR _ _ _ _ _); eauto.
+    { intros (?&?&(?&?&?&?&?)).
+      destruct NORET. red. eexists. esplit; eauto. }
+      
     destruct FAIR as (k & ? & NEXT & FAIR).
     red in FAIR. destruct FAIR as [DIS | (? & LBL & STEP)].
     2: { eapply mk_is_Some, label_lookup_dom in LBL; eauto.
@@ -1082,3 +1263,5 @@ Proof using.
   apply wfree_is_wait_free.
   apply mk_ref_WF_spec.
 Qed.
+
+Print Assumptions mk_ref_is_wait_free. 
