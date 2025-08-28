@@ -1,5 +1,5 @@
 From heap_lang Require Import lang.
-From lawyer.nonblocking Require Import counter wfree_adequacy.
+From lawyer.nonblocking Require Import counter wfree_adequacy wfree_traces.
 
 Theorem counter_is_wait_free
   (l0: loc := Loc 0)
@@ -9,4 +9,4 @@ Proof using.
   done.
 Qed.
 
-Print Assumptions counter_is_wait_free. 
+(* Print Assumptions counter_is_wait_free.  *)
