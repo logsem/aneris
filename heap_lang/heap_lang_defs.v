@@ -30,10 +30,13 @@ Global Instance subG_heap1PreG {Σ}:
   subG (heap1Σ) Σ → heap1GpreS Σ.
 Proof. solve_inG. Qed.
 
+Definition hl_phys_init_resource `{heap1GS Σ} (c: cfg heap_lang) :=
+  ([∗ map] l↦v ∈ (heap c.2), pointsto l (DfracOwn 1) v)%I. 
+
 Global Instance HeapLangEM: LangEM heap_lang. 
 refine {| lgem_GS := heap1GS;
           lgem_si `{heap1GS Σ} := fun c => gen_heap_interp (heap c);
-          lgem_init_resource `{heap1GS Σ} := fun c => ([∗ map] l↦v ∈ (heap c.2), pointsto l (DfracOwn 1) v)%I; |}. 
+          lgem_init_resource := @hl_phys_init_resource |}. 
 - intros. eapply subG_heap1PreG. apply H.
 - simpl. intros Σ PRE c.
   iMod (gen_heap_init c.2.(heap)) as (HEAP) "(HEAP & PTO & _)".

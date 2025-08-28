@@ -46,9 +46,11 @@ Section WaitFreePR.
   Lemma get_call_wp {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
     (a: val) π:
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
-    cp_mul π0 d0 F -∗ th_phase_frag τi π (1 / 2)%Qp -∗ WP m a @ τi {{ _, ⌜ True ⌝ }}.
+    wfs_mod_inv _ WFS (OHE := OHE) -∗
+    cp_mul π0 d0 F -∗ th_phase_frag τi π (1 / 2)%Qp -∗
+    WP m a @ τi {{ _, ⌜ True ⌝ }}.
   Proof using.
-    simpl. iIntros "CPS PH".
+    simpl. iIntros "#INV CPS PH".
     pose proof (@wfs_spec _ WFS _ EM Σ OHE) as SPEC. 
     iApply (SPEC with "[-]").
     2: { by iIntros "!> **". } 
@@ -66,7 +68,8 @@ Section WaitFreePR.
   Definition wfree_trace_inv `{Hinv : @IEMGS _ _ HeapLangEM EM Σ}
     (extr: execution_trace heap_lang) (omtr: auxiliary_trace M): iProp Σ :=
     ⌜ no_extra_obls (trace_last extr) (trace_last omtr) /\
-      from_option (fun e => to_val e = None) True (from_locale (trace_last extr).1 τi) ⌝.
+      from_option (fun e => to_val e = None) True (from_locale (trace_last extr).1 τi) ⌝ ∗
+    wfs_mod_inv _ WFS (OHE := OHE). 
   
   Context (ai: val). 
 
@@ -320,11 +323,13 @@ Section WaitFreePR.
     (FIT: fits_inf_call ic m ai etr)
     :
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
-    cur_obls_sigs etr -∗ state_interp etr mtr -∗ wfree_trace_inv etr mtr.
+    wfs_mod_inv _ WFS (OHE := OHE) -∗
+    cur_obls_sigs etr -∗ state_interp etr mtr -∗
+    wfree_trace_inv etr mtr.
   Proof using.
-    simpl. iIntros "OB TI".
+    simpl. iIntros "#INV OB TI".
     clear -FIT. 
-    rewrite /wfree_trace_inv. simpl.
+    rewrite /wfree_trace_inv. iFrame "INV". simpl.
     rewrite /no_extra_obls. simpl.
     iDestruct "TI" as "(_&_&MSI)". rewrite /obls_asem_mti. simpl.
     rewrite /obls_si. iDestruct "MSI" as "(MSI & %CORR')".
@@ -919,7 +924,8 @@ Section WaitFreePR.
          iMod (wptp_wfre_not_stuck with "TI WPS") as "(TI & WPS & %NSTUCK')"; eauto.
          { econstructor; eauto. }
          { erewrite app_nil_r. red. simpl. apply surjective_pairing. }
-         iDestruct (reestablish_wfree_inv with "[$] [$]") as "#INV'".
+         iDestruct (reestablish_wfree_inv with "[] [$] [$]") as "#INV'".
+         2: { iDestruct "INV" as "[??]". done. }
          { done. }
          iModIntro. iFrame. iSplit; [| done].
          iPureIntro. intros. by apply NSTUCK'. }
@@ -1106,7 +1112,8 @@ Section WaitFreePR.
           iSpecialize ("WPS" with "[CPP PH']").
           { rewrite /wp_tc. rewrite leb_correct_conv.
             2: { simpl. lia. }
-            iPoseProof (get_call_wp with "[$] [$]") as "WP".
+            iPoseProof (get_call_wp with "[] [$] [$]") as "WP".
+            { iDestruct "INV" as "[??]". done. }
             red in FIT. apply proj1 in FIT.
             rewrite trace_lookup_extend in FIT; [| done].
             simpl in FIT. do 2 red in FIT. rewrite ic_helper /= in FIT.
@@ -1372,7 +1379,8 @@ Section WaitFreePR.
              iDestruct ("PHτi" with "[//]") as (π_) "PHτi".
              rewrite half_inv2.
 
-             iPoseProof (get_call_wp ai with "[$] [$]") as "WP".
+             iPoseProof (get_call_wp ai with "[] [$] [$]") as "WP".
+             { iDestruct "INV" as "[??]". done. }
 
              red in FIT. apply proj1 in FIT.
              rewrite trace_lookup_last in FIT.
@@ -1455,7 +1463,8 @@ Section WaitFreePR.
              iDestruct ("PHτi" with "[//]") as (π_) "PHτi".
              rewrite half_inv2.
 
-             iPoseProof (get_call_wp ai with "[$] [$]") as "WP".
+             iPoseProof (get_call_wp ai with "[] [$] [$]") as "WP".
+             { iDestruct "INV" as "[??]". done. }
 
              rewrite /newposts. 
              rewrite app_comm_cons app_assoc.  

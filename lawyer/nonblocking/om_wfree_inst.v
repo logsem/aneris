@@ -38,15 +38,43 @@ From trillium.program_logic Require Import weakestpre.
 From heap_lang Require Import heap_lang_defs lang notation.
 From lawyer.obligations Require Import obligations_resources.
 
-(* TODO: support invariants in precondition *)
+
 (* TODO: relax to non-trivial degrees *)
-(* TODO: remove phases? *)
+(* TODO: support LATs *)
 Record WaitFreeSpec (m: val) := {
+  wfs_is_init_st: cfg heap_lang -> Prop;
+  wfs_mod_inv {M: Model} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ}: iProp Σ;
+  wfs_mod_inv_Pers `{EM: ExecutionModel heap_lang M} `{OHE: !OM_HL_Env OP_HL_WF EM Σ} ::
+    Persistent wfs_mod_inv;
+  wfs_init_mod `{EM: ExecutionModel heap_lang M} `{OHE: !OM_HL_Env OP_HL_WF EM Σ}:
+    forall c (INIT: wfs_is_init_st c),
+      let _: heap1GS Σ := iem_phys _ EM in 
+      ⊢ hl_phys_init_resource c ={⊤}=∗ wfs_mod_inv;
   wfs_F: nat;
   wfs_spec:
   forall {M: Model} {EM: ExecutionModel heap_lang M} Σ {OHE: OM_HL_Env OP_HL_WF EM Σ}
     τ π q (a: val),
-    {{{ cp_mul π d_wfr0 wfs_F ∗ th_phase_frag τ π q }}}
+    {{{ cp_mul π d_wfr0 wfs_F ∗ th_phase_frag τ π q ∗ wfs_mod_inv}}}
       App m a @ τ
     {{{ v, RET v; th_phase_frag τ π q }}}
 }. 
+
+(* (** In proofs, it's easier to use a spec with invariant framed out *) *)
+(* (* TODO: relax to non-trivial degrees *) *)
+(* Record WaitFreeSpecSimpl (m: val) := { *)
+(*   wfss_F: nat; *)
+(*   wfss_spec: *)
+(*   forall {M: Model} {EM: ExecutionModel heap_lang M} Σ {OHE: OM_HL_Env OP_HL_WF EM Σ} *)
+(*     τ π q (a: val), *)
+(*     {{{ cp_mul π d_wfr0 wfss_F ∗ th_phase_frag τ π q}}} *)
+(*       App m a @ τ *)
+(*     {{{ v, RET v; th_phase_frag τ π q }}} *)
+(* }. *)
+
+(* Lemma wfs_wfss m *)
+(*   (WFS: WaitFreeSpec m): *)
+  
+(*   WaitFreeSpecSimpl m. *)
+(* Proof using. *)
+(*   intros []. esplit. *)
+(*   iIntros "" *)

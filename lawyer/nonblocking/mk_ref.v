@@ -39,4 +39,49 @@ Section SimpleExample.
     iApply "POST". by iFrame.
   Qed.
 
+  Definition mk_ref_inv: iProp Σ := ⌜ True ⌝.
+
+  Lemma mk_ref_init_inv (c: cfg heap_lang):
+    let _: heap1GS Σ := iem_phys _ EM in 
+     hl_phys_init_resource c ={⊤}=∗ mk_ref_inv.
+  Proof using. set_solver. Qed.
+
+
 End SimpleExample.
+
+
+From lawyer.nonblocking Require Import om_wfree_inst. 
+
+Lemma mk_ref_wfree_init_inv:
+  ∀ (M : Model) (EM : ExecutionModel heap_lang M) (Σ : gFunctors) 
+    (OHE : OM_HL_Env OP_HL_WF EM Σ) (c : cfg heap_lang),
+    (fun _ => True) c ->
+    let _: heap1GS Σ := iem_phys _ EM in 
+    hl_phys_init_resource c ={⊤}=∗ mk_ref_inv.
+Proof using.
+  iIntros "**". iApply (mk_ref_init_inv with "[$]").
+Qed. 
+
+Lemma mk_ref_wfree_spec:
+  ∀ (M : Model) (EM : ExecutionModel heap_lang M) (Σ : gFunctors) 
+    (OHE : OM_HL_Env OP_HL_WF EM Σ) (τ : locale heap_lang) 
+    (π : Phase) (q : Qp) (a : val) (Φ : language.val heap_lang → iPropI Σ),
+    cp_mul π d_wfr0 5 ∗ th_phase_frag τ π q ∗
+    (λ (M0 : Model) (EM0 : ExecutionModel heap_lang M0) 
+       (Σ0 : gFunctors) (_ : OM_HL_Env OP_HL_WF EM0 Σ0), mk_ref_inv)
+      M EM Σ OHE -∗
+    ▷ (∀ v : language.val heap_lang, th_phase_frag τ π q -∗ Φ v) -∗
+    WP mk_ref a @τ {{ v, Φ v }}.
+Proof using.
+  intros. simpl. 
+  iIntros "(CPS & PH & #INV) POST".
+  iApply (mk_ref_spec with "[-POST]").
+  { iFrame. }
+  iIntros "!> % (?&?)". iApply "POST". iFrame.
+Qed.
+  
+
+Definition mk_ref_WF_spec: WaitFreeSpec mk_ref := {|
+  wfs_init_mod := mk_ref_wfree_init_inv;
+  wfs_spec := mk_ref_wfree_spec;
+|}.
