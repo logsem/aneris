@@ -211,6 +211,9 @@ Section WptpGen.
     by rewrite EQUIV.
   Qed.
 
+  Lemma wptp_from_gen_nil tp0: ⊢ wptp_from_gen tp0 [] [].
+  Proof using. rewrite /wptp_from_gen. set_solver. Qed.
+
 End WptpGen.
 
 

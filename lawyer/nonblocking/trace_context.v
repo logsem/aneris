@@ -39,6 +39,26 @@ Section ThreadPoolContext.
     destruct (from_locale c.1 τ) as [eτ| ]; solve_decision.  
   Qed.
 
+  Lemma not_return_nval tpc c r
+    (RET: return_at tpc c r)
+    (NVAL: nval_at tpc c):
+    False.
+  Proof using.
+    red in RET, NVAL. unfold expr_at in RET, NVAL. destruct tpc.
+    rewrite RET in NVAL.  
+    destruct NVAL as (? & EQ & NVAL).
+    apply Some_inj, ectx_fill_inj in EQ.
+    rewrite -EQ in NVAL. by rewrite to_of_val in NVAL.  
+  Qed.
+
+  Lemma call_nval_at {APP} tpc c m a
+    (APP_NVAL: forall e1 e2, to_val (APP e1 e2) = None)
+    (CALL: call_at tpc c m a (APP := APP)):
+  nval_at tpc c.
+  Proof using.
+    red. eexists. split; eauto.
+  Qed.
+
 End ThreadPoolContext.
 
 

@@ -1,5 +1,6 @@
 From fairness Require Import locales_helpers utils.
 From heap_lang Require Export lang tactics notation.
+From trillium.traces Require Import exec_traces trace_lookup.
 
 Close Scope Z. 
   
@@ -313,4 +314,183 @@ Proof using.
     apply elem_of_lookup_imap in IN as (?&?&?&?).
     subst. rewrite length_app /= in H. 
     apply lookup_lt_Some in H1. lia.
+Qed.
+
+
+(* TODO: use in other places *)
+Lemma elem_of_locales_of_list_from_from_locale_from tp0 τ tp:
+  τ ∈ locales_of_list_from tp0 tp <-> exists e, from_locale_from tp0 tp τ = Some e.
+Proof using.
+  rewrite locales_of_list_from_locales.
+  rewrite elem_of_list_In in_map_iff.
+  rewrite ex_prod. rewrite ex2_comm.
+  apply exist_proper. intros e.
+  rewrite from_locale_from_lookup.
+  rewrite /locale_of.
+  setoid_rewrite <- elem_of_list_In.
+  setoid_rewrite elem_of_list_lookup.  
+  split.
+  - intros (pf & <- & (i & IN)).
+    pose proof IN as ?%prefixes_lookup_orig.
+    pose proof IN as ?%prefixes_from_ith_length. simpl in *.
+    split; [| lia]. rewrite -H. f_equal. lia.
+  - intros (IN & LEN).
+    eexists. split.
+    2: { eexists. eapply prefixes_from_lookup; eauto. }
+    rewrite length_app.
+    apply lookup_lt_Some in IN. simpl in *. 
+    rewrite firstn_length_le; lia.
+Qed.
+
+
+Lemma from_locale_from_elem_of tp0 tp τ e
+  (IN: from_locale_from tp0 tp τ = Some e):
+  e ∈ tp.
+Proof using.
+  apply from_locale_from_lookup in IN.
+  destruct IN as [IN _].
+  eapply elem_of_list_lookup; eauto.
+Qed.
+
+
+Lemma from_locale_from_app_Some tp0 tp1 tp2 τ e:
+  from_locale_from tp0 (tp1 ++ tp2) τ = Some e <->
+  from_locale_from tp0 tp1 τ = Some e \/ from_locale_from (tp0 ++ tp1) tp2 τ = Some e.
+Proof using.
+  clear. 
+  rewrite !from_locale_from_lookup.
+  rewrite lookup_app. rewrite !length_app.
+  destruct (tp1 !! (τ - length tp0)) eqn:L1.
+  - split; try tauto. intros [? | [EQ2 LEN2]]; [done| ].
+    apply lookup_lt_Some in L1, EQ2. lia.
+  - etrans.
+    2: { rewrite Morphisms_Prop.or_iff_morphism; [..| reflexivity].
+         2: apply iff_False_helper; set_solver. 
+         reflexivity. }
+    rewrite False_or. rewrite Nat.sub_add_distr.
+    apply iff_and_pre. intros ?%lookup_lt_Some.
+    apply lookup_ge_None in L1. lia.
+Qed.
+
+Lemma from_locale_from_Some_app' tp0 tp tp' ζ e :
+  from_locale_from (tp0 ++ tp) tp' ζ = Some e ->
+  from_locale_from tp0 (tp ++ tp') ζ = Some e.
+Proof.
+  intros EQ. rewrite from_locale_from_app_Some. eauto. 
+Qed.
+
+
+(* TODO: move, find existing, generalize? *)
+Lemma locale_step_other_same c1 oτ c2 τ' e'
+  (EXPR: from_locale c1.1 τ' = Some e')
+  (STEP: locale_step c1 oτ c2)
+  (OTHER: oτ ≠ Some τ'):
+  from_locale c2.1 τ' = Some e'.
+Proof using.
+  rewrite -EXPR. simpl.
+  inversion STEP; subst; simpl in *.
+  2: { done. }
+  apply from_locale_from_app_Some in EXPR as [IN1 | IN2].
+  { rewrite /from_locale. repeat erewrite from_locale_from_Some_app; eauto. }
+  simpl in IN2. rewrite decide_False in IN2; [| set_solver].
+  rewrite /from_locale.
+  symmetry. rewrite (app_assoc _ ([_])).
+  erewrite from_locale_from_Some_app'; eauto.
+  symmetry. apply from_locale_from_Some_app'. simpl.
+  rewrite decide_False; [| set_solver].
+  apply from_locale_from_Some_app.
+  apply from_locale_from_lookup in IN2 as (?&?). 
+  eapply from_locale_from_lookup. split.
+  - rewrite -H. rewrite !length_app /=. done.
+  - etrans; [| apply H0]. rewrite !length_app /=. done.
+Qed.    
+
+
+(* TODO: ? generalize *)
+Lemma enabled_disabled_step_between (etr: extrace heap_lang) i j ci cj τ
+  (ITH: etr S!! i = Some ci)
+  (JTH: etr S!! j = Some cj)
+  (LE: i <= j)
+  (ENi: locale_enabled τ ci)
+  (DISj: ¬ locale_enabled τ cj)
+  (VALID: extrace_valid etr):
+  exists k, i <= k < j /\ etr L!! k = Some $ Some τ.
+Proof using.
+  apply Nat.le_sum in LE as [d ->].
+  edestruct @decide as [EX | NO].
+  2: { by apply EX. }
+  { apply ex_fin_dec with (l := seq i d).
+    { solve_decision. }
+    intros ? [??]. by apply in_seq. }
+  destruct DISj. generalize dependent ci. generalize dependent i.
+  induction d.
+  { setoid_rewrite Nat.add_0_r. set_solver. }
+  intros.
+  pose proof JTH as JTH'. 
+  apply mk_is_Some, state_lookup_prev with (j := S i) in JTH as [ci' ITH']; [| lia].
+  pose proof ITH' as [oτ ITHl]%mk_is_Some%label_lookup_states'.
+  rewrite -Nat.add_1_r in ITH'.
+  opose proof * (trace_valid_steps'' _ _ _ i) as STEP; eauto.
+  { apply extrace_valid_alt in VALID; eauto. }
+  red in ENi. destruct ENi as (? & EE & ?).
+  eapply locale_step_other_same in STEP; eauto.
+  2: { intros [=->]. destruct NO. eexists. split; eauto. lia. }
+  eapply IHd; eauto.
+  { rewrite -JTH'. f_equal. lia. }
+  { intros (?&?&?). destruct NO. eexists. split; eauto. lia. }
+  red. eauto.
+Qed.
+
+Lemma locale_step_val_preserved c1 oτ c2 τv v
+  (VAL: from_locale c1.1 τv = Some (of_val v))
+  (STEP: locale_step c1 oτ c2):
+  from_locale c2.1 τv = Some (of_val v).
+Proof using.
+  destruct (decide (oτ = Some τv)) as [-> | ].
+  2: { erewrite locale_step_other_same; eauto. }
+  inversion STEP. subst. simpl in *.
+  rewrite /from_locale from_locale_from_locale_of in VAL.
+  inversion VAL. subst e1.
+  inversion H3. subst.
+  apply ectx_language.val_head_stuck in H1.
+  eapply ectx_language.fill_not_val in H1.
+  by erewrite <- H in H1.
+Qed.
+
+Lemma val_preserved_trace etr v i ci τv j 
+  (VALID: extrace_valid etr)
+  (ITH: etr S!! i = Some ci)
+  (VAL: from_locale ci.1 τv = Some (of_val v))
+  (LE: i <= j):
+  from_option (fun cj => from_locale cj.1 τv = Some (of_val v)) True (etr S!! j).
+Proof using.
+  apply Nat.le_sum in LE as [d ->]. induction d.
+  { rewrite Nat.add_0_r. by rewrite ITH. }
+  destruct (etr S!! (i + S d)) eqn:JTH; [| done]. simpl.
+  rewrite Nat.add_succ_r in JTH.
+  pose proof JTH as [[? JTH'] [? JTHl]]%mk_is_Some%next_state_lookup.
+  rewrite JTH' /= in IHd.
+  eapply locale_step_val_preserved; eauto.
+  eapply trace_valid_steps''; eauto. 
+  { by apply extrace_valid_alt. }
+  rewrite -JTH. f_equal. lia.
+Qed.
+
+Lemma from_locale_trace etr i ci τ j
+  (VALID: extrace_valid etr)
+  (ITH: etr S!! i = Some ci)
+  (VAL: is_Some (from_locale ci.1 τ))
+  (LE: i <= j):
+  from_option (fun cj => is_Some (from_locale cj.1 τ)) True (etr S!! j).
+Proof using.
+  apply Nat.le_sum in LE as [d ->]. induction d.
+  { rewrite Nat.add_0_r. by rewrite ITH. }
+  destruct (etr S!! (i + S d)) eqn:JTH; [| done]. simpl.
+  rewrite Nat.add_succ_r in JTH.
+  pose proof JTH as [[[??] JTH'] [? JTHl]]%mk_is_Some%next_state_lookup.
+  rewrite JTH' /= in IHd.
+  eapply from_locale_step; eauto. 
+  eapply trace_valid_steps''; eauto. 
+  { by apply extrace_valid_alt. }
+  erewrite <- surjective_pairing, <-JTH. f_equal. lia.
 Qed.

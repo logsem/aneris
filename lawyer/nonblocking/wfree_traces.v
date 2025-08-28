@@ -1,7 +1,8 @@
 From iris.proofmode Require Import tactics.
-From fairness Require Import locales_helpers utils.
+From fairness Require Import locales_helpers utils fairness.
 From lawyer.nonblocking Require Import trace_context.
 From heap_lang Require Import lang notation.
+From trillium.traces Require Import exec_traces trace_lookup inftraces.
 
 
 Close Scope Z. 
@@ -126,16 +127,13 @@ Section UnderCtx.
 End UnderCtx.
 
 
-Section CallInTrace.
+Section FitsInfCall.
 
   Context (ic: @trace_ctx heap_lang).
   Let ii := tctx_index ic.
   Let tc := tctx_tpctx ic. 
   Let Ki := tpctx_ctx tc.
   Let τi := tpctx_tid tc. 
-  (* Context (tpc: @tpool_ctx heap_lang). *)
-  (* Let Ki := tpctx_ctx tpc.  *)
-  (* Let τi := tpctx_tid tpc.  *)
 
   Context (m: val) (ai: val). 
 
@@ -167,27 +165,25 @@ Section CallInTrace.
     by apply trace_lookup_lt_Some.
   Qed.
 
-  Lemma fits_inf_call_prev etr τ c
-    (FITS: fits_inf_call (etr :tr[τ]: c)):
-    fits_inf_call etr.
+  Lemma fits_inf_call_prev: filter_pref_closed fits_inf_call. 
   Proof using.
-    red.
+    red. intros etr τ c FITS. 
     pose proof (ft_lookup_old etr c τ) as LOOKUP.  
     destruct FITS as (II & FITS & NVAL). split; [| split]. 
-    - destruct (etr !! ii) eqn:ITH; rewrite ITH; [| done].
+    - destruct (etr !! ii) eqn:ITH; [| done].
       simpl. 
       eapply LOOKUP in ITH.
       rewrite ITH in II. eauto.
     - intros ? LE.
       specialize (FITS _ LE).
-      destruct (etr !! j) eqn:JTH; rewrite JTH; [| by eauto]. simpl.
+      destruct (etr !! j) eqn:JTH; [| by eauto]. simpl.
       eapply LOOKUP in JTH.
       by rewrite JTH in FITS.
     - intros.
-      destruct (etr !! i) eqn:ITH; rewrite ITH /=; [| done].
-      destruct (from_locale c0.1 τi) eqn:TT; rewrite TT /=; [| done].
+      destruct (etr !! i) as [c0| ] eqn:ITH; [| done].
+      destruct (from_locale c0.1 τi) eqn:TT; simpl.
+      2: { by rewrite TT. }  
       specialize (NVAL i). erewrite LOOKUP in NVAL; eauto.
-      by rewrite /= TT in NVAL.
   Qed.
 
   Lemma runs_call_helper t1 t2 e σ
@@ -222,4 +218,73 @@ Section CallInTrace.
     Unshelve. exact inhabitant.
   Qed.
 
-End CallInTrace. 
+  Global Instance fic_dec: ∀ etr, Decision (fits_inf_call etr).
+  Proof using.
+    intros. rewrite /fits_inf_call.
+    apply and_dec.
+    { destruct (etr !! ii); solve_decision. }
+    apply and_dec; cycle 1. 
+    - apply Decision_iff_impl with
+        (P := Forall (fun i => from_option (fun e => to_val e = None) True
+                        (from_option (fun c => from_locale c.1 τi) None (etr !! i)))
+                (seq 0 (trace_length etr))).
+      2: { apply Forall_dec. intros i.
+           destruct lookup; try solve_decision. simpl.
+           destruct from_locale; solve_decision. }
+      rewrite List.Forall_forall.
+      simpl.
+      apply forall_proper. intros i.
+      rewrite in_seq. simpl.
+      fold τi. split; auto.
+      intros.
+      destruct lookup eqn:ITH; try done. simpl in *.
+      apply H. split; [lia| ].
+      eapply trace_lookup_lt_Some_1; eauto. 
+    - apply Decision_iff_impl with (P := Forall (fun j => from_option (nval_at tc) True (etr !! j)) (seq ii (trace_length etr - tctx_index ic))).
+      2: { apply Forall_dec. intros. destruct lookup; solve_decision. }
+      rewrite List.Forall_forall. simpl.
+      apply forall_proper. intros i.
+      rewrite in_seq.
+      split; intros X II.
+      2: { apply X. lia. }
+      destruct (etr !! i) eqn:ITH; try done. apply X.
+      split; auto.
+      apply trace_lookup_lt_Some_1 in ITH. 
+      rewrite -Nat.le_add_sub; [done| ]. 
+      edestruct Nat.le_gt_cases as [LE | GT]; [by apply LE| ].
+      simpl in *. lia. 
+  Qed.
+
+End FitsInfCall. 
+
+Section CallInTrace.
+  Context (m: val).
+  
+  Definition has_return_at (tr: extrace heap_lang) '(TraceCtx i tpc as tc) j :=
+    exists r cj, i <= j /\ tr S!! j = Some cj /\ return_at tpc cj r.
+
+  Definition has_return tr tc := exists j, has_return_at tr tc j. 
+
+  Definition fair_call tr '(TpoolCtx K τ as tpc) i :=
+    forall k ck, i <= k -> 
+            tr S!! k = Some ck ->
+            locale_enabled τ ck ->
+            ¬ (exists j, j <= k /\ has_return_at tr (TraceCtx i tpc) j) ->
+    exists d cd, tr S!! (k + d) = Some cd /\
+            fairness_sat locale_enabled tid_match τ cd (tr L!! (k + d)). 
+
+  Definition always_returns tr :=    
+    forall tc a ci, let '(TraceCtx i tpc) := tc in
+      (* fair_ex (tpctx_tid tpc) tr -> *)
+      fair_call tr tpc i ->
+      tr S!! i = Some ci ->
+      call_at tpc ci m a (APP := App) ->
+      has_return tr tc.
+  
+  Definition wait_free (is_init_st: cfg heap_lang -> Prop) := forall etr,
+      (exists e0, (trfirst etr).1 = [subst "m" m e0]) ->
+      is_init_st (trfirst etr) ->
+      extrace_valid etr ->
+      always_returns etr.
+
+End CallInTrace.

@@ -1,4 +1,5 @@
 From iris.proofmode Require Import tactics.
+From iris.algebra Require Import excl.
 From trillium.traces Require Import trace_lookup.
 From fairness Require Import locales_helpers comp_utils fairness fin_branch utils_tactics.
 From heap_lang Require Import simulation_adequacy locales_helpers_hl.
@@ -640,6 +641,25 @@ Qed.
     { apply phase_lt_fork. }
     { reflexivity. }
     rewrite cp_mul_alt mset_map_singleton. done.     
+  Qed.
+
+  Lemma empty_obls_helper `{!ObligationsGS Σ} (T: gset (locale heap_lang)):
+  @own Σ _
+           (@obls_pre_obls _ _ _ _ OP _ _)
+           (@obls_obls _ _ _ _ OP _ _)
+           (◯ (Excl <$> @gset_to_gmap nat _ _ _ ∅ T)) -∗
+    [∗ set] τ ∈ T, obls τ ∅.
+  Proof using.
+    clear. 
+    iIntros "OB".
+    rewrite fmap_gset_to_gmap.
+    rewrite -gmap.big_opS_gset_to_gmap_L.
+    rewrite big_opS_auth_frag.
+    destruct (decide (T = ∅)).
+    { rewrite e. set_solver. }
+    rewrite big_opS_own; [| done].
+    iApply (big_sepS_impl with "OB").
+    iModIntro. set_solver.
   Qed.
 
 End OblsAdequacy.

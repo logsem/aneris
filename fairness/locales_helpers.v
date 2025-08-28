@@ -1,4 +1,5 @@
 From trillium.program_logic Require Import language adequacy.
+From trillium.traces Require Import exec_traces.
 From fairness Require Import utils.
 
 Section XX.
@@ -84,4 +85,18 @@ Proof using.
   destruct i.
   { simpl in ITH. inversion ITH. subst. eauto. }
   simpl in ITH. apply IHl in ITH. eauto.
+Qed.
+
+
+(* TODO: move, remove exec_traces import? *)
+Global Instance locale_enabled_dec {Λ: language} `{EqDecision (locale Λ)}
+  τ (c: cfg Λ):
+  Decision (locale_enabled τ c).
+Proof using.
+  rewrite /locale_enabled.
+  destruct (from_locale c.1 τ) as [e| ] eqn:E.
+  2: { right. set_solver. }
+  destruct (language.to_val e) eqn:V.
+  - right. set_solver.
+  - left. eauto.
 Qed.
