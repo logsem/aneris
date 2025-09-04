@@ -8,10 +8,10 @@ From heap_lang Require Import tactics notation.
 Section SSWP.
   Set Default Proof Using "Type".
 
-  Context `{EM: ExecutionModel heap_lang M}.   
-  Context `{hGS: @heapGS Σ _ EM}.
-  
-  Let eGS := heap_fairnessGS. 
+  Context `{hGS: @heap1GS Σ}.
+  Context {invs_inΣ: invGS_gen HasNoLc Σ}. 
+
+  (* Let eGS := heap_fairnessGS.  *)
 
   Definition sswp (s : stuckness) E e1 (Φ : expr → iProp Σ) : iProp Σ :=
     match to_val e1 with

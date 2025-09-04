@@ -132,8 +132,8 @@ Section ProgramLogic.
       (NVAL: language.to_val e = None)
       :
       let sswp_post := λ e', (▷ MU E' ζ (|={E',E}=> WP e' @ s; ζ; E {{ Φ }}))%I in
-      (|={E,E'}=> sswp s E' e sswp_post)%I -∗
-        WP e @ s; ζ; E {{ Φ }}.
+      (|={E,E'}=> sswp s E' e sswp_post (hGS := iem_phys HeapLangEM EM))%I -∗
+      WP e @ s; ζ; E {{ Φ }}.
     Proof.
       simpl. rewrite wp_unfold /wp_pre.
       iIntros "Hsswp". rewrite NVAL. 
@@ -204,7 +204,7 @@ Section ProgramLogic.
     
     Lemma sswp_MU_wp s E ζ e (Φ : val → iProp Σ)
       (NVAL: language.to_val e = None):
-      sswp s E e (λ e', MU E ζ (WP e' @ s; ζ;  E {{ Φ }})) (hGS := hGS) -∗
+      sswp s E e (λ e', MU E ζ (WP e' @ s; ζ;  E {{ Φ }})) (hGS := iem_phys HeapLangEM EM) -∗
         WP e @ s; ζ; E {{ Φ }}.
     Proof.
       iIntros "Hsswp". iApply sswp_MU_wp_fupd; auto. iModIntro.

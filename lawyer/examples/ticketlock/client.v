@@ -157,7 +157,7 @@ Section MotivatingClient.
       (NVAL: language.to_val e1 = None)
       (DEG_LT: deg_lt d' d):
       th_phase_eq τ π -∗ cp π d -∗
-      sswp NotStuck ⊤ e1 (fun e2 => cp_mul π d' n -∗ exc_lb (S n) -∗ th_phase_eq τ π -∗ WP e2 @τ {{ v, R v }}) -∗
+      sswp NotStuck ⊤ e1 (fun e2 => cp_mul π d' n -∗ exc_lb (S n) -∗ th_phase_eq τ π -∗ WP e2 @τ {{ v, R v }}) (hGS := iem_phys HeapLangEM EM) -∗
       WP e1 @ τ {{ R }}.
     Proof using.
       clear -BOUND DEG_LT NVAL.

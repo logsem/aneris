@@ -296,8 +296,7 @@ Proof. solve_pure_exec. Qed.
 
 
 Section Heap.
-  Context `{EM: ExecutionModel heap_lang M}. 
-  Context `{HGS: @heapGS Σ _ EM}.
+  Context `{HGS: @heap1GS Σ}.
 
   (** Heap *)
   (** The usable rules for [allocN] stated in terms of the [array] proposition
