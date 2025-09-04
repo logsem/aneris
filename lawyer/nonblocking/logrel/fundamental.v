@@ -87,7 +87,8 @@ Section typed_interp.
                  bin_op_eval_int op na nb = Some vr) \/
     (exists ba bb br, a = LitV $ LitBool ba /\ b = LitV $ LitBool bb /\ r = LitV $ LitBool br /\
                  bin_op_eval_bool op ba bb = Some $ LitBool br) \/
-    (exists la ob, a = LitV $ LitLoc la /\ b = LitV (LitInt ob) /\ 
+    (exists la ob, a = LitV $ LitLoc la /\ b = LitV (LitInt ob) /\
+              op = OffsetOp /\
               r = LitV (LitLoc (la +ₗ ob))).
   Proof using.
     rewrite /bin_op_eval in EVAL.
@@ -102,14 +103,14 @@ Section typed_interp.
       destruct op; simpl in H; set_solver.      
     - apply fmap_Some in EVAL as (?&?&->).
       destruct op; simpl in H; set_solver.
-    - destruct l0; try done.
-      inversion EVAL. subst. eauto.
-      repeat right. eauto.
+    - destruct l0; try done. destruct op; try done. 
+      inversion EVAL. subst. 
+      repeat right. do 2 eexists. eauto.
   Qed.
 
   Ltac inv_binop_eval H :=
     apply bin_op_eval_inv in H as
-        [(-> & ? & ->) | [(?&?&?&->&->&->&[(?&->) | (?&->)]&?) | [(?&?&?&->&->&->&?) | (?&?&->&->&->)]]].
+        [(-> & ? & ->) | [(?&?&?&->&->&->&[(?&->) | (?&->)]&?) | [(?&?&?&->&->&->&?) | (?&?&->&->&->&->)]]].
 
   Lemma interp_binop_eval op n1 n2
     (NOLOC: forall l, n1 ≠ LitV (LitLoc l)):
@@ -127,40 +128,111 @@ Section typed_interp.
     | LitLoc _ | LitProphecy _ | LitPoison => False
   end.
 
-  (* an adversary proram is any program with no hard-coded locations.
+  Definition valid_bin_op (op: bin_op): Prop :=
+    match op with 
+    | OffsetOp => False
+    | _ => True
+    end. 
+
+  (* a valid client proram is any program without:
+     - hard-coded locations
+     - address offset operations
      TODO: currently we also exclude prophecies, seems reasonable? *)
-  Fixpoint valid_adversary (e : expr heap_lang) : Prop :=
+  Fixpoint valid_client (e : expr heap_lang) : Prop :=
     match e with
     | Val v => valid_val v
     | Var _ | ChooseNat => True
     | Rec _ _  e | UnOp _ e | Fst e | Snd e |
       InjL e | InjR e | Fork e | Load e
-      => valid_adversary e
-    | App e1 e2 | Pair e1 e2 | BinOp _ e1 e2 |
+      => valid_client e
+    | App e1 e2 | Pair e1 e2 | 
       AllocN e1 e2 | Store e1 e2 | FAA e1 e2
-      => valid_adversary e1 /\ valid_adversary e2
+      => valid_client e1 /\ valid_client e2
+    | BinOp op e1 e2 => valid_bin_op op /\ valid_client e1 /\ valid_client e2
     | If e0 e1 e2 | Case e0 e1 e2 | CmpXchg e0 e1 e2
-      => valid_adversary e0 /\ valid_adversary e1 /\ valid_adversary e2
+      => valid_client e0 /\ valid_client e1 /\ valid_client e2
     end
   with valid_val (v: val heap_lang) : Prop :=
     match v with
     | LitV b => valid_base_lit b
-    | RecV _ _ e => valid_adversary e
+    | RecV _ _ e => valid_client e
     | PairV v1 v2 => valid_val v1 /\ valid_val v2
     | InjLV v | InjRV v => valid_val v
     end.
 
-  Lemma subst_env_binop vs op e1 e2:
-    subst_env vs (BinOp op e1 e2) = BinOp op (subst_env vs e1) (subst_env vs e2).
+  Lemma valid_client_subst_preserved s v e
+    (VALIDe: valid_client e)
+    (VALIDv: valid_val v):
+    valid_client (subst s v e).
   Proof using.
-    rewrite /subst_env.
-    generalize dependent e1. generalize dependent e2. generalize dependent op. 
+    induction e; simpl in *; try done.
+    all: try tauto. 
+    - destruct decide; eauto. 
+    - destruct decide; eauto.
+  Qed.
+
+  Lemma valid_client_subst'_preserved b v e
+    (VALIDe: valid_client e)
+    (VALIDv: valid_val v):
+    valid_client (subst' b v e).
+  Proof using.
+    destruct b; try done.
+    by apply valid_client_subst_preserved.
+  Qed. 
+
+  (* Lemma valid_client_step_preserved e1 e2 σ1 σ2 efs *)
+  (*   (STEP: head_step e1 σ1 e2 σ2 efs) *)
+  (*   (VALID: valid_client e1): *)
+  (*   valid_client e2. *)
+  (* Proof using. *)
+  (*   inversion STEP; subst; simpl in *; try done || tauto.  *)
+  (*   - destruct VALID. *)
+  (*     by repeat (apply valid_client_subst'_preserved; [| done]). *)
+  (*   - admit. *)
+  (*   - destruct VALID. *)
+  (*     inv_binop_eval H; done. *)
+  (*   - lia.  *)
+  (*   - tauto.  *)
+
+  Lemma subst_env_arg2 (F: expr heap_lang -> expr heap_lang -> expr heap_lang)
+    (DISTR: forall e1 e2 s v, subst s v (F e1 e2) = F (subst s v e1) (subst s v e2)):
+    forall e1 e2 vs, subst_env vs (F e1 e2) = F (subst_env vs e1) (subst_env vs e2).
+  Proof using.
+    intros. rewrite /subst_env.
     pattern vs. apply map_first_key_ind. 
     { intros. by rewrite !map_fold_empty. }
-    intros s v m NIN FKEY IH op e1 e2.
+    intros s v m NIN FKEY IH.
     rewrite !map_fold_insert_first_key; auto.
     by rewrite IH.
   Qed.
+
+  Lemma subst_env_arg1 (F: expr heap_lang -> expr heap_lang)
+    (DISTR: forall e1 s v, subst s v (F e1) = F (subst s v e1)):
+    forall e1 vs, subst_env vs (F e1) = F (subst_env vs e1).
+  Proof using.
+    intros. rewrite /subst_env.
+    pattern vs. apply map_first_key_ind. 
+    { intros. by rewrite !map_fold_empty. }
+    intros s v m NIN FKEY IH.
+    rewrite !map_fold_insert_first_key; auto.
+    by rewrite IH.
+  Qed.
+
+  Lemma subst_env_binop vs op e1 e2:
+    subst_env vs (BinOp op e1 e2) = BinOp op (subst_env vs e1) (subst_env vs e2).
+  Proof using. by apply subst_env_arg2. Qed. 
+
+  Lemma subst_env_pair vs e1 e2:
+    subst_env vs (Pair e1 e2) = Pair (subst_env vs e1) (subst_env vs e2).
+  Proof using. by apply subst_env_arg2. Qed. 
+
+  Lemma subst_env_fst vs e:
+    subst_env vs (Fst e) = Fst (subst_env vs e). 
+  Proof using. by apply subst_env_arg1. Qed. 
+
+  Lemma subst_env_snd vs e:
+    subst_env vs (Snd e) = Snd (subst_env vs e).
+  Proof using. by apply subst_env_arg1. Qed. 
 
   (* TODO: remove duplicates*)
   From iris.proofmode Require Import coq_tactics.
@@ -251,8 +323,9 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
   (*     - inversion FILL. subst.  *)
 
   (* TODO: move? *)
-  Lemma binop_srav op v1 v2:
-    sub_redexes_are_values (BinOp op (Val v1) (Val v2)).
+  Lemma srav_helper (e: expr)
+    (NO_FILL_ITEM: ¬ exists i e', e = fill_item i e' /\ to_val e' = None):
+    sub_redexes_are_values e.
   Proof using.
     red. simpl. intros. 
     rewrite /fill in H.
@@ -261,30 +334,37 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
     { eapply (@f_equal _ _ length) in RR.
       rewrite length_rev /= in RR.
       destruct K; simpl in *; done. }
+    
     clear RR. simpl in H.
     rewrite -(rev_involutive l) in H. rewrite -foldl_foldr_rev in H.
     replace (foldl (flip fill_item) e' (rev l)) with (fill (rev l) e') in H by done.
-    remember (fill (rev l) e') as e''.
-    assert (to_val e'' = None).
-    { subst.
-      destruct (to_val (fill _ _)) eqn:VV; [| done].
-      apply to_val_fill_some in VV as (?&->). done. }
-    clear Heqe''.       
-    destruct e; simpl in H; try congruence.
-    all: inversion H; subst; done.
+
+    destruct NO_FILL_ITEM. do 2 eexists. split; eauto.
+    destruct (to_val (fill _ _)) eqn:VV; [| done].
+    apply to_val_fill_some in VV as (?&->). done. 
   Qed.
 
-  Lemma logrel_nat_binop op e1 e2 : logrel e1 -∗ logrel e2 -∗ logrel (BinOp op e1 e2).
+  Ltac solve_no_fill_item := 
+    intros (i&?&FILL&NVAL);
+    destruct i; simpl in FILL; try congruence;
+    inversion FILL; subst; done.
+
+  Ltac solve_head_stuck := 
+    intros; red; simpl; split; [done| ];
+    red; simpl; intros ??? STEP;
+    inversion STEP; subst; (congruence || eauto).
+
+  Ltac solve_stuck_case :=
+    iApply ectx_lifting.wp_lift_pure_head_stuck;
+      [done | apply srav_helper; solve_no_fill_item | solve_head_stuck]. 
+
+  Lemma logrel_nat_binop op e1 e2
+    (VALID: valid_bin_op op):
+    logrel e1 -∗ logrel e2 -∗ logrel (BinOp op e1 e2).
   Proof.
     iIntros "#IH1 #IH2 !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
     rewrite subst_env_binop.
     rewrite {3}/pwp.
-
-    (* Set Ltac Backtrace.  *)
-    (* reshape_expr (BinOp op (subst_env vs e1) (subst_env vs e2)) ltac:(fun K e' => unify e' efoc; wp_bind_core K).  *)
-    (* Set Ltac Debug.  *)
-    (* reshape_expr (BinOp op (subst_env vs e1) (subst_env vs e2)) ltac:(fun K e' => unify e' (subst_env vs e2); wp_bind_core K). *)
-    (* TODO: fix wp_bind tactic *)
 
     iApply (wp_bind [BinOpRCtx _ _]).
     iApply wp_wand; [by iApply "IH2"| ].
@@ -293,57 +373,61 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
     iApply wp_wand; [by iApply "IH1"| ].
     iIntros (v1) "#Hv1 /=".
 
-    destruct (bin_op_eval op v1 v2) eqn:EVAL.
-    2: { iApply ectx_lifting.wp_lift_pure_head_stuck; try done.
-         { apply binop_srav. }        
-         intros. red. simpl. split; [done| ].
-         red. simpl. intros ??? STEP.
-         inversion STEP. subst. congruence. }
+    destruct (bin_op_eval op v1 v2) eqn:EVAL; [| solve_stuck_case]. 
 
     iApply sswp_pwp; [done| ].
     iModIntro. iApply sswp_pure_step; [by apply EVAL| ].
     iIntros "!> !>".
     iApply wp_value.
-    
-    destruct (val_cases_nat v1) as [[? ->]|Hnn1], (val_cases_nat v2) as [[? ->]|Hnn2].
-    
-    destruct (val_cases_nat v1) as [[? ->]|Hnn1].
-    - destruct (val_cases_nat v2) as [[? ->]|Hnn2].
-      + iApply wp_pure_step_later; first done.
-        iNext; iIntros "_".
-        iApply wp_value.
-        iApply interp_binop_eval.
-      + iApply binop_stuck; auto.
-    - iApply binop_stuck; auto.
+
+    iClear "IH1 IH2 Henv Hv2 Hv1". 
+    inv_binop_eval EVAL; by rewrite interp_unfold.
   Qed.
 
   Lemma logrel_pair e1 e2 : logrel e1 -∗ logrel e2 -∗ logrel (Pair e1 e2).
   Proof.
-    iIntros "#IH1 #IH2 !#" (vs) "#Henv"; rewrite /interp_expr /=.
-    iApply (wp_bind (fill [PairLCtx _])).
-    iApply wp_wand; first by iApply "IH1".
-    iIntros (v1) "#Hv1 /=".
-    iApply (wp_bind (fill [PairRCtx _])).
-    iApply wp_wand; first by iApply "IH2".
+    iIntros "#IH1 #IH2 !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
+    rewrite subst_env_pair.
+
+    iApply (wp_bind [PairRCtx _]).
+    iApply wp_wand; [by iApply "IH2"| ].
     iIntros (v2) "#Hv2 /=".
+    iApply (wp_bind [PairLCtx _]).
+    iApply wp_wand; [by iApply "IH1"| ].
+    iIntros (v1) "#Hv1 /=".
+
+    iApply sswp_pwp; [done| ]. iModIntro.
+    iApply sswp_pure_step; [done| ].
+    iIntros "!> !>".
     iApply wp_value.
-    rewrite {5}interp_unfold; simpl.
-    eauto 6.
+    iClear "IH1 IH2".
+    rewrite {3}interp_unfold. simpl.
+    iIntros "!> !>". do 2 iExists _. iSplitR; [done| ].
+    iFrame "#∗". 
   Qed.
 
   Lemma logrel_fst e : logrel e -∗ logrel (Fst e).
   Proof.
-    iIntros "#IH !#" (vs) "#Henv"; rewrite /interp_expr /=.
-    iApply (wp_bind (fill [FstCtx])).
+    iIntros "#IH !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
+    rewrite subst_env_fst. 
+    iApply (wp_bind [FstCtx]).
     iApply wp_wand; first by iApply "IH".
     iIntros (v) "#Hv /=".
-    destruct (val_cases_pair v) as [(? & ? & ->)|Hnp]; simpl.
-    - rewrite {2}interp_unfold; simpl.
-      iDestruct "Hv" as (? ?) "[>% [? ?]]"; simplify_eq.
-      iApply wp_pure_step_later; first done.
-      iNext; iIntros "_".
-      by iApply wp_value.
-    - iApply fst_stuck; done.
+
+    destruct (@decide (exists v1 v2, v = PairV v1 v2)) as [(?&?&->) | NO]. 
+    { destruct v.
+      3: { left. eauto. }
+      all: right; set_solver. }
+    2: solve_stuck_case. 
+    
+    iApply sswp_pwp; [done| ]. iModIntro.
+    iApply sswp_pure_step; [done| ].
+    iApply wp_value.
+    iClear "IH".
+    rewrite {1}interp_unfold. simpl.
+    iNext. iDestruct "Hv" as (??) "(%EQ&?&?)".
+    inversion EQ. subst.
+    iIntros "!> !>". iFrame "#∗".
   Qed.
 
   Lemma logrel_snd e : logrel e -∗ logrel (Snd e).
@@ -611,7 +695,7 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
     - iApply faa_stuck_non_nat_loc; done.
   Qed.
 
-  Theorem fundamental e : valid_adversary e → ⊢ logrel e.
+  Theorem fundamental e : valid_client e → ⊢ logrel e.
   Proof.
     induction e; intros Hedv; simpl in *; intuition.
     - iApply logrel_var; done.
