@@ -55,30 +55,6 @@ Section typed_interp.
     - admit. 
   Admitted.
 
-  (* Lemma logrel_lit_noloc (v: base_lit) *)
-  (*   (NOLOC: forall l, v ≠ LitLoc l): *)
-  (*   ⊢ logrel (LitV v). *)
-
-  (* Lemma logrel_unit : ⊢ logrel UnitV. *)
-  (* Proof. *)
-  (*   iIntros "!#" (vs) "Henv". *)
-  (*   rewrite /interp_expr. *)
-  (*   simpl.  *)
-  (*   iApply wp_value. rewrite interp_unfold. done. *)
-  (* Qed. *)
-
-  (* Lemma logrel_nat n : ⊢ logrel (#n n). *)
-  (* Proof. *)
-  (*   iIntros "!#" (vs) "Henv". *)
-  (*   (* Unset Printing Notations. *) *)
-  (*   iApply wp_value. rewrite interp_unfold /=; done. *)
-  (* Qed. *)
-
-  (* Lemma logrel_bool b : ⊢ logrel (#♭ b). *)
-  (* Proof. iIntros "!#" (vs) "Henv"; iApply wp_value; rewrite interp_unfold /=; done. Qed. *)
-
-  (* Lemma logrel_loc l: ⊢ logrel (Loc l). *)
-
   Lemma bin_op_eval_inv op a b r
     (EVAL: bin_op_eval op a b = Some r):
     (op = EqOp /\ vals_compare_safe a b /\ r = LitV $ LitBool $ bool_decide (a = b)) \/
@@ -180,20 +156,6 @@ Section typed_interp.
     by apply valid_client_subst_preserved.
   Qed. 
 
-  (* Lemma valid_client_step_preserved e1 e2 σ1 σ2 efs *)
-  (*   (STEP: head_step e1 σ1 e2 σ2 efs) *)
-  (*   (VALID: valid_client e1): *)
-  (*   valid_client e2. *)
-  (* Proof using. *)
-  (*   inversion STEP; subst; simpl in *; try done || tauto.  *)
-  (*   - destruct VALID. *)
-  (*     by repeat (apply valid_client_subst'_preserved; [| done]). *)
-  (*   - admit. *)
-  (*   - destruct VALID. *)
-  (*     inv_binop_eval H; done. *)
-  (*   - lia.  *)
-  (*   - tauto.  *)
-
   Lemma subst_env_arg2 (F: expr heap_lang -> expr heap_lang -> expr heap_lang)
     (DISTR: forall e1 e2 s v, subst s v (F e1 e2) = F (subst s v e1) (subst s v e2)):
     forall e1 e2 vs, subst_env vs (F e1 e2) = F (subst_env vs e1) (subst_env vs e2).
@@ -217,22 +179,6 @@ Section typed_interp.
     rewrite !map_fold_insert_first_key; auto.
     by rewrite IH.
   Qed.
-
-  Lemma subst_env_binop vs op e1 e2:
-    subst_env vs (BinOp op e1 e2) = BinOp op (subst_env vs e1) (subst_env vs e2).
-  Proof using. by apply subst_env_arg2. Qed. 
-
-  Lemma subst_env_pair vs e1 e2:
-    subst_env vs (Pair e1 e2) = Pair (subst_env vs e1) (subst_env vs e2).
-  Proof using. by apply subst_env_arg2. Qed. 
-
-  Lemma subst_env_fst vs e:
-    subst_env vs (Fst e) = Fst (subst_env vs e). 
-  Proof using. by apply subst_env_arg1. Qed. 
-
-  Lemma subst_env_snd vs e:
-    subst_env vs (Snd e) = Snd (subst_env vs e).
-  Proof using. by apply subst_env_arg1. Qed. 
 
   (* TODO: remove duplicates*)
   From iris.proofmode Require Import coq_tactics.
@@ -259,11 +205,6 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
             | fail 1 "wp_bind: cannot find" efoc "in" e ]
   | _ => fail "wp_bind: not a 'wp'"
   end.
-
-  (* Goal forall (e1 e2: expr) (op: bin_op) (mp: gmap string val), False. *)
-  (*   intros e1 e2 op vs. *)
-  (*   (* Set Ltac Debug.  *) *)
-  (*   reshape_expr (BinOp op (subst_env vs e1) (subst_env vs e2)) ltac:(fun K e' => unify e' (subst_env vs e2); wp_bind_core K).  *)
 
   (* TODO: move? try to unify with sswp_MU_wp_fupd  *)
   Lemma sswp_pwp s E E' τ e Φ
@@ -294,13 +235,6 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
     iExists tt, tt. by iFrame.
   Qed.
 
-  (* (* TODO: probably can strenghten it *) *)
-  (* Lemma fill_item_fill_comm_weak K i e: *)
-  (*   exists i' e', fill K (fill_item i e) = fill_item i' e'. *)
-  (* Proof using. *)
-  (*   generalize dependent i. generalize dependent e. induction K; eauto. *)
-  (* Qed. *)
-
   Lemma foldl_foldr_rev {A B : Type} (f : B → A → B) (b : B) (la : list A):
     foldl f b la = foldr (flip f) b (rev la). 
   Proof using.
@@ -310,18 +244,6 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
     by rewrite foldr_app.
   Qed.
         
-  (* Lemma binop_imm_no_fill op v1 v2: *)
-  (*   ¬ exists i K e, BinOp op (Val v1) (Val v2) = fill (i :: K) e. *)
-  (* Proof using. *)
-  (*   simpl. red. intros (i&K&e&FILL). *)
-  (*   generalize dependent i. generalize dependent e. *)
-  (*   induction K. *)
-  (*   { intros. simpl in FILL. *)
-  (*     destruct i; simpl in FILL; try congruence. *)
-  (*     - inversion FILL. subst. *)
-  (*       admit. *)
-  (*     - inversion FILL. subst.  *)
-
   (* TODO: move? *)
   Lemma srav_helper (e: expr)
     (NO_FILL_ITEM: ¬ exists i e', e = fill_item i e' /\ to_val e' = None):
@@ -363,7 +285,7 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
     logrel e1 -∗ logrel e2 -∗ logrel (BinOp op e1 e2).
   Proof.
     iIntros "#IH1 #IH2 !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
-    rewrite subst_env_binop.
+    rewrite subst_env_arg2; [| done]. 
     rewrite {3}/pwp.
 
     iApply (wp_bind [BinOpRCtx _ _]).
@@ -387,7 +309,7 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
   Lemma logrel_pair e1 e2 : logrel e1 -∗ logrel e2 -∗ logrel (Pair e1 e2).
   Proof.
     iIntros "#IH1 #IH2 !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
-    rewrite subst_env_pair.
+    rewrite subst_env_arg2; [| done]. 
 
     iApply (wp_bind [PairRCtx _]).
     iApply wp_wand; [by iApply "IH2"| ].
@@ -409,7 +331,7 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
   Lemma logrel_fst e : logrel e -∗ logrel (Fst e).
   Proof.
     iIntros "#IH !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
-    rewrite subst_env_fst. 
+    rewrite subst_env_arg1; [| done].  
     iApply (wp_bind [FstCtx]).
     iApply wp_wand; first by iApply "IH".
     iIntros (v) "#Hv /=".
@@ -432,17 +354,26 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
 
   Lemma logrel_snd e : logrel e -∗ logrel (Snd e).
   Proof.
-    iIntros "#IH !#" (vs) "#Henv"; rewrite /interp_expr /=.
-    iApply (wp_bind (fill [SndCtx])).
+    iIntros "#IH !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
+    rewrite subst_env_arg1; [| done]. 
+    iApply (wp_bind [SndCtx]).
     iApply wp_wand; first by iApply "IH".
     iIntros (v) "#Hv /=".
-    destruct (val_cases_pair v) as [(? & ? & ->)|Hnp]; simpl.
-    - rewrite {2}interp_unfold; simpl.
-      iDestruct "Hv" as (? ?) "[>% [? ?]]"; simplify_eq.
-      iApply wp_pure_step_later; first done.
-      iNext; iIntros "_".
-      by iApply wp_value.
-    - iApply snd_stuck; done.
+
+    destruct (@decide (exists v1 v2, v = PairV v1 v2)) as [(?&?&->) | NO]. 
+    { destruct v.
+      3: { left. eauto. }
+      all: right; set_solver. }
+    2: solve_stuck_case. 
+    
+    iApply sswp_pwp; [done| ]. iModIntro.
+    iApply sswp_pure_step; [done| ].
+    iApply wp_value.
+    iClear "IH".
+    rewrite {1}interp_unfold. simpl.
+    iNext. iDestruct "Hv" as (??) "(%EQ&?&?)".
+    inversion EQ. subst.
+    iIntros "!> !>". iFrame "#∗".
   Qed.
 
   Lemma logrel_injl e : logrel e -∗ logrel (InjL e).
