@@ -25,17 +25,23 @@ Section Pwp.
 End Pwp. 
 
 
-Definition phys_SI {Σ} `{Hinv : @IEMGS Λ M LG EM Σ}
+Definition phys_SI {Λ} (LG: LangEM Λ) `{invGS_gen HasNoLc Σ} {lG: lgem_GS Σ}
   (etr: execution_trace Λ) (_: auxiliary_trace LoopingModel): iProp Σ :=
-  lgem_si (trace_last etr).2 (lgem_GS0 := (iem_phys LG EM)).
+  lgem_si (trace_last etr).2 (lgem_GS0 := lG).
 
+(** not turning these into instances to avoid incorrect Iris instantiations *)
+
+Definition irisG_looping {Λ} (LG: LangEM Λ) `{invGS_gen HasNoLc Σ} {lG: lgem_GS Σ}:
+  irisG Λ LoopingModel Σ := {|
+    state_interp := phys_SI LG (lG := lG);
+    fork_post := fun _ _ => (⌜ True ⌝)%I;
+|}. 
 
 (* TODO: rename *)
-(** not making it an instance to avoid incorrect Iris instantiations *)
 Definition iris_OM_into_Looping {Σ} `(Hinv : @IEMGS Λ M LG EM Σ):
   irisG Λ LoopingModel Σ.
 Proof using.
-  exact {| state_interp := phys_SI; fork_post := fun _ _ => (⌜ True ⌝)%I |}.
+  eapply irisG_looping; apply Hinv.  
 Defined.
 
 
