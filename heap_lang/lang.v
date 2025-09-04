@@ -519,11 +519,11 @@ Definition bin_op_eval (op : bin_op) (v1 v2 : val) : option val :=
     else
       None
   else
-    match v1, v2 with
-    | LitV (LitInt n1), LitV (LitInt n2) => LitV <$> bin_op_eval_int op n1 n2
-    | LitV (LitBool b1), LitV (LitBool b2) => LitV <$> bin_op_eval_bool op b1 b2
-    | LitV (LitLoc l), LitV (LitInt off) => Some $ LitV $ LitLoc (l +ₗ off)
-    | _, _ => None
+    match v1, v2, op with
+    | LitV (LitInt n1), LitV (LitInt n2), _ => LitV <$> bin_op_eval_int op n1 n2
+    | LitV (LitBool b1), LitV (LitBool b2), _ => LitV <$> bin_op_eval_bool op b1 b2
+    | LitV (LitLoc l), LitV (LitInt off), OffsetOp => Some $ LitV $ LitLoc (l +ₗ off)
+    | _, _, _ => None
     end.
 
 Definition state_upd_heap (f: gmap loc val → gmap loc val) (σ: state) : state :=
