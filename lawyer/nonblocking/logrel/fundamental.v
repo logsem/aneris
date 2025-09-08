@@ -154,57 +154,6 @@ Section typed_interp.
     by iApply wp_app_val_val. 
   Qed.
 
-Lemma tac_wp_bind
-  K Δ s E Φ e f :
-  f = (λ e, fill K e) → (* as an eta expanded hypothesis so that we can `simpl` it *)
-  envs_entails Δ (WP e @ s; E {{ v, WP f (Val v) @ s; E {{ Φ }} }})%I →
-  envs_entails Δ (WP fill K e @ s; E {{ Φ }}).
-Proof. rewrite envs_entails_unseal=> -> ->. by apply: wp_bind. Qed.
-
-Ltac wp_bind_core K :=
-  lazymatch eval hnf in K with
-  | [] => idtac
-  | _ => eapply (tac_wp_bind K); [simpl; reflexivity|reduction.pm_prettify]
-  end.
-
-Tactic Notation "wp_bind" open_constr(efoc) :=
-  iStartProof;
-  lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ?locale ?e ?Q) =>
-      first [ reshape_expr e ltac:(fun K e' => unify e' efoc; wp_bind_core K)
-            | fail 1 "wp_bind: cannot find" efoc "in" e ]
-  | _ => fail "wp_bind: not a 'wp'"
-  end.
-
-  (* TODO: move? try to unify with sswp_MU_wp_fupd  *)
-  Lemma sswp_pwp s E E' τ e Φ
-    (NVAL: language.to_val e = None):
-    (|={E,E'}=> sswp s E' e (λ e', ▷ |={E',E}=> pwp s E τ e' Φ)%I) -∗
-    pwp s E τ e Φ.
-  Proof using.
-    rewrite /pwp wp_unfold /wp_pre.
-    iIntros "Hsswp". rewrite NVAL. 
-    iIntros (extr atr K tp1 tp2 σ1 Hvalid Hζ Hextr) "Hσ".
-    iMod "Hsswp" as "foo".
-    rewrite /sswp. rewrite NVAL.
-    iSimpl in "Hσ".
-    iSpecialize ("foo" with "[$]").
-    iMod "foo" as (Hs) "Hsswp".
-    red in Hextr. rewrite Hextr. 
-    iModIntro. iSplit.
-    { iPureIntro. by rewrite Hextr in Hs. }
-    iIntros (e2 σ2 efs Hstep).
-    iDestruct ("Hsswp" with "[//]") as "Hsswp".
-    iApply (step_fupdN_le 2); [| done| ].
-    { pose proof (trace_length_at_least extr). lia. }
-    simpl.
-    iApply (step_fupd_wand with "Hsswp").
-    iIntros ">(Hσ & HMU & ->)".
-    iApply fupd_mask_intro; [set_solver| ]. iIntros "CLOS' !> !>".
-    iMod "CLOS'" as "_". iMod "HMU". iModIntro.
-    iExists tt, tt. by iFrame.
-  Qed. 
-
   Lemma logrel_App_RecV_env (b x : binder) (f: expr) (vs': gmap string val)
     (NOb : ∀ s : string, b = BNamed s → s ∉ dom vs')
     (NOx : ∀ s : string, x = BNamed s → s ∉ dom vs'):
@@ -671,8 +620,10 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
     destruct LOC as (l&->).
     
     rewrite {6}interp_unfold /=.
-    iDestruct "Hl" as "(% & %EQ & INVl)". inversion_clear EQ. 
+    iDestruct "Hl" as "(% & %EQ & INVl)". inversion_clear EQ.
+    iApply wp_atomic. 
     iInv "INVl" as "(%v0 & >L & #IIv)" "CLOS".
+    iModIntro. 
 
     destruct (decide (vals_compare_safe v0 s)).
     2: { iApply (ectx_lifting.wp_lift_head_stuck). 
@@ -816,6 +767,6 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
       by iApply H.
   Qed.
 
-  Print Assumptions fundamental.
+  (* Print Assumptions fundamental. *)
 
 End typed_interp.

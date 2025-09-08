@@ -6,4 +6,4 @@ Proof using.
   simpl in H. apply H. 
 Qed.
 
-(* Print Assumptions mk_ref_is_wait_free.  *)
+Print Assumptions mk_ref_is_wait_free.

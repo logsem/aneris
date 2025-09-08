@@ -765,7 +765,7 @@ Section WaitFreePR.
         @iem_invGS heap_lang (AM2M _) HeapLangEM EM Σ Hinv;
       state_interp :=
         @state_interp heap_lang M Σ _;
-      fork_post := λ (_ : locale heap_lang) (_ : language.val heap_lang), True        
+      fork_post := λ (_ : locale heap_lang) (_ : val), True        
     |}))%I with "[WPS]" as "CLOS".
     2: { iMod "CLOS". iModIntro. by iFrame. }
     rewrite /wptp_wfree.
@@ -800,7 +800,7 @@ Section WaitFreePR.
       destruct (to_val e) eqn:VAL; simpl.
       2: { iFrame. iModIntro. set_solver. }
       rewrite /thread_pr. rewrite decide_True; [| done].
-      pose proof (language.of_to_val e _ VAL) as EV. rewrite -EV.        
+      pose proof (of_to_val e _ VAL) as EV. rewrite -EV.        
       rewrite /wp_tc. destruct leb eqn:LEN.
       - iPoseProof (wp_value_inv' with "WPS'") as "foo".
         iMod (pre_step_looping_wfree_elim with "foo") as "foo".
@@ -830,9 +830,9 @@ Section WaitFreePR.
 
   Lemma wptp_wfree_not_stuck {Σ : gFunctors} (Hinv : IEMGS HeapLangEM EM Σ) 
     (s : stuckness) (ex : execution_trace heap_lang) 
-    (Φs : list (language.val heap_lang → iProp Σ)) 
-    (σ : language.state heap_lang) (atr : auxiliary_trace M) 
-    (tp trest : list (language.expr heap_lang))
+    (Φs : list (val → iProp Σ)) 
+    (σ : state) (atr : auxiliary_trace M) 
+    (tp trest : list expr)
     (VALID: valid_exec ex)
     (LAST: trace_ends_in ex (tp ++ trest, σ))
     (FIT: fits_inf_call ic m ai ex):
@@ -890,7 +890,7 @@ Section WaitFreePR.
   Proof using. by destruct ic as [? []]. Qed.
 
   Lemma wptp_wfree_take_step {Σ} (Hinv : IEMGS HeapLangEM EM Σ) (s : stuckness) 
-    (etr : execution_trace heap_lang) (Φs : list (language.val heap_lang → iProp Σ)) 
+    (etr : execution_trace heap_lang) (Φs : list (val → iProp Σ)) 
     (c : cfg heap_lang) (oτ : olocale heap_lang) (c' : cfg heap_lang) 
     (mtr : auxiliary_trace M)
     (VALID: valid_exec etr)
@@ -1046,7 +1046,7 @@ Section WaitFreePR.
           HeapLangEM EM Σ Hinv;
       state_interp :=
         @state_interp heap_lang M Σ (@IEM_irisG heap_lang M HeapLangEM EM Σ Hinv);
-      fork_post := λ (_ : locale heap_lang) (_ : language.val heap_lang), True        
+      fork_post := λ (_ : locale heap_lang) (_ : val), True        
     |})))%I with "[WPS1 WPS2 WPS']" as "WPS". 
         { iIntros "WP".
           rewrite app_comm_cons app_assoc.

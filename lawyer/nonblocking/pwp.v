@@ -1,13 +1,12 @@
 From iris.proofmode Require Import tactics.
 From trillium.traces Require Import inftraces trace_lookup exec_traces trace_len. 
 From fairness Require Import fairness locales_helpers.
-(* From lawyer.examples Require Import orders_lib obls_tactics. *)
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am obls_termination obligations_wf.
-From lawyer.nonblocking Require Import trace_context om_wfree_inst wptp_gen.
+From lawyer.nonblocking Require Import trace_context wptp_gen.
 From trillium.program_logic Require Import execution_model weakestpre adequacy_utils adequacy_cond simulation_adequacy_em_cond. 
 From lawyer Require Import action_model sub_action_em.
-(* From heap_lang Require Import lang. *)
 From lawyer Require Import program_logic.  
+From heap_lang Require Import sswp_logic. 
 
 
 Section Pwp.
@@ -82,7 +81,7 @@ Proof using.
   rewrite wp_unfold /wp_pre.
   destruct (to_val e1) eqn:He1.
   { erewrite val_stuck in He1; done. }
-  simpl. rewrite He1.
+  simpl. 
   iDestruct "HSI" as "(%EV & PHYS & MSI)". simpl. 
   iMod ("Hwp" $! _ looping_trace K with "[//] [] [] PHYS") as "[Hs Hwp]".
   1, 2: done.
@@ -107,3 +106,35 @@ Proof using.
   do 2 iExists _. subst ζ. iFrame. 
   iPureIntro. congruence. 
 Qed.
+
+
+(* TODO: move? try to unify with sswp_MU_wp_fupd  *)
+Lemma sswp_pwp {Σ} {iG: invGS_gen HasNoLc Σ} {hG: heap1GS Σ}
+  s E E' τ e Φ
+  (NVAL: language.to_val e = None):
+  let iG := irisG_looping HeapLangEM (lG := hG) in 
+  (|={E,E'}=> sswp s E' e (λ e', ▷ |={E',E}=> pwp s E τ e' Φ)%I) -∗
+    pwp s E τ e Φ.
+Proof using.
+  rewrite /pwp wp_unfold /wp_pre.
+  iIntros "Hsswp". rewrite NVAL. 
+  iIntros (extr atr K tp1 tp2 σ1 Hvalid Hζ Hextr) "Hσ".
+  iMod "Hsswp" as "foo".
+  rewrite /sswp. rewrite NVAL.
+  iSimpl in "Hσ".
+  iSpecialize ("foo" with "[$]").
+  iMod "foo" as (Hs) "Hsswp".
+  red in Hextr. rewrite Hextr. 
+  iModIntro. iSplit.
+  { iPureIntro. by rewrite Hextr in Hs. }
+  iIntros (e2 σ2 efs Hstep).
+  iDestruct ("Hsswp" with "[//]") as "Hsswp".
+  iApply (step_fupdN_le 2); [| done| ].
+  { pose proof (trace_length_at_least extr). lia. }
+  simpl.
+  iApply (step_fupd_wand with "Hsswp").
+  iIntros ">(Hσ & HMU & ->)".
+  iApply fupd_mask_intro; [set_solver| ]. iIntros "CLOS' !> !>".
+  iMod "CLOS'" as "_". iMod "HMU". iModIntro.
+  iExists tt, tt. by iFrame.
+Qed. 

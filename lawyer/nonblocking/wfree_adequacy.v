@@ -254,16 +254,18 @@ Section WFAdequacy.
     (VALID: valid_client e0):
     let _ := irisG_looping HeapLangEM (lG := hG) in 
     ⊢ pwp MaybeStuck ⊤ τ (subst "m" m e0) (λ _, True).
-  Proof using.
+  Proof using SPEC.
     simpl. opose proof * (fundamental e0) as FTLR. 
     { done. }
     rewrite /logrel in FTLR.
     rewrite /interp_expr in FTLR.
     rewrite -subst_env_singleton.
     iApply wp_wand; [iApply FTLR| ].
-    - admit.
+    - rewrite -insert_empty. iApply interp_env_cons; [done| ].
+      iSplitL; [| by iApply interp_env_nil].
+      destruct SPEC. iApply wfs_safety_spec. 
     - by iIntros "**".
-  Admitted.
+  Qed. 
 
   Lemma init_wptp_wfree_pwps `{Hinv: @IEMGS _ _ HeapLangEM EM Σ} tp0 tp N
     (NO: τi ∉ locales_of_list_from tp0 tp)
@@ -271,7 +273,7 @@ Section WFAdequacy.
   ⊢ wptp_from_gen (thread_pr ic MaybeStuck N) tp0 tp
       (map (λ (_ : nat) (_ : val), ⌜ True ⌝%I)
          (adequacy_utils.locales_of_list_from tp0 tp)).
-  Proof using.
+  Proof using SPEC.
     iInduction tp as [|e tp] "IH" forall (tp0 NO).
     { simpl. iApply wptp_from_gen_nil. }
     rewrite adequacy_utils.locales_of_list_from_cons. 
@@ -469,11 +471,12 @@ Section WFAdequacy.
     iApply (init_wptp_wfree with "[$] [$]"). done. 
   Qed.
 
-  Definition wfreeΣ: gFunctors.
-  Admitted.
+  Definition wfreeΣ: gFunctors := iemΣ HeapLangEM EM. 
 
   Instance wfree_pre: @heapGpreS wfreeΣ M EM.
-  Admitted. 
+  Proof. 
+    unshelve esplit. 
+  Qed. 
 
   Local Lemma tc_helper:
     tctx_tpctx ic = {| tpctx_ctx := Ki; tpctx_tid := τi |}.
@@ -920,3 +923,5 @@ Proof using.
     destruct DOM as (k & r & ck & RANGE & KTH & RETk).
     red. exists k, r, ck. split; eauto. lia.
 Qed.
+
+(* Print Assumptions wfree_is_wait_free. *)

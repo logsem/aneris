@@ -12,8 +12,10 @@ Definition logN : namespace := nroot .@ "logN".
 
 (** interp : is a unary logical relation. *)
 Section logrel.
-  (* Context `{heap1GS Σ}. *)
-  Context {Σ: gFunctors} {iG: irisG heap_lang LoopingModel Σ} {hG: heap1GS Σ}. 
+  Context {Σ: gFunctors}
+    (* {iG: irisG heap_lang LoopingModel Σ} *)
+    {invG: invGS_gen HasNoLc Σ}
+    {hG: heap1GS Σ}. 
   Notation D := (persistent_predO (val heap_lang) (iPropI Σ)).
   Implicit Types ii : D.
 
@@ -24,7 +26,6 @@ Section logrel.
   Next Obligation.
     solve_proper.
   Qed.
-  (* Solve Obligations with solve_proper. *)
   Instance interp_prod_contractive : Contractive interp_prod.
   Proof. solve_contractive. Qed.
 
@@ -36,10 +37,9 @@ Section logrel.
   Proof. solve_contractive. Qed.
 
   Program Definition interp_arrow : D -n> D :=
-    λne ii, PersPred (λ w, □ ∀ τ v, ▷ ii v → 
-      (* WP App (of_val w) (of_val v) ? {{ ii }} *)
-      pwp MaybeStuck ⊤ τ (App (of_val w) (of_val v)) ii 
-              )%I.
+    λne ii, PersPred (λ w, □ ∀ τ v, ▷ ii v →
+      let _ := irisG_looping HeapLangEM (lG := hG) in 
+      pwp MaybeStuck ⊤ τ (App (of_val w) (of_val v)) ii )%I.
   Solve Obligations with solve_proper.
   Instance interp_arrow_contractive : Contractive interp_arrow.
   Proof.
@@ -83,9 +83,6 @@ Section logrel.
             | RecV _ _ _ => interp_arrow ii
             | PairV _ _ => interp_prod ii
             | InjLV _ | InjRV _ => interp_sum ii
-      (* | UnitV | NatV _ | BoolV _ => PersPred (λ _, True) *)
-      (* | RecV _ | LamV _ => interp_arrow ii *)
-      (* | LocV _ => interp_ref ii *)
       end%I.
   Final Obligation.
   Proof. intros []; try solve_proper. destruct l; solve_proper. 
@@ -113,7 +110,7 @@ Section logrel.
   Proof. rewrite /interp; apply fixpoint_unfold. Qed.
 
   Definition interp_expr (τ: locale heap_lang) (e: expr heap_lang) : iProp Σ :=
-    (* WP e ? {{ interp }}%I. *)
+    let _ := irisG_looping HeapLangEM (lG := hG) in 
     pwp MaybeStuck ⊤ τ e interp.
 
   Definition interp_env (vs : gmap string (val heap_lang)) : iProp Σ :=
@@ -121,15 +118,6 @@ Section logrel.
 
   Global Instance interp_env_persistent vs : Persistent (interp_env vs) := _.
 
-  (* (* TODO: move *) *)
-  (* Lemma big_sepM_elem_of {PROP : bi} {K : Type} {EqDecision0 : EqDecision K}  *)
-  (*   {H : Countable K} {A : Type} (Φ : K → A → PROP)  *)
-  (*   (m : gmap K A) *)
-  (*   (k: K) (a: A) *)
-  (*   (KTH: m !! k = Some a): *)
-  (*   ([∗ map] k↦y ∈ m, Φ k y) ⊢ Φ k a. *)
-  (* Proof using. *)
-   
   Lemma interp_env_Some_l vs s v :
     vs !! s = Some v → interp_env vs ⊢ interp v.
   Proof.

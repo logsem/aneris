@@ -1,7 +1,7 @@
 From iris.proofmode Require Import tactics.
-(* From lawyer Require Import program_logic sub_action_em action_model. *)
 From lawyer.examples Require Import orders_lib.
-From lawyer.obligations Require Import env_helpers obligations_model .
+From lawyer.obligations Require Import env_helpers obligations_model.
+From lawyer.nonblocking.logrel Require Import logrel.
 
 
 Definition WF_Degree := bounded_nat 2.
@@ -56,25 +56,10 @@ Record WaitFreeSpec (m: val) := {
     τ π q (a: val),
     {{{ cp_mul π d_wfr0 wfs_F ∗ th_phase_frag τ π q ∗ wfs_mod_inv}}}
       App m a @ τ
-    {{{ v, RET v; th_phase_frag τ π q }}}
+    {{{ v, RET v; th_phase_frag τ π q }}};
+
+  (* TODO: derive it from wfs_spec *)
+  wfs_safety_spec:
+    ∀ {Σ : gFunctors} `{heap1GS Σ, invGS_gen HasNoLc Σ},
+      ⊢ interp m;
 }. 
-
-(* (** In proofs, it's easier to use a spec with invariant framed out *) *)
-(* (* TODO: relax to non-trivial degrees *) *)
-(* Record WaitFreeSpecSimpl (m: val) := { *)
-(*   wfss_F: nat; *)
-(*   wfss_spec: *)
-(*   forall {M: Model} {EM: ExecutionModel heap_lang M} Σ {OHE: OM_HL_Env OP_HL_WF EM Σ} *)
-(*     τ π q (a: val), *)
-(*     {{{ cp_mul π d_wfr0 wfss_F ∗ th_phase_frag τ π q}}} *)
-(*       App m a @ τ *)
-(*     {{{ v, RET v; th_phase_frag τ π q }}} *)
-(* }. *)
-
-(* Lemma wfs_wfss m *)
-(*   (WFS: WaitFreeSpec m): *)
-  
-(*   WaitFreeSpecSimpl m. *)
-(* Proof using. *)
-(*   intros []. esplit. *)
-(*   iIntros "" *)
