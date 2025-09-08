@@ -139,6 +139,22 @@ Section typed_interp.
     all: by rewrite interp_unfold. 
   Qed.
 
+  Lemma un_op_eval_inv op v r
+    (EVAL: un_op_eval op v = Some r):
+    (op = NegOp /\ exists b, v = LitV $ LitBool b /\ r = LitV $ LitBool $ negb b) \/
+    (op = NegOp /\ exists n, v = LitV $ LitInt n /\ r = LitV $ LitInt $ (Z.lnot n)) \/ 
+    (op = MinusUnOp /\ exists n, v = LitV $ LitInt n /\ r = LitV $ LitInt (- n)). 
+  Proof using.
+    rewrite /un_op_eval in EVAL.
+    destruct op, v; try congruence.
+    all: destruct l; try congruence; inversion EVAL; subst.
+    all: set_solver.
+  Qed.
+
+  Ltac inv_unop_eval H :=
+    apply un_op_eval_inv in H as
+        [(-> & ? & -> & ->) | [(-> & ? & -> & ->)| (-> & ? & -> & ->)]]. 
+
   Definition valid_base_lit (v: base_lit) : Prop :=
     match v with
     | LitInt _ | LitBool _ | LitUnit => True
@@ -655,7 +671,27 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
     - iSplitL; [| done]. iApply "FORK".
   Qed.
 
-  Lemma logrel_nat_binop op e1 e2
+  Lemma logrel_unop op e:
+    logrel e -∗ logrel (UnOp op e).
+  Proof.
+    iIntros "#IH !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
+    rewrite subst_env_arg1; [| done]. 
+
+    iApply (wp_bind [UnOpCtx _]).
+    iApply wp_wand; [by iApply "IH"| ].
+    iIntros (v) "#Hv /=".
+
+    destruct (un_op_eval op v) eqn:EVAL; [| solve_stuck_case].
+    iApply sswp_pwp; [done| ].
+    iModIntro. iApply sswp_pure_step; [by apply EVAL| ].
+    iIntros "!> !>".
+    iApply wp_value.
+
+    rewrite {3}interp_unfold.
+    inv_unop_eval EVAL; done. 
+  Qed.
+
+  Lemma logrel_binop op e1 e2
     (VALID: valid_bin_op op):
     logrel e1 -∗ logrel e2 -∗ logrel (BinOp op e1 e2).
   Proof.
@@ -1064,6 +1100,18 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
     by iApply "IIl". 
   Qed.
 
+  Lemma logrel_ChooseNat: ⊢ logrel ChooseNat.
+  Proof using.
+    iIntros "!#" (vs τ) "#Henv"; rewrite /interp_expr /=.
+    rewrite (subst_env_arg1 (fun _ => ChooseNat) _ (Val $ LitV $ LitUnit)); [| done].
+    iApply sswp_pwp; [done| ].
+    iModIntro.
+    iApply wp_choose_nat.
+    iIntros "!> % !>!>".
+    iApply wp_value.
+    by rewrite interp_unfold.
+  Qed.    
+
   Scheme expr_ind_mut := Induction for expr Sort Prop
   with val_ind_mut := Induction for val Sort Prop.  
 
@@ -1080,9 +1128,9 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
     - iApply logrel_rec. by iApply H.
     - destruct H1. 
       iApply logrel_app; [by iApply H | by iApply H0].
-    - admit.
+    - iApply logrel_unop. by iApply H.
     - destruct H1 as (?&?&?).
-      iApply logrel_nat_binop; [done | by iApply H | by iApply H0].
+      iApply logrel_binop; [done | by iApply H | by iApply H0].
     - destruct H2 as (?&?&?).
       iApply logrel_if; [by iApply H | by iApply H0 | by iApply H1].
     - destruct H1 as (?&?).
@@ -1103,7 +1151,7 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
       iApply logrel_CmpXchg; [by iApply H | by iApply H0 | by iApply H1].
     - destruct H1 as (?&?).
       iApply logrel_FAA; [by iApply H | by iApply H0].
-    - admit.
+    - by iApply logrel_ChooseNat. 
     - rewrite interp_unfold. destruct l; done.   
     - intros. simpl in *.
       iApply interp_RecV. by iApply H.
@@ -1118,5 +1166,7 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
       iRight. iExists _. iSplit; [done| ].
       by iApply H.
   Qed.
+
+  Print Assumptions fundamental.
 
 End typed_interp.
