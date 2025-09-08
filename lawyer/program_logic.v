@@ -7,20 +7,20 @@ From heap_lang Require Export heap_lang_defs tactics notation sswp_logic locales
 
 Close Scope Z. 
 
-Lemma tac_wp_bind `{EM: ExecutionModel heap_lang M} `{@heapGS Σ _ EM} 
+Lemma tac_wp_bind `{irisG heap_lang M Σ}
   K Δ s E Φ e f :
   f = (λ e, fill K e) → (* as an eta expanded hypothesis so that we can `simpl` it *)
   envs_entails Δ (WP e @ s; E {{ v, WP f (Val v) @ s; E {{ Φ }} }})%I →
   envs_entails Δ (WP fill K e @ s; E {{ Φ }}).
 Proof. rewrite envs_entails_unseal=> -> ->. by apply: wp_bind. Qed.
 
-Global Ltac wp_bind_core K :=
+Ltac wp_bind_core K :=
   lazymatch eval hnf in K with
   | [] => idtac
   | _ => eapply (tac_wp_bind K); [simpl; reflexivity|reduction.pm_prettify]
   end.
 
-Global Tactic Notation "wp_bind" open_constr(efoc) :=
+Tactic Notation "wp_bind" open_constr(efoc) :=
   iStartProof;
   lazymatch goal with
   | |- envs_entails _ (wp ?s ?E ?locale ?e ?Q) =>
@@ -28,6 +28,7 @@ Global Tactic Notation "wp_bind" open_constr(efoc) :=
             | fail 1 "wp_bind: cannot find" efoc "in" e ]
   | _ => fail "wp_bind: not a 'wp'"
   end.
+
 
 
 Section ProgramLogic.
