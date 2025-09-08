@@ -6,6 +6,7 @@ From fairness Require Import fairness locales_helpers utils.
 From lawyer Require Import program_logic sub_action_em action_model.
 From lawyer.examples Require Import orders_lib obls_tactics.
 From lawyer.nonblocking Require Import trace_context om_wfree_inst pr_wfree wfree_traces wptp_gen pwp.
+From lawyer.nonblocking.logrel Require Import fundamental. 
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am obls_termination.
 From heap_lang Require Import lang simulation_adequacy.
 
@@ -249,17 +250,24 @@ Section WFAdequacy.
     iApply big_sepM_dom. iApply (big_sepM_impl with "[$]"). set_solver.  
   Qed.
 
-  Lemma init_pwp `{!irisG heap_lang LoopingModel Σ} τ e0:
-    ⊢ pwp.pwp MaybeStuck ⊤ τ (subst "m" m e0) (λ _, True).
+  Lemma init_pwp {Σ} {hG :heap1GS Σ} {iG: invGS_gen HasNoLc Σ} τ e0
+    (VALID: valid_client e0):
+    let _ := irisG_looping HeapLangEM (lG := hG) in 
+    ⊢ pwp MaybeStuck ⊤ τ (subst "m" m e0) (λ _, True).
   Proof using.
-    (* should follow from FTLR and specification for m.
-       Need to assume/derive logrel for m (besides its Lawyer spec)
-     *)
+    simpl. opose proof * (fundamental e0) as FTLR. 
+    { done. }
+    rewrite /logrel in FTLR.
+    rewrite /interp_expr in FTLR.
+    rewrite -subst_env_singleton.
+    iApply wp_wand; [iApply FTLR| ].
+    - admit.
+    - by iIntros "**".
   Admitted.
 
   Lemma init_wptp_wfree_pwps `{Hinv: @IEMGS _ _ HeapLangEM EM Σ} tp0 tp N
     (NO: τi ∉ locales_of_list_from tp0 tp)
-    (SUBST: Forall (λ e, ∃ e0, e = subst "m" m e0) tp):
+    (SUBST: Forall (λ e, ∃ e0, e = subst "m" m e0 /\ valid_client e0) tp):
   ⊢ wptp_from_gen (thread_pr ic MaybeStuck N) tp0 tp
       (map (λ (_ : nat) (_ : val), ⌜ True ⌝%I)
          (adequacy_utils.locales_of_list_from tp0 tp)).
@@ -274,12 +282,12 @@ Section WFAdequacy.
     rewrite /thread_pr. rewrite decide_False.
     2: { intros EQ. apply NO. rewrite locales_of_list_from_locales.
          rewrite /τi EQ. set_solver. }
-    inversion SUBST as [| ?? [? ->]]. subst. 
-    iApply init_pwp.
+    inversion SUBST as [| ?? (? & -> & ?)]. subst. 
+    by iApply init_pwp.
   Qed.
 
   Definition tpool_init_restr (tp: list expr) :=
-    Forall (fun e => exists e0, e = subst "m" m e0) tp /\
+    Forall (fun e => exists e0, e = subst "m" m e0 /\ valid_client e0) tp /\
     (ii = 0 -> exists e, from_locale tp τi = Some e /\ under_ctx Ki e = Some (m ai)) /\
     (forall e, from_locale tp τi = Some e -> to_val e = None). 
 
@@ -315,8 +323,8 @@ Section WFAdequacy.
     2: { rewrite leb_correct; [| lia].
          apply Forall_app, proj2 in TP.
          apply Forall_app, proj1 in TP.
-         inversion TP as [| ?? [? ->]]. subst.
-         iApply init_pwp. }
+         inversion TP as [| ?? (? & -> & ?)]. subst.
+         by iApply init_pwp. }
     rewrite leb_correct_conv; [| lia].
     iDestruct ("T" with "[//]") as (π) "[CPS PH]".
     rewrite half_inv2. 
@@ -570,7 +578,7 @@ Section WFAdequacy.
   Proof using. done. Qed. 
 
   Theorem simple_om_simulation_adequacy_terminate_multiple_waitfree extr
-        (ETR0: exists e0, (trfirst extr).1 = [subst "m" m e0])
+        (ETR0: valid_init_tpool m (trfirst extr).1)
         (MOD_INIT: wfs_is_init_st m SPEC (trfirst extr))
     :
     extrace_valid extr -> 
@@ -580,7 +588,7 @@ Section WFAdequacy.
     exists k, ¬ fits_inf_call ic m ai (trace_take_fwd k extr).
   Proof.
     intros VALID FAIR.
-    destruct ETR0 as [e0 ETR0]. 
+    destruct ETR0 as (e0 & ETR0 & VALID0). 
 
     destruct (@decide (ii = 0 → ∃ e,
                     from_locale (trfirst extr).1 τi = Some e ∧ under_ctx Ki e = Some (m ai))) as [II0| ].
@@ -787,7 +795,7 @@ Section WFAdequacy.
   (* TODO: rename *)
   Lemma obls_terminates_impl_multiple_waitfree
     (extr : extrace heap_lang)
-    (ETR0: exists e0, (trfirst extr).1 = [subst "m" m e0])
+    (ETR0: valid_init_tpool m (trfirst extr).1)
     (MOD_INIT: wfs_is_init_st m SPEC (trfirst extr))
     (VALID: extrace_valid extr)
     (* (FAIR: fair_ex τi extr) *)

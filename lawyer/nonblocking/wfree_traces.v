@@ -1,6 +1,7 @@
 From iris.proofmode Require Import tactics.
 From fairness Require Import locales_helpers utils fairness.
 From lawyer.nonblocking Require Import trace_context.
+From lawyer.nonblocking.logrel Require Import valid_client.
 From heap_lang Require Import lang notation.
 From trillium.traces Require Import exec_traces trace_lookup inftraces.
 
@@ -280,9 +281,13 @@ Section CallInTrace.
       tr S!! i = Some ci ->
       call_at tpc ci m a (APP := App) ->
       has_return tr tc.
+
+  (* TODO: generalize to multiple threads *)
+  Definition valid_init_tpool (tp: list expr) :=
+    (exists e0, tp = [subst "m" m e0] /\ valid_client e0). 
   
   Definition wait_free (is_init_st: cfg heap_lang -> Prop) := forall etr,
-      (exists e0, (trfirst etr).1 = [subst "m" m e0]) ->
+      valid_init_tpool (trfirst etr).1 ->
       is_init_st (trfirst etr) ->
       extrace_valid etr ->
       always_returns etr.
