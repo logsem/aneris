@@ -1,12 +1,12 @@
 (* From iris.program_logic Require Import lifting ectx_lifting. *)
 (* From iris.program_logic Require Export weakestpre. *)
 
-From iris.proofmode Require Import proofmode.
-From lawyer.nonblocking.logrel Require Export persistent_pred logrel.
+From iris.proofmode Require Import proofmode coq_tactics.
+From lawyer.nonblocking.logrel Require Export persistent_pred logrel substitutions.
 From lawyer.nonblocking Require Export pwp. 
 From iris.base_logic Require Import invariants.
 From iris.prelude Require Import options.
-From heap_lang Require Import heap_lang_defs sswp_logic.
+From heap_lang Require Import heap_lang_defs sswp_logic tactics. 
 
 
 Section typed_interp.
@@ -20,46 +20,7 @@ Section typed_interp.
   Existing Instance iG. 
   
   Notation D := (persistent_predO val (iPropI Σ)).
-
-  Lemma subst_env_var x vs:
-    subst_env vs (Var x) = from_option Val (Var x) (vs !! x).
-  Proof using.
-    rewrite /subst_env.
-
-    set (P := fun (e: expr heap_lang) (mp: gmap string (val heap_lang)) =>
-                e = from_option Val (Var x) (mp !! x)).
-    enough (P (map_fold subst (Var x) vs) vs).
-    { done. }
-
-    apply map_fold_weak_ind; clear vs. 
-    { done. }
-    subst P. simpl. intros s v vs e NIN ->.
-    rewrite insert_union_singleton_l. rewrite lookup_union.
-    rewrite utils_maps.lookup_map_singleton.
-
-    destruct decide as [-> | NEQ]. 
-    { simpl. rewrite NIN. simpl. by rewrite decide_True. }
-    rewrite option_union_left_id.
-    destruct (vs !! x) eqn:XTH.
-    - simpl. done.
-    - simpl. by rewrite decide_False.
-  Qed.
-
-  (* TODO: move? try to unify with other proofs for fork  *)
-  (* TODO: move *)
-  Lemma foldl_foldr_rev {A B : Type} (f : B → A → B) (b : B) (la : list A):
-    foldl f b la = foldr (flip f) b (rev la). 
-  Proof using.
-    generalize dependent b. induction la.
-    { done. }
-    simpl. intros. rewrite IHla.
-    by rewrite foldr_app.
-  Qed.
         
-  (* TODO: remove duplicates*)
-  From iris.proofmode Require Import coq_tactics.
-  From heap_lang Require Import tactics. 
-
   (* TODO: move? *)
   Lemma srav_helper (e: expr)
     (NO_FILL_ITEM: ¬ exists i e', e = fill_item i e' /\ to_val e' = None):
@@ -193,48 +154,11 @@ Section typed_interp.
     | InjLV v | InjRV v => valid_val v
     end.
 
-  Lemma subst_env_arg3
-    (F: expr -> expr -> expr -> expr)
-    (DISTR: forall e1 e2 e3 s v, subst s v (F e1 e2 e3) = F (subst s v e1) (subst s v e2) (subst s v e3)):
-    forall e1 e2 e3 vs, subst_env vs (F e1 e2 e3) = F (subst_env vs e1) (subst_env vs e2) (subst_env vs e3).
-  Proof using.
-    intros. rewrite /subst_env.
-    pattern vs. apply map_first_key_ind. 
-    { intros. by rewrite !map_fold_empty. }
-    intros s v m NIN FKEY IH.
-    rewrite !map_fold_insert_first_key; auto.
-    by rewrite IH.
-  Qed.
-
-  Lemma subst_env_arg2 (F: expr -> expr -> expr)
-    (DISTR: forall e1 e2 s v, subst s v (F e1 e2) = F (subst s v e1) (subst s v e2)):
-    forall e1 e2 vs, subst_env vs (F e1 e2) = F (subst_env vs e1) (subst_env vs e2).
-  Proof using.
-    intros. rewrite /subst_env.
-    pattern vs. apply map_first_key_ind. 
-    { intros. by rewrite !map_fold_empty. }
-    intros s v m NIN FKEY IH.
-    rewrite !map_fold_insert_first_key; auto.
-    by rewrite IH.
-  Qed.
-
-  Lemma subst_env_arg1 (F: expr -> expr)
-    (DISTR: forall e1 s v, subst s v (F e1) = F (subst s v e1)):
-    forall e1 vs, subst_env vs (F e1) = F (subst_env vs e1).
-  Proof using.
-    intros. rewrite /subst_env.
-    pattern vs. apply map_first_key_ind. 
-    { intros. by rewrite !map_fold_empty. }
-    intros s v m NIN FKEY IH.
-    rewrite !map_fold_insert_first_key; auto.
-    by rewrite IH.
-  Qed.
-
   Lemma logrel_var x : ⊢ logrel (Var x).
   Proof.
     iIntros "!#" (vs τ) "Henv".
     rewrite subst_env_var /interp_expr.
-    destruct (vs !! x) eqn:XTH; simpl. 
+    destruct (vs !! x) eqn:XTH; rewrite XTH; simpl. 
     - iApply wp_value.
       iApply interp_env_Some_l; done.
     - solve_stuck_case. 
@@ -255,120 +179,6 @@ Section typed_interp.
     by iApply "Hv1".
   Qed. 
     
-  Definition rm_binder (b: binder) (vs: gmap string val) :=
-    match b with 
-    | BNamed s => delete s vs
-    | BAnon => vs
-    end.
-
-  Lemma subst_env_empty e: subst_env ∅ e = e.
-  Proof using. done. Qed.
-
-  Lemma subst_env_singleton s v e: subst_env {[ s := v ]} e = subst s v e.
-  Proof using.
-    rewrite /subst_env. by rewrite map_fold_singleton.
-  Qed.
-
-  Lemma rm_binder_empty b: rm_binder b ∅ = ∅.
-  Proof using. destruct b; set_solver. Qed.
-
-  Ltac gd x := generalize dependent x. 
-
-  Lemma subst_comm s1 v1 s2 v2 e
-    (NEQ: s1 ≠ s2):
-    subst s1 v1 (subst s2 v2 e) = subst s2 v2 (subst s1 v1 e).
-  Proof using.
-    gd s1. gd v1. gd s2. gd v2. 
-    induction e; intros; simpl; try done.
-    all: try by (f_equal; eauto).
-    - destruct decide, decide; subst; simpl; try done.
-      + by rewrite decide_True.
-      + by rewrite decide_True.
-      + by rewrite !decide_False.
-    - destruct decide, decide; subst; simpl; try done.
-      f_equal. eauto.
-  Qed.
-
-  Lemma subst_env_insert s v vs e
-    (FRESH: s ∉ dom vs):
-    subst_env (<[ s := v ]> vs) e = subst s v (subst_env vs e).
-  Proof using.
-    rewrite /subst_env.
-    eapply map_fold_insert_L.
-    2: by apply not_elem_of_dom.
-    intros. by apply subst_comm.
-  Qed.
-
-  Lemma subst_env_insert' s v vs e
-    (FRESH: s ∉ dom vs):
-    subst_env (<[ s := v ]> vs) e = subst_env vs (subst s v e). 
-  Proof using.
-    rewrite subst_env_insert; [| done].
-    (* TODO: extract lemma *)
-    gd e. revert FRESH. pattern vs. apply map_first_key_ind; clear vs. 
-    { intros. by rewrite !subst_env_empty. }
-    intros. rewrite subst_env_insert; [| by apply not_elem_of_dom].
-    rewrite dom_insert_L in FRESH. 
-    apply not_elem_of_union in FRESH as [?%not_elem_of_singleton ?].
-    rewrite subst_comm; [| done].
-    rewrite H1; [| done].  
-    rewrite -subst_env_insert; [| by apply not_elem_of_dom]. 
-    done.
-  Qed.
-
-  Lemma rm_binder_insert_comm b s v vs
-    (NEQ: b ≠ BNamed s):
-    rm_binder b (<[ s := v ]> vs) = <[ s := v ]> (rm_binder b vs).
-  Proof using.
-    destruct b as [| sb]; simpl. 
-    { done. }
-    apply map_eq. intros s'.
-    Set Printing Coercions.
-    assert (sb ≠ s).
-    { congruence. }
-    destruct (decide (s' = s)) as [-> | NEQ'].
-    { rewrite lookup_delete_ne; [| done].
-      by rewrite !lookup_insert. }
-    rewrite lookup_insert_ne; [| done].
-    destruct (decide (sb = s')) as [-> | NEQ''].
-    { by rewrite !lookup_delete. }
-    do 2 (rewrite lookup_delete_ne; [| done]).
-    rewrite lookup_insert_ne; done.
-  Qed.
-
-  Lemma dom_rm_binder b vs:
-    dom (rm_binder b vs) = dom vs ∖ match b with | BNamed s => {[ s ]} | _ => ∅ end.
-  Proof using.
-    rewrite /rm_binder. destruct b; set_solver.
-  Qed.
-
-  Lemma subst_env_rec (b x: binder) (f: expr) vs:
-    let vs' := rm_binder b $ rm_binder x vs in
-    subst_env vs (Rec b x f) = Rec b x (subst_env vs' f).
-  Proof using.
-    simpl. generalize dependent f. 
-    pattern vs. apply map_first_key_ind; clear vs. 
-    { intros. by rewrite !rm_binder_empty !subst_env_empty. }
-    intros s v vs NIN FKEY IH f.
-    rewrite subst_env_insert; [| by apply not_elem_of_dom].
-    rewrite IH. simpl. f_equal.
-    destruct decide.
-    - destruct a. 
-      rewrite -subst_env_insert.
-      2: { rewrite !dom_rm_binder.
-           apply not_elem_of_dom in NIN.
-           destruct x, b; set_solver. }
-      rewrite rm_binder_insert_comm; [| done].
-      f_equal. rewrite rm_binder_insert_comm; [| done].
-      done. 
-    - apply Classical_Prop.not_and_or in n.
-      destruct (decide (BNamed s = x)) as [<- | ?]; simpl. 
-      + by rewrite delete_insert_delete.
-      + rewrite rm_binder_insert_comm; [| done].
-        destruct n as [<-%NNP_P | <-%NNP_P]; simpl; try done.
-        by rewrite delete_insert_delete.
-  Qed.
-
   Lemma logrel_app e1 e2 : logrel e1 -∗ logrel e2 -∗ logrel (App e1 e2).
   Proof.
     iIntros "#IH1 #IH2 !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
@@ -381,24 +191,6 @@ Section typed_interp.
     iIntros (v1) "#Hv1 /=".
     by iApply wp_app_val_val. 
   Qed.
-
-  Lemma subst_subst_ignored s v v' e:
-    subst s v' (subst s v e) = subst s v e.
-  Proof using.
-    gd v. gd v'. induction e; simpl; try done.
-    all: try by (intros; f_equal; eauto).
-    - intros. destruct decide; try done. simpl.
-      by rewrite decide_False.
-    - destruct decide; try done.
-      intros. f_equal. eauto.
-  Qed.
-
-  Lemma interp_env_subseteq vs vs' (SUB: vs' ⊆ vs):
-    interp_env vs -∗ interp_env vs'.
-  Proof using.
-    iIntros "#ENV". rewrite /interp_env.
-    iApply big_sepM_subseteq; eauto.
-  Qed.    
 
 Lemma tac_wp_bind
   K Δ s E Φ e f :
@@ -450,64 +242,6 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
     iMod "CLOS'" as "_". iMod "HMU". iModIntro.
     iExists tt, tt. by iFrame.
   Qed. 
-
-  (* Lemma logrel_App_RecV_env (b x : binder) (f: expr) (vs': gmap string val) *)
-  (*   (NOb : ∀ s : string, b = BNamed s → s ∉ dom vs') *)
-  (*   (NOx : ∀ s : string, x = BNamed s → s ∉ dom vs'): *)
-  (* (* □ (∀ (vs0 : gmap string val) (τ0 : nat), *) *)
-  (* (*          interp_env vs0 -∗ *) *)
-  (* (*          pwp MaybeStuck ⊤ τ0 (subst_env vs0 f) (pers_pred_car interp)) -∗ *) *)
-  (*   interp_env vs' -∗ *)
-  (*   interp (RecV b x (subst_env vs' f)).  *)
-  (* (* □ ∀ (τ0 : nat) (v : val), *) *)
-  (* (*     ▷ pers_pred_car interp v *) *)
-  (* (*     → pwp MaybeStuck ⊤ τ0 (Val (RecV b x (subst_env vs' f))) *) *)
-  (* (*         (pers_pred_car interp). *) *)
-  (* Proof using. *)
-  (*   (* iIntros "#IH #Henv". *) *)
-  (*   iIntros "#Henv". *)
-  (*   (* iClear "IH".  *) *)
-  (*   iLöb as "IHrec". *)
-  (*   rewrite {2}interp_unfold /=. *)
-  (*   iModIntro. iIntros (τ' v) "#ARG". *)
-  (*   iApply sswp_pwp; [done| ]. iModIntro. *)
-  (*   iApply sswp_pure_step; [done| ]. *)
-  (*   do 3 iModIntro.  *)
-  (*   simpl. *)
-
-  (*   destruct x; simpl. *)
-  (*   - destruct b; simpl. *)
-  (*     + rewrite {1}interp_unfold. simpl.  *)
-  (*       by iApply "IHrec".  *)
-  (*     + simpl. *)
-  (*       rewrite -subst_env_insert. *)
-  (*       2: { eauto. } *)
-  (*       iApply "IH". simpl. *)
-  (*       rewrite interp_env_cons; [| set_solver]. *)
-  (*       iSplit; [| done].  *)
-  (*       iEval (rewrite interp_unfold). simpl. iApply "IHrec".   *)
-  (*   - destruct b; simpl. *)
-  (*     + rewrite -subst_env_insert; [| set_solver]. *)
-  (*       iApply "IH". *)
-  (*       rewrite interp_env_cons; [| set_solver]. *)
-  (*       iSplit; [| done].  *)
-  (*       iApply "ARG".  *)
-  (*     + simpl. *)
-  (*       destruct (decide (s0 = s)) as [-> | ?]. *)
-  (*       * rewrite subst_subst_ignored.  *)
-  (*         rewrite -subst_env_insert; [| set_solver]. simpl. *)
-  (*         iApply "IH". simpl. *)
-  (*         rewrite interp_env_cons; [| set_solver]. simpl. *)
-  (*         iSplit; [| done].  *)
-  (*         iEval (rewrite interp_unfold). simpl. iApply "IHrec". *)
-  (*       * do 2 (rewrite -subst_env_insert; [| set_solver]). *)
-  (*         simpl. iApply "IH". *)
-  (*         do 2 (rewrite interp_env_cons; [| set_solver]). *)
-  (*         iFrame "ARG".  *)
-  (*         iSplit; [| done].  *)
-  (*         iEval (rewrite interp_unfold). simpl. iApply "IHrec". *)
-  (* Qed. *)
-
 
   Lemma logrel_App_RecV_env (b x : binder) (f: expr) (vs': gmap string val)
     (NOb : ∀ s : string, b = BNamed s → s ∉ dom vs')
@@ -561,13 +295,6 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
           iEval (rewrite interp_unfold). simpl. iApply "IHrec".
   Qed.
 
-  Lemma rm_binder_subseteq s vs:
-    rm_binder s vs ⊆ vs.
-  Proof using.
-    destruct s; simpl; try set_solver.
-    apply delete_subseteq.
-  Qed. 
-    
   Lemma logrel_rec b x f : logrel f -∗ logrel (Rec b x f).
   Proof.
     iIntros "#IH !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
@@ -595,47 +322,7 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
     all: set_solver.
   Qed.
 
-  (* Lemma logrel_val v *)
-  (*   (VALID: valid_val v) *)
-  (*   : ⊢ logrel (Val v). *)
-  (* Proof. *)
-  (*   iIntros "!#" (vs τ) "#Henv". *)
-  (*   rewrite (subst_env_arg1 (fun _ => Val v) _ (Val $ LitV $ LitUnit)); [| done]. *)
-  (*   rewrite /interp_expr. *)
-  (*   iApply wp_value. *)
-
-  (*   iClear "Henv". clear vs τ. rewrite interp_unfold.  *)
-  (*   iInduction (v) as [| | | | ] forall (VALID); simpl.  *)
-  (*   - destruct l; done. *)
-  (*   - iModIntro.   *)
-    
-  (*   rewrite interp_unfold. destruct v; simpl in *; try done.  *)
-  (*     iApply interp_env_Some_l; done. *)
-  (*   - admit.  *)
-  (* Admitted. *)
-
-  Lemma valid_client_subst_preserved s v e
-    (VALIDe: valid_client e)
-    (VALIDv: valid_val v):
-    valid_client (subst s v e).
-  Proof using.
-    induction e; simpl in *; try done.
-    all: try tauto. 
-    - destruct decide; eauto. 
-    - destruct decide; eauto.
-  Qed.
-
-  Lemma valid_client_subst'_preserved b v e
-    (VALIDe: valid_client e)
-    (VALIDv: valid_val v):
-    valid_client (subst' b v e).
-  Proof using.
-    destruct b; try done.
-    by apply valid_client_subst_preserved.
-  Qed. 
-
   Lemma pwp_fork s E τ e Φ:
-    (* (NVAL: language.to_val e = None): *)
     (∀ τ', pwp s ⊤ τ' e (fun _ => ⌜ True ⌝)) -∗
     Φ (LitV $ LitUnit) -∗
     pwp s E τ (Fork e) Φ.

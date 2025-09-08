@@ -1,6 +1,6 @@
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Export weakestpre.
-From lawyer.nonblocking.logrel Require Export persistent_pred.
+From lawyer.nonblocking.logrel Require Export persistent_pred substitutions.
 From lawyer.nonblocking Require Export pwp. 
 From iris.algebra Require Import list.
 From iris.base_logic Require Import invariants.
@@ -130,7 +130,6 @@ Section logrel.
   (*   ([∗ map] k↦y ∈ m, Φ k y) ⊢ Φ k a. *)
   (* Proof using. *)
    
-
   Lemma interp_env_Some_l vs s v :
     vs !! s = Some v → interp_env vs ⊢ interp v.
   Proof.
@@ -148,8 +147,12 @@ Section logrel.
     by apply not_elem_of_dom.
   Qed.
 
-  Definition subst_env (vs: gmap string (val heap_lang)) (e: expr heap_lang) := 
-    map_fold subst e vs. 
+  Lemma interp_env_subseteq vs vs' (SUB: vs' ⊆ vs):
+    interp_env vs -∗ interp_env vs'.
+  Proof using.
+    iIntros "#ENV". rewrite /interp_env.
+    iApply big_sepM_subseteq; eauto.
+  Qed.    
 
   Definition logrel (e : expr heap_lang) : iProp Σ :=
     □ ∀ vs τ, interp_env vs -∗ interp_expr τ (subst_env vs e).
