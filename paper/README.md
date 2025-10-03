@@ -115,12 +115,13 @@ The final result stating the termination of the closed program is located in `cl
 - The rule _MU-OM-nofork_: `lawyer/lawyer/obligations/obligations_logic.v`, lemma `BOU_AMU`.
 	
 #### Section 4.2
-- Sequential fair lock specification (Definition 6): `lawyer/lawyer/examples/ticketlock/releasing_lock.v`, record `ReleasingFairLock`.
-- Logically atomic fair lock specification: `lawyer/lawyer/examples/ticketlock/fair_lock.v`, record `FairLock`.
+- Sequential fair lock specification (Fig. 15): `lawyer/lawyer/examples/ticketlock/releasing_lock.v`, record `ReleasingFairLock`.
+
+#### Section 4.3
 - Verification of ticketlock implementation against the logically atomic specification: `lawyer/lawyer/examples/ticketlock/ticketlock.v`, see in particular `TL_FL`. 
 - Derivation of the sequential specification for a wrapper over logically atomic implementation: `lawyer/lawyer/examples/ticketlock/releasing_lock.v`, see in particular `RFL_FL`. 
 	
-#### Section 4.3
+#### Section 4.4
 Verification of the top-level program on top of the sequential lock specification: `lawyer/lawyer/examples/ticketlock/client.v`, theorem `client_spec`.
 	 
 ### Appendix
@@ -137,7 +138,9 @@ Full form of Lawyer rules can be found in `lawyer/lawyer/program_logic.v` (rules
 	 
 #### Appendix D
 - "Total" atomic updates: `lawyer/lawyer/examples/ticketlock/obls_atomic.v`, definition `TAU`.
-- "Total" logically atomic triples: `lawyer/lawyer/examples/ticketlock/obls_atomic.v`, definitions `TLAT` and `TLAT_RR` for different kinds of "wait clauses" used in underlying `TAU`.
+- "Total" logically atomic triples: `lawyer/lawyer/examples/ticketlock/obls_atomic.v`, definitions `TLAT` and `TLAT_RR` for different kinds of "wait clauses" used in underlying `TAU`
+- Logically atomic fair lock specification (Definition 7): `lawyer/lawyer/examples/ticketlock/fair_lock.v`, record `FairLock`.
+
 
 ### Additional case studies
 - Two implementations of parallel composition operator and rules for them: `lawyer/lawyer/examples/par.v`, definitions `par` and `par_sym`, along with `par_spec` and `par_sym_spec` lemmas.
