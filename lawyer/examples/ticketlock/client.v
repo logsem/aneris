@@ -73,7 +73,7 @@ Section MotivatingClient.
 
   Definition c__cl: nat := 4.
   Definition MAX_EXC := 70.
-  Definition client_LB := max_list [MAX_EXC + 2; rfl_sb_fun RFL c__cl].  
+  Definition client_LB := max_list [MAX_EXC + 1; rfl_sb_fun RFL c__cl].  
   Hypothesis (LS_LB: client_LB <= LIM_STEPS).
 
   Definition P__lock' flag s__f (b: bool): iProp Σ :=
