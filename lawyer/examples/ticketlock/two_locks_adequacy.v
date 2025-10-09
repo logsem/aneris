@@ -5,7 +5,7 @@ From fairness Require Import utils.
 From heap_lang Require Import simulation_adequacy.
 From lawyer Require Import sub_action_em action_model.
 From lawyer.obligations Require Import obligations_adequacy obligations_logic obligations_em obligations_resources obligations_model obligations_am env_helpers.
-From lawyer.examples.ticketlock Require Import fair_lock ticketlock client releasing_lock ticketlock_releasing.
+From lawyer.examples.ticketlock Require Import fair_lock ticketlock two_locks releasing_lock ticketlock_releasing.
 From lawyer.examples Require Import orders_lib signal_map.
 
 
@@ -20,15 +20,17 @@ Section Adequacy.
   Let d__h := CD 2.
   Let d__l := CD 1.
   Let d__w := CD 0.
-  Let d0 := CD 0.
 
-  Definition ClosedLevel := bounded_nat 3.
-  Definition CL (i: nat): ClosedLevel := bn_ith 2 i.
-  Let l__f := CL 2.
-  Let l__acq := CL 1.
-  Let l0 := CL 0.
+  Definition ClosedLevel := bounded_nat 4.
+  Definition CL (i: nat): ClosedLevel := bn_ith 3 i.
 
-  Definition ClosedLim := max_list [tl_c__cr; tl_fl_B c__cl; MAX_EXC + 2].
+  Let l__acq1 := CL 3.
+  Let l01 := CL 2.
+  Let l__acq2 := CL 1.
+  Let l02 := CL 0.
+
+  (* Definition ClosedLim := max_list [tl_c__cr; tl_fl_B c__cl; MAX_EXC + 2; tl_fl_B c__cl]. *)
+  Definition ClosedLim := max_list [MAX_EXC + 2; rfl_fl_sb_fun_impl tl_c__cr tl_fl_B c__cl]. 
 
   Instance ClosedObligationsPre: ObligationsParamsPre ClosedDegree ClosedLevel ClosedLim.
     esplit; try by apply _.
@@ -64,21 +66,51 @@ Section Adequacy.
 
   Let EM := TopAM_EM ObligationsASEM (fun {Σ} {aGS: asem_GS Σ} τ => obls τ ∅ (oGS := aGS)).
 
-  Program Definition TLPreInstance' :=
-    TLPreInstance l__acq d__l d__h d__e d__m _ _ _ (OP := Closed_OP_HL) (EM := EM).
+  Program Definition TLPreInstance'1 :=
+    TLPreInstance l__acq1 d__l d__h d__e d__m _ _ _ (OP := Closed_OP_HL) (EM := EM).
   Solve All Obligations with apply ith_bn_lt; lia.
   Fail Next Obligation.
 
-  Program Definition TLInstance' :=
-    TL_FL d__w d__l d__h d__e d__m _ _ _ _ _ l__acq (OP := Closed_OP_HL) (EM := EM).
+  Program Definition TLInstance'1 :=
+    TL_FL d__w d__l d__h d__e d__m _ _ _ _ _ l__acq1 (OP := Closed_OP_HL) (EM := EM).
   Solve Obligations with apply ith_bn_lt; lia.
   Next Obligation.
     rewrite /ClosedLim. cbv. lia.
   Qed.
   Fail Next Obligation.
 
-  Program Definition RFLInstance' :=
-    RFL_FL_TL' {[ l__acq ]} l0 _ l__acq _
+  Program Definition RFLInstance'1 :=
+    RFL_FL_TL' {[ l__acq1 ]} l01 _ l__acq1 _
+      d__w d__l d__h d__e d__m d__m' _ _ _ _ _
+      _ (OP := Closed_OP_HL) (EM := EM).
+  Next Obligation.
+    simpl. intros ?. rewrite /lvls_acq elem_of_singleton. intros ->.
+    apply ith_bn_lt. lia.
+  Qed.
+  Next Obligation.
+    set_solver.
+  Qed.
+  Solve Obligations with (simpl; apply ith_bn_lt; lia).
+  Next Obligation.
+    rewrite /ClosedLim /tl_exc. simpl. lia.
+  Qed.
+  Fail Next Obligation.
+
+  Program Definition TLPreInstance'2 :=
+    TLPreInstance l__acq2 d__l d__h d__e d__m _ _ _ (OP := Closed_OP_HL) (EM := EM).
+  Solve All Obligations with apply ith_bn_lt; lia.
+  Fail Next Obligation.
+
+  Program Definition TLInstance'2 :=
+    TL_FL d__w d__l d__h d__e d__m _ _ _ _ _ l__acq2 (OP := Closed_OP_HL) (EM := EM).
+  Solve Obligations with apply ith_bn_lt; lia.
+  Next Obligation.
+    rewrite /ClosedLim. cbv. lia.
+  Qed.
+  Fail Next Obligation.
+
+  Program Definition RFLInstance'2 :=
+    RFL_FL_TL' {[ l__acq2 ]} l02 _ l__acq2 _
       d__w d__l d__h d__e d__m d__m' _ _ _ _ _
       _ (OP := Closed_OP_HL) (EM := EM).
   Next Obligation.
@@ -95,7 +127,9 @@ Section Adequacy.
   Fail Next Obligation.
 
   Definition RFLΣ := #[GFunctor $ excl_authUR (optionUR SignalId); sig_mapΣ; TLΣ].
-  Global Instance subG_RFLΣ {Σ}: subG RFLΣ Σ → RFL_FL_preG Σ (FLP := TLPreInstance').
+  Global Instance subG_RFLΣ1 {Σ}: subG RFLΣ Σ → RFL_FL_preG Σ (FLP := TLPreInstance'1).
+  Proof. intros. esplit; solve_inG. Qed. 
+  Global Instance subG_RFLΣ2 {Σ}: subG RFLΣ Σ → RFL_FL_preG Σ (FLP := TLPreInstance'2).
   Proof. intros. esplit; solve_inG. Qed. 
 
   Definition ClosedΣ := #[ ClientΣ;
@@ -115,14 +149,14 @@ Section Adequacy.
 
   Lemma closed_program_terminates_impl
     (extr : heap_lang_extrace)
-    (START: trfirst extr = ([client_prog RFLInstance' #()], Build_state ∅ ∅)):
+    (START: trfirst extr = ([client_two RFLInstance'1 RFLInstance'2 #()], Build_state ∅ ∅)):
     extrace_fairly_terminating extr.
   Proof.
     assert (heapGpreS ClosedΣ EM) as HPreG.
     { apply subG_heapPreG. apply _. }
 
     eapply @obls_terminates_impl with
-      (cps_degs := 4 *: {[+ d__r +]})
+      (cps_degs := 50 *: {[+ d__r +]})
       (eb := 70); eauto.
     1-5: by apply _.
     1-2: by apply fin_wf.
@@ -132,20 +166,22 @@ Section Adequacy.
     simpl in *. 
 
     pose proof @client_spec as SPEC.
-    specialize SPEC with (OP := Closed_OP_HL) (RFL := RFLInstance') (OHE := Closed_OM_HL_Env HEAP).
-    specialize SPEC with (l__f := l__f) (d0 := d0) (d__r := d__r).
+    specialize SPEC with (OP := Closed_OP_HL) (RFL1 := RFLInstance'1) (RFL2 := RFLInstance'2) (OHE := Closed_OM_HL_Env HEAP).
+    specialize SPEC with (d__cl := d__r).
     simpl in *.
 
     iApply (SPEC with "[-]").
-    { simpl. intros ?. rewrite /rfl_fl_lvls. simpl. rewrite /lvls_acq.
-      rewrite elem_of_union !elem_of_singleton.
-      intros [-> | ->]; apply ith_bn_lt; lia. }
+    { intros ??. rewrite !elem_of_union !elem_of_singleton.
+      intros [-> | ->] [-> | ->]; apply ith_bn_lt; lia. }
     1, 2: apply ith_bn_lt; lia. 
-    { cbv; lia. }
     { simpl. by iIntros (? _) "X". }
     { (* TODO: why solve_inG doesn't solve it? *)
       intros. split; try solve_inG || apply _.
+      simpl. apply _. }  
+    { (* TODO: why solve_inG doesn't solve it? *)
+      intros. split; try solve_inG || apply _.
       simpl. apply _. }
+    { cbv. lia. }
     2: { by iIntros "!> % ?". }
 
     clear SPEC.
@@ -165,9 +201,9 @@ Section Adequacy.
 End Adequacy.
 
 
-Theorem closed_program_terminates:
+Theorem two_locks_program_terminates:
   forall extr,
-    trfirst extr = ([client_prog RFLInstance' #()], Build_state ∅ ∅) ->
+    trfirst extr = ([client_two RFLInstance'1 RFLInstance'2 #()], Build_state ∅ ∅) ->
     extrace_fairly_terminating extr.
 Proof using.
   intros. eapply closed_program_terminates_impl; eauto.  

@@ -1,4 +1,4 @@
-From lawyer.examples.ticketlock Require Import closed_adequacy. 
+From lawyer.examples.ticketlock Require Import closed_adequacy two_locks_adequacy. 
 From lawyer.examples.nondet Require Import nondet_adequacy nondet_par_adequacy.
 From lawyer.examples.const_term  Require Import const_term_adequacy.
 From lawyer.examples.eo_fin  Require Import eo_fin_adequacy.
@@ -13,7 +13,8 @@ Definition results := (
   const_term_bound_termination, 
   eofin_terminates, 
   lf_counter_termination,
-  rt_bound_termination
+  rt_bound_termination,
+  two_locks_program_terminates
 ). 
 
 Goal True. 
