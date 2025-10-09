@@ -88,7 +88,8 @@ Section RTBAdequacy.
     { unfold LB. apply max_list_elem_of_le. apply elem_of_list_further, elem_of_list_here. }
     2: { simpl. iNext. iIntros (?) "?". iFrame. }
 
-    rewrite START. by iApply closed_pre_helper.
+    rewrite START.
+    iDestruct (closed_pre_helper with "[$]") as "(?&?&?&?)". by iFrame.
   Qed.
 
 End RTBAdequacy.

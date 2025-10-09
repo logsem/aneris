@@ -551,6 +551,7 @@ Section OblsAdequacy.
     :
     extrace_fairly_terminating extr.
   Proof.
+    simpl in *. rewrite /obls_init_resource in WPe. 
     eapply obls_terminates_impl_multiple; eauto.
     { subst s1. rewrite Hexfirst. apply init_om_state_init. } 
     { subst s1. apply om_live_tids_init. }
@@ -564,7 +565,8 @@ Section OblsAdequacy.
           (e: expr) (k: nat) (d: Degree) (σ: state) (b: nat):
     obls_init_resource (init_om_state ([e], σ) (k *: {[+ d +]}) b) ()  ⊢
       th_phase_eq (locale_of [] e) (ext_phase π0 0)  ∗
-      cp_mul (ext_phase π0 0) d k ∗ obls (locale_of [] e) ∅.
+      cp_mul (ext_phase π0 0) d k ∗ obls (locale_of [] e) ∅ ∗
+      exc_lb b. 
   Proof using.
     iIntros "INIT". 
     rewrite /obls_init_resource /init_om_state.
@@ -578,6 +580,31 @@ Section OblsAdequacy.
     { apply phase_lt_fork. }
     { reflexivity. }
     rewrite cp_mul_alt mset_map_singleton. done.     
+  Qed.
+
+  Lemma obls_terminates_impl_paper Σ
+    {HEAP: heapGpreS Σ EM}
+    (extr : heap_lang_extrace) (e: expr) (σ: state)
+    (d: Degree)
+    (Hexfirst : trfirst extr = ([e], Build_state ∅ ∅))
+    (τ0 := 0: locale heap_lang)
+    (WPe: forall (HEAP: heapGS Σ EM),
+        let _: ObligationsGS Σ := @heap_fairnessGS Σ M EM HEAP in
+        ⊢ {{{ ∃ π, obls τ0 ∅  ∗ th_phase_eq τ0 π ∗ cp π d }}}
+            e @ τ0
+          {{{ v, RET v; obls τ0 ∅ }}})
+    :
+    extrace_fairly_terminating extr.
+  Proof.
+    eapply obls_terminates_impl; eauto.
+    iIntros (?) "[HEAP OM]". iApply (WPe with "[-]").
+    2: { iNext. set_solver. } 
+    rewrite Hexfirst. iDestruct (closed_pre_helper with "OM") as "OM".
+    iDestruct "OM" as "(PH & CPS & OB & #EB)".
+    subst τ0. iFrame.
+    erewrite <- cp_mul_1. iFrame.
+    (* eb is not used in this spec *)
+    Unshelve. exact 0.
   Qed.
 
 End OblsAdequacy.

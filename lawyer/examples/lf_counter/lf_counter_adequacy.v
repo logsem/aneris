@@ -77,7 +77,8 @@ Section LFCAdequacy.
     { simpl. iIntros (? _) "X". iApply "X". }
     2: { simpl. iNext. iIntros (?) "?". iFrame. }
 
-    rewrite START. by iApply closed_pre_helper.
+    rewrite START. 
+    iDestruct (closed_pre_helper with "[$]") as "(?&?&?&?)". by iFrame.  
   Qed.
 
 End LFCAdequacy.

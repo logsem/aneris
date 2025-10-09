@@ -82,7 +82,8 @@ Section NondetAdequacy.
     { apply ith_bn_lt. lia. }
     2: { simpl. iNext. iIntros (?) "(%&?&?&?&?)". iFrame. }
 
-    rewrite START. by iApply closed_pre_helper.
+    rewrite START.
+    iDestruct (closed_pre_helper with "[$]") as "(?&?&?&?)". by iFrame.  
   Qed.
 
 End NondetAdequacy.

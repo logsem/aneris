@@ -82,7 +82,8 @@ Section ConstTermAdequacy.
     2: { simpl. iNext. iIntros (_) "X". iApply "X". }
    
     clear SPEC.
-    rewrite START. by iApply closed_pre_helper.
+    rewrite START.
+    iDestruct (closed_pre_helper with "[$]") as "(?&?&?&?)". by iFrame.  
   Qed.
 
 End ConstTermAdequacy.

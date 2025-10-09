@@ -77,7 +77,8 @@ Section NondetAdequacy.
     { lia. }
     2: { simpl. iNext. iIntros (?) "(%&% &?&?&?&?)". iFrame. }
 
-    rewrite START. by iApply closed_pre_helper.
+    rewrite START. 
+    iDestruct (closed_pre_helper with "[$]") as "(?&?&?&?)". by iFrame.  
   Qed.
 
   Definition conf_init_pre (cnt flag: loc) := ([stop_and_read #cnt #flag; incr_loop #cnt #flag], Build_state {[ cnt := #0; flag := #false ]} ∅). 
