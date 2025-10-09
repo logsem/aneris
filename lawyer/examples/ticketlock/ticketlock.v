@@ -16,7 +16,7 @@ From lawyer.examples.ticketlock Require Import obls_atomic fair_lock.
 Section Ticketlock.
   Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
   Context `{EM: ExecutionModel heap_lang M}.
-  Context {FLP: FairLockPre}.
+  (* Context {FLP: FairLockPre}. *)
   Notation "'Degree'" := (om_hl_Degree). 
   Notation "'Level'" := (om_hl_Level).
 

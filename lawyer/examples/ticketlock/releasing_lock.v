@@ -131,8 +131,17 @@ Section RFLFromFL.
     inv lock_ns (lock_inv_inner lk).
 
   Definition sb_add := 3.
-  Definition rfl_fl_sb_fun :=
+
+  Definition rfl_fl_sb_fun := 
     fun i => max_list [10; fl_c__cr FLP; fl_B FLP i + sb_add; fl_B FLP (i + sb_add)].
+
+  (** we'll use this general definition for illustrative purposes 
+      when discussing the ticketlock instantiation *)
+  Definition rfl_fl_sb_fun_impl (N: nat) (F: nat -> nat) := 
+    fun i => max_list [10; N; F i + sb_add; F (i + sb_add)].
+  Lemma rfl_fl_sb_fun_impl_alt: 
+    rfl_fl_sb_fun = rfl_fl_sb_fun_impl (fl_c__cr FLP) (fl_B FLP).
+  Proof. reflexivity. Qed.  
 
   Definition rfl_fl_is_lock lk u: iProp Σ :=
     lock_inv lk ∗ fl_is_lock FL lk (u + sb_add) (FLG := FLG) ∗
@@ -356,17 +365,22 @@ Section RFLFromFL.
         destruct (1 - q')%Qp; done. }
     Qed.
 
-    Definition acquire_aux: val :=
-      λ: "lk", fl_acquire FLP "lk" ;; Skip
-    .
+    (** extra steps to exchange fuel and/or remove later *)
+    Definition method_aux (v: val): val :=
+      λ: "arg", v "arg". 
+    Definition method_aux' (v: val): val :=
+      λ: "arg", v "arg" ;; Skip. 
 
-    (** leading lambda to exchange fuel, trailing Skip to strip later *)
+    Definition release_aux: val := method_aux (fl_release FLP).
+    Definition acquire_aux: val := method_aux' (fl_acquire FLP).
+    Definition newlock_aux: val := method_aux (fl_create FLP). 
+
     (* TODO: change the definition of (our counterpart of) atomic_wp,
        so that it allows showing postcondition under later *)
     Lemma acquire_usage:
       rfl_acquire_spec_gen acquire_aux P__lock d__m'.
     Proof using L__FL LVL_ORDo LTmm'.
-      rewrite /rfl_acquire_spec_gen /acquire_aux. intros τ lk π Ob c__cl ?.
+      rewrite /rfl_acquire_spec_gen /acquire_aux /method_aux'. intros τ lk π Ob c__cl ?.
       iIntros (Φ).
       iIntros "(#(INV & LOCK & %BOUND) & OB & PH & CPm & #OB_GT) POST".
 
@@ -556,16 +570,10 @@ Section RFL2FL.
   Context (d__m': Degree).
   Hypothesis (LTmm': deg_lt (fl_d__m FLP) d__m').
 
-  (** extra steps to exchange fuel that has to align with that of acquire_aux *)
-  Definition release_aux: val :=
-    λ: "lk", (fl_release FLP) "lk". 
-  Definition newlock_aux: val :=
-    λ: <>, (fl_create FLP) #().
-
   Program Definition RFL_FL: ReleasingFairLock := {|
-      rfl_newlock := newlock_aux;
+      rfl_newlock := newlock_aux (FLP := FLP);
       rfl_acquire := acquire_aux (FLP := FLP);
-      rfl_release := release_aux;
+      rfl_release := release_aux (FLP := FLP);
       rfl_preG := RFL_FL_preG;
       rfl_G := RFL_FL_G;
   
@@ -584,7 +592,7 @@ Section RFL2FL.
   Next Obligation.
     intros **.
     iIntros "(CP & PH & P) POST".
-    rewrite /newlock_aux. pure_step_hl. MU_by_BOU.
+    rewrite /newlock_aux /method_aux. pure_step_hl. MU_by_BOU.
     iMod (first_BOU with "[$]") as "[CPS _]".
     { apply LTmm'. }
     { try_solve_bounds. use_rfl_fl_sb. }
@@ -594,10 +602,13 @@ Section RFL2FL.
         
     unshelve epose proof (fl_create_spec FL) as spec.
     { apply PRE. }
-    simpl in spec. iApply (spec with "[] [-POST P]").
+    wp_bind (fl_create FLP #()). simpl.
+    iDestruct (cp_mul_take with "CPS") as "[CPS CP]". 
+    simpl in spec. iApply (spec with "[] [-POST CPS P]").
     { try_solve_bounds. }
-    { iDestruct (cp_mul_take with "CPS") as "[??]". iFrame. }
+    { iFrame. }
     iNext. iIntros (lk) "(%FLG & LK & #LOCK & PH)".
+    
     iApply "POST".
 
     Unshelve. 2: exact (u + sb_add).
@@ -606,7 +617,7 @@ Section RFL2FL.
 
     iModIntro.
     iExists {| rfl_fl_impl := CG ; rfl_fl_fl := FLG |}.
-    iFrame "#∗".
+    rewrite /RFL_FL_obligation_1. iFrame "#∗".
     try_solve_bounds. 
   Qed.
   Next Obligation.
@@ -630,7 +641,7 @@ Section RFL2FL.
   Next Obligation.
     intros **. simpl.
     iIntros "(#(INV & LOCK & %BOUND) & #SGT & OB & PH & CP & LOCKED & BOU) POST".
-    rewrite /release_aux. pure_step_hl. MU_by_BOU.
+    rewrite /release_aux /method_aux. pure_step_hl. MU_by_BOU.
     iMod (first_BOU with "[$]") as "[CPS _]".
     { apply LTmm'. }
     { try_solve_bounds. use_rfl_fl_sb. }

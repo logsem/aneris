@@ -33,9 +33,6 @@ Section TicketlockReleasing.
   Solve Obligations with eauto. 
   Fail Next Obligation.  
 
-  (** This states that ticketlock satisfies the sequential lock specification
-      for any choice of OM parameters satisfying the restrictions in Context above.
-      To make sure it refers to (wrappers over) ticketlock functions, see the output of the Compute command below. *)
   Program Definition RFL_FL_TL := @RFL_FL _ _ _ OP _ EM _ TLInstance l__o _ l__acq _ d5 _.
   Next Obligation.
     simpl. intros ?. rewrite /lvls_acq elem_of_singleton. intros ->.
@@ -49,7 +46,23 @@ Section TicketlockReleasing.
   Qed. 
   Fail Next Obligation.
 
-  (** Compute (rfl_newlock RFL_FL_TL, rfl_acquire RFL_FL_TL, rfl_release RFL_FL_TL). *)
+  (** here we state that (wrappers over) ticketlock methods 
+      satisfy the sequential lock specification,
+      if the spec's parameters (rfl_d, rfl_lvls and rfl_sb_fun) are chosen 
+      according to the OM parameters which in turn satisfy conditions in Context *)
+  Definition RFL_FL_TL': ReleasingFairLock := {|
+    rfl_newlock := method_aux tl_newlock;
+    rfl_acquire := method_aux' tl_acquire;
+    rfl_release := method_aux tl_release;
+    rfl_d := d5;
+    rfl_lvls := {[ l__acq; l__o ]};
+    rfl_sb_fun := rfl_fl_sb_fun_impl tl_c__cr tl_fl_B;
+
+    (*******)
+    rfl_newlock_spec := @rfl_newlock_spec _ _ _ _ _ _ RFL_FL_TL;
+    rfl_acquire_spec := @rfl_acquire_spec _ _ _ _ _ _ RFL_FL_TL;
+    rfl_release_spec := @rfl_release_spec _ _ _ _ _ _ RFL_FL_TL;
+  |}.
 
 End TicketlockReleasing.
 
@@ -123,7 +136,7 @@ Section Adequacy.
   Fail Next Obligation.
 
   Program Definition RFLInstance' :=
-    RFL_FL_TL {[ l__acq ]} l0 _ l__acq _
+    RFL_FL_TL' {[ l__acq ]} l0 _ l__acq _
       d__w d__l d__h d__e d__m d__m' _ _ _ _ _
       _ (OP := Closed_OP_HL) (EM := EM).
   Next Obligation.
