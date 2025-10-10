@@ -93,10 +93,10 @@ Section MotivatingClient.
           obls τ ∅          
       }}}
         acquire_two lk1 lk2 @ τ
-      {{{ v, RET v; ∃ s1 s2 l1 l2, obls τ {[ s1; s2 ]} ∗ th_phase_eq τ π ∗ ⌜ s1 ≠ s2 ⌝ ∗
-                          sgn s1 l1 None ∗ rfl_locked RFL1 s1 (rfl_G0 := RFLG1) ∗
-                          sgn s2 l2 None ∗ rfl_locked RFL2 s2 (rfl_G0 := RFLG2) ∗ 
-                          ⌜ l1 ∈ rfl_lvls RFL1 /\ l2 ∈ rfl_lvls RFL2 ⌝ }}}. 
+      {{{ v, RET v; ∃ s1 s2, obls τ {[ s1; s2 ]} ∗ th_phase_eq τ π ∗
+                          rfl_locked RFL1 s1 (rfl_G0 := RFLG1) ∗
+                          rfl_locked RFL2 s2 (rfl_G0 := RFLG2)
+                          }}}. 
     Proof using LOCKS_ORDER DEG2 DEG1 CL.
       iIntros (Φ) "(#LOCKS & CP1 & CP2 & CPS & PH & OB) POST". rewrite /acquire_two.
       pure_steps.
@@ -111,24 +111,29 @@ Section MotivatingClient.
       { iFrame "#∗". by iApply sgns_gt'_12. }
       iIntros "!> %v2 (%s2 & %l2 & OB & #SGN2 & %NEW2 & %LVL2 & PH & _ & L2)".
       iApply "POST". iExists s1, s2. iFrame "#∗". 
-      iPureIntro. set_solver. 
     Qed.
 
-    Lemma release_two_spec τ π lk1 lk2 s1 s2 l1 l2 
-      (NEQ: s1 ≠ s2):
+    Lemma release_two_spec τ π lk1 lk2 s1 s2:
       {{{ two_locks lk1 lk2 ∗ 
           cp π d1 ∗ cp π d2 ∗ cp_mul π d__cl 5 ∗ th_phase_eq τ π ∗
-          obls τ {[ s1; s2 ]} ∗ sgn s1 l1 None ∗ sgn s2 l2 None ∗
-          ⌜ l1 ∈ rfl_lvls RFL1 /\ l2 ∈ rfl_lvls RFL2 ⌝ ∗
+          obls τ {[ s1; s2 ]} ∗ 
           rfl_locked RFL1 s1 (rfl_G0 := RFLG1) ∗
           rfl_locked RFL2 s2 (rfl_G0 := RFLG2)
       }}}
         release_two lk1 lk2 @ τ
       {{{ v, RET v; obls τ ∅ ∗ th_phase_eq τ π }}}.
     Proof using LOCKS_ORDER DEG2 DEG1 CL.
-      iIntros (Φ) "(#LOCKS & CP1 & CP2 & CPS & PH & OB & #SGN1 & #SGN2 & [%LVL1 %LVL2] & L1 & L2) POST". rewrite /release_two.
+      iIntros (Φ) "(#LOCKS & CP1 & CP2 & CPS & PH & OB & L1 & L2) POST". rewrite /release_two.
       pure_steps.
       iDestruct "LOCKS" as "[#LOCK1 #LOCK2]".
+
+      iAssert (⌜ s1 ≠ s2 ⌝)%I as %NEQ.
+      { iDestruct (rfl_locked_sgn with "L1") as "(%l1 & #SGN1 & %IN1)".
+        iDestruct (rfl_locked_sgn with "L2") as "(%l2 & #SGN2 & %IN2)".
+        iIntros (<-).
+        iDestruct (sgn_level_agree with "SGN1 SGN2") as "<-".
+        iPureIntro. eapply LOCKS_ORDER in IN1; eauto.
+        by apply strict_ne in IN1. }
 
       wp_bind (rfl_release RFL2 lk2)%E.
       iApply (rfl_release_spec with "[-POST CPS CP1 L1]").
@@ -170,12 +175,11 @@ Section MotivatingClient.
       split_cps "CPS" 5. 
       iApply (acquire_two_spec with "[-POST CP1' CP2' CPS]").
       { rewrite -!cp_mul_1. iFrame "#∗". }
-      iIntros "!> %v1 (%s1 & %s2 & %l1 & %l2 & OB & PH & %NEQ & #SGN1 & L1 & #SGN2 & L2 & %LVLS)".
+      iIntros "!> %v1 (%s1 & %s2 & OB & PH & L1 & L2)".
 
       wp_bind (Rec _ _ _)%E.
       do 3 pure_step_cases. 
       iApply (release_two_spec with "[-POST]").
-      { eauto. }
       { rewrite -!cp_mul_1. by iFrame "#∗". }
 
       iIntros "!> %v [??]". by iApply "POST".
