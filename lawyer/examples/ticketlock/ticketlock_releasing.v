@@ -56,6 +56,8 @@ Section TicketlockReleasing.
     rfl_newlock_spec := @rfl_newlock_spec _ _ _ _ _ _ RFL_FL_TL;
     rfl_acquire_spec := @rfl_acquire_spec _ _ _ _ _ _ RFL_FL_TL;
     rfl_release_spec := @rfl_release_spec _ _ _ _ _ _ RFL_FL_TL;
+    rfl_locked_excl := @rfl_locked_excl _ _ _ _ _ _ RFL_FL_TL;
+    rfl_locked_sgn := @rfl_locked_sgn _ _ _ _ _ _ RFL_FL_TL;
   |}.
 
 End TicketlockReleasing.

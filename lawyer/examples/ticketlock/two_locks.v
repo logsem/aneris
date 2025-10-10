@@ -134,8 +134,7 @@ Section MotivatingClient.
       iApply (rfl_release_spec with "[-POST CPS CP1 L1]").
       2: iFrame "#∗".
       { set_solver. }
-      { iSplitR; [iApply sgns_gt'_12| ]; eauto.
-        iIntros "%q %Q PH OB". iModIntro. iSplit; [done| ].
+      { iIntros "%q %Q PH OB". iModIntro. iSplit; [done| ].
         iIntros "PH'". iDestruct (th_phase_frag_combine' with "[$PH $PH']") as "foo"; [done| ].
         iAccu. }
       iIntros "!> %v2 [OB PH]".
@@ -145,8 +144,7 @@ Section MotivatingClient.
       iApply (rfl_release_spec with "[-POST CPS]").
       2: iFrame "#∗".
       { apply not_elem_of_empty. }
-      { iSplitR; [iApply empty_sgns_levels_rel| ].
-        rewrite union_empty_l_L. iFrame.       
+      { rewrite union_empty_l_L. iFrame.       
         iIntros "%q %Q PH OB". iModIntro. iSplit; [done| ].
         iIntros "PH'". iDestruct (th_phase_frag_combine' with "[$PH $PH']") as "foo"; [done| ].
         iAccu. }

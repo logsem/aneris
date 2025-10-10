@@ -65,7 +65,7 @@ Section EOFinAdequacy.
     iApply (SPEC with "[-]"). 
     { simpl. iIntros (? _) "X". iApply "X". }
     2: { simpl. iNext. iIntros (_) "X". iApply "X". }
-    
+
     simpl. rewrite START.
     rewrite /obls_init_resource /init_om_state. 
       
@@ -73,12 +73,13 @@ Section EOFinAdequacy.
     rewrite locales_of_cfg_simpl. simpl.
     rewrite union_empty_r_L.
     iDestruct "INIT" as "(CPS & SIGS & OB & EPS & PH & EB)".
-    rewrite /cps_repr /sig_map_repr /eps_repr /obls_map_repr. 
+    rewrite /cps_repr /sig_map_repr /eps_repr /obls_map_repr.
+    rewrite obligations_resources.obls_unseal. 
     rewrite big_sepM_singleton. 
     rewrite fmap_empty.
     rewrite !gset_to_gmap_singleton. 
     rewrite map_fmap_singleton.      
-    iFrame.
+    iFrame. rewrite big_sepS_empty. iApply bi.sep_assoc. iSplitL; [| done]. 
     rewrite mset_map_disj_union. rewrite big_sepMS_disj_union.
     rewrite !mset_map_mul !mset_map_singleton.
 

@@ -57,7 +57,7 @@ Section ReleasingLockSpec.
         τ lk (π: Phase) (Ob: gset SignalId) (u: nat) (P: iProp Σ) s__o Q
         (ADD: s__o ∉ Ob):
       {{{ rfl_is_lock lk u P (rfl_G0 := RFLG) ∗
-          sgns_levels_gt' Ob rfl_lvls ∗
+          (* sgns_levels_gt' Ob rfl_lvls ∗ *)
           obls τ (Ob ∪ {[ s__o ]}) ∗ 
           th_phase_eq τ π ∗ cp π rfl_d ∗
           rfl_locked s__o (rfl_G0 := RFLG) ∗
@@ -69,6 +69,12 @@ Section ReleasingLockSpec.
 
       rfl_is_lock_pers `{PRE: rfl_G Σ} {OHE: OM_HL_Env OP EM Σ}
         lk u P: Persistent (rfl_is_lock lk u P (rfl_G0 := PRE));
+
+      rfl_locked_excl `{PRE: rfl_G Σ} {OHE: OM_HL_Env OP EM Σ} s1 s2:
+        rfl_locked s1 (rfl_G0 := PRE) -∗ rfl_locked s2 (rfl_G0 := PRE) -∗ False;
+
+      rfl_locked_sgn `{PRE: rfl_G Σ} {OHE: OM_HL_Env OP EM Σ} s:
+        rfl_locked s (rfl_G0 := PRE) -∗ ∃ l, sgn s l None ∗ ⌜ l ∈ rfl_lvls ⌝;
   }.
   
 End ReleasingLockSpec.
@@ -227,13 +233,33 @@ Section RFLFromFL.
       simpl. by rewrite union_empty_r_L. 
     Qed.
 
+    Existing Instance fl_is_lock_pers. 
+
     Definition rfl_fl_locked (s__o: SignalId): iProp Σ :=
       lock_owner_frag (Some s__o) ∗ sgn s__o l__o None ∗
       fl_release_token FL (FLG := FLG).
 
-    Existing Instance fl_is_lock_pers. 
-
+    Lemma rfl_fl_locked_excl s1 s2:
+      rfl_fl_locked s1 -∗ rfl_fl_locked s2 -∗ False.
+    Proof using.
+      clear. 
+      rewrite /rfl_fl_locked. 
+      iIntros "(L1 & ? & ?) (L2 & ? & ?)".
+      iCombine "L1 L2" as "L".
+      iDestruct (own_valid with "L") as %V.
+      rewrite auth_frag_valid Some_valid in V.
+      set_solver.
+    Qed. 
+      
     Definition rfl_fl_lvls := fl_acq_lvls FLP ∪ {[ l__o ]}. 
+
+    Lemma rfl_fl_locked_lvl s:
+      rfl_fl_locked s -∗ ∃ l, sgn s l None ∗ ⌜ l ∈ rfl_fl_lvls ⌝.
+    Proof using.
+      clear. 
+      rewrite /rfl_fl_locked. iIntros "(?&#SGN&?)".
+      iFrame "#∗". iPureIntro. rewrite /rfl_fl_lvls. set_solver.
+    Qed.
 
     Context (d__m': Degree).
     Hypothesis (LTmm': deg_lt (fl_d__m FLP) d__m').
@@ -429,7 +455,7 @@ Section RFLFromFL.
       (ADD: s__o ∉ Ob)
       :
       {{{ rfl_fl_is_lock lk u ∗
-          sgns_levels_gt' Ob (fl_acq_lvls FLP) ∗ obls τ (Ob ∪ {[ s__o ]}) ∗ 
+          obls τ (Ob ∪ {[ s__o ]}) ∗ 
           th_phase_eq τ π ∗ cp π (fl_d__m FLP) ∗
           rfl_fl_locked s__o ∗ 
           (∀ q, ⌜ Qp.le q 1 ⌝ -∗ th_phase_frag τ π q -∗ obls τ Ob -∗
@@ -439,7 +465,8 @@ Section RFLFromFL.
       {{{ v, RET v; Q }}}.
     Proof using All.
       iIntros (Φ).
-      iIntros "(#(INV & LOCK & %BOUND) & #SGT & OB & PH & CPm & LOCKED & FIN_BOU) POST".
+      iIntros "(#(INV & LOCK & %BOUND) & OB & PH & CPm & LOCKED & FIN_BOU) POST".
+      iDestruct (obls_signals with "[$]") as "#SOB". 
 
       iApply (wp_step_fupd _ _ ⊤ _ _ with "[POST]").
       { done. }
@@ -451,15 +478,10 @@ Section RFLFromFL.
       iApply ("REL" with "[] [OB PH CPm]").
       { try_solve_bounds. }
       { iFrame.
-        (* TODO: make a lemma *)
-        rewrite /sgns_levels_gt'.
-
-        rewrite /sgns_levels_rel. rewrite big_sepS_union; [| set_solver].
-        iSplit. 
-        - iApply (big_sepS_impl with "[$]").
-          iModIntro. iIntros (??) "(%l & ? & %LE)".
-          iExists _. iFrame. done.
-        - iApply big_sepS_singleton. iExists _. by iFrame "SGNo". }
+        rewrite /sgns_levels_gt'. rewrite /sgns_levels_rel.
+        iApply (big_sepS_impl with "SOB").
+        iModIntro. iIntros (??) "(%l & ?)".
+        iFrame. set_solver. }
 
       iApply (TAU_intro with "[-]").
       3: { iSplit; [| iAccu].
@@ -640,7 +662,7 @@ Section RFL2FL.
   Qed.
   Next Obligation.
     intros **. simpl.
-    iIntros "(#(INV & LOCK & %BOUND) & #SGT & OB & PH & CP & LOCKED & BOU) POST".
+    iIntros "(#(INV & LOCK & %BOUND) & OB & PH & CP & LOCKED & BOU) POST".
     rewrite /release_aux /method_aux. pure_step_hl. MU_by_BOU.
     iMod (first_BOU with "[$]") as "[CPS _]".
     { apply LTmm'. }
@@ -648,17 +670,21 @@ Section RFL2FL.
     iModIntro. burn_cp_after_BOU.
 
     iApply (release_usage with "[-POST] [$]").
-    5: iFrame "#∗".
+    5: iFrame "#∗". 
     all: try by eauto.
-    rewrite bi.sep_assoc. iSplitR.
+    iSplitR.
     2: { rewrite cp_mul_1. iApply (cp_mul_weaken with "[$]"); done || lia. }
-    iSplit. 
-    - try_solve_bounds. 
-    - iApply (sgns_levels_rel'_impl with "[$]"); set_solver.
+    try_solve_bounds. 
   Qed.
   Next Obligation.
     intros. simpl. apply _.
   Qed.
+  Next Obligation.
+    simpl. intros. iApply rfl_fl_locked_excl.
+  Qed. 
+  Next Obligation.
+    simpl. intros. iApply rfl_fl_locked_lvl. 
+  Qed. 
   Fail Next Obligation.
 
 End RFL2FL.

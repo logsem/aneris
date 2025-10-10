@@ -150,16 +150,9 @@ Section Adequacy.
 
     clear SPEC.
     rewrite START. simpl.
-    rewrite /obls_init_resource /init_om_state.      
-    rewrite init_phases_helper.
-    rewrite locales_of_cfg_simpl. simpl.
-    iDestruct "INIT" as "(CPS & SIGS & OB & EPS & PH & EB)".
-    rewrite union_empty_r_L !gset_to_gmap_singleton.
-    rewrite big_sepM_singleton. iFrame.  
-    rewrite /cps_repr /sig_map_repr /eps_repr /obls_map_repr.
-    rewrite !mset_map_mul !mset_map_singleton.
-    rewrite -!(cp_mul_alt (oGS := (@heap_fairnessGS _ _ _ HEAP))).
-    iApply cp_mul_weaken; [..| by iFrame]; apply phase_lt_fork || lia. 
+    iDestruct (closed_pre_helper with "[$]") as "(?&?&?&?)".
+    iFrame. 
+    iApply cp_mul_weaken; [..| by iFrame]; [reflexivity | lia]. 
   Qed.
 
 End Adequacy.

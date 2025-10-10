@@ -575,7 +575,9 @@ Section OblsAdequacy.
     iDestruct "INIT" as "(CPS & SIGS & OB & EPS & PH & EB)".
     rewrite union_empty_r_L !gset_to_gmap_singleton.
     rewrite big_sepM_singleton. iFrame.
-    rewrite mset_map_mul.
+    rewrite obligations_resources.obls_unseal. iFrame.  
+    rewrite big_sepS_empty. iSplit; [| done].
+    rewrite mset_map_mul.    
     iApply cp_mul_weaken.
     { apply phase_lt_fork. }
     { reflexivity. }

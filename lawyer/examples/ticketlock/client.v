@@ -139,8 +139,6 @@ Section MotivatingClient.
       3: by iApply "POST".
       all: try by eauto. 
       iFrame "#∗".
-      iSplitR.
-      { iApply empty_sgns_levels_rel. }
 
       iIntros (?) "%QQ PH OB".
       iApply BOU_intro. simpl.
@@ -276,8 +274,6 @@ Section MotivatingClient.
       iApply (rfl_release_spec with "[-POST] [$]").
       2: iFrame "#∗".
       all: try by eauto.
-      iSplit.
-      { iApply empty_sgns_levels_rel. }
 
       iIntros (q QQ) "PH OB".
       iMod ("FIN" with "[$] [$]") as "(C&P&?&PH)".

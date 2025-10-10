@@ -182,8 +182,12 @@ Section NondetAdequacy.
     pose proof @alloc_nondet_inv_impl.
     specialize (H _ _ _ ND_OP_HL _ EM NDΣ (OHE HEAP) () 0 _ 0 cnt flag 0).
 
-    iApply fupd_mask_mono; [apply empty_subseteq| ]. 
-    iMod (H with "[$] [$] [$] [$] []") as "foo".
+    iApply fupd_mask_mono; [apply empty_subseteq| ].
+    iDestruct (sgn_get_ex _ _ (Some false) with "SIGS") as "[SIGS #SGN]".
+
+    iMod (H with "[$] [$] [OB0] [$] []") as "foo".
+    { rewrite obligations_resources.obls_unseal. iFrame.
+      rewrite big_sepS_singleton. by iExists _. }
     { iApply (exc_lb_le with "[$]"). lia. }
     iDestruct "foo" as (ND) "(#INV & OB0 & #SGN' & TOK)".
     iModIntro. rewrite bi.sep_assoc. iSplit; [| done].
@@ -213,12 +217,14 @@ Section NondetAdequacy.
       iApply (SPEC with "[-]").
       4: { by iIntros "!> % ?". }
       2: lia.
-      2: iFrame "INV PH1 OB1".
+      2: iFrame "INV PH1".
       { lia. }
-      iSplitL. 
+      rewrite obligations_resources.obls_unseal. iFrame.
+      iSplitL; [| iSplitR]. 
       + iApply (cp_mul_weaken with "[$]").
         * apply phase_lt_fork.
         * lia.
+      + by iApply big_sepS_empty.
       + rewrite /eps_repr.
         rewrite /ep. iExists _. iFrame "EPS".
         iPureIntro. apply phase_lt_fork.
