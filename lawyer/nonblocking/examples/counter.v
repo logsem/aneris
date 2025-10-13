@@ -13,22 +13,24 @@ Section Counter.
       FAA #l #(1:nat)
   .
 
+  Context (l: loc).
+
+  Definition counter_inv_ns := nroot .@ "cnt". 
+
+  Context {Σ: gFunctors}. 
+  
+  Definition counter_inv {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ}: iProp Σ :=
+    inv counter_inv_ns (∃ (n: nat), l ↦ #n).
+
   Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
   Context `{EM: ExecutionModel heap_lang M}.
 
-  Context {Σ} {OHE: OM_HL_Env OP EM Σ}.
+  Context {OHE: OM_HL_Env OP EM Σ}.
 
   Notation "'Degree'" := (om_hl_Degree).
   Context (d: Degree).
 
   Existing Instance OHE.
-
-  Context (l: loc).
-
-  Definition counter_inv_ns := nroot .@ "cnt". 
-
-  Definition counter_inv: iProp Σ :=
-    inv counter_inv_ns (∃ (n: nat), l ↦ #n).
 
   Definition counter_is_init_st (c: cfg heap_lang) :=
     (heap c.2) !! l = Some #(0: nat).
@@ -48,13 +50,20 @@ Section Counter.
     iNext. iExists _. iFrame.
   Qed.
 
+  (* Goal heap1GS Σ. *)
+  (*   apply (iem_phys HeapLangEM EM).  *)
+  (*   Show Proof.  *)
+  (*   apply _.  *)
+
   (* TODO: derive from LAT spec *)
   (* TODO: restrict the set of arguments *)
   Lemma counter_mock_spec τ π q (a: val):
+    let _: heap1GS Σ := (iem_phys HeapLangEM EM) in
     {{{ cp_mul π d 5 ∗ th_phase_frag τ π q ∗ counter_inv }}}
         incr l a @ τ
     {{{ (n: nat), RET #n; th_phase_frag τ π q }}}.
   Proof using.
+    simpl. 
     iIntros (Φ) "(CPS & PH & #INV) POST". rewrite /incr. 
     pure_steps.
     iApply wp_atomic.
@@ -76,13 +85,10 @@ From lawyer.nonblocking Require Import om_wfree_inst.
 Lemma counter_wfree_spec (l: loc):
   ∀ (M : Model) (EM : ExecutionModel heap_lang M) (Σ : gFunctors) 
     (OHE : OM_HL_Env OP_HL_WF EM Σ) (τ : locale heap_lang) 
-    (π : Phase) (q : Qp) (a : val) (Φ : language.val heap_lang → iPropI Σ),
-    cp_mul π d_wfr0 5 ∗ th_phase_frag τ π q ∗
-    (λ (M0 : Model) (EM0 : ExecutionModel heap_lang M0) 
-       (Σ0 : gFunctors) (OHE0 : OM_HL_Env OP_HL_WF EM0 Σ0), 
-       counter_inv l)
-      M EM Σ OHE -∗
-    ▷ (∀ v : language.val heap_lang, th_phase_frag τ π q -∗ Φ v) -∗
+    (π : Phase) (q : Qp) (a : val) (Φ : val → iPropI Σ),
+    let _: heap1GS Σ := (iem_phys HeapLangEM EM) in
+    cp_mul π d_wfr0 5 ∗ th_phase_frag τ π q ∗ counter_inv l -∗
+    ▷ (∀ v : val, th_phase_frag τ π q -∗ Φ v) -∗
     WP incr l a @τ {{ v, Φ v }}.
 Proof using.
   intros. simpl.
@@ -97,13 +103,47 @@ Lemma counter_wfree_init_inv (l : loc):
    (Σ : gFunctors) (OHE : OM_HL_Env OP_HL_WF EM Σ) (c : cfg heap_lang),
    counter_is_init_st l c ->
     let _: heap1GS Σ := iem_phys _ EM in 
-     hl_phys_init_resource c ={⊤}=∗ counter_inv l (OHE := OHE).
+     hl_phys_init_resource c ={⊤}=∗ counter_inv l.
 Proof using.
   intros. by apply counter_init_inv.
 Qed.
 
 
+From lawyer.nonblocking.logrel Require Import logrel.
+From iris.base_logic Require Import invariants.
+
+Lemma counter_safety_spec
+  {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ} (l: loc)
+  :
+    counter_inv l ⊢ persistent_pred.pers_pred_car interp (incr l).
+Proof using.
+  iIntros "#INV". rewrite interp_unfold /incr /=.
+  iModIntro. iIntros (τ v) "IIv".
+
+  iApply sswp_pwp; [done| ].
+  iModIntro.
+  iApply sswp_pure_step; [done| ].
+  do 3 iModIntro.
+  simpl. 
+
+  iApply sswp_pwp; [done| ..].
+  iInv "INV" as "(%n & >L)" "CLOS". iModIntro.
+  iApply (wp_faa with "[$]"). iIntros "!> L".
+  iNext. 
+  iMod ("CLOS" with "[L]") as "_".
+  { iNext.
+    Set Printing Coercions.
+    replace (Z.of_nat n + Z.of_nat 1)%Z with (Z.of_nat (n + 1)) by lia.
+    iFrame. }
+  iModIntro.
+
+  iApply trillium.program_logic.weakestpre.wp_value.
+  by rewrite {2}interp_unfold.
+Qed.
+
+
 Definition counter_WF_spec (l: loc): WaitFreeSpec (incr l) := {|
   wfs_init_mod := counter_wfree_init_inv l;
-  wfs_spec := counter_wfree_spec l;  
+  wfs_spec := counter_wfree_spec l;
+  wfs_safety_spec := counter_safety_spec;
 |}. 
