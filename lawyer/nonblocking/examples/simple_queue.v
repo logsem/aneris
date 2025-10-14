@@ -257,6 +257,7 @@ Section SimpleQueue.
   
     Definition dequeue_resources (h fl: nat): iProp Σ :=
       @me_exact _ hq_me_h h ∗ @me_exact _ hq_me_fl fl.
+    foobar. add 1/2 of pointsto head to make sure it doesn't change even upon concurrent enqueue to empty queue. 
   
     Definition read_head_token: iProp Σ. Admitted. 
     Definition dequeue_token: iProp Σ. Admitted. 
@@ -362,33 +363,34 @@ Section SimpleQueue.
   Lemma access_queue_ends hq h t br fl:
     let _: heap1GS Σ := iem_phys _ EM in
     hq_auth hq -∗ queue_interp hq h t br fl -∗
-    (* ∃ ndh (pt: loc), ith_node h ndh ∗ Head ↦ #ndh.1 ∗ Tail ↦ #pt ∗ *)
-    (*            ⌜ h = t <-> ndh.1 = pt ⌝ ∗  *)
-    (*            (Head ↦ #ndh.1 -∗ Tail ↦ #pt -∗ hq_auth hq ∗ queue_interp hq h t br fl). *)
       ∃ (ph pt: loc), Head ↦ #ph ∗ Tail ↦ #pt ∗
-        (⌜ h = t /\ ph = pt ⌝ ∨ ⌜ h < t /\ ph ≠ pt ⌝ ∗ ∃ ndh, ith_node h ndh) ∗
-        (Head ↦ #ph -∗ Tail ↦ #pt -∗ hq_auth hq -∗ queue_interp hq h t br fl).
+        (⌜ h >= t /\ ph = pt ⌝ ∨ ⌜ h < t /\ ph ≠ pt ⌝ ∗ ∃ ndh, ith_node h ndh) ∗
+        (Head ↦ #ph -∗ Tail ↦ #pt -∗ hq_auth hq ∗ queue_interp hq h t br fl).
   Proof using.
-    simpl. iIntros "HQ QI".
+    simpl. iIntros "[AUTH #FRAGS] QI".
     rewrite /queue_interp.
-    iDestruct "QI" as "(Q & (%nd & %HEAD & BR) & (%pt & TAIL & DUMMY))".
-    iDestruct (hq_auth_get_ith with "[$]") as "[ITH HQ]"; eauto.
-    iFrame "BR TAIL".
-    rewrite bi.sep_comm -bi.sep_assoc. iSplit.
-    { destruct nd as [ph [vh ?]]. simpl.
+    iDestruct "QI" as "(%T_LEN & Q & (%pt & TAIL & DUMMY & HEAD))".
+    iFrame "HEAD TAIL".
+    destruct (Nat.lt_ge_cases h t) as [LT | GE]; subst t.     
+    - 
+      pose proof LT as [[ph [??]] HTH]%lookup_lt_is_Some_2.
+      rewrite HTH. simpl.
+      iDestruct (big_sepL_lookup_acc with "FRAGS") as "[ITH _]"; [by eauto| ].
+      iFrame "ITH". 
 
-      assert (length hq = t) by admit. subst t.
-      
       iDestruct (big_sepL_lookup_acc with "Q") as "[HNI CLOS]".
       { erewrite lookup_drop. by erewrite Nat.add_0_r. }
-      rewrite {1}/hn_interp.
-
-      
-      
-      
-    iFrame.
-    
-    by iIntros "$".
+      iAssert (⌜ ph ≠ pt ⌝)%I as %NEQ.
+      { iIntros (<-). rewrite {1}/hn_interp.
+        iDestruct "DUMMY" as "[X _]". iDestruct "HNI" as "[Y _]".
+        iDestruct (pointsto_valid_2 with "[$] [$]") as %V. set_solver. }
+      iSplit; [iRight; done| ].
+      iSpecialize ("CLOS" with "[$]"). 
+      iIntros "??". by iFrame "#∗". 
+    - iSplit. 
+      2: { iIntros "??". by iFrame "#∗". }
+      iLeft. iSplit; [done| ].
+      rewrite lookup_ge_None_2; done. 
   Qed.
 
   Lemma dequeue_resources_auth_agree h' fl' h t br fl hob:
@@ -401,12 +403,12 @@ Section SimpleQueue.
     hq_auth hq -∗ queue_interp hq h t br fl -∗ ith_node i hn -∗
     hn_interp hn ∗ (hn_interp hn -∗ queue_interp hq h t br fl ∗ hq_auth hq).
   Proof using.
-    simpl. rewrite /queue_interp. iIntros "AUTH (Q & $ & $) #ITH".
+    simpl. rewrite /queue_interp. iIntros "AUTH (% & Q & $) #ITH".
     iDestruct (hq_auth_lookup with "[$] [$]") as %ITH.
     apply proj1, Nat.le_sum in IN as [? ->].
     iDestruct (big_sepL_lookup_acc with "Q") as "[HNI CLOS]".
     { erewrite lookup_drop; eauto. }
-    repeat iFrame.
+    iFrame. iIntros. iSplit; [done| ]. by iApply "CLOS".     
   Qed.
 
   (* Lemma get_val_spec Q τ π q h hn fl: *)
@@ -453,10 +455,10 @@ Section SimpleQueue.
     iEval (rewrite /queue_inv_inner) in "inv".
     iDestruct "inv" as "(>HQ & >QI & DANGLE & OHV & >%ORDER & >AUTHS & >%SAFE_BR & RH & DQ)".
     
-    iApply sswp_MU_wp; [done| ]. 
-    iDestruct (access_head with "[$] [$]") as "(%ch & #HEADch & HEAD & CLOS')".
-    iApply (wp_load with "[$]"). iIntros "!> HEAD".
-    iDestruct ("CLOS'" with "[$]") as "(HQ & QI)".
+    iApply sswp_MU_wp; [done| ].
+    iDestruct (access_queue_ends with "[$] [$]") as "(%ph & %pt & HEAD & TAIL & HT & CLOS')".    
+    iApply (wp_load with "HEAD"). iIntros "!> HEAD".
+    iDestruct ("CLOS'" with "[$] [$]") as "(HQ & QI)".
     MU_by_burn_cp. iApply wp_value.
 
     iDestruct "DQ" as "[DR | TOK']".
@@ -467,6 +469,7 @@ Section SimpleQueue.
     iModIntro.
     (* TODO: do we need to keep track of previous values at this point? *)
     clear t br hob od ohv ORDER SAFE_BR hq.
+    clear pt.
 
     wp_bind (Rec _ _ _)%E. pure_steps. 
     
@@ -479,9 +482,11 @@ Section SimpleQueue.
     iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %hob & %od & %ohv & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
     iDestruct "inv" as "(>HQ & >QI & DANGLE & OHV & >%ORDER & AUTHS & >%SAFE_BR & RH & DQ)".
-    iApply sswp_MU_wp; [done| ]. 
-    iDestruct (access_tail with "[$] [$]") as "(%ct & #TAILct & TAIL & CLOS')".
+    iApply sswp_MU_wp; [done| ].
+    iDestruct (access_queue_ends with "[$] [$]") as "(%ph_ & %pt & HEAD & TAIL & HT & CLOS')".    
     iApply (wp_load with "[$]"). iIntros "!> TAIL".
+    iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[<- ->]. 
+
     iDestruct ("CLOS'" with "[$]") as "(HQ & QI)".
     MU_by_burn_cp. iApply wp_value.
     iMod ("CLOS" with "[-POST CPS PH DR]") as "_".
