@@ -66,6 +66,27 @@ Section MaxExact.
     iPureIntro. by apply mono_nat_both_valid.
   Qed.
 
+  Lemma me_auth_exact n m:
+    me_auth n -∗ me_exact m -∗ ⌜ m = n ⌝.
+  Proof using.
+    iIntros "X Y". iCombine "X Y" as "X".
+    iDestruct (own_valid with "X") as %V. 
+    rewrite pair_valid in V. apply proj1 in V.
+    iPureIntro.
+    rewrite ucmra_unit_right_id in V.
+    symmetry. eapply excl_auth_agree_L; eauto. 
+  Qed.
+
+  Lemma me_exact_excl n m:
+    me_exact n -∗ me_exact m -∗ False.
+  Proof using.
+    rewrite /me_exact. 
+    rewrite bi.wand_curry -own_op.
+    iIntros "X". iDestruct (own_valid with "[$]") as %V.
+    rewrite pair_valid in V. apply proj1 in V. simpl in V.
+    by apply excl_auth_frag_op_valid in V.
+  Qed.
+
 End MaxExact.
 
 
@@ -127,21 +148,11 @@ Section HistQueue.
 
   Class HistQueuePreG Σ := {
       hq_pre_map :: inG Σ (authUR (gmapUR nat (agreeR HistNode)));
-      hq_pre_me :: MaxExactPreG Σ;
-      hq_pre_tok :: inG Σ (exclR unitO);
   }.
   
   Class HistQueueG Σ := {
       hq_PreG :: HistQueuePreG Σ;
       hq_γ__map: gname;
-      hq_γ_tok_rh: gname;
-      hq_γ_tok_dq: gname;
-
-      hq_me_h :: MaxExactG Σ;
-      hq_me_t :: MaxExactG Σ;
-      hq_me_br :: MaxExactG Σ;
-      hq_me_fl :: MaxExactG Σ;
-      hq_me_hob :: MaxExactG Σ;
   }.
 
   Context `{HistQueueG Σ}. 
@@ -190,14 +201,33 @@ Section HistQueue.
 End HistQueue.
 
 
+Class QueuePreG Σ := {
+  q_pre_max :: MaxExactPreG Σ;
+  q_pre_tok :: inG Σ (exclR unitO);
+  q_pre_hq :: HistQueueG Σ;
+  q_pre_dangle :: inG Σ (excl_authUR (option nat));
+}.
+
+
 Class QueueG Σ := {
+    q_pre :: QueuePreG Σ; 
+    
     Head: loc; Tail: loc; BeingRead: loc; 
     FreeLater: loc; OldHeadVal: loc;
-    (* γHead: gname; γTail: gname; γBeingRead: gname;  *)
-    (* γFreeLater: gname; γOldHeadVal: gname; *)
 
     γHob: gname;
     q_hq :: HistQueueG Σ;
+
+    q_γ_tok_rh: gname;
+    q_γ_tok_dq: gname;
+
+    q_γ_dangle: gname;
+
+    q_me_h :: MaxExactG Σ;
+    q_me_t :: MaxExactG Σ;
+    q_me_br :: MaxExactG Σ;
+    q_me_fl :: MaxExactG Σ;
+    q_me_hob :: MaxExactG Σ;
 }.
 
 
@@ -284,16 +314,21 @@ Section SimpleQueue.
       apply _. 
     Defined.
   
-    Definition dangle (od: option loc): iProp Σ. Admitted.
+    Definition dangle_auth (od: option nat): iProp Σ := own q_γ_dangle (●E od).
+    Definition dangle_frag (od: option nat): iProp Σ := own q_γ_dangle (◯E od).
+      
+    Definition dangle_interp (od: option nat) (h: nat) (hq: HistQueue): iProp Σ :=
+      dangle_auth od ∗ (⌜ od = None ⌝ ∨ ⌜ od = Some (h - 1) ⌝ ∗ from_option hn_interp (⌜ False ⌝)%I (hq !! (h - 1)))
+    . 
   
     Definition auths (h t br fl hob: nat): iProp Σ :=
-      @me_auth _ hq_me_h h ∗ @me_auth _ hq_me_t t ∗ @me_auth _ hq_me_br br ∗
-      @me_auth _ hq_me_fl fl ∗ @me_auth _ hq_me_hob hob
+      @me_auth _ q_me_h h ∗ @me_auth _ q_me_t t ∗ @me_auth _ q_me_br br ∗
+      @me_auth _ q_me_fl fl ∗ @me_auth _ q_me_hob hob
     .
 
     Definition snapshot (h t br fl hob: nat): iProp Σ :=
-      @me_lb _ hq_me_h h ∗ @me_lb _ hq_me_t t ∗ @me_lb _ hq_me_br br ∗
-      @me_lb _ hq_me_fl fl ∗ @me_lb _ hq_me_hob hob
+      @me_lb _ q_me_h h ∗ @me_lb _ q_me_t t ∗ @me_lb _ q_me_br br ∗
+      @me_lb _ q_me_fl fl ∗ @me_lb _ q_me_hob hob
     .
 
     Lemma take_snapshot (h t br fl hob: nat): 
@@ -312,7 +347,7 @@ Section SimpleQueue.
       all: iApply (@me_auth_lb with "[-]"); eauto.
     Qed.
   
-    Definition safe_BR (h br fl hob: nat) (od: option loc): Prop :=
+    Definition safe_BR (h br fl hob: nat) (od: option nat): Prop :=
       br = h \/ (* reading the current queue head *)
       br = h - 1 /\ is_Some od \/ (* reading the dangling head *)
       br <= h - 1 /\ ( (* read of some old node that: *)
@@ -321,24 +356,24 @@ Section SimpleQueue.
       ).
   
     Definition read_head_resources (t br hob: nat): iProp Σ :=
-      @me_exact _ hq_me_t t ∗ @me_exact _ hq_me_br br ∗ @me_exact _ hq_me_hob hob. 
+      @me_exact _ q_me_t t ∗ @me_exact _ q_me_br br ∗ @me_exact _ q_me_hob hob. 
   
-    Definition dequeue_resources (h fl: nat) (ph: loc): iProp Σ :=
-      @me_exact _ hq_me_h h ∗ @me_exact _ hq_me_fl fl ∗
-      Head ↦{1/2} #ph. 
+    Definition dequeue_resources (h fl: nat) (ph: loc) (od: option nat): iProp Σ :=
+      @me_exact _ q_me_h h ∗ @me_exact _ q_me_fl fl ∗
+      Head ↦{1/2} #ph ∗ dangle_frag od. 
   
-    Definition read_head_token: iProp Σ := own hq_γ_tok_rh (Excl ()).
-    Definition dequeue_token: iProp Σ := own hq_γ_tok_dq (Excl ()).
+    Definition read_head_token: iProp Σ := own q_γ_tok_rh (Excl ()).
+    Definition dequeue_token: iProp Σ := own q_γ_tok_dq (Excl ()).
   
     Definition queue_inv_inner (hq: HistQueue) (h t br fl hob: nat)
-      (od: option loc) (ohv: val): iProp Σ :=
+      (od: option nat) (ohv: val): iProp Σ :=
       hq_auth hq ∗ 
-      queue_interp hq h t br fl ∗ dangle od ∗ OldHeadVal ↦ ohv ∗
+      queue_interp hq h t br fl ∗ dangle_interp od h hq ∗ OldHeadVal ↦ ohv ∗
       ⌜ fl <= br <= hob /\ hob <= h /\ fl < h /\ h <= t⌝ ∗
       auths h t br fl hob ∗
       ⌜ safe_BR h br fl hob od ⌝ ∗
       (read_head_resources t br hob ∨ read_head_token) ∗ 
-      ((∃ ph, dequeue_resources h fl ph) ∨ dequeue_token)
+      ((∃ ph, dequeue_resources h fl ph None) ∨ dequeue_token)
     .
   
     Definition queue_ns := nroot .@ "queue".
@@ -416,15 +451,14 @@ Section SimpleQueue.
     iIntros "X". by iDestruct (own_valid with "[$]") as %V.
   Qed. 
 
-  Lemma dequeue_resources_excl h1 fl1 ph1 h2 fl2 ph2:
+  Lemma dequeue_resources_excl h1 fl1 ph1 od1 h2 fl2 ph2 od2:
     let _: heap1GS Σ := iem_phys _ EM in 
-    dequeue_resources h1 fl1 ph1 -∗ dequeue_resources h2 fl2 ph2 -∗ False.
+    dequeue_resources h1 fl1 ph1 od1 -∗ dequeue_resources h2 fl2 ph2 od2 -∗ False.
   Proof using.
-  (*   simpl.  *)
-  (*   rewrite bi.wand_curry -own_op. *)
-  (*   iIntros "X". by iDestruct (own_valid with "[$]") as %V. *)
-  (* Qed. *)
-  Admitted.
+    simpl. rewrite /dequeue_resources.
+    iIntros "(X&_) (Y&_)".
+    by iApply (me_exact_excl with "X [$]"). 
+  Qed.
 
   (* Lemma access_head hq h t br fl: *)
   (*   let _: heap1GS Σ := iem_phys _ EM in *)
@@ -483,10 +517,24 @@ Section SimpleQueue.
       rewrite lookup_ge_None_2; done. 
   Qed.
 
-  Lemma dequeue_resources_auth_agree h' fl' ph h t br fl hob:
+  Lemma dequeue_resources_auth_agree h' fl' ph od h t br fl hob:
     let _: heap1GS Σ := iem_phys _ EM in 
-    dequeue_resources h' fl' ph -∗ auths h t br fl hob -∗ ⌜ h' = h /\ fl' = fl ⌝.
-  Proof using. Admitted. 
+    dequeue_resources h' fl' ph od -∗ auths h t br fl hob -∗ ⌜ h' = h /\ fl' = fl ⌝.
+  Proof using.
+    simpl. iIntros "(H&FL&?&?) (H'&?&?&FL'&?)".
+    iDestruct (me_auth_exact with "H' H") as %?. 
+    iDestruct (me_auth_exact with "FL' FL") as %?.
+    done. 
+  Qed. 
+
+  Lemma dequeue_resources_dangle_agree h fl ph od od' h' hq':
+    let _: heap1GS Σ := iem_phys _ EM in 
+    dequeue_resources h fl ph od -∗ dangle_interp od' h' hq' -∗ ⌜ od' = od ⌝.
+  Proof using.
+    simpl. iIntros "(?&?&?&FRAG) (AUTH&?)".
+    iCombine "AUTH FRAG" as "D". iDestruct (own_valid with "D") as %V.
+    iPureIntro. eapply excl_auth_agree_L; eauto. 
+  Qed. 
 
   Lemma access_queue hq h t br fl i hn
     (IN: h <= i < t):
@@ -502,12 +550,12 @@ Section SimpleQueue.
     iFrame. iIntros. iSplit; [done| ]. by iApply "CLOS".     
   Qed. 
 
-  Lemma get_head_val_spec Q τ π q h nd fl ph:
+  Lemma get_head_val_spec Q τ π q h nd fl ph od:
     let _: heap1GS Σ := iem_phys _ EM in
-    {{{ queue_inv Q ∗ ith_node h (ph, nd) ∗ dequeue_resources h fl ph ∗
+    {{{ queue_inv Q ∗ ith_node h (ph, nd) ∗ dequeue_resources h fl ph od ∗
         th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
       get_val #ph @τ
-    {{{ RET (nd.1); th_phase_frag τ π q ∗ dequeue_resources h fl ph }}}.
+    {{{ RET (nd.1); th_phase_frag τ π q ∗ dequeue_resources h fl ph od }}}.
   Proof using.
     simpl. iIntros (Φ) "([#QAT #INV] & #HEADhn & DR & PH & CPS) POST".
     rewrite /get_val.
@@ -517,7 +565,7 @@ Section SimpleQueue.
     iApply sswp_MU_wp; [done| ].
     iApply sswp_pure_step; [done| ].
     MU_by_burn_cp. rewrite loc_add_0. iApply wp_value.
-    iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %hob & %od & %ohv & inv)" "CLOS".
+    iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %hob & %od_ & %ohv & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
     iDestruct "inv" as "(>HQ & >QI & DANGLE & OHV & >%ORDER & >AUTHS & >%SAFE_BR & RH & DQ)".
     iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[<- <-].
@@ -539,12 +587,12 @@ Section SimpleQueue.
   Qed.
 
   (* TODO: unify with the proof above *)
-  Lemma get_head_next_spec Q τ π q h nd fl ph:
+  Lemma get_head_next_spec Q τ π q h nd fl ph od:
     let _: heap1GS Σ := iem_phys _ EM in
-    {{{ queue_inv Q ∗ ith_node h (ph, nd) ∗ dequeue_resources h fl ph ∗
+    {{{ queue_inv Q ∗ ith_node h (ph, nd) ∗ dequeue_resources h fl ph od ∗
         th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
       get_next #ph @τ
-    {{{ RET #(nd.2); th_phase_frag τ π q ∗ dequeue_resources h fl ph }}}.
+    {{{ RET #(nd.2); th_phase_frag τ π q ∗ dequeue_resources h fl ph od }}}.
   Proof using.
     simpl. iIntros (Φ) "([#QAT #INV] & #HEADhn & DR & PH & CPS) POST".
     rewrite /get_next.
@@ -554,7 +602,7 @@ Section SimpleQueue.
     iApply sswp_MU_wp; [done| ].
     iApply sswp_pure_step; [done| ].
     MU_by_burn_cp. iApply wp_value.
-    iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %hob & %od & %ohv & inv)" "CLOS".
+    iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %hob & %od' & %ohv & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
     iDestruct "inv" as "(>HQ & >QI & DANGLE & OHV & >%ORDER & >AUTHS & >%SAFE_BR & RH & DQ)".
     iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[<- <-].
@@ -575,11 +623,11 @@ Section SimpleQueue.
     iModIntro. iApply "POST". iFrame.
   Qed.
 
-  Lemma dequeue_res_head_agree h fl (ph ph': loc):
+  Lemma dequeue_res_head_agree h fl (ph ph': loc) od:
     let _: heap1GS Σ := iem_phys _ EM in 
-    dequeue_resources h fl ph -∗ Head ↦{1 / 2} #ph' -∗ ⌜ ph' = ph ⌝.
+    dequeue_resources h fl ph od -∗ Head ↦{1 / 2} #ph' -∗ ⌜ ph' = ph ⌝.
   Proof using.
-    simpl. rewrite /dequeue_resources. iIntros "(_&_&H') H".
+    simpl. rewrite /dequeue_resources. iIntros "(_&_&H'&?) H".
     iDestruct (pointsto_agree with "[$] [$]") as %?. set_solver.
   Qed.
 
@@ -601,6 +649,32 @@ Section SimpleQueue.
     by iApply "POST".
   Qed.
 
+  Lemma dequeue_upd_head_spec l τ π q h ph vh (nxh: loc) fl:
+    {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_inv l) ∗
+        (let _: heap1GS Σ := iem_phys _ EM in ith_node h (ph, (vh, nxh))) ∗ 
+        th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel ∗
+        (let _: heap1GS Σ := iem_phys _ EM in dequeue_resources h fl ph None) }}}
+      #Head <- #nxh @τ
+    {{{ RET #(); th_phase_frag τ π q ∗ (let _: heap1GS Σ := iem_phys _ EM in dequeue_resources (h + 1) fl nxh (Some h)) }}}.
+  Proof using.
+    simpl.
+    iIntros (Φ) "([#QAT #INV] & #HTH & PH & CPS & DR) POST".
+    iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %hob & %od_ & %ohv & inv)" "CLOS".
+    iEval (rewrite /queue_inv_inner) in "inv".
+    iDestruct "inv" as "(>HQ & >QI & >DANGLE & >OHV & >%ORDER & >AUTHS & >%SAFE_BR & RH & >DQ)".
+    iDestruct "DQ" as "[(% & DR') | TOK]".
+    { by iDestruct (dequeue_resources_excl with "[$] [$]") as "?". }
+    iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[<- <-]. 
+    iDestruct (dequeue_resources_dangle_agree with "[$] [$]") as %->. 
+
+    iApply sswp_MU_wp; [done| ].
+    iApply (wp_store with "[$]"). iIntros "!> ?".
+    MU_by_burn_cp. iApply wp_value.
+    iMod ("CLOS" with "[-POST PH]") as "_". 
+    { by iFrame. }
+    by iApply "POST".
+ 
+
   Lemma dequeue_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_inv l) ∗
         (let _: heap1GS Σ := iem_phys _ EM in dequeue_token) ∗ 
@@ -616,7 +690,7 @@ Section SimpleQueue.
     iApply (get_head_spec with "[$QAT $CPS' $PH]").
     iIntros "!> PH".
 
-    wp_bind (! _)%E. 
+    wp_bind (! _)%E.
     iInv "INV" as "(%hq & %h & %t & %br & %fl & %hob & %od & %ohv & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
     iDestruct "inv" as "(>HQ & >QI & DANGLE & OHV & >%ORDER & >AUTHS & >%SAFE_BR & RH & DQ)".
@@ -629,7 +703,6 @@ Section SimpleQueue.
     iDestruct (dequeue_res_head_agree with "DR [$]") as %<-. 
     iDestruct ("CLOS'" with "[$] [$]") as "(HQ & QI)".
     MU_by_burn_cp. iApply wp_value.
-
 
     iMod ("CLOS" with "[-POST CPS PH DR]") as "_".
     { by iFrame. }
@@ -721,6 +794,8 @@ Section SimpleQueue.
     split_cps "CPS" get_loc_fuel; [cbv; lia| ].
     iApply (get_head_spec with "[$QAT $CPS' $PH]").
     iIntros "!> PH".
+
+    wp_bind (_ <- _)%E. 
  
     iApply (get_head_next_spec with ""
 
