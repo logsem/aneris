@@ -87,6 +87,25 @@ Section MaxExact.
     by apply excl_auth_frag_op_valid in V.
   Qed.
 
+  Lemma me_update n m k
+    (LE: n <= k):
+    me_auth n -∗ me_exact m ==∗ me_auth k ∗ me_exact k.
+  Proof using.
+    rewrite /me_auth /me_exact.
+    rewrite bi.wand_curry -!own_op.
+    iApply own_update. 
+    rewrite !ucmra_unit_right_id.
+    rewrite -!pair_op.
+    etrans.
+    - eapply (prod_update _ (_, _)); simpl; [| reflexivity]. 
+      apply (excl_auth_update _ _ k).
+    - eapply (prod_update _ (_, _)); simpl; [reflexivity| ].
+      rewrite -mono_nat_auth_lb_op.
+      etrans; [| apply cmra_update_op_l].
+      apply cmra_update_op; [| reflexivity].
+      by apply mono_nat_update.
+  Qed. 
+
 End MaxExact.
 
 
@@ -281,6 +300,19 @@ Section SimpleQueue.
 
     Definition dummy_node: Node := (#0, Loc 0).
 
+    Fixpoint is_LL_into (hq: HistQueue) (pt: loc) := 
+      match hq with 
+      | [] => True
+      | [ (_, (_, nxt)) ] => nxt = pt
+      (*   | (_, (_, nxt1)) :: ((l2, (_, _)) as hn2) :: hq' => nxt1 = l2 /\ is_LL (hn2 :: hq') *)
+      (** to avoid introducing Function *)
+      | (_, (_, nxt1)) :: hq' =>
+          match hq' with
+          | [] => True
+          | (l2, (_, _)) :: _ => nxt1 = l2 /\ is_LL_into hq' pt
+          end
+      end. 
+
     (** tail always points to a dummy node
         which doesn NOT belong to the logical queue hq.
         Upon enqueuing, this dummy note is updated and appended to hq.
@@ -290,7 +322,7 @@ Section SimpleQueue.
     Definition queue_interp (hq: HistQueue) (h t br fl: nat): iProp Σ :=
       ⌜ t = length hq ⌝ ∗ 
       ([∗ list] nd ∈ drop h hq, hn_interp nd) ∗
-      ∃ (pt: loc), Tail ↦ #pt ∗ hn_interp (pt, dummy_node) ∗ 
+      ∃ (pt: loc), Tail ↦ #pt ∗ hn_interp (pt, dummy_node) ∗ ⌜ is_LL_into hq pt ⌝ ∗
       Head ↦{1/2} #(from_option (fun hn => hn.1) pt (hq !! h))
     .
 
@@ -493,7 +525,7 @@ Section SimpleQueue.
   Proof using.
     simpl. iIntros "[AUTH #FRAGS] QI".
     rewrite /queue_interp.
-    iDestruct "QI" as "(%T_LEN & Q & (%pt & TAIL & DUMMY & HEAD))".
+    iDestruct "QI" as "(%T_LEN & Q & (%pt & TAIL & DUMMY & %LL & HEAD))".
     iFrame "HEAD TAIL".
     destruct (Nat.lt_ge_cases h t) as [LT | GE]; subst t.     
     - 
@@ -527,14 +559,32 @@ Section SimpleQueue.
     done. 
   Qed. 
 
+  Lemma dangle_auth_frag_agree od1 od2:
+    let _: heap1GS Σ := iem_phys _ EM in 
+    dangle_auth od1 -∗ dangle_frag od2 -∗ ⌜ od2 = od1 ⌝. 
+  Proof using.
+    simpl. rewrite /dangle_auth /dangle_frag.
+    rewrite bi.wand_curry -own_op.
+    iIntros "X". iDestruct (own_valid with "[$]") as %V.
+    iPureIntro. symmetry. by apply excl_auth_agree_L.
+  Qed.  
+
+  Lemma dangle_update od1 od2 od':
+    let _: heap1GS Σ := iem_phys _ EM in 
+    dangle_auth od1 -∗ dangle_frag od2 ==∗ dangle_auth od' ∗ dangle_frag od'. 
+  Proof using.
+    simpl. rewrite /dangle_auth /dangle_frag.
+    rewrite bi.wand_curry -!own_op.
+    iApply own_update. apply excl_auth_update. 
+  Qed.  
+
   Lemma dequeue_resources_dangle_agree h fl ph od od' h' hq':
     let _: heap1GS Σ := iem_phys _ EM in 
     dequeue_resources h fl ph od -∗ dangle_interp od' h' hq' -∗ ⌜ od' = od ⌝.
   Proof using.
     simpl. iIntros "(?&?&?&FRAG) (AUTH&?)".
-    iCombine "AUTH FRAG" as "D". iDestruct (own_valid with "D") as %V.
-    iPureIntro. eapply excl_auth_agree_L; eauto. 
-  Qed. 
+    by iDestruct (dangle_auth_frag_agree with "[$] [$]") as %?. 
+  Qed.
 
   Lemma access_queue hq h t br fl i hn
     (IN: h <= i < t):
@@ -640,13 +690,27 @@ Section SimpleQueue.
     iIntros (Φ) "([#QAT #INV] & PH & CPS) POST".
     iInv "INV" as "(%hq & %h & %t & %br & %fl & %hob & %od & %ohv & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as "(>HQ & >QI & DANGLE & OHV & >%ORDER & >AUTHS & >%SAFE_BR & RH & DQ)".    
+    iDestruct "inv" as "(>HQ & >QI & DANGLE & OHV & >%ORDER & >AUTHS & >%SAFE_BR & RH & DQ)".
     iApply sswp_MU_wp; [done| ].
     iApply (wp_store with "[$]"). iIntros "!> ?".
     MU_by_burn_cp. iApply wp_value.
     iMod ("CLOS" with "[-POST PH]") as "_". 
     { by iFrame. }
     by iApply "POST".
+  Qed.
+
+  Lemma is_LL_into_drop hq pt k
+    (LL: is_LL_into hq pt):
+    is_LL_into (drop k hq) pt.
+  Proof using.
+    revert k. induction hq.
+    { intros. by rewrite drop_nil. }
+    intros. destruct k.
+    { by rewrite drop_0. }
+    simpl. apply IHhq.
+    simpl in LL. destruct a as [? [? ?]].
+    destruct hq; try done.
+    destruct h as [? [? ?]]. tauto.
   Qed.
 
   Lemma dequeue_upd_head_spec l τ π q h ph vh (nxh: loc) fl:
@@ -665,14 +729,75 @@ Section SimpleQueue.
     iDestruct "DQ" as "[(% & DR') | TOK]".
     { by iDestruct (dequeue_resources_excl with "[$] [$]") as "?". }
     iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[<- <-]. 
-    iDestruct (dequeue_resources_dangle_agree with "[$] [$]") as %->. 
+    iDestruct (dequeue_resources_dangle_agree with "[$] [$]") as %->.
 
+    iClear "INV QAT".
+
+    (* TODO: split into lemmas *)
+    iDestruct (hq_auth_lookup with "[$] [$]") as %HTH.
+    iAssert (⌜ t ≠ h ⌝)%I as %NEMPTY.
+    { iIntros (->). iDestruct (queue_interp_cur_empty with "[$]") as %NO.
+      specialize (NO 0). rewrite Nat.add_0_r in NO. congruence. } 
+
+    rewrite /dangle_interp. iDestruct "DANGLE" as "(DAUTH & [_ | (% & ?)])"; [| done].
+    rewrite /dequeue_resources. iDestruct "DR" as "(CH & CFL & HEAD' & DFRAG)".
+    rewrite /queue_interp. iDestruct "QI" as "(%T_LEN &  HNIS & %pt & TAIL & TLI & %LL & HEAD)".
+    rewrite HTH. iEval (simpl) in "HEAD".
+
+    iCombine "HEAD HEAD'" as "HEAD". 
     iApply sswp_MU_wp; [done| ].
-    iApply (wp_store with "[$]"). iIntros "!> ?".
+    iApply (wp_store with "[$]"). iIntros "!> [HEAD HEAD']".
     MU_by_burn_cp. iApply wp_value.
-    iMod ("CLOS" with "[-POST PH]") as "_". 
-    { by iFrame. }
-    by iApply "POST".
+
+    iMod (dangle_update _ _ (Some h) with "[$] [$]") as "[DAUTH DFRAG]".
+
+    iAssert (|==> auths (h + 1) t br fl hob ∗ @me_exact _ q_me_h (h + 1))%I with "[CH AUTHS]" as "UPD".
+    { rewrite /auths. iDestruct "AUTHS" as "(AUTH&?&?&?&?)". iFrame.
+      iApply (me_update with "AUTH CH"). lia. }
+    iMod "UPD" as "[AUTHS CH]".
+
+    iApply "POST". iFrame.
+
+    iAssert (queue_interp hq (h + 1) t br fl ∗ hn_interp (ph, (vh, nxh)))%I
+      with "[HNIS TAIL TLI HEAD]" as "[QI HNI]".
+    { iFrame. rewrite -!bi.sep_assoc.
+      iSplit; [done| ].
+      iFrame "%".
+      pose proof (take_drop_middle _ _ _ HTH) as SPLIT.
+      rewrite -SPLIT.
+      assert (length (take h hq) = h) as H_LEN. 
+      { apply length_take_le. apply lookup_lt_Some in HTH. lia. }
+      rewrite drop_app_length'; [| done]. simpl.
+      rewrite cons_middle app_assoc.
+      rewrite drop_app_length'.
+      2: { rewrite length_app /=. lia. }
+      iDestruct "HNIS" as "[$ $]".
+      rewrite lookup_app_r.
+      2: { rewrite length_app /=. rewrite H_LEN. lia. }
+      rewrite length_app /=. rewrite H_LEN Nat.sub_diag. 
+      rewrite -SPLIT in LL. 
+      apply is_LL_into_drop with (k := h) in LL.
+      rewrite drop_app_length' in LL; [| done].
+      simpl in LL. destruct (drop (S h) hq) eqn:REST.
+      - by subst.
+      - simpl. destruct h0 as [? [??]]. simpl.
+        by destruct LL as [-> ?]. }
+
+    iClear "HTH CPS".
+    iMod ("CLOS" with "[-]") as "_"; [| done].
+    iFrame. iNext. rewrite Nat.add_sub. rewrite HTH /=.
+    iSplitL.
+    { iRight. by iFrame. }
+    iPureIntro. split.
+    { lia. }
+
+    red. red in SAFE_BR. 
+    destruct SAFE_BR as [-> | [[-> ?] | [LE [-> | GT]]] ].
+    - right. left. split; auto. lia.
+    - by destruct H.
+    - lia.
+    - lia.
+  Qed. 
  
 
   Lemma dequeue_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
