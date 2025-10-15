@@ -461,6 +461,32 @@ Section SimpleQueue.
     by iApply "POST".
   Qed.
 
+  Lemma get_BR_spec l τ π q:
+    {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_at l) ∗
+        th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
+      loc_BR l @ τ
+    {{{ RET #BeingRead; th_phase_frag τ π q }}}.
+  Proof using.
+    simpl. iIntros (Φ) "(#QAT & PH & CPS) POST". rewrite /loc_BR.
+    rewrite /queue_at. iDestruct "QAT" as %->.
+    pure_steps.
+    repeat (wp_bind (Snd (#_, _)%V)%E; pure_steps). 
+    by iApply "POST".
+  Qed.
+
+  Lemma get_FL_spec l τ π q:
+    {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_at l) ∗
+        th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
+      loc_FL l @ τ
+    {{{ RET #FreeLater; th_phase_frag τ π q }}}.
+  Proof using.
+    simpl. iIntros (Φ) "(#QAT & PH & CPS) POST". rewrite /loc_FL.
+    rewrite /queue_at. iDestruct "QAT" as %->.
+    pure_steps.
+    repeat (wp_bind (Snd (#_, _)%V)%E; pure_steps). 
+    by iApply "POST".
+  Qed.
+
   Lemma get_OHV_spec l τ π q:
     {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_at l) ∗
         th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
@@ -797,13 +823,33 @@ Section SimpleQueue.
     - by destruct H.
     - lia.
     - lia.
-  Qed. 
- 
+  Qed.
+
+  Definition dequeue_fuel := 100.    
+
+  Lemma check_BR_spec l τ π q h t br fl hob ph ndh:
+    {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_inv l) ∗
+        (let _: heap1GS Σ := iem_phys _ EM in ith_node h (ph, ndh)) ∗
+        (let _: heap1GS Σ := iem_phys _ EM in snapshot h t br fl hob) ∗ 
+        (let _: heap1GS Σ := iem_phys _ EM in dequeue_resources (h + 1) fl ndh.2 (Some h)) ∗ 
+        th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
+      ! #BeingRead @τ
+    {{{ (pbr: loc), RET #pbr; th_phase_frag τ π q ∗
+            (let _: heap1GS Σ := iem_phys _ EM in dequeue_resources (h + 1) fl ndh.2 (Some h)) ∗
+            ∃ br' hob', (let _: heap1GS Σ := iem_phys _ EM in snapshot h t br' fl hob') ∗ 
+              (* ⌜ br' < h /\ pbr ≠ ph \/ br' = h /\ pbr = ph \/ ⌝ *)
+              (* TODO: figure out postcondition *)
+              ⌜ br' = h /\ pbr = ph \/ hob = (h + 1)%nat /\ pbr ≠ ph ⌝
+    }}}.
+  Proof using.
+  Admitted.
+  foobar. 
+
 
   Lemma dequeue_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_inv l) ∗
         (let _: heap1GS Σ := iem_phys _ EM in dequeue_token) ∗ 
-          th_phase_frag τ π q ∗ cp_mul π d 50 }}}
+          th_phase_frag τ π q ∗ cp_mul π d dequeue_fuel }}}
       dequeue l @ τ
     {{{ (v: val), RET v; th_phase_frag τ π q ∗ (let _: heap1GS Σ := iem_phys _ EM in dequeue_token) }}}.
   Proof using.
@@ -920,9 +966,20 @@ Section SimpleQueue.
     iApply (get_head_spec with "[$QAT $CPS' $PH]").
     iIntros "!> PH".
 
-    wp_bind (_ <- _)%E. 
- 
-    iApply (get_head_next_spec with ""
+    wp_bind (_ <- _)%E.
+    split_cps "CPS" get_loc_fuel; [cbv; lia| ].
+    iApply (dequeue_upd_head_spec with "[$QAT $CPS' $PH $INV $HTH $DR]").
+    iIntros "!> (PH & DR)".
+
+    wp_bind (Rec _ _ _)%E. pure_steps.
+    split_cps "CPS" get_loc_fuel; [cbv; lia| ].
+    iApply (get_BR_spec with "[$QAT $CPS' $PH]").
+    iIntros "!> PH".
+
+    wp_bind (! _)%E.
+    
+    
+    
 
     
 End SimpleQueue.
