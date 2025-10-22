@@ -326,7 +326,8 @@ Section SimpleQueue.
       ∃ (pt: loc), Tail ↦ #pt ∗ hn_interp (pt, dummy_node) ∗ ⌜ is_LL_into hq pt ⌝ ∗
       let ph: loc := (from_option (fun hn => hn.1) pt (hq !! h)) in
       Head ↦{1/2} #ph ∗
-      (∃ (nbr: HistNode), ⌜ hq !! br = Some nbr ⌝ ∗ BeingRead ↦#(nbr.1))
+      (∃ (nbr: HistNode), ⌜ hq !! br = Some nbr ⌝ ∗ BeingRead ↦#(nbr.1)) ∗
+      (∃ (nfl: HistNode), ⌜ hq !! fl = Some nfl ⌝ ∗ FreeLater ↦#(nfl.1) ∗ hn_interp nfl)
     .
 
     Lemma queue_interp_cur_empty (hq: HistQueue) (h br fl: nat):
@@ -397,7 +398,8 @@ Section SimpleQueue.
     .
 
     Definition rop_interp (rop: option nat) (h br fl: nat) (od: option nat): iProp Σ :=
-      ∀ r, ⌜ rop = Some r  ⌝ -∗ (safe_read r h br fl od ∨ can_cancel ∗ cancelled r). 
+      ∀ r, ⌜ rop = Some r  ⌝ -∗ 
+            (safe_read r h br fl od ∨ can_cancel ∗ cancelled r ∗ ⌜ od = Some r \/ r = fl ⌝). 
   
     Definition read_head_resources (t br: nat): iProp Σ :=
       @me_exact _ q_me_t t ∗ @me_exact _ q_me_br br ∗ rop_frag None ∗ can_cancel ∗ rop_token.
@@ -793,7 +795,7 @@ Section SimpleQueue.
 
     rewrite /dangle_interp. iDestruct "DANGLE" as "(DAUTH & [_ | (% & ?)])"; [| done].
     rewrite /dequeue_resources. iDestruct "DR" as "(CH & CFL & HEAD' & DFRAG)".
-    rewrite /queue_interp. iDestruct "QI" as "(%T_LEN &  HNIS & %pt & TAIL & TLI & %LL & HEAD & BR)".
+    rewrite /queue_interp. iDestruct "QI" as "(%T_LEN &  HNIS & %pt & TAIL & TLI & %LL & HEAD & BR & FL)".
     rewrite HTH. iEval (simpl) in "HEAD".
 
     iCombine "HEAD HEAD'" as "HEAD". 
@@ -811,7 +813,7 @@ Section SimpleQueue.
     iApply "POST". iFrame.
 
     iAssert (queue_interp hq (h + 1) t br fl ∗ hn_interp (ph, (vh, nxh)))%I
-      with "[HNIS TAIL TLI HEAD BR]" as "[QI HNI]".
+      with "[HNIS TAIL TLI HEAD BR FL]" as "[QI HNI]".
     { iFrame. rewrite -!bi.sep_assoc.
       iSplit; [done| ].
       iFrame "%".
@@ -840,9 +842,9 @@ Section SimpleQueue.
 
     iClear "HTH CPS".
     iMod ("CLOS" with "[-]") as "_"; [| done].
-    iFrame. iNext. rewrite Nat.add_sub. rewrite HTH /=.
+    iFrame "QI AUTHS OHV HQ RH DAUTH TOK". iNext.
+    iExists _. rewrite Nat.add_sub. rewrite HTH /=.
 
-    iExists _.     
     iSplitL "HNI". 
     { iRight. by iFrame. }
     iSplit.
@@ -854,23 +856,24 @@ Section SimpleQueue.
 
     iDestruct "ROP" as "[[HEAD | [DANGLE | FL]] | CANCELLED]".
     - iDestruct "HEAD" as "(-> & [CC | (-> & TOK)])".
-      + iRight. iFrame "#∗".
+      + iRight. iFrame "#∗". set_solver. 
       + iLeft. iRight. iLeft. iFrame.
         iPureIntro. split; [lia | done]. 
     - iDestruct "DANGLE" as "((_ & _ & %) & _)". by destruct H.
     - set_solver.
-    - iFrame.     
+    - iDestruct "CANCELLED" as "(?&?&[% | ->])"; [done| ].
+      iRight. iFrame. set_solver.  
   Qed.
 
   Definition dequeue_fuel := 100.    
 
-  Lemma wf_queue_head_br hq h t br fl od
-    (ORDER: hq_state_wf h t br fl od):
-      (let _: heap1GS Σ := iem_phys _ EM in queue_interp hq (h + 1) t br fl) -∗ 
-      ⌜ forall hn hbr, hq !! h = Some hn  -> hq !! br = Some hbr -> h ≠ br -> hn.1 ≠ hbr.1 ⌝ .
-  Proof using.
-    simpl. iIntros "(%T_LEN &  HNIS & %pt & TAIL & TLI & %LL & HEAD & BR)".
-    red in ORDER. destruct ORDER as (?&?&?&?&BR_EQ).
+  (* Lemma wf_queue_head_br hq h t br fl od *)
+  (*   (ORDER: hq_state_wf h t br fl od): *)
+  (*     (let _: heap1GS Σ := iem_phys _ EM in queue_interp hq (h + 1) t br fl) -∗  *)
+  (*     ⌜ forall hn hbr, hq !! h = Some hn  -> hq !! br = Some hbr -> h ≠ br -> hn.1 ≠ hbr.1 ⌝ . *)
+  (* Proof using. *)
+  (*   simpl. iIntros "(%T_LEN &  HNIS & %pt & TAIL & TLI & %LL & HEAD & BR)". *)
+  (*   red in ORDER. destruct ORDER as (?&?&?&?&BR_EQ). *)
 
   Lemma check_BR_spec l τ π q h (* t *) (* br *) fl ph ndh:
     {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_inv l) ∗
@@ -880,9 +883,9 @@ Section SimpleQueue.
         th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
       ! #BeingRead @τ
     {{{ (pbr: loc), RET #pbr; th_phase_frag τ π q ∗
-            (let _: heap1GS Σ := iem_phys _ EM in dequeue_resources (h + 1) fl ndh.2 (Some h)) ∗
-            (⌜ pbr = ph ⌝ ∗ @me_lb _ q_me_br h ∨ ⌜ pbr ≠ ph ⌝ ∗
-                                                   (let _: heap1GS Σ := iem_phys _ EM in  hn_interp (ph, ndh)))
+            (let _: heap1GS Σ := iem_phys _ EM in dequeue_resources (h + 1) fl ndh.2 (if (decide (pbr = ph)) then Some h else None)) ∗
+            (⌜ pbr = ph ⌝ ∗ @me_lb _ q_me_br h ∨ 
+             ⌜ pbr ≠ ph ⌝ ∗ (let _: heap1GS Σ := iem_phys _ EM in  hn_interp (ph, ndh)))
     }}}.
   Proof using.
     iIntros (Φ) "([#QAT #INV] & #HTH & DR& PH & CPS) POST".
@@ -904,8 +907,29 @@ Section SimpleQueue.
     rewrite /dangle_interp. iDestruct "DANGLE" as "(DAUTH & [% | (_ & HNI)])"; [done| ].
     rewrite Nat.add_sub HTH /=. 
     rewrite /dequeue_resources. iDestruct "DR" as "(CH & CFL & HEAD' & DFRAG)".
-    rewrite /queue_interp. iDestruct "QI" as "(%T_LEN &  HNIS & %pt & TAIL & TLI & %LL & HEAD & BR)".
-    iDestruct "BR" as "(%nbr & %BRTH & BR)". destruct nbr as [pbr nbr].  
+    rewrite /queue_interp. iDestruct "QI" as "(%T_LEN &  HNIS & %pt & TAIL & TLI & %LL & HEAD & BR & FL)".
+    iDestruct "BR" as "(%nbr & %BRTH & BR)". destruct nbr as [pbr nbr].
+    iAssert (⌜ pbr = ph -> br = h ⌝)%I as %EQ_PTR.
+    { iIntros (->). simpl.
+      red in ORDER. rewrite Nat.add_sub in ORDER.
+      rewrite !and_assoc in ORDER. destruct ORDER as [ORDER [BR_NEXT | [BR_FL | [? ?]]]].
+      - subst br. rewrite BRTH /=.
+        iCombine "HEAD HEAD'" as "HEAD".
+        subst t. iDestruct (big_sepL_lookup_acc _ _ 0 with "HNIS") as "[HNI' CLOS']".
+        { etrans; [| etrans]; [| apply BRTH| reflexivity].
+          rewrite lookup_drop. f_equal. lia. }
+        simpl. destruct nbr, ndh.
+        iDestruct "HNI" as "[HNI _]". iDestruct "HNI'" as "[HNI' _]".
+        iCombine "HNI HNI'" as "X".
+        by iDestruct (pointsto_valid with "X") as %V.
+      - subst br.
+        iDestruct "FL" as "(%nfl & %FLTH & FL & FLI)".
+        rewrite BRTH in FLTH. inversion FLTH. subst nfl. 
+        simpl. destruct nbr, ndh.        
+        iDestruct "HNI" as "[HNI _]". iDestruct "FLI" as "[HNI' _]".
+        iCombine "HNI HNI'" as "X".
+        by iDestruct (pointsto_valid with "X") as %V.
+      - done. }  
 
     (* iCombine "HEAD HEAD'" as "HEAD".  *)
     iApply sswp_MU_wp; [done| ]. 
@@ -915,12 +939,14 @@ Section SimpleQueue.
     iApply "POST". iFrame.
 
     iAssert (queue_interp hq (h + 1) t br fl)%I
-      with "[HNIS TAIL TLI HEAD BR]" as "QI".
+      with "[HNIS TAIL TLI HEAD BR FL]" as "QI".
     { by iFrame. }
 
     simpl.
     destruct (decide (br = h)) as [-> | NEQ].
-    - iLeft.
+    - rewrite HTH in BRTH. inversion BRTH. subst.
+      rewrite decide_True; [| done]. iFrame.  
+      iLeft.
       iDestruct (take_snapshot with "[$]") as "#SHT".
       iMod ("CLOS" with "[-]") as "_".
       { iFrame. iNext.
@@ -930,7 +956,54 @@ Section SimpleQueue.
       iModIntro. iSplit.
       { set_solver. }
       iDestruct "SHT" as "(?&?&?&?)". done.
-    - 
+    - assert (pbr ≠ ph) by tauto.
+      rewrite decide_False; [| done].
+      iMod (dangle_update _ _ None with "[$] [$]") as "[DAUTH DFRAG]".
+      iFrame.      
+      iApply fupd_or. iRight. iFrame "HNI".
+      rewrite -(bi.sep_True' ⌜ _ ⌝%I). iApply fupd_frame_l. iSplit; [done| ].
+      iMod ("CLOS" with "[-]") as "_"; [| done]. 
+      iFrame. iExists _. iNext. iSplitR.
+      { by iLeft. }
+      iSplit.
+      + iPureIntro. red. red in ORDER.
+        repeat split; lia.
+      + rewrite /rop_interp.
+        iIntros (r ->). iSpecialize ("ROP" with "[//]").
+        iDestruct "ROP" as "[SAFE | (CC&CNC&X)]".
+        * rewrite /safe_read. iDestruct "SAFE" as "[X | Y]".
+          ** iFrame.
+          ** rewrite Nat.add_sub. iDestruct "Y" as "[X | Y]".
+             2: { iFrame. }
+             iDestruct "X" as "((->&->&?) & ?)". lia.
+        *
+          foobar. remove extra restrictions beyond BRIN?
+          assert (br <= r) by admit.
+          assert (br < h) by admit.
+          iDestruct "X" as "[%X | Y]".
+          **
+            inversion X. subst. 
+            rewrite /safe_read. rewrite Nat.add_sub.
+            red in ORDER. rewrite Nat.add_sub in ORDER.
+            destruct ORDER as (?&?&?&?&?).
+            destruct H6 as [|[]]; subst; try lia.
+            set_solver. 
+            *** 
+             
+        rewrite Nat.add_sub HTH /=.
+        iSplit; [| done].
+        iRight. by iFrame. }
+      iModIntro. iSplit.
+      { set_solver. }
+      iDestruct "SHT" as "(?&?&?&?)". done.
+
+      
+
+      
+      (*   red in ORDER. rewrite Nat.add_sub in ORDER. *)
+      (*   rewrite /queue_interp. iDestruct "QI" as "(_ &  HNIS & %pt & TAIL & TLI & %LL & HEAD & BR)". *)
+      (*   iDestruct "BR" as "(%nbr & %BRTH & BR)". destruct nbr as [pbr nbr].   *)
+ 
       iApply "SHT". 
         
     iFrame. iNext. rewrite Nat.add_sub. rewrite HTH /=.
