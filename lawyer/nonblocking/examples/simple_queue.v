@@ -312,7 +312,7 @@ Section SimpleQueue.
           | [] => True
           | (l2, (_, _)) :: _ => nxt1 = l2 /\ is_LL_into hq' pt
           end
-      end. 
+      end.
 
     (** tail always points to a dummy node
         which doesn NOT belong to the logical queue hq.
@@ -324,7 +324,9 @@ Section SimpleQueue.
       ⌜ t = length hq ⌝ ∗ 
       ([∗ list] nd ∈ drop h hq, hn_interp nd) ∗
       ∃ (pt: loc), Tail ↦ #pt ∗ hn_interp (pt, dummy_node) ∗ ⌜ is_LL_into hq pt ⌝ ∗
-      Head ↦{1/2} #(from_option (fun hn => hn.1) pt (hq !! h))
+      let ph: loc := (from_option (fun hn => hn.1) pt (hq !! h)) in
+      Head ↦{1/2} #ph ∗
+      (∃ (nbr: HistNode), ⌜ hq !! br = Some nbr ⌝ ∗ BeingRead ↦#(nbr.1))
     .
 
     Lemma queue_interp_cur_empty (hq: HistQueue) (h br fl: nat):
@@ -390,7 +392,7 @@ Section SimpleQueue.
 
     Definition safe_read (r: nat) (h br fl: nat) (od: option nat): iProp Σ :=
       ⌜ r = h ⌝ ∗ (can_cancel ∨ ⌜ r = br ⌝ ∗ rop_token) ∨
-      ⌜ r = h - 1 /\ r = br /\ is_Some od ⌝ ∨
+      ⌜ r = h - 1 /\ r = br /\ is_Some od ⌝ ∗ rop_token ∨
       ⌜ r = br /\ r = fl ⌝
     .
 
@@ -406,12 +408,16 @@ Section SimpleQueue.
   
     Definition read_head_token: iProp Σ := own q_γ_tok_rh (Excl ()).
     Definition dequeue_token: iProp Σ := own q_γ_tok_dq (Excl ()).
+
+    Definition hq_state_wf h t br fl od: Prop :=
+      fl <= br /\ br <= h /\ fl < h /\ h <= t /\
+      (br = h \/ br = fl \/ od = Some (h - 1) /\ br = h - 1). 
   
     Definition queue_inv_inner (hq: HistQueue) (h t br fl: nat)
       (rop od: option nat) (ohv: val): iProp Σ :=
       hq_auth hq ∗ 
       queue_interp hq h t br fl ∗ dangle_interp od h hq ∗ OldHeadVal ↦ ohv ∗
-      ⌜ fl <= br /\ fl < h /\ h <= t⌝ ∗
+      ⌜ hq_state_wf h t br fl od ⌝ ∗
       auths h t br fl ∗
       rop_interp rop h br fl od  ∗
       (read_head_resources t br ∨ read_head_token) ∗ 
@@ -561,14 +567,14 @@ Section SimpleQueue.
   Proof using.
     simpl. iIntros "[AUTH #FRAGS] QI".
     rewrite /queue_interp.
-    iDestruct "QI" as "(%T_LEN & Q & (%pt & TAIL & DUMMY & %LL & HEAD))".
-    iFrame "HEAD TAIL".
+    iDestruct "QI" as "(%T_LEN & Q & (%pt & TAIL & DUMMY & %LL & HEAD & BR))".
+    iFrame "HEAD TAIL".    
     destruct (Nat.lt_ge_cases h t) as [LT | GE]; subst t.     
     - 
       pose proof LT as [[ph [??]] HTH]%lookup_lt_is_Some_2.
       rewrite HTH. simpl.
       iDestruct (big_sepL_lookup_acc with "FRAGS") as "[ITH _]"; [by eauto| ].
-      iFrame "ITH". 
+      iFrame "ITH BR". 
 
       iDestruct (big_sepL_lookup_acc with "Q") as "[HNI CLOS]".
       { erewrite lookup_drop. by erewrite Nat.add_0_r. }
@@ -582,14 +588,14 @@ Section SimpleQueue.
     - iSplit. 
       2: { iIntros "??". by iFrame "#∗". }
       iLeft. iSplit; [done| ].
-      rewrite lookup_ge_None_2; done. 
+      rewrite (lookup_ge_None_2 _ h) /=; done.      
   Qed.
 
-  Lemma dequeue_resources_auth_agree h' fl' ph od h t br fl hob:
+  Lemma dequeue_resources_auth_agree h' fl' ph od h t br fl:
     let _: heap1GS Σ := iem_phys _ EM in 
-    dequeue_resources h' fl' ph od -∗ auths h t br fl hob -∗ ⌜ h' = h /\ fl' = fl ⌝.
+    dequeue_resources h' fl' ph od -∗ auths h t br fl -∗ ⌜ h' = h /\ fl' = fl ⌝.
   Proof using.
-    simpl. iIntros "(H&FL&?&?) (H'&?&?&FL'&?)".
+    simpl. iIntros "(H&FL&?&?) (H'&?&?&FL')".
     iDestruct (me_auth_exact with "H' H") as %?. 
     iDestruct (me_auth_exact with "FL' FL") as %?.
     done. 
@@ -651,9 +657,9 @@ Section SimpleQueue.
     iApply sswp_MU_wp; [done| ].
     iApply sswp_pure_step; [done| ].
     MU_by_burn_cp. rewrite loc_add_0. iApply wp_value.
-    iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %hob & %od_ & %ohv & inv)" "CLOS".
+    iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od_ & %ohv & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as "(>HQ & >QI & DANGLE & OHV & >%ORDER & >AUTHS & >%SAFE_BR & RH & DQ)".
+    iDestruct "inv" as "(>HQ & >QI & DANGLE & OHV & >%ORDER & >AUTHS & >ROP & RH & DQ)".
     iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[<- <-].
     iDestruct "DR" as "[HEAD FL]".
     iDestruct (hq_auth_lookup with "[$] [$]") as %HTH.
@@ -661,7 +667,7 @@ Section SimpleQueue.
     { iIntros (->). iDestruct (queue_interp_cur_empty with "[$]") as %NO.
       specialize (NO 0). rewrite Nat.add_0_r in NO. congruence. } 
     iDestruct (access_queue with "[$] [$] [$]") as "[HNI CLOS']".
-    { lia. }
+    { red in ORDER. lia. }
     rewrite {1}/hn_interp. iDestruct "HNI" as "[VAL NXT]".
     iApply sswp_MU_wp; [done| ].
     iApply (wp_load with "VAL"). iIntros "!> VAL". 
@@ -688,9 +694,9 @@ Section SimpleQueue.
     iApply sswp_MU_wp; [done| ].
     iApply sswp_pure_step; [done| ].
     MU_by_burn_cp. iApply wp_value.
-    iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %hob & %od' & %ohv & inv)" "CLOS".
+    iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od' & %ohv & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as "(>HQ & >QI & DANGLE & OHV & >%ORDER & >AUTHS & >%SAFE_BR & RH & DQ)".
+    iDestruct "inv" as "(>HQ & >QI & DANGLE & OHV & >%ORDER & >AUTHS & >ROP & RH & DQ)".
     iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[<- <-].
     iDestruct "DR" as "[HEAD FL]".
     iDestruct (hq_auth_lookup with "[$] [$]") as %HTH.
@@ -698,7 +704,7 @@ Section SimpleQueue.
     { iIntros (->). iDestruct (queue_interp_cur_empty with "[$]") as %NO.
       specialize (NO 0). rewrite Nat.add_0_r in NO. congruence. } 
     iDestruct (access_queue with "[$] [$] [$]") as "[HNI CLOS']".
-    { lia. }
+    { red in ORDER. lia. }
     rewrite {1}/hn_interp. iDestruct "HNI" as "[VAL NXT]".
     iApply sswp_MU_wp; [done| ].
     iApply (wp_load with "NXT"). iIntros "!> NXT". 
@@ -724,9 +730,9 @@ Section SimpleQueue.
     {{{ RET #(); th_phase_frag τ π q }}}.
   Proof using.
     iIntros (Φ) "([#QAT #INV] & PH & CPS) POST".
-    iInv "INV" as "(%hq & %h & %t & %br & %fl & %hob & %od & %ohv & inv)" "CLOS".
+    iInv "INV" as "(%hq & %h & %t & %br & %fl & %rop & %od & %ohv & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as "(>HQ & >QI & DANGLE & OHV & >%ORDER & >AUTHS & >%SAFE_BR & RH & DQ)".
+    iDestruct "inv" as "(>HQ & >QI & DANGLE & OHV & >%ORDER & >AUTHS & >ROP & RH & DQ)".
     iApply sswp_MU_wp; [done| ].
     iApply (wp_store with "[$]"). iIntros "!> ?".
     MU_by_burn_cp. iApply wp_value.
@@ -749,6 +755,16 @@ Section SimpleQueue.
     destruct h as [? [? ?]]. tauto.
   Qed.
 
+  Lemma cancel_rop h t br fl h'
+    (LT: h' < h):
+    auths h t br fl -∗ cancelled h'.
+  Proof using.
+    iIntros "(H&?&?&?)".
+    rewrite /cancelled.
+    iDestruct (me_auth_save with "H") as "LB".
+    iExists _. by iFrame.
+  Qed.    
+
   Lemma dequeue_upd_head_spec l τ π q h ph vh (nxh: loc) fl:
     {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_inv l) ∗
         (let _: heap1GS Σ := iem_phys _ EM in ith_node h (ph, (vh, nxh))) ∗ 
@@ -759,9 +775,9 @@ Section SimpleQueue.
   Proof using.
     simpl.
     iIntros (Φ) "([#QAT #INV] & #HTH & PH & CPS & DR) POST".
-    iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %hob & %od_ & %ohv & inv)" "CLOS".
+    iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od_ & %ohv & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as "(>HQ & >QI & >DANGLE & >OHV & >%ORDER & >AUTHS & >%SAFE_BR & RH & >DQ)".
+    iDestruct "inv" as "(>HQ & >QI & >DANGLE & >OHV & >%ORDER & >AUTHS & >ROP & RH & >DQ)".
     iDestruct "DQ" as "[(% & DR') | TOK]".
     { by iDestruct (dequeue_resources_excl with "[$] [$]") as "?". }
     iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[<- <-]. 
@@ -773,11 +789,11 @@ Section SimpleQueue.
     iDestruct (hq_auth_lookup with "[$] [$]") as %HTH.
     iAssert (⌜ t ≠ h ⌝)%I as %NEMPTY.
     { iIntros (->). iDestruct (queue_interp_cur_empty with "[$]") as %NO.
-      specialize (NO 0). rewrite Nat.add_0_r in NO. congruence. } 
+      specialize (NO 0). rewrite Nat.add_0_r in NO. congruence. }
 
     rewrite /dangle_interp. iDestruct "DANGLE" as "(DAUTH & [_ | (% & ?)])"; [| done].
     rewrite /dequeue_resources. iDestruct "DR" as "(CH & CFL & HEAD' & DFRAG)".
-    rewrite /queue_interp. iDestruct "QI" as "(%T_LEN &  HNIS & %pt & TAIL & TLI & %LL & HEAD)".
+    rewrite /queue_interp. iDestruct "QI" as "(%T_LEN &  HNIS & %pt & TAIL & TLI & %LL & HEAD & BR)".
     rewrite HTH. iEval (simpl) in "HEAD".
 
     iCombine "HEAD HEAD'" as "HEAD". 
@@ -787,15 +803,15 @@ Section SimpleQueue.
 
     iMod (dangle_update _ _ (Some h) with "[$] [$]") as "[DAUTH DFRAG]".
 
-    iAssert (|==> auths (h + 1) t br fl hob ∗ @me_exact _ q_me_h (h + 1))%I with "[CH AUTHS]" as "UPD".
-    { rewrite /auths. iDestruct "AUTHS" as "(AUTH&?&?&?&?)". iFrame.
+    iAssert (|==> auths (h + 1) t br fl ∗ @me_exact _ q_me_h (h + 1))%I with "[CH AUTHS]" as "UPD".
+    { rewrite /auths. iDestruct "AUTHS" as "(AUTH&?&?&?)". iFrame.
       iApply (me_update with "AUTH CH"). lia. }
     iMod "UPD" as "[AUTHS CH]".
 
     iApply "POST". iFrame.
 
     iAssert (queue_interp hq (h + 1) t br fl ∗ hn_interp (ph, (vh, nxh)))%I
-      with "[HNIS TAIL TLI HEAD]" as "[QI HNI]".
+      with "[HNIS TAIL TLI HEAD BR]" as "[QI HNI]".
     { iFrame. rewrite -!bi.sep_assoc.
       iSplit; [done| ].
       iFrame "%".
@@ -819,42 +835,122 @@ Section SimpleQueue.
       - simpl. destruct h0 as [? [??]]. simpl.
         by destruct LL as [-> ?]. }
 
+    iDestruct (cancel_rop with "[$]") as "#CNC".
+    { red. rewrite Nat.add_1_r. reflexivity. } 
+
     iClear "HTH CPS".
     iMod ("CLOS" with "[-]") as "_"; [| done].
     iFrame. iNext. rewrite Nat.add_sub. rewrite HTH /=.
-    iSplitL.
-    { iRight. by iFrame. }
-    iPureIntro. split.
-    { lia. }
 
-    red. red in SAFE_BR. 
-    destruct SAFE_BR as [-> | [[-> ?] | [LE [-> | GT]]] ].
-    - right. left. split; auto. lia.
-    - by destruct H.
-    - lia.
-    - lia.
+    iExists _.     
+    iSplitL "HNI". 
+    { iRight. by iFrame. }
+    iSplit.
+    { iPureIntro. red. red in ORDER. repeat split; try lia.
+      repeat apply proj2 in ORDER.
+      rewrite Nat.add_sub. set_solver. }
+    rewrite /rop_interp. iIntros (r ->).
+    iSpecialize ("ROP" with "[//]"). rewrite /safe_read.
+
+    iDestruct "ROP" as "[[HEAD | [DANGLE | FL]] | CANCELLED]".
+    - iDestruct "HEAD" as "(-> & [CC | (-> & TOK)])".
+      + iRight. iFrame "#∗".
+      + iLeft. iRight. iLeft. iFrame.
+        iPureIntro. split; [lia | done]. 
+    - iDestruct "DANGLE" as "((_ & _ & %) & _)". by destruct H.
+    - set_solver.
+    - iFrame.     
   Qed.
 
   Definition dequeue_fuel := 100.    
 
-  Lemma check_BR_spec l τ π q h t br fl hob ph ndh:
+  Lemma wf_queue_head_br hq h t br fl od
+    (ORDER: hq_state_wf h t br fl od):
+      (let _: heap1GS Σ := iem_phys _ EM in queue_interp hq (h + 1) t br fl) -∗ 
+      ⌜ forall hn hbr, hq !! h = Some hn  -> hq !! br = Some hbr -> h ≠ br -> hn.1 ≠ hbr.1 ⌝ .
+  Proof using.
+    simpl. iIntros "(%T_LEN &  HNIS & %pt & TAIL & TLI & %LL & HEAD & BR)".
+    red in ORDER. destruct ORDER as (?&?&?&?&BR_EQ).
+
+  Lemma check_BR_spec l τ π q h (* t *) (* br *) fl ph ndh:
     {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_inv l) ∗
         (let _: heap1GS Σ := iem_phys _ EM in ith_node h (ph, ndh)) ∗
-        (let _: heap1GS Σ := iem_phys _ EM in snapshot h t br fl hob) ∗ 
+        (* (let _: heap1GS Σ := iem_phys _ EM in snapshot h t br fl) ∗  *)
         (let _: heap1GS Σ := iem_phys _ EM in dequeue_resources (h + 1) fl ndh.2 (Some h)) ∗ 
         th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
       ! #BeingRead @τ
     {{{ (pbr: loc), RET #pbr; th_phase_frag τ π q ∗
             (let _: heap1GS Σ := iem_phys _ EM in dequeue_resources (h + 1) fl ndh.2 (Some h)) ∗
-            ∃ br' hob', (let _: heap1GS Σ := iem_phys _ EM in snapshot h t br' fl hob') ∗ 
-              (* ⌜ br' < h /\ pbr ≠ ph \/ br' = h /\ pbr = ph \/ ⌝ *)
-              (* TODO: figure out postcondition *)
-              ⌜ br' = h /\ pbr = ph \/ hob = (h + 1)%nat /\ pbr ≠ ph ⌝
+            (⌜ pbr = ph ⌝ ∗ @me_lb _ q_me_br h ∨ ⌜ pbr ≠ ph ⌝ ∗
+                                                   (let _: heap1GS Σ := iem_phys _ EM in  hn_interp (ph, ndh)))
     }}}.
   Proof using.
-  Admitted.
-  foobar. 
+    iIntros (Φ) "([#QAT #INV] & #HTH & DR& PH & CPS) POST".
+    iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od_ & %ohv & inv)" "CLOS".
+    iEval (rewrite /queue_inv_inner) in "inv".
+    iDestruct "inv" as "(>HQ & >QI & >DANGLE & >OHV & >%ORDER & >AUTHS & >ROP & RH & >DQ)".
+    iDestruct "DQ" as "[(% & DR') | TOK]".
+    { by iDestruct (dequeue_resources_excl with "[$] [$]") as "?". }
+    iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[<- <-]. 
+    iDestruct (dequeue_resources_dangle_agree with "[$] [$]") as %->.
 
+    iClear "INV QAT".
+
+    (* TODO: split into lemmas *)
+    iDestruct (hq_auth_lookup with "[$] [$]") as %HTH.
+    iAssert (⌜ t ≠ h ⌝)%I as %NEMPTY.
+    { iIntros (->). red in ORDER. lia. }
+
+    rewrite /dangle_interp. iDestruct "DANGLE" as "(DAUTH & [% | (_ & HNI)])"; [done| ].
+    rewrite Nat.add_sub HTH /=. 
+    rewrite /dequeue_resources. iDestruct "DR" as "(CH & CFL & HEAD' & DFRAG)".
+    rewrite /queue_interp. iDestruct "QI" as "(%T_LEN &  HNIS & %pt & TAIL & TLI & %LL & HEAD & BR)".
+    iDestruct "BR" as "(%nbr & %BRTH & BR)". destruct nbr as [pbr nbr].  
+
+    (* iCombine "HEAD HEAD'" as "HEAD".  *)
+    iApply sswp_MU_wp; [done| ]. 
+    iApply (wp_load with "BR"). iIntros "!> BR".
+    MU_by_burn_cp. iApply wp_value.
+
+    iApply "POST". iFrame.
+
+    iAssert (queue_interp hq (h + 1) t br fl)%I
+      with "[HNIS TAIL TLI HEAD BR]" as "QI".
+    { by iFrame. }
+
+    simpl.
+    destruct (decide (br = h)) as [-> | NEQ].
+    - iLeft.
+      iDestruct (take_snapshot with "[$]") as "#SHT".
+      iMod ("CLOS" with "[-]") as "_".
+      { iFrame. iNext.
+        rewrite Nat.add_sub HTH /=.
+        iSplit; [| done].
+        iRight. by iFrame. }
+      iModIntro. iSplit.
+      { set_solver. }
+      iDestruct "SHT" as "(?&?&?&?)". done.
+    - 
+      iApply "SHT". 
+        
+    iFrame. iNext. rewrite Nat.add_sub. rewrite HTH /=.
+
+    iExists _.     
+    iSplitL "HNI". 
+    { iRight. by iFrame. }
+    iSplit; [iPureIntro; lia| ].
+    rewrite /rop_interp. iIntros (r ->).
+    iSpecialize ("ROP" with "[//]"). rewrite /safe_read.
+
+    iDestruct "ROP" as "[[HEAD | [DANGLE | FL]] | CANCELLED]".
+    - iDestruct "HEAD" as "(-> & [CC | (-> & TOK)])".
+      + iRight. iFrame "#∗".
+      + iLeft. iRight. iLeft. iFrame.
+        iPureIntro. split; [lia | done]. 
+    - iDestruct "DANGLE" as "((_ & _ & %) & _)". by destruct H.
+    - set_solver.
+    - iFrame.     
+  Qed.
 
   Lemma dequeue_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_inv l) ∗
