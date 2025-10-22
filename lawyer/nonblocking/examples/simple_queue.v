@@ -224,7 +224,7 @@ Class QueuePreG Σ := {
   q_pre_max :: MaxExactPreG Σ;
   q_pre_tok :: inG Σ (exclR unitO);
   q_pre_hq :: HistQueueG Σ;
-  q_pre_dangle :: inG Σ (excl_authUR (option nat));
+  q_pre_dangle_rop :: inG Σ (excl_authUR (option nat));
 }.
 
 
@@ -234,19 +234,20 @@ Class QueueG Σ := {
     Head: loc; Tail: loc; BeingRead: loc; 
     FreeLater: loc; OldHeadVal: loc;
 
-    γHob: gname;
     q_hq :: HistQueueG Σ;
 
     q_γ_tok_rh: gname;
     q_γ_tok_dq: gname;
+    q_γ_tok_cc: gname;
+    q_γ_tok_rop: gname;
 
     q_γ_dangle: gname;
+    q_γ_rop: gname;
 
     q_me_h :: MaxExactG Σ;
     q_me_t :: MaxExactG Σ;
     q_me_br :: MaxExactG Σ;
     q_me_fl :: MaxExactG Σ;
-    q_me_hob :: MaxExactG Σ;
 }.
 
 
@@ -348,48 +349,57 @@ Section SimpleQueue.
   
     Definition dangle_auth (od: option nat): iProp Σ := own q_γ_dangle (●E od).
     Definition dangle_frag (od: option nat): iProp Σ := own q_γ_dangle (◯E od).
+
+    Definition rop_auth (rop: option nat): iProp Σ := own q_γ_rop (●E rop).
+    Definition rop_frag (rop: option nat): iProp Σ := own q_γ_rop (◯E rop).
       
     Definition dangle_interp (od: option nat) (h: nat) (hq: HistQueue): iProp Σ :=
       dangle_auth od ∗ (⌜ od = None ⌝ ∨ ⌜ od = Some (h - 1) ⌝ ∗ from_option hn_interp (⌜ False ⌝)%I (hq !! (h - 1)))
     . 
   
-    Definition auths (h t br fl hob: nat): iProp Σ :=
+    Definition auths (h t br fl: nat): iProp Σ :=
       @me_auth _ q_me_h h ∗ @me_auth _ q_me_t t ∗ @me_auth _ q_me_br br ∗
-      @me_auth _ q_me_fl fl ∗ @me_auth _ q_me_hob hob
+      @me_auth _ q_me_fl fl
     .
 
-    Definition snapshot (h t br fl hob: nat): iProp Σ :=
+    Definition snapshot (h t br fl: nat): iProp Σ :=
       @me_lb _ q_me_h h ∗ @me_lb _ q_me_t t ∗ @me_lb _ q_me_br br ∗
-      @me_lb _ q_me_fl fl ∗ @me_lb _ q_me_hob hob
+      @me_lb _ q_me_fl fl
     .
 
-    Lemma take_snapshot (h t br fl hob: nat): 
-      auths h t br fl hob -∗ snapshot h t br fl hob.
+    Lemma take_snapshot (h t br fl: nat): 
+      auths h t br fl -∗ snapshot h t br fl.
     Proof using.
-      iIntros "(?&?&?&?&?)".
+      iIntros "(?&?&?&?)".
       rewrite /snapshot. repeat iSplit; by iApply @me_auth_save.
     Qed.
 
-    Lemma snapshot_lb (h t br fl hob: nat) (h' t' br' fl' hob': nat):
-      snapshot h t br fl hob -∗ auths h' t' br' fl' hob' -∗
-      ⌜ h <= h' /\ t <= t' /\ br <= br' /\ fl <= fl' /\ hob <= hob' ⌝.
+    Lemma snapshot_lb (h t br fl: nat) (h' t' br' fl': nat):
+      snapshot h t br fl -∗ auths h' t' br' fl' -∗
+      ⌜ h <= h' /\ t <= t' /\ br <= br' /\ fl <= fl'⌝.
     Proof using.
-      iIntros "#(X&?&?&?&?) (Y&?&?&?&?)".
+      iIntros "#(X&?&?&?) (Y&?&?&?)".
       repeat iSplit.
       all: iApply (@me_auth_lb with "[-]"); eauto.
     Qed.
+
+    Definition can_cancel: iProp Σ := own q_γ_tok_cc (Excl ()).
+    Definition rop_token: iProp Σ := own q_γ_tok_rop (Excl ()).
+    Definition cancelled (r: nat): iProp Σ :=
+      ∃ r', ⌜ r < r' ⌝ ∗ @me_lb _ q_me_h r'. 
+
+    Definition safe_read (r: nat) (h br fl: nat) (od: option nat): iProp Σ :=
+      ⌜ r = h ⌝ ∗ (can_cancel ∨ ⌜ r = br ⌝ ∗ rop_token) ∨
+      ⌜ r = h - 1 /\ r = br /\ is_Some od ⌝ ∨
+      ⌜ r = br /\ r = fl ⌝
+    .
+
+    Definition rop_interp (rop: option nat) (h br fl: nat) (od: option nat): iProp Σ :=
+      ∀ r, ⌜ rop = Some r  ⌝ -∗ (safe_read r h br fl od ∨ can_cancel ∗ cancelled r). 
   
-    Definition safe_BR (h br fl hob: nat) (od: option nat): Prop :=
-      br = h \/ (* reading the current queue head *)
-      br = h - 1 /\ is_Some od \/ (* reading the dangling head *)
-      br <= h - 1 /\ ( (* read of some old node that: *)
-        fl = br \/ (* is protected by FreeLater *)
-        hob > br (* won't actually be read, since a newer head has been observed *)
-      ).
-  
-    Definition read_head_resources (t br hob: nat): iProp Σ :=
-      @me_exact _ q_me_t t ∗ @me_exact _ q_me_br br ∗ @me_exact _ q_me_hob hob. 
-  
+    Definition read_head_resources (t br: nat): iProp Σ :=
+      @me_exact _ q_me_t t ∗ @me_exact _ q_me_br br ∗ rop_frag None ∗ can_cancel ∗ rop_token.
+
     Definition dequeue_resources (h fl: nat) (ph: loc) (od: option nat): iProp Σ :=
       @me_exact _ q_me_h h ∗ @me_exact _ q_me_fl fl ∗
       Head ↦{1/2} #ph ∗ dangle_frag od. 
@@ -397,14 +407,14 @@ Section SimpleQueue.
     Definition read_head_token: iProp Σ := own q_γ_tok_rh (Excl ()).
     Definition dequeue_token: iProp Σ := own q_γ_tok_dq (Excl ()).
   
-    Definition queue_inv_inner (hq: HistQueue) (h t br fl hob: nat)
-      (od: option nat) (ohv: val): iProp Σ :=
+    Definition queue_inv_inner (hq: HistQueue) (h t br fl: nat)
+      (rop od: option nat) (ohv: val): iProp Σ :=
       hq_auth hq ∗ 
       queue_interp hq h t br fl ∗ dangle_interp od h hq ∗ OldHeadVal ↦ ohv ∗
-      ⌜ fl <= br <= hob /\ hob <= h /\ fl < h /\ h <= t⌝ ∗
-      auths h t br fl hob ∗
-      ⌜ safe_BR h br fl hob od ⌝ ∗
-      (read_head_resources t br hob ∨ read_head_token) ∗ 
+      ⌜ fl <= br /\ fl < h /\ h <= t⌝ ∗
+      auths h t br fl ∗
+      rop_interp rop h br fl od  ∗
+      (read_head_resources t br ∨ read_head_token) ∗ 
       ((∃ ph, dequeue_resources h fl ph None) ∨ dequeue_token)
     .
   
@@ -418,7 +428,7 @@ Section SimpleQueue.
     (* Definition queue_inv (q: loc): iProp Σ := *)
     Definition queue_inv (q: val): iProp Σ :=
       queue_at q ∗ inv queue_ns 
-        (∃ hq h t br fl hob od ohv, queue_inv_inner hq h t br fl hob od ohv)
+        (∃ hq h t br fl rop od ohv, queue_inv_inner hq h t br fl rop od ohv)
     .
   
   End QueueResources.
