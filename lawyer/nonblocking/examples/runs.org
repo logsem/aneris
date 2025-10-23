@@ -1,0 +1,35 @@
+* runs
+  1. init
+     fl, br    h, t
+      [ ]      [ dummy ]
+  2. enq
+     fl, br    h         t
+      [ ]      [l0 ]-[ dummy ]
+  3. enq
+     fl, br    h                t
+      [ ]      [ l0 ]-[ l1 ]-[ dummy ]
+  4. start read - only read current head
+     fl, br    h, ch_rop          t
+      [ ]      [ l0 ]-[ l1 ]-[ dummy ]
+  5. dequeue; h != br - will free l0; read is ongoing
+     fl, br    ch_rop   h       t
+      [ ]      [ +l0+ ]-[ l1 ]-[ dummy ]
+  6. dequeue; ph != pbr - will free l1; read is ongoing
+     fl, br    ch_rop               h, t
+      [ ]      [ +l0+ ]-[ +l1+ ]-[ dummy ]
+  7. continue read, upd br
+     fl         br, ch_rop          h, t
+      [ ]      [ +l0+ ]-[ +l1+ ]-[ dummy ]
+  8. finish read: read head again - not equal
+     fl         br, ch_rop         ch_rop', h, t
+      [ ]      [ +l0+ ]-[ +l1+ ]-[ dummy ]
+  9. cleanup
+     fl         br                  h, t
+      [ ]      [ +l0+ ]-[ +l1+ ]-[ dummy ]
+  10. _example of fl>br_
+  11. enqueue *at l0 again*
+     fl         br                  h             t
+      [ ]      [ +l0+ ]-[ +l1+ ]-[ l0 again ]-[ dummy ]
+  12. dequeue; ph = pbr -> move fl to h; clean up old fl
+                         br                     fl         h, t
+      [ +(old)+ ]      [ +l0+ ]-[ +l1+ ]-[ +l0 again+ ]-[ dummy ]
