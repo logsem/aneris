@@ -412,7 +412,8 @@ Section SimpleQueue.
     Definition dequeue_token: iProp Σ := own q_γ_tok_dq (Excl ()).
 
     Definition hq_state_wf h t br fl: Prop :=
-      fl <= br /\ br <= h /\ fl < h /\ h <= t.
+      (* fl <= br /\ *) (* see runs.org for a counterexample *)
+      br <= h /\ fl < h /\ h <= t.
       (* THIS IS FALSE: br can fall behind arbitrarily *)
       (* (br = h \/ br = fl \/ od = Some (h - 1) /\ br = h - 1).  *)
   
@@ -907,42 +908,6 @@ Section SimpleQueue.
     rewrite /dequeue_resources. iDestruct "DR" as "(CH & CFL & HEAD' & DFRAG)".
     rewrite /queue_interp. iDestruct "QI" as "(%T_LEN &  HNIS & %pt & TAIL & TLI & %LL & HEAD & BR & FL)".
     iDestruct "BR" as "(%nbr & %BRTH & BR)". destruct nbr as [pbr nbr].
-    iAssert (⌜ pbr = ph -> br = h ⌝)%I as %EQ_PTR.
-    { iIntros (->). simpl.
-      red in ORDER.
-      (* relied on wrong br assumption *)
-      
-      (* rewrite !and_assoc in ORDER. destruct ORDER as [ORDER [BR_NEXT | [BR_FL | [? ?]]]]. *)
-      (* - subst br. rewrite BRTH /=. *)
-      (*   iCombine "HEAD HEAD'" as "HEAD". *)
-      (*   subst t. iDestruct (big_sepL_lookup_acc _ _ 0 with "HNIS") as "[HNI' CLOS']". *)
-      (*   { etrans; [| etrans]; [| apply BRTH| reflexivity]. *)
-      (*     rewrite lookup_drop. f_equal. lia. } *)
-      (*   simpl. destruct nbr, ndh. *)
-      (*   iDestruct "HNI" as "[HNI _]". iDestruct "HNI'" as "[HNI' _]". *)
-      (*   iCombine "HNI HNI'" as "X". *)
-      (*   by iDestruct (pointsto_valid with "X") as %V. *)
-      (* - subst br. *)
-      (*   iDestruct "FL" as "(%nfl & %FLTH & FL & FLI)". *)
-      (*   rewrite BRTH in FLTH. inversion FLTH. subst nfl.  *)
-      (*   simpl. destruct nbr, ndh.         *)
-      (*   iDestruct "HNI" as "[HNI _]". iDestruct "FLI" as "[HNI' _]". *)
-      (*   iCombine "HNI HNI'" as "X". *)
-      (*   by iDestruct (pointsto_valid with "X") as %V. *)
-      (* - done.  *)
-
-      destruct (decide (br = h)) as [| NEQ]; [done| ].
-      assert (br < h \/ br = h + 1) as [LT | NEXT] by lia.
-      2: { subst br.
-           (* conflict of new head and dangle *)
-           admit. }
-      destruct (decide (br = fl)) as [-> | NEQ'].
-      { (* conflict of head and fl *)
-        admit. }
-      assert (fl < br) as GT by lia.
-      clear NEQ NEQ'.
-      admit. }
-    clear EQ_PTR. 
 
     (* iCombine "HEAD HEAD'" as "HEAD".  *)
     iApply sswp_MU_wp; [done| ]. 
@@ -993,44 +958,43 @@ Section SimpleQueue.
         2: { iFrame. }
         iDestruct "X" as "((->&->&?) & ?)".
         congruence. 
-    
-    foobar. 
-    (* done with assumption of br = h <-> pbr = ph *)
-    simpl.
-    destruct (decide (br = h)) as [-> | NEQ].
-    - rewrite HTH in BRTH. inversion BRTH. subst.
-      rewrite decide_True; [| done]. iFrame.  
-      iLeft.
-      iDestruct (take_snapshot with "[$]") as "#SHT".
-      iMod ("CLOS" with "[-]") as "_".
-      { iFrame. iNext.
-        rewrite Nat.add_sub HTH /=.
-        iSplit; [| done].
-        iRight. by iFrame. }
-      iModIntro. iSplit.
-      { set_solver. }
-      iDestruct "SHT" as "(?&?&?&?)". done.
-    - destruct (decide (pbr = ph)) as [-> | NEQ_PTR].
-      2: { iMod (dangle_update _ _ None with "[$] [$]") as "[DAUTH DFRAG]".
-           iFrame.      
-           iApply fupd_or. iRight. iFrame "HNI".
-           rewrite -(bi.sep_True' ⌜ _ ⌝%I). iApply fupd_frame_l. iSplit; [done| ].
-           iMod ("CLOS" with "[-]") as "_"; [| done]. 
-           iFrame. iExists _. iNext. iSplitR.
-           { by iLeft. }
-           iSplit.
-           + iPureIntro. red. red in ORDER.
-             repeat split; lia.
-           + rewrite /rop_interp.
-             iIntros (r ->). iSpecialize ("ROP" with "[//]").
-             iDestruct "ROP" as "[SAFE | ?]"; [| by iFrame]. 
-             rewrite /safe_read. iDestruct "SAFE" as "[X | Y]".
-             * iFrame.
-             * rewrite Nat.add_sub. iDestruct "Y" as "[X | Y]".
-                2: { iFrame. }
-                iDestruct "X" as "((->&->&?) & ?)". lia. }
+    (* foobar.  *)
+    (* (* done with assumption of br = h <-> pbr = ph *) *)
+    (* simpl. *)
+    (* destruct (decide (br = h)) as [-> | NEQ]. *)
+    (* - rewrite HTH in BRTH. inversion BRTH. subst. *)
+    (*   rewrite decide_True; [| done]. iFrame.   *)
+    (*   iLeft. *)
+    (*   iDestruct (take_snapshot with "[$]") as "#SHT". *)
+    (*   iMod ("CLOS" with "[-]") as "_". *)
+    (*   { iFrame. iNext. *)
+    (*     rewrite Nat.add_sub HTH /=. *)
+    (*     iSplit; [| done]. *)
+    (*     iRight. by iFrame. } *)
+    (*   iModIntro. iSplit. *)
+    (*   { set_solver. } *)
+    (*   iDestruct "SHT" as "(?&?&?&?)". done. *)
+    (* - destruct (decide (pbr = ph)) as [-> | NEQ_PTR]. *)
+    (*   2: { iMod (dangle_update _ _ None with "[$] [$]") as "[DAUTH DFRAG]". *)
+    (*        iFrame.       *)
+    (*        iApply fupd_or. iRight. iFrame "HNI". *)
+    (*        rewrite -(bi.sep_True' ⌜ _ ⌝%I). iApply fupd_frame_l. iSplit; [done| ]. *)
+    (*        iMod ("CLOS" with "[-]") as "_"; [| done].  *)
+    (*        iFrame. iExists _. iNext. iSplitR. *)
+    (*        { by iLeft. } *)
+    (*        iSplit. *)
+    (*        + iPureIntro. red. red in ORDER. *)
+    (*          repeat split; lia. *)
+    (*        + rewrite /rop_interp. *)
+    (*          iIntros (r ->). iSpecialize ("ROP" with "[//]"). *)
+    (*          iDestruct "ROP" as "[SAFE | ?]"; [| by iFrame].  *)
+    (*          rewrite /safe_read. iDestruct "SAFE" as "[X | Y]". *)
+    (*          * iFrame. *)
+    (*          * rewrite Nat.add_sub. iDestruct "Y" as "[X | Y]". *)
+    (*             2: { iFrame. } *)
+    (*             iDestruct "X" as "((->&->&?) & ?)". lia. } *)
 
-      iMod (dangle_update _ _ None with "[$] [$]") as "[DAUTH DFRAG]".      
+    (*   iMod (dangle_update _ _ None with "[$] [$]") as "[DAUTH DFRAG]".       *)
   Qed.
 
   Lemma dequeue_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
