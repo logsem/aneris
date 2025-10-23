@@ -39,27 +39,47 @@ From heap_lang Require Import heap_lang_defs lang notation.
 From lawyer.obligations Require Import obligations_resources.
 
 
+Lemma foo:
+  forall {M: Model} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ},
+    heap1GS Σ.
+Proof using.
+  intros.
+  exact (iem_phys _ EM).
+  Show Proof.
+  Abort. 
+
+Lemma foo:
+  forall {M: Model} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ},
+    invGS_gen HasNoLc Σ.
+Proof using.
+  intros.
+  apply _.
+  Show Proof. 
+Abort. 
+
+
 (* TODO: relax to non-trivial degrees *)
 (* TODO: support LATs *)
 Record WaitFreeSpec (m: val) := {
   wfs_is_init_st: cfg heap_lang -> Prop;
-  wfs_mod_inv {M: Model} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ}: iProp Σ;
-  wfs_mod_inv_Pers `{EM: ExecutionModel heap_lang M} `{OHE: !OM_HL_Env OP_HL_WF EM Σ} ::
+  (** for wait-free modules, we expect that invariant doesn't contain OM resources *)
+  wfs_mod_inv {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ}: iProp Σ;
+  wfs_mod_inv_Pers `{heap1GS Σ, invGS_gen HasNoLc Σ} ::
     Persistent wfs_mod_inv;
-  wfs_init_mod `{EM: ExecutionModel heap_lang M} `{OHE: !OM_HL_Env OP_HL_WF EM Σ}:
+  wfs_init_mod `{heap1GS Σ, invGS_gen HasNoLc Σ}:
     forall c (INIT: wfs_is_init_st c),
-      let _: heap1GS Σ := iem_phys _ EM in 
       ⊢ hl_phys_init_resource c ={⊤}=∗ wfs_mod_inv;
   wfs_F: nat;
   wfs_spec:
-  forall {M: Model} {EM: ExecutionModel heap_lang M} Σ {OHE: OM_HL_Env OP_HL_WF EM Σ}
+  forall {M: Model} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ}
     τ π q (a: val),
-    {{{ cp_mul π d_wfr0 wfs_F ∗ th_phase_frag τ π q ∗ wfs_mod_inv}}}
+    {{{ cp_mul π d_wfr0 wfs_F ∗ th_phase_frag τ π q ∗ 
+        (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv ) }}}
       App m a @ τ
     {{{ v, RET v; th_phase_frag τ π q }}};
 
   (* TODO: derive it from wfs_spec *)
   wfs_safety_spec:
     ∀ {Σ : gFunctors} `{heap1GS Σ, invGS_gen HasNoLc Σ},
-      ⊢ interp m;
+      wfs_mod_inv ⊢ interp m;
 }. 

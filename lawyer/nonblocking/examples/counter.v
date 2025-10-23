@@ -17,26 +17,14 @@ Section Counter.
 
   Definition counter_inv_ns := nroot .@ "cnt". 
 
-  Context {Σ: gFunctors}. 
-  
-  Definition counter_inv {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ}: iProp Σ :=
+  Definition counter_inv {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ}: iProp Σ :=
     inv counter_inv_ns (∃ (n: nat), l ↦ #n).
-
-  Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
-  Context `{EM: ExecutionModel heap_lang M}.
-
-  Context {OHE: OM_HL_Env OP EM Σ}.
-
-  Notation "'Degree'" := (om_hl_Degree).
-  Context (d: Degree).
-
-  Existing Instance OHE.
 
   Definition counter_is_init_st (c: cfg heap_lang) :=
     (heap c.2) !! l = Some #(0: nat).
 
-  Lemma counter_init_inv (c: cfg heap_lang) (INIT: counter_is_init_st c):
-    let _: heap1GS Σ := iem_phys _ EM in 
+  Lemma counter_init_inv {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ}
+    (c: cfg heap_lang) (INIT: counter_is_init_st c):
     hl_phys_init_resource c ={⊤}=∗ counter_inv. 
   Proof using.
     simpl. iIntros "INIT". rewrite /hl_phys_init_resource.
@@ -49,6 +37,18 @@ Section Counter.
     2: iModIntro; by iApply "INV".
     iNext. iExists _. iFrame.
   Qed.
+
+  Context {Σ: gFunctors}. 
+  
+  Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
+  Context `{EM: ExecutionModel heap_lang M}.
+
+  Context {OHE: OM_HL_Env OP EM Σ}.
+
+  Notation "'Degree'" := (om_hl_Degree).
+  Context (d: Degree).
+
+  Existing Instance OHE.
 
   (* Goal heap1GS Σ. *)
   (*   apply (iem_phys HeapLangEM EM).  *)
@@ -99,10 +99,8 @@ Proof using.
 Qed.
 
 Lemma counter_wfree_init_inv (l : loc):
-  forall (M : Model) (EM : ExecutionModel heap_lang M) 
-   (Σ : gFunctors) (OHE : OM_HL_Env OP_HL_WF EM Σ) (c : cfg heap_lang),
-   counter_is_init_st l c ->
-    let _: heap1GS Σ := iem_phys _ EM in 
+  forall {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ}
+   (c : cfg heap_lang), counter_is_init_st l c -> 
      hl_phys_init_resource c ={⊤}=∗ counter_inv l.
 Proof using.
   intros. by apply counter_init_inv.
@@ -112,8 +110,8 @@ Qed.
 From lawyer.nonblocking.logrel Require Import logrel.
 From iris.base_logic Require Import invariants.
 
-Lemma counter_safety_spec
-  {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ} (l: loc)
+Lemma counter_safety_spec (l: loc)
+  {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ}
   :
     counter_inv l ⊢ persistent_pred.pers_pred_car interp (incr l).
 Proof using.
@@ -143,7 +141,7 @@ Qed.
 
 
 Definition counter_WF_spec (l: loc): WaitFreeSpec (incr l) := {|
-  wfs_init_mod := counter_wfree_init_inv l;
+  wfs_init_mod Σ _ _ := counter_wfree_init_inv l;
   wfs_spec := counter_wfree_spec l;
-  wfs_safety_spec := counter_safety_spec;
+  wfs_safety_spec Σ _ _ := counter_safety_spec l;
 |}. 

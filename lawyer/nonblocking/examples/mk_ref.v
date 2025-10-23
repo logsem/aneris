@@ -15,6 +15,13 @@ Section SimpleExample.
       "l"
   .
 
+  Definition mk_ref_inv {Σ}: iProp Σ := ⌜ True ⌝.
+
+  Lemma mk_ref_init_inv {Σ : gFunctors} `{heap1GS Σ, invGS_gen HasNoLc Σ}
+    (c: cfg heap_lang):
+     hl_phys_init_resource c ={⊤}=∗ mk_ref_inv.
+  Proof using. set_solver. Qed.
+
   Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
   Context `{EM: ExecutionModel heap_lang M}.
 
@@ -41,13 +48,6 @@ Section SimpleExample.
     iApply "POST". by iFrame.
   Qed.
 
-  Definition mk_ref_inv: iProp Σ := ⌜ True ⌝.
-
-  Lemma mk_ref_init_inv (c: cfg heap_lang):
-    let _: heap1GS Σ := iem_phys _ EM in 
-     hl_phys_init_resource c ={⊤}=∗ mk_ref_inv.
-  Proof using. set_solver. Qed.
-
 
 End SimpleExample.
 
@@ -55,10 +55,8 @@ End SimpleExample.
 From lawyer.nonblocking Require Import om_wfree_inst. 
 
 Lemma mk_ref_wfree_init_inv:
-  ∀ (M : Model) (EM : ExecutionModel heap_lang M) (Σ : gFunctors) 
-    (OHE : OM_HL_Env OP_HL_WF EM Σ) (c : cfg heap_lang),
+  ∀ {Σ : gFunctors} `{heap1GS Σ, invGS_gen HasNoLc Σ} (c : cfg heap_lang),
     (fun _ => True) c ->
-    let _: heap1GS Σ := iem_phys _ EM in 
     hl_phys_init_resource c ={⊤}=∗ mk_ref_inv.
 Proof using.
   iIntros "**". iApply (mk_ref_init_inv with "[$]").
@@ -131,7 +129,7 @@ Qed.
   
 
 Definition mk_ref_WF_spec: WaitFreeSpec mk_ref := {|
-  wfs_init_mod := mk_ref_wfree_init_inv;
+  wfs_init_mod Σ _ _ := mk_ref_wfree_init_inv;
   wfs_spec := mk_ref_wfree_spec;
   wfs_safety_spec := @mk_ref_safety_spec;
 |}.

@@ -46,7 +46,7 @@ Section WaitFreePR.
   Lemma get_call_wp {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
     (a: val) π:
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
-    wfs_mod_inv _ WFS (OHE := OHE) -∗
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ WFS) -∗
     cp_mul π0 d0 F -∗ th_phase_frag τi π (1 / 2)%Qp -∗
     WP m a @ τi {{ _, ⌜ True ⌝ }}.
   Proof using.
@@ -69,7 +69,7 @@ Section WaitFreePR.
     (extr: execution_trace heap_lang) (omtr: auxiliary_trace M): iProp Σ :=
     ⌜ no_extra_obls (trace_last extr) (trace_last omtr) /\
       from_option (fun e => to_val e = None) True (from_locale (trace_last extr).1 τi) ⌝ ∗
-    wfs_mod_inv _ WFS (OHE := OHE). 
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ WFS). 
   
   Context (ai: val). 
 
@@ -323,7 +323,7 @@ Section WaitFreePR.
     (FIT: fits_inf_call ic m ai etr)
     :
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
-    wfs_mod_inv _ WFS (OHE := OHE) -∗
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ WFS) -∗
     cur_obls_sigs etr -∗ state_interp etr mtr -∗
     wfree_trace_inv etr mtr.
   Proof using.

@@ -253,27 +253,30 @@ Section WFAdequacy.
   Lemma init_pwp {Σ} {hG :heap1GS Σ} {iG: invGS_gen HasNoLc Σ} τ e0
     (VALID: valid_client e0):
     let _ := irisG_looping HeapLangEM (lG := hG) in 
-    ⊢ pwp MaybeStuck ⊤ τ (subst "m" m e0) (λ _, True).
+    wfs_mod_inv _ SPEC ⊢ pwp MaybeStuck ⊤ τ (subst "m" m e0) (λ _, True).
   Proof using SPEC.
     simpl. opose proof * (fundamental e0) as FTLR. 
     { done. }
+    iIntros "#INV". 
     rewrite /logrel in FTLR.
     rewrite /interp_expr in FTLR.
     rewrite -subst_env_singleton.
     iApply wp_wand; [iApply FTLR| ].
     - rewrite -insert_empty. iApply interp_env_cons; [done| ].
       iSplitL; [| by iApply interp_env_nil].
-      destruct SPEC. iApply wfs_safety_spec. 
+      destruct SPEC. by iApply wfs_safety_spec. 
     - by iIntros "**".
   Qed. 
 
   Lemma init_wptp_wfree_pwps `{Hinv: @IEMGS _ _ HeapLangEM EM Σ} tp0 tp N
     (NO: τi ∉ locales_of_list_from tp0 tp)
     (SUBST: Forall (λ e, ∃ e0, e = subst "m" m e0 /\ valid_client e0) tp):
-  ⊢ wptp_from_gen (thread_pr ic MaybeStuck N) tp0 tp
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ SPEC)
+   ⊢ wptp_from_gen (thread_pr ic MaybeStuck N) tp0 tp
       (map (λ (_ : nat) (_ : val), ⌜ True ⌝%I)
          (adequacy_utils.locales_of_list_from tp0 tp)).
   Proof using SPEC.
+    iIntros "#INV". 
     iInduction tp as [|e tp] "IH" forall (tp0 NO).
     { simpl. iApply wptp_from_gen_nil. }
     rewrite adequacy_utils.locales_of_list_from_cons. 
@@ -296,7 +299,7 @@ Section WFAdequacy.
   Lemma init_wptp_wfree `{Hinv: @IEMGS _ _ HeapLangEM EM Σ} c
     (ETR0: tpool_init_restr c.1):
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
-    wfs_mod_inv _ SPEC (OHE := pr_wfree.OHE) -∗
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ SPEC) -∗
     (⌜ ii = 0 ⌝ → ∃ π, cp_mul π0 d0 F ∗ th_phase_frag τi π (/2)%Qp) -∗
     wptp_wfree ic MaybeStuck {tr[ c ]}
       (map (λ _ _, True) (adequacy_utils.locales_of_list c.1)).
@@ -310,11 +313,13 @@ Section WFAdequacy.
     iApply wptp_from_gen_app. iSplitR.
     { iApply init_wptp_wfree_pwps.
       - done. 
-      - by apply Forall_app, proj1 in TP. }
+      - by apply Forall_app, proj1 in TP.
+      - done. }
     simpl. iApply wptp_from_gen_app. iSplitL.
     2: { iApply init_wptp_wfree_pwps.
          - done. 
-         - by do 2 (apply Forall_app, proj2 in TP). }
+         - by do 2 (apply Forall_app, proj2 in TP).
+         - done. }
 
     destruct TP' as [-> | (e & -> & LOC)].
     { simpl. iApply wptp_from_gen_nil. }
@@ -360,7 +365,7 @@ Section WFAdequacy.
     (init_om_wfree_state c) ((): @em_init_param _ _ EM).
   Proof using.    
     red. iIntros (Hinv) "(PHYS & MOD)". simpl.
-    iMod (@wfs_init_mod _ SPEC _ _ _ pr_wfree.OHE with "[PHYS]") as "#INV".
+    iMod (@wfs_init_mod _ SPEC with "[PHYS]") as "#INV".
     2: { iFrame. }
     { by rewrite -surjective_pairing. } 
          
