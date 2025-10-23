@@ -923,7 +923,25 @@ Section SimpleQueue.
 
     simpl.
     destruct (decide (pbr = ph)) as [-> | NEQ].
-    -
+    - assert (br <= h + 1).
+      { red in ORDER. lia. }
+      assert (br < h \/ br = h \/ br = h + 1) as [LT | [EQ | EQ']] by lia.
+      3: { subst br. (* two interps of ph - ?! *)
+           admit. }
+      2: { subst br. (* reading the currently removed node; ok; next rop is >= r, can use it for deriving contra *)
+           admit. }
+      (* reading an OLD node *)
+      clear H.
+      (** if rop is None, the operation must start with r >= h + 1  *)
+      destruct rop as [r | ]. 
+      2: { admit. }
+      rewrite /rop_interp. iSpecialize ("ROP" with "[//]").
+      rewrite /safe_read.
+      rewrite Nat.add_sub.
+      (* if safe: *)
+      (* cases 1, 2 are fine, as we remember the >= h bound on rop *)
+       
+      
       (* rewrite HTH in BRTH. inversion BRTH. subst. *)
       (* rewrite decide_True; [| done]. iFrame.   *)
       iFrame. 
