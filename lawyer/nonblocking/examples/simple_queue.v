@@ -399,7 +399,7 @@ Section SimpleQueue.
 
     Definition rop_interp (rop: option nat) (h br fl: nat) (od: option nat): iProp Σ :=
       ∀ r, ⌜ rop = Some r  ⌝ -∗ 
-            (safe_read r h br fl od ∨ can_cancel ∗ cancelled r ∗ ⌜ od = Some r \/ r = fl ⌝). 
+            (safe_read r h br fl od ∨ can_cancel ∗ cancelled r). 
   
     Definition read_head_resources (t br: nat): iProp Σ :=
       @me_exact _ q_me_t t ∗ @me_exact _ q_me_br br ∗ rop_frag None ∗ can_cancel ∗ rop_token.
@@ -855,13 +855,12 @@ Section SimpleQueue.
 
     iDestruct "ROP" as "[[HEAD | [DANGLE | FL]] | CANCELLED]".
     - iDestruct "HEAD" as "(-> & [CC | (-> & TOK)])".
-      + iRight. iFrame "#∗". set_solver. 
+      + iRight. iFrame "#∗". 
       + iLeft. iRight. iLeft. iFrame.
         iPureIntro. split; [lia | done]. 
     - iDestruct "DANGLE" as "((_ & _ & %) & _)". by destruct H.
     - set_solver.
-    - iDestruct "CANCELLED" as "(?&?&[% | ->])"; [done| ].
-      iRight. iFrame. set_solver.  
+    - iFrame. 
   Qed.
 
   Definition dequeue_fuel := 100.    
@@ -956,6 +955,47 @@ Section SimpleQueue.
       with "[HNIS TAIL TLI HEAD BR FL]" as "QI".
     { by iFrame. }
 
+
+    simpl.
+    destruct (decide (pbr = ph)) as [-> | NEQ].
+    -
+      (* rewrite HTH in BRTH. inversion BRTH. subst. *)
+      (* rewrite decide_True; [| done]. iFrame.   *)
+      iFrame. 
+      iDestruct (take_snapshot with "[$]") as "#SHT".
+      iMod ("CLOS" with "[-]") as "_".
+      { iFrame. iNext.
+        rewrite Nat.add_sub HTH /=.
+        iSplit; [| done].
+        iRight. by iFrame. }
+      iModIntro. iLeft. iSplit. 
+      { set_solver. }
+      iDestruct "SHT" as "(?&?&?&?)".
+      (* Set Printing Implicit. *)
+      admit. (* can we do the subsequent proof without it? *)
+    -      
+      iMod (dangle_update _ _ None with "[$] [$]") as "[DAUTH DFRAG]".
+      iFrame.      
+      iApply fupd_or. iRight. iFrame "HNI".
+      rewrite -(bi.sep_True' ⌜ _ ⌝%I). iApply fupd_frame_l. iSplit; [done| ].
+      iMod ("CLOS" with "[-]") as "_"; [| done]. 
+      iFrame. iExists _. iNext. iSplitR.
+      { by iLeft. }
+      iSplit; [done| ]. 
+      rewrite /rop_interp.
+      iIntros (r ->). iSpecialize ("ROP" with "[//]").
+      iDestruct "ROP" as "[SAFE | ?]"; [| by iFrame]. 
+      rewrite /safe_read.
+      rewrite Nat.add_sub. 
+      iDestruct "SAFE" as "[X | Y]".
+      * iFrame.
+      * iDestruct "Y" as "[X | Y]".
+        2: { iFrame. }
+        iDestruct "X" as "((->&->&?) & ?)".
+        congruence. 
+    
+    foobar. 
+    (* done with assumption of br = h <-> pbr = ph *)
     simpl.
     destruct (decide (br = h)) as [-> | NEQ].
     - rewrite HTH in BRTH. inversion BRTH. subst.
@@ -970,73 +1010,27 @@ Section SimpleQueue.
       iModIntro. iSplit.
       { set_solver. }
       iDestruct "SHT" as "(?&?&?&?)". done.
-    - assert (pbr ≠ ph) by tauto.
-      rewrite decide_False; [| done].
-      iMod (dangle_update _ _ None with "[$] [$]") as "[DAUTH DFRAG]".
-      iFrame.      
-      iApply fupd_or. iRight. iFrame "HNI".
-      rewrite -(bi.sep_True' ⌜ _ ⌝%I). iApply fupd_frame_l. iSplit; [done| ].
-      iMod ("CLOS" with "[-]") as "_"; [| done]. 
-      iFrame. iExists _. iNext. iSplitR.
-      { by iLeft. }
-      iSplit.
-      + iPureIntro. red. red in ORDER.
-        repeat split; lia.
-      + rewrite /rop_interp.
-        iIntros (r ->). iSpecialize ("ROP" with "[//]").
-        iDestruct "ROP" as "[SAFE | (CC&CNC&X)]".
-        * rewrite /safe_read. iDestruct "SAFE" as "[X | Y]".
-          ** iFrame.
-          ** rewrite Nat.add_sub. iDestruct "Y" as "[X | Y]".
-             2: { iFrame. }
-             iDestruct "X" as "((->&->&?) & ?)". lia.
-        *
-          foobar. remove extra restrictions beyond BRIN?
-          assert (br <= r) by admit.
-          assert (br < h) by admit.
-          iDestruct "X" as "[%X | Y]".
-          **
-            inversion X. subst. 
-            rewrite /safe_read. rewrite Nat.add_sub.
-            red in ORDER. rewrite Nat.add_sub in ORDER.
-            destruct ORDER as (?&?&?&?&?).
-            destruct H6 as [|[]]; subst; try lia.
-            set_solver. 
-            *** 
-             
-        rewrite Nat.add_sub HTH /=.
-        iSplit; [| done].
-        iRight. by iFrame. }
-      iModIntro. iSplit.
-      { set_solver. }
-      iDestruct "SHT" as "(?&?&?&?)". done.
+    - destruct (decide (pbr = ph)) as [-> | NEQ_PTR].
+      2: { iMod (dangle_update _ _ None with "[$] [$]") as "[DAUTH DFRAG]".
+           iFrame.      
+           iApply fupd_or. iRight. iFrame "HNI".
+           rewrite -(bi.sep_True' ⌜ _ ⌝%I). iApply fupd_frame_l. iSplit; [done| ].
+           iMod ("CLOS" with "[-]") as "_"; [| done]. 
+           iFrame. iExists _. iNext. iSplitR.
+           { by iLeft. }
+           iSplit.
+           + iPureIntro. red. red in ORDER.
+             repeat split; lia.
+           + rewrite /rop_interp.
+             iIntros (r ->). iSpecialize ("ROP" with "[//]").
+             iDestruct "ROP" as "[SAFE | ?]"; [| by iFrame]. 
+             rewrite /safe_read. iDestruct "SAFE" as "[X | Y]".
+             * iFrame.
+             * rewrite Nat.add_sub. iDestruct "Y" as "[X | Y]".
+                2: { iFrame. }
+                iDestruct "X" as "((->&->&?) & ?)". lia. }
 
-      
-
-      
-      (*   red in ORDER. rewrite Nat.add_sub in ORDER. *)
-      (*   rewrite /queue_interp. iDestruct "QI" as "(_ &  HNIS & %pt & TAIL & TLI & %LL & HEAD & BR)". *)
-      (*   iDestruct "BR" as "(%nbr & %BRTH & BR)". destruct nbr as [pbr nbr].   *)
- 
-      iApply "SHT". 
-        
-    iFrame. iNext. rewrite Nat.add_sub. rewrite HTH /=.
-
-    iExists _.     
-    iSplitL "HNI". 
-    { iRight. by iFrame. }
-    iSplit; [iPureIntro; lia| ].
-    rewrite /rop_interp. iIntros (r ->).
-    iSpecialize ("ROP" with "[//]"). rewrite /safe_read.
-
-    iDestruct "ROP" as "[[HEAD | [DANGLE | FL]] | CANCELLED]".
-    - iDestruct "HEAD" as "(-> & [CC | (-> & TOK)])".
-      + iRight. iFrame "#∗".
-      + iLeft. iRight. iLeft. iFrame.
-        iPureIntro. split; [lia | done]. 
-    - iDestruct "DANGLE" as "((_ & _ & %) & _)". by destruct H.
-    - set_solver.
-    - iFrame.     
+      iMod (dangle_update _ _ None with "[$] [$]") as "[DAUTH DFRAG]".      
   Qed.
 
   Lemma dequeue_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
