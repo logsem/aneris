@@ -411,15 +411,16 @@ Section SimpleQueue.
     Definition read_head_token: iProp Σ := own q_γ_tok_rh (Excl ()).
     Definition dequeue_token: iProp Σ := own q_γ_tok_dq (Excl ()).
 
-    Definition hq_state_wf h t br fl od: Prop :=
-      fl <= br /\ br <= h /\ fl < h /\ h <= t /\
-      (br = h \/ br = fl \/ od = Some (h - 1) /\ br = h - 1). 
+    Definition hq_state_wf h t br fl: Prop :=
+      fl <= br /\ br <= h /\ fl < h /\ h <= t.
+      (* THIS IS FALSE: br can fall behind arbitrarily *)
+      (* (br = h \/ br = fl \/ od = Some (h - 1) /\ br = h - 1).  *)
   
     Definition queue_inv_inner (hq: HistQueue) (h t br fl: nat)
       (rop od: option nat) (ohv: val): iProp Σ :=
       hq_auth hq ∗ 
       queue_interp hq h t br fl ∗ dangle_interp od h hq ∗ OldHeadVal ↦ ohv ∗
-      ⌜ hq_state_wf h t br fl od ⌝ ∗
+      ⌜ hq_state_wf h t br fl ⌝ ∗
       auths h t br fl ∗
       rop_interp rop h br fl od  ∗
       (read_head_resources t br ∨ read_head_token) ∗ 
@@ -848,9 +849,7 @@ Section SimpleQueue.
     iSplitL "HNI". 
     { iRight. by iFrame. }
     iSplit.
-    { iPureIntro. red. red in ORDER. repeat split; try lia.
-      repeat apply proj2 in ORDER.
-      rewrite Nat.add_sub. set_solver. }
+    { iPureIntro. red. red in ORDER. repeat split; try lia. }
     rewrite /rop_interp. iIntros (r ->).
     iSpecialize ("ROP" with "[//]"). rewrite /safe_read.
 
@@ -911,25 +910,40 @@ Section SimpleQueue.
     iDestruct "BR" as "(%nbr & %BRTH & BR)". destruct nbr as [pbr nbr].
     iAssert (⌜ pbr = ph -> br = h ⌝)%I as %EQ_PTR.
     { iIntros (->). simpl.
-      red in ORDER. rewrite Nat.add_sub in ORDER.
-      rewrite !and_assoc in ORDER. destruct ORDER as [ORDER [BR_NEXT | [BR_FL | [? ?]]]].
-      - subst br. rewrite BRTH /=.
-        iCombine "HEAD HEAD'" as "HEAD".
-        subst t. iDestruct (big_sepL_lookup_acc _ _ 0 with "HNIS") as "[HNI' CLOS']".
-        { etrans; [| etrans]; [| apply BRTH| reflexivity].
-          rewrite lookup_drop. f_equal. lia. }
-        simpl. destruct nbr, ndh.
-        iDestruct "HNI" as "[HNI _]". iDestruct "HNI'" as "[HNI' _]".
-        iCombine "HNI HNI'" as "X".
-        by iDestruct (pointsto_valid with "X") as %V.
-      - subst br.
-        iDestruct "FL" as "(%nfl & %FLTH & FL & FLI)".
-        rewrite BRTH in FLTH. inversion FLTH. subst nfl. 
-        simpl. destruct nbr, ndh.        
-        iDestruct "HNI" as "[HNI _]". iDestruct "FLI" as "[HNI' _]".
-        iCombine "HNI HNI'" as "X".
-        by iDestruct (pointsto_valid with "X") as %V.
-      - done. }  
+      red in ORDER.
+      (* relied on wrong br assumption *)
+      
+      (* rewrite !and_assoc in ORDER. destruct ORDER as [ORDER [BR_NEXT | [BR_FL | [? ?]]]]. *)
+      (* - subst br. rewrite BRTH /=. *)
+      (*   iCombine "HEAD HEAD'" as "HEAD". *)
+      (*   subst t. iDestruct (big_sepL_lookup_acc _ _ 0 with "HNIS") as "[HNI' CLOS']". *)
+      (*   { etrans; [| etrans]; [| apply BRTH| reflexivity]. *)
+      (*     rewrite lookup_drop. f_equal. lia. } *)
+      (*   simpl. destruct nbr, ndh. *)
+      (*   iDestruct "HNI" as "[HNI _]". iDestruct "HNI'" as "[HNI' _]". *)
+      (*   iCombine "HNI HNI'" as "X". *)
+      (*   by iDestruct (pointsto_valid with "X") as %V. *)
+      (* - subst br. *)
+      (*   iDestruct "FL" as "(%nfl & %FLTH & FL & FLI)". *)
+      (*   rewrite BRTH in FLTH. inversion FLTH. subst nfl.  *)
+      (*   simpl. destruct nbr, ndh.         *)
+      (*   iDestruct "HNI" as "[HNI _]". iDestruct "FLI" as "[HNI' _]". *)
+      (*   iCombine "HNI HNI'" as "X". *)
+      (*   by iDestruct (pointsto_valid with "X") as %V. *)
+      (* - done.  *)
+
+      destruct (decide (br = h)) as [| NEQ]; [done| ].
+      assert (br < h \/ br = h + 1) as [LT | NEXT] by lia.
+      2: { subst br.
+           (* conflict of new head and dangle *)
+           admit. }
+      destruct (decide (br = fl)) as [-> | NEQ'].
+      { (* conflict of head and fl *)
+        admit. }
+      assert (fl < br) as GT by lia.
+      clear NEQ NEQ'.
+      admit. }
+    clear EQ_PTR. 
 
     (* iCombine "HEAD HEAD'" as "HEAD".  *)
     iApply sswp_MU_wp; [done| ]. 
