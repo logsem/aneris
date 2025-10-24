@@ -1145,32 +1145,42 @@ Section SimpleQueue.
         iSplit; [| done].
         iRight. by iFrame. }
       iModIntro. by iLeft.
-    - iDestruct (ith_read_hist_compat with "[$] [$]") as %(? & READ & BB). 
+    - iDestruct (ith_read_hist_compat with "[$] [$]") as %(b & READ & INCR_BOUND). 
       iMod (dangle_update _ _ None with "[$] [$]") as "[DAUTH DFRAG]".
       iFrame.      
       iApply fupd_or. iRight. iFrame "HNI".
       rewrite -(bi.sep_True' ⌜ _ ⌝%I). iApply fupd_frame_l. iSplit; [done| ].
       iMod ("CLOS" with "[-]") as "_"; [| done]. 
 
+      rewrite /rop_interp.
+      destruct rop.
+      2: { iFrame. iExists _. iNext. iSplitR.
+           { by iLeft. }
+           iSplit; [done| ]. iSplit; [| done].  
+           rewrite /rop_interp. by iIntros (??). }
+      
+      iDestruct ("ROP" with "[//]") as "(%r' & #READ_ & ROP)".
+      iDestruct (ith_read_hist_compat with "[$] READ_") as %(? & READ' & _).
 
       iFrame. iExists _. iNext. iSplitR.
       { by iLeft. }
       iSplit; [done| ]. iSplit; [| done].  
       rewrite /rop_interp.
-      iIntros (i' ->). iDestruct ("ROP" with "[//]") as "(%r' & #READ_ & ROP)". iFrame. 
+      iIntros (i' [=]). subst n.
       iDestruct "ROP" as "[SAFE | $]".
       2: done. 
 
       destruct (decide (i' = i)). 
-      { subst. rewrite {1}/safe_read. rewrite Nat.add_sub. 
+      { subst. rewrite {1}/safe_read. rewrite Nat.add_sub.
+        iFrame "READ_". 
         iDestruct "SAFE" as "[FROM_HEAD | [FROM_DANGLE | FROM_BR]]".
-        - iDestruct (ith_read_agree with "READ READ_") as %->.
-          iFrame "READ_".
-          iDestruct "FROM_HEAD" as "[% ?]". lia.
+        - iFrame.
+          (* iDestruct (ith_read_agree with "READ READ_") as %->. *)
+          (* iFrame "READ_". *)
+          (* iDestruct "FROM_HEAD" as "[% ?]". lia. *)
         - iDestruct "FROM_DANGLE" as "[(-> & -> & _) ?]".
           congruence.
-        - iFrame "READ_".
-          iFrame. }
+        - iFrame. }
 
       assert (i < i') as NEW.
       { red in RH_WF. destruct RH_WF as (n' & DOM & [? | [=]] & RH_WF); [done| ].
@@ -1179,53 +1189,17 @@ Section SimpleQueue.
         lia. }
       clear n.
 
-      
-      
-      iDestruct "SAFE" as "[X | Y]".
-      * iFrame.
-      * iDestruct "Y" as "[X | Y]".
-        2: { iFrame. }
-        iDestruct "X" as "((->&->&?) & ?)".
-        congruence. 
-    (* foobar.  *)
-    (* (* done with assumption of br = h <-> pbr = ph *) *)
-    (* simpl. *)
-    (* destruct (decide (br = h)) as [-> | NEQ]. *)
-    (* - rewrite HTH in BRTH. inversion BRTH. subst. *)
-    (*   rewrite decide_True; [| done]. iFrame.   *)
-    (*   iLeft. *)
-    (*   iDestruct (take_snapshot with "[$]") as "#SHT". *)
-    (*   iMod ("CLOS" with "[-]") as "_". *)
-    (*   { iFrame. iNext. *)
-    (*     rewrite Nat.add_sub HTH /=. *)
-    (*     iSplit; [| done]. *)
-    (*     iRight. by iFrame. } *)
-    (*   iModIntro. iSplit. *)
-    (*   { set_solver. } *)
-    (*   iDestruct "SHT" as "(?&?&?&?)". done. *)
-    (* - destruct (decide (pbr = ph)) as [-> | NEQ_PTR]. *)
-    (*   2: { iMod (dangle_update _ _ None with "[$] [$]") as "[DAUTH DFRAG]". *)
-    (*        iFrame.       *)
-    (*        iApply fupd_or. iRight. iFrame "HNI". *)
-    (*        rewrite -(bi.sep_True' ⌜ _ ⌝%I). iApply fupd_frame_l. iSplit; [done| ]. *)
-    (*        iMod ("CLOS" with "[-]") as "_"; [| done].  *)
-    (*        iFrame. iExists _. iNext. iSplitR. *)
-    (*        { by iLeft. } *)
-    (*        iSplit. *)
-    (*        + iPureIntro. red. red in ORDER. *)
-    (*          repeat split; lia. *)
-    (*        + rewrite /rop_interp. *)
-    (*          iIntros (r ->). iSpecialize ("ROP" with "[//]"). *)
-    (*          iDestruct "ROP" as "[SAFE | ?]"; [| by iFrame].  *)
-    (*          rewrite /safe_read. iDestruct "SAFE" as "[X | Y]". *)
-    (*          * iFrame. *)
-    (*          * rewrite Nat.add_sub. iDestruct "Y" as "[X | Y]". *)
-    (*             2: { iFrame. } *)
-    (*             iDestruct "X" as "((->&->&?) & ?)". lia. } *)
-
-    (*   iMod (dangle_update _ _ None with "[$] [$]") as "[DAUTH DFRAG]".       *)
-  Qed.
-
+      assert (h + 1 <= r') as READ'_BOUND.
+      { red in RH_WF. destruct RH_WF as (n' & DOM & [? | [=]] & RH_WF); [done| ].
+        apply proj1 in RH_WF. eapply RH_WF in NEW; eauto. simpl in NEW. lia. }
+      iFrame "READ_".
+      rewrite {1}/safe_read.
+      iDestruct "SAFE" as "[FROM_HEAD | [FROM_DANGLE | FROM_BR]]".
+      + iFrame.
+      + iDestruct "FROM_DANGLE" as "[(-> & -> & _) ?]". lia.
+      + iFrame.
+  Qed. 
+  
   Lemma dequeue_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_inv l) ∗
         (let _: heap1GS Σ := iem_phys _ EM in dequeue_token) ∗ 
