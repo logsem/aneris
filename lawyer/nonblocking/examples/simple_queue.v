@@ -220,36 +220,6 @@ Section HistQueue.
 End HistQueue.
 
 
-Class QueuePreG Σ := {
-  q_pre_max :: MaxExactPreG Σ;
-  q_pre_tok :: inG Σ (exclR unitO);
-  q_pre_hq :: HistQueueG Σ;
-  q_pre_dangle_rop :: inG Σ (excl_authUR (option nat));
-}.
-
-
-Class QueueG Σ := {
-    q_pre :: QueuePreG Σ; 
-    
-    Head: loc; Tail: loc; BeingRead: loc; 
-    FreeLater: loc; OldHeadVal: loc;
-
-    q_hq :: HistQueueG Σ;
-
-    q_γ_tok_rh: gname;
-    q_γ_tok_dq: gname;
-    q_γ_tok_cc: gname;
-    q_γ_tok_rop: gname;
-
-    q_γ_dangle: gname;
-    q_γ_rop: gname;
-
-    q_me_h :: MaxExactG Σ;
-    q_me_t :: MaxExactG Σ;
-    q_me_br :: MaxExactG Σ;
-    q_me_fl :: MaxExactG Σ;
-}.
-
 Section ReadsHistory.
 
   Class ReadHistPreG Σ := {
@@ -379,6 +349,39 @@ Section ReadsHistory.
   Qed.
 
 End ReadsHistory.
+
+
+Class QueuePreG Σ := {
+  q_pre_max :: MaxExactPreG Σ;
+  q_pre_tok :: inG Σ (exclR unitO);
+  q_pre_hq :: HistQueuePreG Σ;
+  q_pre_rh :: ReadHistPreG Σ;
+  q_pre_dangle_rop :: inG Σ (excl_authUR (option nat));
+}.
+
+
+Class QueueG Σ := {
+    q_pre :: QueuePreG Σ; 
+    
+    Head: loc; Tail: loc; BeingRead: loc; 
+    FreeLater: loc; OldHeadVal: loc;
+
+    q_hq :: HistQueueG Σ;
+    q_rh :: ReadHistG Σ;
+
+    q_γ_tok_rh: gname;
+    q_γ_tok_dq: gname;
+    q_γ_tok_cc: gname;
+    q_γ_tok_rop: gname;
+
+    q_γ_dangle: gname;
+    q_γ_rop: gname;
+
+    q_me_h :: MaxExactG Σ;
+    q_me_t :: MaxExactG Σ;
+    q_me_br :: MaxExactG Σ;
+    q_me_fl :: MaxExactG Σ;
+}.
 
 
 Section SimpleQueue.
@@ -524,12 +527,12 @@ Section SimpleQueue.
     Definition safe_read (r: nat) (h br fl: nat) (od: option nat): iProp Σ :=
       ⌜ r = h ⌝ ∗ (can_cancel ∨ ⌜ r = br ⌝ ∗ rop_token) ∨
       ⌜ r = h - 1 /\ r = br /\ is_Some od ⌝ ∗ rop_token ∨
-      ⌜ r = br /\ r = fl ⌝
+      ⌜ r = br /\ r = fl ⌝ ∗ rop_token 
     .
 
     Definition rop_interp (rop: option nat) (h br fl: nat) (od: option nat): iProp Σ :=
-      ∀ r, ⌜ rop = Some r  ⌝ -∗ 
-            (safe_read r h br fl od ∨ can_cancel ∗ cancelled r). 
+      ∀ i, ⌜ rop = Some i  ⌝ -∗ ∃ r, ith_read i r 0 ∗                         
+                     (safe_read r h br fl od ∨ can_cancel ∗ cancelled r).
   
     Definition read_head_resources (t br: nat): iProp Σ :=
       @me_exact _ q_me_t t ∗ @me_exact _ q_me_br br ∗ rop_frag None ∗ can_cancel ∗ rop_token.
@@ -546,14 +549,21 @@ Section SimpleQueue.
       br <= h /\ fl < h /\ h <= t.
       (* THIS IS FALSE: br can fall behind arbitrarily *)
       (* (br = h \/ br = fl \/ od = Some (h - 1) /\ br = h - 1).  *)
-  
+
+    Definition read_hist_wf (hist: read_hist) (rop: option nat) (h: nat) :=
+      exists n, dom hist = set_seq 0 (S n) /\ (rop = None \/ rop = Some n) /\ 
+            (forall i j opi opj, i < j -> hist !! i = Some opi -> hist !! i = Some opj ->
+                             opi.2 <= opj.1) /\
+            (forall i opi, hist !! i = Some opi -> opi.2 <= h). 
+    
     Definition queue_inv_inner (hq: HistQueue) (h t br fl: nat)
-      (rop od: option nat) (ohv: val): iProp Σ :=
+      (rop od: option nat) (hist: read_hist) (ohv: val): iProp Σ :=
       hq_auth hq ∗ 
       queue_interp hq h t br fl ∗ dangle_interp od h hq ∗ OldHeadVal ↦ ohv ∗
       ⌜ hq_state_wf h t br fl ⌝ ∗
       auths h t br fl ∗
-      rop_interp rop h br fl od  ∗
+      rop_interp rop h br fl od ∗
+      read_hist_auth hist ∗ ⌜ read_hist_wf hist rop h ⌝ ∗
       (read_head_resources t br ∨ read_head_token) ∗ 
       ((∃ ph, dequeue_resources h fl ph None) ∨ dequeue_token)
     .
@@ -568,7 +578,7 @@ Section SimpleQueue.
     (* Definition queue_inv (q: loc): iProp Σ := *)
     Definition queue_inv (q: val): iProp Σ :=
       queue_at q ∗ inv queue_ns 
-        (∃ hq h t br fl rop od ohv, queue_inv_inner hq h t br fl rop od ohv)
+        (∃ hq h t br fl rop od hist ohv, queue_inv_inner hq h t br fl rop od hist ohv)
     .
   
   End QueueResources.
