@@ -348,6 +348,18 @@ Section ReadsHistory.
     rewrite lookup_fmap. apply not_elem_of_dom in NOITH. by rewrite NOITH.
   Qed.
 
+  Lemma ith_read_agree i r1 r2 b1 b2:
+    ith_read i r1 b1 -∗ ith_read i r2 b2 -∗ ⌜ r2 = r1  ⌝.
+  Proof using.
+    rewrite /ith_read.
+    rewrite bi.wand_curry -own_op.
+    iIntros "X". iDestruct (own_valid with "[$]") as %V.
+    rewrite -auth_frag_op singleton_op in V.
+    rewrite auth_frag_valid in V. apply singleton_valid in V.
+    rewrite -pair_op in V. rewrite pair_valid in V. apply proj1 in V.
+    by apply to_agree_op_inv_L in V.
+  Qed. 
+
 End ReadsHistory.
 
 
@@ -1048,23 +1060,24 @@ Section SimpleQueue.
   (*   simpl. iIntros "(%T_LEN &  HNIS & %pt & TAIL & TLI & %LL & HEAD & BR)". *)
   (*   red in ORDER. destruct ORDER as (?&?&?&?&BR_EQ). *)
 
-  Lemma check_BR_spec l τ π q h (* t *) (* br *) fl ph ndh:
+  Lemma check_BR_spec l τ π q h (* t *) (* br *) fl ph ndh i r:
     {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_inv l) ∗
         (let _: heap1GS Σ := iem_phys _ EM in ith_node h (ph, ndh)) ∗
-        (* (let _: heap1GS Σ := iem_phys _ EM in snapshot h t br fl) ∗  *)
         (let _: heap1GS Σ := iem_phys _ EM in dequeue_resources (h + 1) fl ndh.2 (Some h)) ∗ 
-        th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
+        th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel ∗
+        ith_read i r (h + 1)
+    }}}
       ! #BeingRead @τ
     {{{ (pbr: loc), RET #pbr; th_phase_frag τ π q ∗
             (let _: heap1GS Σ := iem_phys _ EM in dequeue_resources (h + 1) fl ndh.2 (if (decide (pbr = ph)) then Some h else None)) ∗
-            (⌜ pbr = ph ⌝ ∗ @me_lb _ q_me_br h ∨ 
+            (⌜ pbr = ph ⌝ ∨ 
              ⌜ pbr ≠ ph ⌝ ∗ (let _: heap1GS Σ := iem_phys _ EM in  hn_interp (ph, ndh)))
     }}}.
   Proof using.
-    iIntros (Φ) "([#QAT #INV] & #HTH & DR& PH & CPS) POST".
-    iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od_ & %ohv & inv)" "CLOS".
+    iIntros (Φ) "([#QAT #INV] & #HTH & DR& PH & CPS & #READ) POST".
+    iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od_ & %hist & %ohv & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as "(>HQ & >QI & >DANGLE & >OHV & >%ORDER & >AUTHS & >ROP & RH & >DQ)".
+    iDestruct "inv" as "(>HQ & >QI & >DANGLE & OHV & >%ORDER & >AUTHS & >ROP & >RHIST & >%RH_WF & >RH & >DQ)".
     iDestruct "DQ" as "[(% & DR') | TOK]".
     { by iDestruct (dequeue_resources_excl with "[$] [$]") as "?". }
     iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[<- <-]. 
@@ -1097,23 +1110,24 @@ Section SimpleQueue.
 
     simpl.
     destruct (decide (pbr = ph)) as [-> | NEQ].
-    - assert (br <= h + 1).
-      { red in ORDER. lia. }
-      assert (br < h \/ br = h \/ br = h + 1) as [LT | [EQ | EQ']] by lia.
-      3: { subst br. (* two interps of ph - ?! *)
-           admit. }
-      2: { subst br. (* reading the currently removed node; ok; next rop is >= r, can use it for deriving contra *)
-           admit. }
-      (* reading an OLD node *)
-      clear H.
-      (** if rop is None, the operation must start with r >= h + 1  *)
-      destruct rop as [r | ]. 
-      2: { admit. }
-      rewrite /rop_interp. iSpecialize ("ROP" with "[//]").
-      rewrite /safe_read.
-      rewrite Nat.add_sub.
-      (* if safe: *)
-      (* cases 1, 2 are fine, as we remember the >= h bound on rop *)
+    -
+      (* assert (br <= h + 1). *)
+      (* { red in ORDER. lia. } *)
+      (* assert (br < h \/ br = h \/ br = h + 1) as [LT | [EQ | EQ']] by lia. *)
+      (* 3: { subst br. (* two interps of ph - ?! *) *)
+      (*      admit. } *)
+      (* 2: { subst br. (* reading the currently removed node; ok; next rop is >= r, can use it for deriving contra *) *)
+      (*      admit. } *)
+      (* (* reading an OLD node *) *)
+      (* clear H. *)
+      (* (** if rop is None, the operation must start with r >= h + 1  *) *)
+      (* destruct rop as [r | ].  *)
+      (* 2: { admit. } *)
+      (* rewrite /rop_interp. iSpecialize ("ROP" with "[//]"). *)
+      (* rewrite /safe_read. *)
+      (* rewrite Nat.add_sub. *)
+      (* (* if safe: *) *)
+      (* (* cases 1, 2 are fine, as we remember the >= h bound on rop *) *)
        
       
       (* rewrite HTH in BRTH. inversion BRTH. subst. *)
@@ -1125,11 +1139,7 @@ Section SimpleQueue.
         rewrite Nat.add_sub HTH /=.
         iSplit; [| done].
         iRight. by iFrame. }
-      iModIntro. iLeft. iSplit. 
-      { set_solver. }
-      iDestruct "SHT" as "(?&?&?&?)".
-      (* Set Printing Implicit. *)
-      admit. (* can we do the subsequent proof without it? *)
+      iModIntro. by iLeft.
     -      
       iMod (dangle_update _ _ None with "[$] [$]") as "[DAUTH DFRAG]".
       iFrame.      
@@ -1138,12 +1148,17 @@ Section SimpleQueue.
       iMod ("CLOS" with "[-]") as "_"; [| done]. 
       iFrame. iExists _. iNext. iSplitR.
       { by iLeft. }
-      iSplit; [done| ]. 
+      iSplit; [done| ]. iSplit; [| done].  
       rewrite /rop_interp.
-      iIntros (r ->). iSpecialize ("ROP" with "[//]").
-      iDestruct "ROP" as "[SAFE | ?]"; [| by iFrame]. 
-      rewrite /safe_read.
-      rewrite Nat.add_sub. 
+      iIntros (i' ->). iDestruct ("ROP" with "[//]") as "(%r' & #READ_ & ROP)". iFrame. 
+      iDestruct "ROP" as "[SAFE | $]".
+
+      destruct (decide (i' = i)). 
+      { subst. rewrite {1}/safe_read.
+        iDestruct "SAFE" as "[FROM_HEAD | [FROM_DANGLE | FROM_BR]]".
+        - 
+
+      
       iDestruct "SAFE" as "[X | Y]".
       * iFrame.
       * iDestruct "Y" as "[X | Y]".
