@@ -250,6 +250,136 @@ Class QueueG Σ := {
     q_me_fl :: MaxExactG Σ;
 }.
 
+Section ReadsHistory.
+
+  Class ReadHistPreG Σ := {
+      rh_map_pre :: inG Σ (authUR (gmapUR nat (prodR (agreeR nat) max_natUR)));
+  }.
+  
+  Class ReadHistG Σ := {
+      rh_pre :: ReadHistPreG Σ;
+      rh_γ__map: gname;
+  }.
+
+  Definition read_hist := gmap nat (nat * nat). 
+
+  Definition read_hist_auth `{ReadHistG Σ} (hist: read_hist) :=
+    let hist' := (((fun '(r, b) => (to_agree r, MaxNat b)) <$> hist): gmapUR _ _) in
+    own rh_γ__map (● hist' ⋅ ◯ hist').
+  
+  Definition ith_read `{ReadHistG Σ} i r b :=
+    own rh_γ__map (◯ {[ i := (to_agree r, MaxNat b)]}).
+
+  Lemma read_hist_init `{ReadHistPreG Σ} hist:
+    ⊢ (|==> ∃ (_: ReadHistG Σ), read_hist_auth hist)%I.
+  Proof using.
+    iMod (own_alloc (let hist' := (((fun '(r, b) => (to_agree r, MaxNat b)) <$> hist): gmapUR _ _) in
+                     (● hist' ⋅ ◯ hist'))) as (γ) "X".
+    { simpl. apply auth_both_valid_2; [| done].
+      (* HIDE: TODO: find/make lemma, fix similar thing in obligations_em *)
+      intros s. destruct lookup eqn:L; [| done].
+      apply lookup_fmap_Some in L. 
+      destruct L as ([l b]&<-&?).
+      done. }
+    iModIntro. iExists {| rh_γ__map := γ; |}. done.
+  Qed.
+
+  Context `{ReadHistG Σ}. 
+
+  Lemma ith_read_hist_compat hist i r b:
+    read_hist_auth hist -∗ ith_read i r b -∗ ⌜ exists b', hist !! i = Some (r, b') /\ b <= b' ⌝.
+  Proof using.
+    (* TODO: can simplify this proof *)
+    iIntros "[X _] Y". iCombine "X Y" as "X". iDestruct (own_valid with "X") as %V.
+    iPureIntro.
+    apply auth_both_valid_discrete in V as [SUB V].
+    apply @singleton_included_l in SUB. destruct SUB as ([l' y]&SIG'&LE').
+    
+    (* TODO: make a lemma, unify with similar proof in signal_map and ?obligations_resources *)
+    simpl in LE'. rewrite -SIG' in LE'.
+    rewrite lookup_fmap in LE'.
+    destruct (hist !! i) as [[??]|] eqn:LL.
+    all: rewrite LL in LE'; simpl in LE'.
+    2: { apply option_included_total in LE' as [?|?]; set_solver. }
+    rewrite Some_included_total in LE'.
+    apply pair_included in LE' as [LE1 LE2].
+    apply to_agree_included in LE1. rewrite leibniz_equiv_iff in LE1. subst.
+    (****)
+
+    eexists. split; [reflexivity| ].
+    by rewrite max_nat_included /= in LE2. 
+  Qed.
+
+  Goal forall i r b, Persistent (ith_read i r b). apply _. Abort.
+
+  Lemma read_hist_get hist i r b
+    (ITH: hist !! i = Some (r, b)):
+    read_hist_auth hist -∗ ith_read i r b.
+  Proof using.
+    iIntros "AUTH". rewrite /read_hist_auth /ith_read.
+    iApply (own_mono with "[$]").
+    etrans; [| apply cmra_included_r].
+    apply auth_frag_mono.
+    apply singleton_included_l.
+    rewrite lookup_fmap ITH. simpl.
+    set_solver.
+  Qed.    
+
+  Lemma ith_read_included i r b b'
+    (LE: b' <= b):
+  ith_read i r b -∗ ith_read i r b'.
+  Proof using.
+    iApply own_mono.
+    apply auth_frag_mono.
+    apply singleton_included_mono.
+    apply pair_included. split; [done| ].
+    by apply max_nat_included.
+  Qed.
+
+  Lemma read_hist_update hist i r b b'
+    (ITH: hist !! i = Some (r, b)):
+    read_hist_auth hist ==∗ read_hist_auth (<[ i := (r, max b b') ]> hist) ∗ ith_read i r (max b b').
+  Proof using.
+    iIntros "AUTH".
+    iAssert (|==> read_hist_auth (<[i:=(r, max b b')]> hist))%I with "[AUTH]" as "AUTH".
+    2: { iMod "AUTH".
+         iDestruct (read_hist_get with "[$]") as "#FRAG".
+         { apply lookup_insert. }
+         iFrame. iModIntro.
+         iApply (ith_read_included with "[$]"). lia. }
+         
+    iApply (own_update with "[$]").
+    apply auth_update.
+    rewrite fmap_insert.
+    eapply insert_local_update.
+    3: { apply prod_local_update'; simpl; [reflexivity| ].
+         eapply (max_nat_local_update (MaxNat _)). simpl.
+         apply Nat.le_max_l. }
+    all: by rewrite lookup_fmap ITH /=.
+  Qed.
+
+  Lemma read_hist_alloc hist i r b
+    (NOITH: i ∉ dom hist):
+    read_hist_auth hist ==∗ read_hist_auth (<[ i := (r, b) ]> hist) ∗ ith_read i r b.
+  Proof using.
+    iIntros "AUTH".
+    iAssert (|==> read_hist_auth (<[i:=(r, b)]> hist))%I with "[AUTH]" as "AUTH".
+    2: { iMod "AUTH".
+         iDestruct (read_hist_get with "[$]") as "#FRAG".
+         { apply lookup_insert. }
+         iFrame. iModIntro.
+         iApply (ith_read_included with "[$]"). lia. }
+         
+    iApply (own_update with "[$]").
+    apply auth_update.
+    rewrite fmap_insert.
+    eapply alloc_local_update.
+    2: done. 
+    rewrite lookup_fmap. apply not_elem_of_dom in NOITH. by rewrite NOITH.
+  Qed.
+
+End ReadsHistory.
+
 
 Section SimpleQueue.
 
