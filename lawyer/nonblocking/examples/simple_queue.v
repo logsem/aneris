@@ -220,10 +220,64 @@ Section HistQueue.
 End HistQueue.
 
 
+Section ReadProtocol.
+
+  Definition read_prot_cmra: cmra := csumR (exclR unit) (csumR (agreeR unit) (csumR (excl unit) (agreeR unit))). 
+
+  (* Class ReadProtPreG Σ := { rprot_pre_st :: inG Σ read_prot_cmra; }. *)
+  
+  (* Class ReadProtG Σ := { *)
+  (*     rpto_pre :: ReadProtPreG Σ; *)
+  (*     (* rprot_γ__st: gname; *) *)
+  (* }. *)
+
+  Definition rp_init: read_prot_cmra := Cinl $ Excl (). 
+  Definition rp_canceled: read_prot_cmra := Cinr $ Cinl $ to_agree (). 
+  Definition rp_going: read_prot_cmra := Cinr $ Cinr $ Cinl $ Excl (). 
+  Definition rp_protected: read_prot_cmra := Cinr $ Cinr $ Cinr $ to_agree ().
+
+  (* Lemma read_prot_init `{ReadProtPreG Σ}: *)
+  (*   ⊢ |==> ∃ (_: ReadProtG Σ), rp_init. *)
+  (* Proof using. *)
+  (*   iMod (own_alloc (Cinl $ Excl ())) as (γ) "X". *)
+  (*   { done. } *)
+  (*   iModIntro. iExists {| rprot_γ__st := γ; |}. done. *)
+  (* Qed. *)
+
+  Lemma rp_init_excl (rp: read_prot_cmra):
+    ¬ ✓ (rp_init ⋅ rp).  
+  Proof using.
+    intros ?. destruct rp; done.
+  Qed.
+
+  Lemma rp_going_excl (rp: read_prot_cmra):
+    ¬ ✓ (rp_going ⋅ rp). 
+  Proof using.
+    intros ?. 
+    destruct rp; try done.
+    destruct c; try done. destruct c; try done. 
+  Qed.
+
+  (* Goal Persistent rp_canceled /\ Persistent rp_protected. *)
+  (*   split; apply _. *)
+  (* Abort. *)
+
+  Lemma rp_canceled_not_protected:
+    ¬ ✓ (rp_canceled ⋅ rp_protected). 
+  Proof using. 
+    intros ?. done. 
+  Qed.
+
+End ReadProtocol.
+
+
 Section ReadsHistory.
 
   Class ReadHistPreG Σ := {
-      rh_map_pre :: inG Σ (authUR (gmapUR nat (prodR (agreeR nat) max_natUR)));
+      rh_map_pre :: inG Σ (authUR (gmapUR nat (prodR
+                                    (optionR $ prodR (agreeR nat) max_natUR)
+                                    (optionR read_prot_cmra)
+                                    )))
   }.
   
   Class ReadHistG Σ := {
@@ -231,33 +285,37 @@ Section ReadsHistory.
       rh_γ__map: gname;
   }.
 
-  Definition read_hist := gmap nat (nat * nat). 
+  Definition read_hist := gmap nat ((nat * nat) * read_prot_cmra). 
 
   Definition read_hist_auth `{ReadHistG Σ} (hist: read_hist) :=
-    let hist' := (((fun '(r, b) => (to_agree r, MaxNat b)) <$> hist): gmapUR _ _) in
-    own rh_γ__map (● hist' ⋅ ◯ hist').
+    let hist' := (((fun '(r, b, p) => (Some (to_agree r, MaxNat b), Some p)) <$> hist): gmapUR _ _) in
+    let hist'' := (((fun '(r, b, p) => (Some (to_agree r, MaxNat b), None)) <$> hist): gmapUR _ _) in
+    own rh_γ__map (● hist' ⋅ ◯ hist'').
   
   Definition ith_read `{ReadHistG Σ} i r b :=
-    own rh_γ__map (◯ {[ i := (to_agree r, MaxNat b)]}).
+    own rh_γ__map (◯ {[ i := (Some (to_agree r, MaxNat b), None) ]}).
 
-  Lemma read_hist_init `{ReadHistPreG Σ} hist:
-    ⊢ (|==> ∃ (_: ReadHistG Σ), read_hist_auth hist)%I.
-  Proof using.
-    iMod (own_alloc (let hist' := (((fun '(r, b) => (to_agree r, MaxNat b)) <$> hist): gmapUR _ _) in
-                     (● hist' ⋅ ◯ hist'))) as (γ) "X".
-    { simpl. apply auth_both_valid_2; [| done].
-      (* HIDE: TODO: find/make lemma, fix similar thing in obligations_em *)
-      intros s. destruct lookup eqn:L; [| done].
-      apply lookup_fmap_Some in L. 
-      destruct L as ([l b]&<-&?).
-      done. }
-    iModIntro. iExists {| rh_γ__map := γ; |}. done.
-  Qed.
+  (* Lemma read_hist_init `{ReadHistPreG Σ} (hist: read_hist) *)
+  (*   (RP_INIT: forall i op, hist !! i = Some op -> op.2 = rp_init): *)
+  (*   ⊢ (|==> ∃ (_: ReadHistG Σ), read_hist_auth hist)%I. *)
+  (* Proof using. *)
+  (*   iMod (own_alloc (let hist' := (((fun '(r, b, p) => (Some (to_agree r, MaxNat b), Some p)) <$> hist): gmapUR _ _) in *)
+  (*                    (● hist' ⋅ ◯ hist')) *)
+  (*        ) as (γ) "X". *)
+  (*   { simpl. apply auth_both_valid_2; [| done]. *)
+  (*     (* HIDE: TODO: find/make lemma, fix similar thing in obligations_em *) *)
+  (*     intros s. destruct lookup eqn:L; [| done]. *)
+  (*     apply lookup_fmap_Some in L.  *)
+  (*     destruct L as ([[l b] p]&<-&?). *)
+  (*     apply Some_valid. split; apply Some_valid; try done. *)
+  (*     apply RP_INIT in H0. simpl in H0. by subst. } *)
+  (*   iModIntro. iExists {| rh_γ__map := γ; |}. done. *)
+  (* Qed. *)
 
   Context `{ReadHistG Σ}. 
 
   Lemma ith_read_hist_compat hist i r b:
-    read_hist_auth hist -∗ ith_read i r b -∗ ⌜ exists b', hist !! i = Some (r, b') /\ b <= b' ⌝.
+    read_hist_auth hist -∗ ith_read i r b -∗ ⌜ exists b' p, hist !! i = Some ((r, b'), p) /\ b <= b' ⌝.
   Proof using.
     (* TODO: can simplify this proof *)
     iIntros "[X _] Y". iCombine "X Y" as "X". iDestruct (own_valid with "X") as %V.
@@ -268,22 +326,24 @@ Section ReadsHistory.
     (* TODO: make a lemma, unify with similar proof in signal_map and ?obligations_resources *)
     simpl in LE'. rewrite -SIG' in LE'.
     rewrite lookup_fmap in LE'.
-    destruct (hist !! i) as [[??]|] eqn:LL.
+    destruct (hist !! i) as [[[??]?]|] eqn:LL.
     all: rewrite LL in LE'; simpl in LE'.
     2: { apply option_included_total in LE' as [?|?]; set_solver. }
+    rewrite Some_included_total in LE'.
+    apply pair_included in LE' as [LE' _].
     rewrite Some_included_total in LE'.
     apply pair_included in LE' as [LE1 LE2].
     apply to_agree_included in LE1. rewrite leibniz_equiv_iff in LE1. subst.
     (****)
 
-    eexists. split; [reflexivity| ].
+    do 2 eexists. split; [reflexivity| ].
     by rewrite max_nat_included /= in LE2. 
   Qed.
 
   Goal forall i r b, Persistent (ith_read i r b). apply _. Abort.
 
-  Lemma read_hist_get hist i r b
-    (ITH: hist !! i = Some (r, b)):
+  Lemma read_hist_get hist i r b p
+    (ITH: hist !! i = Some (r, b, p)):
     read_hist_auth hist -∗ ith_read i r b.
   Proof using.
     iIntros "AUTH". rewrite /read_hist_auth /ith_read.
@@ -292,7 +352,9 @@ Section ReadsHistory.
     apply auth_frag_mono.
     apply singleton_included_l.
     rewrite lookup_fmap ITH. simpl.
-    set_solver.
+    eexists. split; [reflexivity| ].
+    rewrite Some_included_total.
+    apply pair_included. split; auto.
   Qed.    
 
   Lemma ith_read_included i r b b'
@@ -302,51 +364,62 @@ Section ReadsHistory.
     iApply own_mono.
     apply auth_frag_mono.
     apply singleton_included_mono.
-    apply pair_included. split; [done| ].
+    apply pair_included. split; [| done].
+    apply Some_included_total. apply pair_included.  
+    split; [done| ].
     by apply max_nat_included.
   Qed.
 
-  Lemma read_hist_update hist i r b b'
-    (ITH: hist !! i = Some (r, b)):
-    read_hist_auth hist ==∗ read_hist_auth (<[ i := (r, max b b') ]> hist) ∗ ith_read i r (max b b').
+  Lemma read_hist_update hist i r b b' p
+    (ITH: hist !! i = Some ((r, b), p)):
+    read_hist_auth hist ==∗ read_hist_auth (<[ i := ((r, max b b'), p) ]> hist) ∗ ith_read i r (max b b').
   Proof using.
     iIntros "AUTH".
-    iAssert (|==> read_hist_auth (<[i:=(r, max b b')]> hist))%I with "[AUTH]" as "AUTH".
+    iAssert (|==> read_hist_auth (<[i:=((r, max b b'), p)]> hist))%I with "[AUTH]" as "AUTH".
     2: { iMod "AUTH".
          iDestruct (read_hist_get with "[$]") as "#FRAG".
          { apply lookup_insert. }
          iFrame. iModIntro.
          iApply (ith_read_included with "[$]"). lia. }
          
-    iApply (own_update with "[$]").
-    apply auth_update.
-    rewrite fmap_insert.
-    eapply insert_local_update.
-    3: { apply prod_local_update'; simpl; [reflexivity| ].
-         eapply (max_nat_local_update (MaxNat _)). simpl.
-         apply Nat.le_max_l. }
-    all: by rewrite lookup_fmap ITH /=.
-  Qed.
+  (*   iApply (own_update with "[$]"). *)
+  (*   apply auth_update. *)
+  (*   rewrite fmap_insert. *)
+  (*   eapply insert_local_update. *)
+  (*   3: { apply prod_local_update'; simpl; [| reflexivity]. *)
+  (*        apply option_local_update.  *)
+  (*        apply prod_local_update'; simpl; [reflexivity| ]. *)
+  (*        eapply (max_nat_local_update (MaxNat _)). simpl. *)
+  (*        apply Nat.le_max_l. } *)
+  (*   all: by rewrite lookup_fmap ITH /=. *)
+  (* Qed. *)
+  Admitted. 
 
-  Lemma read_hist_alloc hist i r b
+  Definition ith_rp i rp := own rh_γ__map (◯ {[ i := (None, Some rp) ]}).
+
+  Lemma read_hist_alloc hist i r b 
     (NOITH: i ∉ dom hist):
-    read_hist_auth hist ==∗ read_hist_auth (<[ i := (r, b) ]> hist) ∗ ith_read i r b.
+    read_hist_auth hist ==∗ read_hist_auth (<[ i := ((r, b), rp_init) ]> hist) ∗ ith_read i r b ∗ ith_rp i rp_init. 
   Proof using.
-    iIntros "AUTH".
-    iAssert (|==> read_hist_auth (<[i:=(r, b)]> hist))%I with "[AUTH]" as "AUTH".
-    2: { iMod "AUTH".
-         iDestruct (read_hist_get with "[$]") as "#FRAG".
-         { apply lookup_insert. }
-         iFrame. iModIntro.
-         iApply (ith_read_included with "[$]"). lia. }
-         
-    iApply (own_update with "[$]").
-    apply auth_update.
-    rewrite fmap_insert.
-    eapply alloc_local_update.
-    2: done. 
-    rewrite lookup_fmap. apply not_elem_of_dom in NOITH. by rewrite NOITH.
-  Qed.
+  (*   iIntros "AUTH". *)
+  (*   iAssert (|==> read_hist_auth (<[i:=((r, b), rp_init)]> hist) ∗ ith_rp i rp_init)%I with "[AUTH]" as "X". *)
+  (*   2: { iMod "X" as "[AUTH $]". *)
+  (*        iDestruct (read_hist_get with "[$]") as "#FRAG". *)
+  (*        { apply lookup_insert. } *)
+  (*        iFrame. iModIntro. *)
+  (*        iApply (ith_read_included with "[$]"). lia. } *)
+
+  (*   rewrite -own_op.  *)
+  (*   iApply (own_update with "[$]"). *)
+
+  (*   rewrite -cmra_assoc. rewrite -auth_frag_op.   *)
+  (*   apply auth_update.     *)
+  (*   rewrite fmap_insert. *)
+  (*   eapply alloc_local_update. *)
+  (*   2: done.  *)
+  (*   rewrite lookup_fmap. apply not_elem_of_dom in NOITH. by rewrite NOITH. *)
+  (* Qed. *)
+  Admitted. 
 
   Lemma ith_read_agree i r1 r2 b1 b2:
     ith_read i r1 b1 -∗ ith_read i r2 b2 -∗ ⌜ r2 = r1  ⌝.
@@ -357,7 +430,9 @@ Section ReadsHistory.
     rewrite -auth_frag_op singleton_op in V.
     rewrite auth_frag_valid in V. apply singleton_valid in V.
     rewrite -pair_op in V. rewrite pair_valid in V. apply proj1 in V.
-    by apply to_agree_op_inv_L in V.
+    rewrite -Some_op -pair_op in V. rewrite Some_valid in V.
+    rewrite pair_valid in V. apply proj1 in V.
+    by apply to_agree_op_inv_L in V. 
   Qed. 
 
 End ReadsHistory.
@@ -368,6 +443,7 @@ Class QueuePreG Σ := {
   q_pre_tok :: inG Σ (exclR unitO);
   q_pre_hq :: HistQueuePreG Σ;
   q_pre_rh :: ReadHistPreG Σ;
+  q_pre_rprot :: inG Σ (gmapUR nat read_prot_cmra);
   q_pre_dangle_rop :: inG Σ (excl_authUR (option nat));
 }.
 
@@ -380,6 +456,7 @@ Class QueueG Σ := {
 
     q_hq :: HistQueueG Σ;
     q_rh :: ReadHistG Σ;
+    (* q_rprot :: ReadProtG Σ; *)
 
     q_γ_tok_rh: gname;
     q_γ_tok_dq: gname;
@@ -530,24 +607,24 @@ Section SimpleQueue.
       repeat iSplit.
       all: iApply (@me_auth_lb with "[-]"); eauto.
     Qed.
+    
+    Definition cancel_witness (r: nat): iProp Σ :=
+      ∃ r', ⌜ r < r' ⌝ ∗ @me_lb _ q_me_h r'.
 
-    Definition can_cancel: iProp Σ := own q_γ_tok_cc (Excl ()).
     Definition rop_token: iProp Σ := own q_γ_tok_rop (Excl ()).
-    Definition cancelled (r: nat): iProp Σ :=
-      ∃ r', ⌜ r < r' ⌝ ∗ @me_lb _ q_me_h r'. 
 
-    Definition safe_read (r: nat) (h br fl: nat) (od: option nat): iProp Σ :=
-      ⌜ r = h ⌝ ∗ (can_cancel ∨ ⌜ r = br ⌝ ∗ rop_token) ∨
-      ⌜ r = h - 1 /\ r = br /\ is_Some od ⌝ ∗ rop_token ∨
-      ⌜ r = br /\ r = fl ⌝ ∗ rop_token 
+    Definition safe_read i (r: nat) (h br fl: nat) (od: option nat): iProp Σ :=
+      ⌜ r = h ⌝ ∗ (ith_rp i rp_init ∨ ⌜ r = br ⌝ ∗ ith_rp i rp_going ∗ rop_token) ∨
+      ⌜ r = h - 1 /\ r = br /\ is_Some od ⌝ ∗ ith_rp i rp_protected ∨
+      ⌜ r = br /\ r = fl ⌝ ∗ ith_rp i rp_protected 
     .
 
     Definition rop_interp (rop: option nat) (h br fl: nat) (od: option nat): iProp Σ :=
       ∀ i, ⌜ rop = Some i  ⌝ -∗ ∃ r, ith_read i r 0 ∗                         
-                     (safe_read r h br fl od ∨ can_cancel ∗ cancelled r).
+                     (safe_read i r h br fl od ∨ ith_rp i rp_canceled ∗ cancel_witness r).
   
     Definition read_head_resources (t br: nat): iProp Σ :=
-      @me_exact _ q_me_t t ∗ @me_exact _ q_me_br br ∗ rop_frag None ∗ can_cancel ∗ rop_token.
+      @me_exact _ q_me_t t ∗ @me_exact _ q_me_br br ∗ rop_frag None ∗ rop_token.
 
     Definition dequeue_resources (h fl: nat) (ph: loc) (od: option nat): iProp Σ :=
       @me_exact _ q_me_h h ∗ @me_exact _ q_me_fl fl ∗
@@ -565,8 +642,8 @@ Section SimpleQueue.
     Definition read_hist_wf (hist: read_hist) (rop: option nat) (h: nat) :=
       exists n, dom hist = set_seq 0 (S n) /\ (rop = None \/ rop = Some n) /\ 
             (forall i j opi opj, i < j -> hist !! i = Some opi -> hist !! j = Some opj ->
-                             opi.2 <= opj.1) /\
-            (forall i opi, hist !! i = Some opi -> opi.1 <= h /\ opi.2 <= h). 
+                             opi.1.2 <= opj.1.1) /\
+            (forall i opi, hist !! i = Some opi -> opi.1.1 <= h /\ opi.1.2 <= h). 
     
     Definition queue_inv_inner (hq: HistQueue) (h t br fl: nat)
       (rop od: option nat) (hist: read_hist) (ohv: val): iProp Σ :=
@@ -889,6 +966,7 @@ Section SimpleQueue.
     iInv "INV" as "(%hq & %h & %t & %br & %fl & %rop & %od & %hist & %ohv & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
     iDestruct "inv" as "(>HQ & >QI & DANGLE & OHV & >%ORDER & >AUTHS & >ROP & RHIST & >%RH_WF & RH & DQ)".
+
     iApply sswp_MU_wp; [done| ].
     iApply (wp_store with "[$]"). iIntros "!> ?".
     MU_by_burn_cp. iApply wp_value.
@@ -913,18 +991,19 @@ Section SimpleQueue.
 
   Lemma cancel_rop h t br fl h'
     (LT: h' < h):
-    auths h t br fl -∗ cancelled h'.
+    auths h t br fl -∗ cancel_witness h'.
   Proof using.
     iIntros "(H&?&?&?)".
-    rewrite /cancelled.
+    rewrite /cancel_witness.
     iDestruct (me_auth_save with "H") as "LB".
     iExists _. by iFrame.
   Qed.    
 
   Lemma read_hist_wf_bump hist rop h:
-  read_hist_auth hist -∗ ⌜ read_hist_wf hist rop h ⌝ ==∗
+  read_hist_auth hist -∗ ⌜ read_hist_wf hist rop h ⌝ -∗ ith_rp i rp_init ==∗
   ∃ i r, let hist' := <[ i := (r, h + 1) ]> hist in
          read_hist_auth hist' ∗ ith_read i r (h + 1) ∗ ⌜ read_hist_wf hist' rop (h + 1) ⌝ ∗
+         ith_rp i rp_
          ⌜ r <= h ⌝.
   Proof using.
     rewrite /read_hist_wf. iIntros "AUTH [%n %WF]".
@@ -1045,7 +1124,7 @@ Section SimpleQueue.
 
     iDestruct ("ROP" with "[//]") as "(% & READ_ & ROP)". iFrame. 
 
-    iDestruct "ROP" as "[[HEAD | [DANGLE | FL]] | CANCELLED]".
+    iDestruct "ROP" as "[[HEAD | [DANGLE | FL]] | CANCEL_WITNESS]".
     - iDestruct "HEAD" as "(-> & [CC | (-> & TOK)])".
       + iRight. iFrame "#∗". 
       + iLeft. iRight. iLeft. iFrame.
