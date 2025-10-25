@@ -1219,9 +1219,9 @@ Section SimpleQueue.
     }}}
         (if: (#ph = !#BeingRead)
         then
-            let: "old_br" := !#FreeLater in
+            let: "old_fl" := !#FreeLater in
             #FreeLater <- #ph ;;
-            "old_vr"
+            "old_fl"
             else #ph) @ τ
     {{{ (to_free: loc), RET #to_free;
         ∃ hn, (let _: heap1GS Σ := iem_phys _ EM in hn_interp (to_free, hn)) ∗ th_phase_frag τ π q }}}.
@@ -1308,7 +1308,7 @@ Section SimpleQueue.
     destruct rop. 
     - iDestruct ("ROP" with "[//]") as "(%r' & #READ_ & ROP)".
       iDestruct (ith_read_hist_compat with "[$] READ_") as %(? & READ' & _).
-      iDestruct (ith_read_hist_compat with "[$] READ") as %(? & READ & _).
+      iDestruct (ith_read_hist_compat with "[$] READ") as %(? & READ & BB).
       
       iAssert (dequeue_resources (h + 1) h ndh.2 None)%I with "[CH CFL HEAD' DFRAG]" as "DR".
       { iFrame. }
@@ -1334,42 +1334,54 @@ Section SimpleQueue.
             - iDestruct "FROM_DANGLE" as "[(-> & -> & _) ?]".
               iLeft. rewrite /safe_read. rewrite Nat.add_sub.
               do 2 iRight. by iFrame. 
-            - rewrite READ in READ'. inversion READ'. subst r' x0.
-              iDestruct "FROM_BR" as "[% ?]". red in ORDER.
-              destruct H as [-> <-].
-              rewrite /safe_read. rewrite Nat.add_sub. }
-
+            -
+              (* rewrite READ in READ'. inversion READ'. subst r' x0. *)
+              (* iDestruct "FROM_BR" as "[% ?]". red in ORDER. *)
+              (* destruct H as [-> <-]. *)
+              (* rewrite /safe_read. rewrite Nat.add_sub. *)
+              admit. 
+          }
           
+          assert (i < i') as NEW.
+          { red in RH_WF. destruct RH_WF as (n' & DOM & [? | [=]] & RH_WF); [done| ].
+            subst i'.
+            apply mk_is_Some, elem_of_dom in READ. rewrite DOM elem_of_set_seq in READ.
+            lia. }
+          clear n.
 
+          assert (h + 1 <= r') as READ'_BOUND.
+          { red in RH_WF. destruct RH_WF as (n' & DOM & [? | [=]] & RH_WF); [done| ].
+            apply proj1 in RH_WF. eapply RH_WF in NEW; eauto. simpl in NEW. lia. }
+          rewrite {1}/safe_read.
+          iDestruct "SAFE" as "[FROM_HEAD | [FROM_DANGLE | FROM_BR]]".
+          + iFrame.
+          + iDestruct "FROM_DANGLE" as "[(-> & -> & _) ?]". lia.
+          + iFrame.
+            iDestruct "FROM_BR" as "([% %] & ?)". subst.
+            red in ORDER. lia.
+        - rewrite /hq_state_wf. iPureIntro.
+          red in ORDER. lia. }
 
-    - iSpecialize 
+      iModIntro. wp_bind (Rec _ _ _)%E. pure_steps.
+      (* TODO: fix a mistake in fl read spec *)
+      admit.
+    - 
+      iAssert (dequeue_resources (h + 1) h ndh.2 None)%I with "[CH CFL HEAD' DFRAG]" as "DR".
+      { iFrame. }
 
+      iMod ("CLOS" with "[-POST CPS PH DR HNI_FL]") as "_".
+      { iFrame. iExists _. iNext. iSplitR.
+        { by iLeft. }
+        iFrame "%".
+        iSplit; cycle 1.
+        - rewrite /rop_interp. by iIntros (??). 
+        - rewrite /hq_state_wf. iPureIntro.
+          red in ORDER. lia. }
 
-    
-    2: { iMod ("CLOS" with ""
-      iFrame. iExists _. iNext. iSplitR.
-         { by iLeft. }
-         iSplit; [done| ]. iSplit; [| done].  
-         rewrite /rop_interp. by iIntros (??). }
-
-
-    iIntros (i' [=]). subst n.
-    iDestruct "ROP" as "[SAFE | $]".
-    2: done. 
-
- 
- 
-    
-    iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od_ & %hist & %ohv & inv)" "CLOS".
-    iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as "(>HQ & >QI & >DANGLE & OHV & >%ORDER & >AUTHS & >ROP & >RHIST & >%RH_WF & >RH & >DQ)".
-    iDestruct "DQ" as "[(% & DR') | TOK]".
-    { by iDestruct (dequeue_resources_excl with "[$] [$]") as "?". }
-    iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[<- <-]. 
-    iDestruct (dequeue_resources_dangle_agree with "[$] [$]") as %->.
-
-    iClear "INV QAT".
- 
+      iModIntro. wp_bind (Rec _ _ _)%E. pure_steps.
+      (* TODO: fix a mistake in fl read spec *)
+      admit.
+  Qed. 
 
   
   Lemma dequeue_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
