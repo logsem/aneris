@@ -19,10 +19,10 @@ Section proof.
     ∀ (c cond v : val) (key : Key) (sa : socket_address) (E : coPset),
     ⌜↑KVS_InvName ⊆ E⌝ -∗
     ⌜key ∈ KVS_keys⌝ -∗
-    IsConnected c sa -∗  
+    IsConnected c sa -∗
     GlobalInv -∗
     RU_client_toolbox -∗
-    □ (▷ |={⊤, E}=> ∃ V, key ↦ₖ V ∗ (key ↦ₖ V ={E, ⊤}=∗ emp)) -∗
+    □ (|={⊤, E}=> ▷ ∃ V, key ↦ₖ V ∗ (key ↦ₖ V ={E, ⊤}=∗ emp)) -∗
     (∀ v', {{{ True }}}
             cond v' @[ip_of_address sa]
            {{{ (b : bool), RET #b; ⌜b → v = v'⌝ }}}) -∗
@@ -33,10 +33,10 @@ Section proof.
     iIntros (c cond v key sa E) "%Hsub %Hin #Hginv #Hconn (#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) #Hshift #Htest !# %Φ Hstate HΦ".
     rewrite /weak_wait_transaction.
     wp_pures.
-    wp_apply ("Hst" with "[//][$]").
+    wp_apply ("Hst" with "[$]"); first done.
     iPoseProof "Hshift" as "Hshift'".
-    iMod "Hshift'" as "[%V (Hkey & Hclose)]".
-    iModIntro.
+    iMod "Hshift'"; do 2 iModIntro;
+      iDestruct "Hshift'" as "[%V (Hkey & Hclose)]".
     iExists {[ key := V ]}.
     rewrite big_sepM_singleton.
     iFrame.
@@ -46,10 +46,10 @@ Section proof.
     iModIntro.
     wp_pures.
     iLöb as "IH".
-    wp_apply ("Hrd" with "[//][//][$]").
+    wp_apply ("Hrd" with "[//][$]"); first done.
     iPoseProof "Hshift" as "Hshift'".
-    iMod "Hshift'" as "[%V' (Hkey' & Hclose)]".
-    iModIntro.
+    iMod "Hshift'"; do 2 iModIntro;
+      iDestruct "Hshift'" as "[%V' (Hkey' & Hclose)]".
     iExists None, V'.
     iFrame.
     iIntros (wo) "(Hkey_con & Hkey & Hdisj)".
@@ -63,9 +63,9 @@ Section proof.
       destruct b eqn:Heq_b; wp_pures.
       + rewrite /commitU.
         wp_pures.
-        wp_apply ("Hcom" with "[//][$]").
-        iMod "Hshift" as "[%V'' (Hkey & Hclose)]".
-        iModIntro.
+        wp_apply ("Hcom" with "[$]"); first done.
+        iMod "Hshift"; do 2 iModIntro;
+          iDestruct "Hshift" as "[%V'' (Hkey & Hclose)]".
         iExists (dom {[key := V]}), {[key := None]}, {[key := V'']}.
         iFrame.
         iSplitR "Hclose HΦ Hseen".

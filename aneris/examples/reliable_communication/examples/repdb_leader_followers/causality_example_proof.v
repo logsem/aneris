@@ -101,7 +101,7 @@ Section proof_of_code.
     { iExists _. by iFrame "#∗". }
     iDestruct 1 as (h a Hkey Hval Hatkey) "[#Hobs' Hx]".
     wp_pures.
-    wp_apply ("Hawr" $! (⊤ ∖ ↑N) _ (SerVal #1)); [solve_ndisj|done|].
+    wp_apply ("Hawr" $! _ (SerVal #1)); [solve_ndisj|done|].
     iInv N as "IH" "Hclose".
     iDestruct "IH" as "[>Hy | >IH]"; last first.
     { iDestruct "IH" as (h' hfx hfy we_y we_x) "(Hy & Hx' & _)".
@@ -110,7 +110,7 @@ Section proof_of_code.
       [solve_ndisj|].
     assert (at_key "y" ([] ++ h ++ [a]) = None) as Hatkey'.
     { rewrite /at_key. by rewrite Hhist. }
-    iModIntro.
+    iApply fupd_mask_intro; first solve_ndisj; iIntros "Hmask !>".
     iExists ([] ++ h ++ [a]), None.
     iFrame "#∗". iSplit; [done|].
     iIntros (h'' a').
@@ -122,6 +122,7 @@ Section proof_of_code.
         [by rewrite !assoc|done]. }
     assert (at_key "x" h'' = None).
     { rewrite at_key_snoc_none in Hatkey''''; [done|by rewrite Hkey']. }
+    iMod "Hmask" as "_".
     iMod ("Hclose" with "[-HΦ]"); [|by iApply "HΦ"].
     iNext. iRight. iExists h, h'', [], a', a.
     rewrite !app_assoc.

@@ -294,15 +294,12 @@ Section Implication.
       iClear "Hsi_com Hsi_start Hsi_write Hsi_init_cli Hsi_init_kvs".
       unfold read_spec.
       iModIntro.
-      iIntros (c sa E' k) "%Hsub' Hk_in Hconn".
-      iDestruct ("Hsi_read" $! c sa E' k Hsub' with "Hk_in Hconn") as "Hsi_read'".
-      iIntros (Φ).
+      iIntros (c sa k Hk) "#Hconn %Φ !> %E' %Hsub'".
+      iDestruct ("Hsi_read" $! c sa k with "[%//] Hconn") as "Hsi_read'".
       iDestruct ("Hsi_read'" $! Φ) as "#Hsi_read''".
-      iModIntro.
       iIntros "Hhyp".
-      iApply "Hsi_read''".
-      iNext.
-      iMod "Hhyp" as "[%vo [%V ((Hloc_key & Hkey) & Hhyp_later)]]".
+      iApply ("Hsi_read''" $! E'); first done.
+      iMod "Hhyp" as "[%vo [%V (>(Hloc_key & Hkey) & Hhyp_later)]]".
       simpl.
       iDestruct "Hkey" as "[%h (%Hbi & Hkey)]".
       iDestruct "Hloc_key" as "[[%wo [%h' (%Heq & %Hdisj & #Hseen & Hupd & Hloc_key)]] |
@@ -311,7 +308,7 @@ Section Implication.
         iModIntro.
         iExists wo.
         iSplitL "Hloc_key"; first by iFrame.
-        iIntros "Hloc_key".
+        iIntros "!>Hloc_key".
         iApply "Hhyp_later".
         iSplitL "Hupd Hloc_key".
         + iLeft.
@@ -335,7 +332,7 @@ Section Implication.
       - iModIntro.
         iExists vo.
         iSplitL "Hloc_key"; first by iFrame.
-        iIntros "Hloc_key".
+        iIntros "!>Hloc_key".
         iApply "Hhyp_later".
         iSplitL "Hupd Hloc_key".
         + iRight.
@@ -353,26 +350,23 @@ Section Implication.
       iClear "Hsi_com Hsi_start Hsi_read Hsi_init_cli Hsi_init_kvs".
       unfold write_spec.
       iModIntro.
-      iIntros (c sa E' k v) "%Hsub' Hk_in Hconn".
-      iDestruct ("Hsi_write" $! c sa E' k v Hsub' with "Hk_in Hconn") as "Hsi_write'".
-      iIntros (Φ).
+      iIntros (c sa k v) "Hk_in Hconn".
+      iDestruct ("Hsi_write" $! c sa k v with "Hk_in Hconn") as "Hsi_write'".
+      iIntros (Φ E' HE').
       iDestruct ("Hsi_write'" $! Φ) as "#Hsi_write''".
       iModIntro.
       iIntros "Hhyp".
-      iApply "Hsi_write''".
-      simpl.
-      iNext.
-      iMod "Hhyp" as "[%vo ([[%wo [%h (%Heq & %Hdisj & #Hseen & Hupd & Hloc_key)]] | (%Hneq & Hupd & Hloc_key)] & Hhyp_later)]".
-      - iModIntro.
-        iExists wo, false.
+      iApply ("Hsi_write''" $! E' HE').
+      iMod "Hhyp"; do 2 iModIntro;
+        iDestruct "Hhyp" as "[%vo ([[%wo [%h (%Heq & %Hdisj & #Hseen & Hupd & Hloc_key)]] | (%Hneq & Hupd & Hloc_key)] & Hhyp_later)]".
+      - iExists wo, false.
         iSplitL "Hloc_key Hupd"; first by iFrame.
         iIntros "(Hloc_key & Hupd)".
         iApply "Hhyp_later".
         iRight.
         iFrame.
         by iPureIntro.
-      - iModIntro.
-        iExists vo, true.
+      - iExists vo, true.
         iSplitL "Hloc_key Hupd"; first by iFrame.
         iIntros "(Hloc_key & Hupd)".
         iApply "Hhyp_later".
@@ -385,16 +379,15 @@ Section Implication.
       iClear "Hsi_com Hsi_read Hsi_write Hsi_init_cli Hsi_init_kvs".
       unfold start_spec.
       iModIntro.
-      iIntros (c sa E') "%Hsub' Hconn".
-      iDestruct ("Hsi_start" $! c sa E' Hsub' with "Hconn") as "Hsi_start'".
-      iIntros (Φ).
-      iDestruct ("Hsi_start'" $! Φ) as "#Hsi_start''".
+      iIntros (c sa) "Hconn".
+      iDestruct ("Hsi_start" $! c sa with "Hconn") as "Hsi_start'".
+      iIntros (Φ E' HE').
+      iDestruct ("Hsi_start'" $! Φ E' HE') as "#Hsi_start''".
       iModIntro.
       iIntros "Hhyp".
       iApply "Hsi_start''".
-      iNext.
-      iMod "Hhyp" as "[%m ((Hstate & Hmem_keys) & Hhyp_later)]".
-      iModIntro.
+      iMod "Hhyp"; do 2 iModIntro;
+        iDestruct "Hhyp" as "[%m ((Hstate & Hmem_keys) & Hhyp_later)]".
       simpl.
       iDestruct "Hstate" as "[(_ & Hstate) | [%_ (%Hfalse & _)]]"; last done.
       iDestruct (rewrite_maps_1 with "[$Hmem_keys]") as "[%m' (%Hdom & %Himp & Hmem_keys)]".
@@ -431,16 +424,15 @@ Section Implication.
     iClear "Hsi_read Hsi_start Hsi_write Hsi_init_cli Hsi_init_kvs".
     unfold commit_spec.
     iModIntro.
-    iIntros (c sa E') "%Hsub' Hconn".
-    iDestruct ("Hsi_com" $! c sa E' Hsub' with "Hconn") as "Hsi_com'".
-    iIntros (Φ).
-    iDestruct ("Hsi_com'" $! Φ) as "#Hsi_com''".
+    iIntros (c sa) "Hconn".
+    iDestruct ("Hsi_com" $! c sa with "Hconn") as "Hsi_com'".
+    iIntros (Φ E' HE').
+    iDestruct ("Hsi_com'" $! Φ E' HE') as "#Hsi_com''".
     iModIntro.
     iIntros "Hhyp".
     iApply "Hsi_com''".
-    iNext.
-    iMod "Hhyp" as "[%s [%mc [%m ((Hstate & %Hdom1 & %Hdom2 & Hloc_keys & Hmem_keys) & Hhyp_later)]]]".
-    iModIntro.
+    iMod "Hhyp"; do 2 iModIntro;
+      iDestruct "Hhyp" as "[%s [%mc [%m ((Hstate & %Hdom1 & %Hdom2 & Hloc_keys & Hmem_keys) & Hhyp_later)]]]".
     iDestruct "Hstate" as "[(%Hfalse & _)|[%ms (%Heq_active & Hstate)]]"; first done.
     iDestruct (rewrite_maps_1 with "[$Hmem_keys]") as "[%m' (%Hdom & %Himp & Hmem_keys)]".
     iDestruct (rewrite_maps_2 with "[$Hloc_keys]") as "[%mc' (%Hdom_mc & %Hbi_mc & Hloc_keys)]".

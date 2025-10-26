@@ -29,26 +29,27 @@ Section proof.
   Definition client_inv src dst : iProp Σ :=
     ∃ (h_src h_dst : Hist) (v_src v_dst : nat), src ↦ₖ (h_src ++ [(#v_src)]) ∗ dst ↦ₖ (h_dst ++ [(#v_dst)]).
 
-  Lemma transfer_transaction (amount : nat) (c : val) (src dst : Key) 
+  Lemma transfer_transaction (amount : nat) (c : val) (src dst : Key)
     (client_addr : socket_address) (client_inv_name : namespace) :
     SI_client_toolbox -∗
-    {{{ ⌜src ∈ KVS_keys⌝ ∗ ⌜dst ∈ KVS_keys⌝ ∗ ⌜src ≠ dst⌝ ∗ 
+    {{{ ⌜src ∈ KVS_keys⌝ ∗ ⌜dst ∈ KVS_keys⌝ ∗ ⌜src ≠ dst⌝ ∗
         ⌜∀ (n : nat), KVS_Serializable #n ⌝ ∗
         ⌜↑KVS_InvName ⊆ (⊤ : coPset) ∖ ↑client_inv_name⌝ ∗
-        inv client_inv_name (client_inv src dst) ∗ 
-        ConnectionState c client_addr CanStart  ∗ 
+        inv client_inv_name (client_inv src dst) ∗
+        ConnectionState c client_addr CanStart  ∗
         IsConnected c client_addr }}}
       transaction c $amount $src $dst @[ip_of_address client_addr]
     {{{ v, RET v; True }}}.
   Proof.
-    iIntros "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) %Φ !> 
+    iIntros "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) %Φ !>
     (%Hin & %Hin' & %Hsub & %Hser & %Hneq & #Hinv & Hstate & #Hconn) HΦ".
-    rewrite /transaction. wp_pures. 
-    wp_apply ("Hst" $! c client_addr (⊤ ∖ ↑client_inv_name)); try solve_ndisj.
+    rewrite /transaction. wp_pures.
+    iPoseProof ("Hst" $! c client_addr with "[$]") as "Hst'".
+    wp_apply ("Hst'" $! _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
     iInv (client_inv_name) as ">[%h_src [%h_dst [%v_src [%v_dst (Hks & Hkd)]]]]" "Hclose".
-    iModIntro. iFrame.
+    do 2 iModIntro. iFrame.
     iExists {[src := (h_src ++ [(#v_src)]); dst := (h_dst ++ [(#v_dst)])]}.
-    rewrite !big_sepM_insert; try set_solver. 
+    rewrite !big_sepM_insert; try set_solver.
     2 : by apply lookup_singleton_ne.
     2 : by apply lookup_singleton_ne.
     2 : by apply lookup_singleton_ne.
@@ -58,8 +59,9 @@ Section proof.
     iMod ("Hclose" with "[Hks Hkd]") as "_".
     { iNext. iExists _,_ ,_ , _. iFrame. }
     iModIntro. wp_pures.
-    wp_apply ("Hrd" $! _ _ ⊤ with "[//][][$]"); first by iPureIntro.
-    iModIntro.
+    iPoseProof ("Hrd" $! _ _ src with "[%][$]") as "Hrd'";
+      first set_solver. wp_apply ("Hrd'" $! _ ⊤); first done.
+    do 2 iModIntro.
     iExists _.
     iFrame.
     iIntros "Hcs1".
@@ -69,32 +71,37 @@ Section proof.
     wp_pures.
     case_bool_decide as Hleq.
     - wp_pures.
-      wp_apply ("Hwr" $! _ _  ⊤ _ (SerVal #(v_src - amount)) with "[//][][$]"); first set_solver.
-      iModIntro.
+      iPoseProof ("Hwr" $! _ _ src (SerVal #(v_src - amount))
+                   with "[%][$]") as "Hwr'"; first set_solver.
+      wp_apply ("Hwr'" $! _  ⊤); first done.
+      do 2 iModIntro.
       iExists _, _.
       iFrame.
       iIntros "(Hcs1 & Hcs2)".
       iModIntro.
       wp_pures.
-      wp_apply ("Hrd" $! _ _ ⊤ with "[//][][$]"); first by iPureIntro.
-      iModIntro.
+      iPoseProof ("Hrd" $! _ _ dst with "[%][$]") as "Hrd'";
+        first set_solver.  wp_apply ("Hrd'" $! _ ⊤); first done.
+      do 2 iModIntro.
       iExists _.
       iFrame.
       iIntros "Hcd1".
       iModIntro.
       wp_pures.
-      wp_apply ("Hwr" $! _ _  ⊤ _ (SerVal #(v_dst + amount)) with "[//][][$]"); first set_solver.
-      iModIntro.
+      iPoseProof ("Hwr" $! _ _ dst (SerVal #(v_dst + amount))
+                   with "[%][$]") as "Hwr'";
+        first set_solver. wp_apply ("Hwr'" $! _ ⊤); first done.
+      do 2 iModIntro.
       iExists _, _.
       iFrame.
       iIntros "(Hcd1 & Hcd2)".
       iModIntro.
       wp_pures.
-      wp_apply (commitU_spec c client_addr (⊤ ∖ ↑client_inv_name));
-      try solve_ndisj. iFrame "#".
+      iPoseProof ((commitU_spec c client_addr) with "[$][$]") as "Hcom'".
+      wp_apply ("Hcom'" $! _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
       iInv (client_inv_name) as ">[%h_src' [%h_dst' [%v_src' [%v_dst' (Hks' & Hkd')]]]]" "Hclose".
-      iModIntro.
-      iExists {[src := (h_src' ++ [(#v_src')]); dst := (h_dst' ++ [(#v_dst')])]} , _, 
+      do 2 iModIntro.
+      iExists {[src := (h_src' ++ [(#v_src')]); dst := (h_dst' ++ [(#v_dst')])]} , _,
         {[src := (Some (#(v_src - amount)), true); dst := (Some (#(v_dst + amount)), true)]}.
       iFrame.
       iSplitL "Hcs1 Hcs2 Hcd1 Hcd2 Hks' Hkd'".
@@ -109,17 +116,17 @@ Section proof.
           by apply lookup_singleton_ne.
         + iIntros "[_ HBig]".
           iMod ("Hclose" with "[HBig]") as "_".
-          * iNext. 
+          * iNext.
             iDestruct "HBig" as "[(_ & Hkeys)|(_ & Hkeys)]".
             -- iExists (h_src' ++ _), (h_dst' ++ _), (v_src - amount), (v_dst + amount).
                rewrite !(big_sepM2_insert); try set_solver.
                iDestruct "Hkeys" as "((Hsrc & _) & (Hdst & _) & _)".
                simpl.
-               replace #(v_src - amount) with #(v_src - amount)%nat; last first. 
+               replace #(v_src - amount) with #(v_src - amount)%nat; last first.
                {
                  repeat f_equal. lia.
                }
-               replace #(v_dst + amount) with #(v_dst + amount)%nat; last first. 
+               replace #(v_dst + amount) with #(v_dst + amount)%nat; last first.
                {
                  repeat f_equal. lia.
                }
@@ -132,11 +139,11 @@ Section proof.
                by apply lookup_singleton_ne.
           * iModIntro. by iApply "HΦ".
     - wp_pures.
-      wp_apply (commitU_spec c client_addr (⊤ ∖ ↑client_inv_name));
-      try solve_ndisj. iFrame "#".
+      iPoseProof ((commitU_spec c client_addr) with "[$][$]") as "Hcom'".
+      wp_apply ("Hcom'" $! _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
       iInv (client_inv_name) as ">[%h_src' [%h_dst' [%v_src' [%v_dst' (Hks' & Hkd')]]]]" "Hclose".
-      iModIntro.
-      iExists {[src := (h_src' ++ [$ v_src']); dst := (h_dst' ++ [$ v_dst'])]} , _, 
+      do 2 iModIntro.
+      iExists {[src := (h_src' ++ [$ v_src']); dst := (h_dst' ++ [$ v_dst'])]} , _,
         {[src := (Some ($v_src), false); dst := (Some ($v_dst), false)]}.
       iFrame.
       iSplitL "Hcs1 Hcs2 Hcd1 Hcd2 Hks' Hkd'".
@@ -163,13 +170,13 @@ Section proof.
               iFrame.
               by apply lookup_singleton_ne.
           * iModIntro. by iApply "HΦ".
-    Unshelve. 
-    replace #(v_src - amount) with #(v_src - amount)%nat; last first. 
+    Unshelve.
+    replace #(v_src - amount) with #(v_src - amount)%nat; last first.
     {
       repeat f_equal. lia.
     }
     apply Hser.
-    replace #(v_dst + amount) with #(v_dst + amount)%nat; last first. 
+    replace #(v_dst + amount) with #(v_dst + amount)%nat; last first.
     {
       repeat f_equal. lia.
     }
@@ -177,4 +184,3 @@ Section proof.
   Qed.
 
 End proof.
-

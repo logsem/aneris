@@ -192,11 +192,10 @@ Section Specification.
     iIntros "#Hgetstate".
     rewrite /simplified_get_state_spec.
     iIntros (s1 s2) "#Haddr !>". iIntros (Φ) "Hloc HΦ".
-    iApply ("Hgetstate" with "[//]").
+    iApply ("Hgetstate" with "[//][//]").
     iExists s1, s2; iFrame.
     iApply fupd_mask_intro; [set_solver |].
-    iNext.
-    iIntros "Hcl ".
+    iIntros "Hcl !>".
     iIntros (? ? ?) "(? & ? & ?)". iMod "Hcl". iModIntro.
     iApply "HΦ".
     eauto with iFrame.
@@ -230,9 +229,9 @@ Section Specification.
     iIntros "#Hupdate" (op log_op h s1 s2) "#Haddr %Hcoh".
     iModIntro.
     iIntros (Φ) "[Hglob Hloc] HΦ".
-    iApply ("Hupdate" with "[//]"); [done |].
+    iApply ("Hupdate" with "[//][//]"); [done |].
     iApply fupd_mask_intro; [set_solver |].
-    iIntros "!> Hcl". iExists h, s1, s2. iFrame.
+    iIntros "Hcl!>". iExists h, s1, s2. iFrame.
     iIntros (e h' s1' s2') "(? & ? & ? & ? & ? & ? & ? & ? & ?)".
     iMod "Hcl". iModIntro.
     iApply "HΦ". eauto with iFrame.

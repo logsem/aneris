@@ -38,22 +38,21 @@ Section Read_Proof.
   Import code_api.
 
  Definition read_spec_internal `{!MTS_resources} : Prop :=
-  ∀ (c : val) (sa : socket_address)
-  (k : Key) (E : coPset),
+  ∀ (c : val) (sa : socket_address) (k : Key),
   ⌜k ∈ KVS_keys⌝ -∗
   @make_request_spec _ _ _ _ MTC _ -∗
   Global_Inv clients γKnownClients γGauth γGsnap γT γTrs -∗
   is_connected γGsnap γT γTrs γKnownClients c sa -∗
-  <<< ∀∀ (vo : option val), 
+  <<< ∀∀ (vo : option val),
       ownCacheUser γKnownClients k c vo >>>
-    TC_read c #k @[ip_of_address sa] E
+    TC_read c #k @[ip_of_address sa] (↑KVS_InvName)
   <<<▷ RET $vo; ownCacheUser γKnownClients k c vo >>>.
 
  Lemma read_spec_internal_holds `{!MTS_resources} :
    read_spec_internal.
   Proof.
-    iIntros (c sa k E Hk) "#HSpec #Hinv #Hisc !#".
-    iIntros (Φ) "Hshift".
+    iIntros (c sa k Hk) "#HSpec #Hinv #Hisc !#".
+    iIntros (Φ E HE) "Hshift".
     iDestruct "Hisc" as (lk cst l) "Hisc".
     iDestruct "Hisc" as (γCst γlk γS γA γCache γMsnap γU ->) "#(Hc1 & Hisc)". rewrite /make_request_spec.
     rewrite /TC_read /= /read.
@@ -65,9 +64,10 @@ Section Read_Proof.
     iDestruct "Hres"
       as (?) "(Hl & Hcr & [( -> & Hres_abs & Hms & Htk) | Hres])".
     {
-      iApply fupd_aneris_wp.
-      iMod "Hshift" as "[%vo (Hcache & _)]".
-      iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? ?) "Hcache". 
+      wp_bind (!_)%E.
+      iMod "Hshift". wp_load.
+      iDestruct "Hshift" as "[%vo (Hcache & _)]".
+      iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? ?) "Hcache".
       iDestruct "Hcache" as (Heq) "Hcache".
       symmetry in Heq. simplify_eq.
       iDestruct "Hcache" as "(#Hc2 & Helem & %Hval)".
@@ -84,19 +84,17 @@ Section Read_Proof.
     wp_load.
     wp_pures.
     wp_bind (Load _).
-    wp_apply (aneris_wp_atomic _ _ E).
-    iMod "Hshift" as "[%vo (Hcache & Hclose)]".
+    iMod "Hshift". wp_load.
+    iDestruct "Hshift" as "[%vo (Hcache & Hclose)]".
     assert (is_coherent_cache cuM cM Msnap) as Hcohc by done.
     destruct Hcoh as (Hc1 & Hc2 & Hc3 & Hc4 & Hc5 & Hc6 & Hc7 & Hc8) .
-    iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? ?) "Hcache". 
+    iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? ?) "Hcache".
     iDestruct "Hcache" as (Heq) "(#Hc4 & Hcache & %Hvb)".
     simplify_eq /=.
     iDestruct (client_connected_agree with "[$Hc4][$Hc1]") as "%Heq'".
     simplify_eq.
     iDestruct (@ghost_map.ghost_map_lookup with
                 "[$Hauth][$Hcache]") as "%Hkin".
-    iModIntro.
-    wp_load.
     iMod ("Hclose" with "[Hcache]") as "HΦ".
     {
       iExists _, _, _, _, _, _, _, _.

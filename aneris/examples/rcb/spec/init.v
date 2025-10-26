@@ -88,9 +88,9 @@ Section Specification.
     rewrite /simplified_deliver_spec.
     iIntros (s) "%Haddr".
     iIntros (Φ) "!> Hloc HΦ".
-    iApply "Hdeliver"; [done |].
+    iApply ("Hdeliver" with "[//]"); [done |].
     iApply fupd_mask_intro; [set_solver |].
-    iIntros "!> Hcl".
+    iIntros "Hcl!>".
     iExists s; iFrame.
     iIntros (s' vo) "[Hloc [[-> ->] |Hsome]]";
       iMod "Hcl"; iModIntro; iApply "HΦ".
@@ -124,9 +124,9 @@ Section Specification.
     rewrite /simplified_broadcast_spec.
     iIntros (Hi Φ) "!>".
     iIntros "[Hglob Hloc] HΦ".
-    iApply "Hbr"; [done |].
+    iApply ("Hbr" with "[//]"); [done |].
     iApply fupd_mask_intro; [set_solver |].
-    iIntros "!> Hmask".
+    iIntros "Hmask!>".
     iExists h, s. iFrame.
     iIntros (w a) "(? & ? & ? & ? & ? & ? & ? & ? & ?)".
     iMod "Hmask". iModIntro.
@@ -165,13 +165,12 @@ Section DeliverBroadcastInvExample.
     iIntros "#Hdel".
     rewrite /deliver_with_inv_example.
     iIntros "#Haddr !>" (Φ) "#Hinv HΦ".
-    iApply "Hdel"; [done |].
+    iApply ("Hdel" with "[//]"); [done |].
     (* Before we intro the mask as in the sequential case, we have to open
        the local invariant. *)
-    iNext.
     iInv LInv as "> Hloc" "Hcl". iDestruct "Hloc" as (s) "Hloc".
     iApply fupd_mask_intro; [set_solver |]. iIntros "Hmask".
-    iExists s; iFrame. iIntros (s' vo) "[Hloc Hopt]".
+    iExists s; iFrame. iNext. iIntros (s' vo) "[Hloc Hopt]".
     iMod "Hmask". iMod ("Hcl" with "[Hloc]") as "_".
     { eauto with iFrame. }
     iModIntro.
@@ -203,12 +202,11 @@ Section DeliverBroadcastInvExample.
     iIntros "#Hbr" (v).
     rewrite /broadcast_with_inv_example.
     iIntros (Hi Φ) "!> #HInv HΦ".
-    iApply "Hbr"; [done |].
-    iNext.
+    iApply ("Hbr" with "[//]"); [done |].
     iInv LInv as "> Hinv" "Hcl".
     iDestruct "Hinv" as (h s) "[Hglob Hloc]".
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
-    iExists h, s; iFrame.
+    iExists h, s; iFrame. iNext.
     iIntros (w a) "(? & ? & ? & ? & ? & ? & ? & Hloc & Hglob)".
     iMod "Hmask". iMod ("Hcl" with "[Hloc Hglob]").
     { eauto with iFrame. }
@@ -299,10 +297,10 @@ Section Helpers.
     iIntros "#Hi !>" (Φ) "#Hvs".
     iLöb as "IH".
     wp_rec.
-    wp_apply "Hdeliver"; [done |].
+    wp_apply ("Hdeliver" with "[//]"); [done |].
     iMod "Hvs". iModIntro.
     iDestruct "Hvs" as (s) "[Hloc Hvs]".
-    iExists s; iFrame.
+    iExists s; iFrame. iNext.
     iIntros (s' vo) "[Hloc' [[-> ->] | Hsome]]".
     - iMod ("Hvs" with "Hloc'") as "_".
       iModIntro. wp_match.

@@ -44,7 +44,7 @@ THE SOFTWARE.
 Notation "'{{{' P } } } '<<<' ∀∀ x1 .. xn , α '>>>' e '@[' ip ] Eo '<<<▷' ∃∃ y1 .. yn , β '>>>' {{{ z1 .. zn , 'RET' v ; Q } } }" :=
   (□ ∀ Φ E,
         ⌜Eo ⊆ E⌝ -∗
-        P -∗ (▷ |={⊤,E}=> ∃ x1, .. (∃ xn,
+        P -∗ (|={⊤,E}=> ▷ ∃ x1, .. (∃ xn,
                 α ∗
                 ∀ y1, .. (∀ yn, β -∗ |={E,⊤}=> ∀ z1, .. (∀ zn, Q -∗ Φ v%V) .. ) .. ) .. ) -∗
           WP e @[ip] ⊤ {{ Φ }})%I
@@ -56,7 +56,7 @@ Notation "'{{{' P } } } '<<<' ∀∀ x1 .. xn , α '>>>' e '@[' ip ] Eo '<<<▷'
 Notation "'<<<' ∀∀ x1 .. xn , α '>>>' e '@[' ip ] Eo '<<<▷' ∃∃ y1 .. yn , β '>>>' {{{ z1 .. zn , 'RET' v ; Q } } }" :=
   (□ ∀ Φ E,
         ⌜Eo ⊆ E⌝ -∗
-        (▷ |={⊤,E}=> ∃ x1, .. (∃ xn,
+        (|={⊤,E}=> ▷ ∃ x1, .. (∃ xn,
               α ∗
               ∀ y1, .. (∀ yn, β -∗ |={E,⊤}=> ∀ z1, .. (∀ zn, Q -∗ Φ v%V) .. ) .. ) .. ) -∗
           WP e @[ip] ⊤ {{ Φ }})%I
@@ -66,10 +66,11 @@ Notation "'<<<' ∀∀ x1 .. xn , α '>>>' e '@[' ip ] Eo '<<<▷' ∃∃ y1 .. 
 
 (* No RET binders. Return value determined together with fancy update. *)
 Notation "'<<<' ∀∀ x1 .. xn , α '>>>' e '@[' ip ] Eo '<<<▷' ∃∃ y1 .. yn , 'RET' v ; β '>>>'" :=
-  (□ ∀ Φ,
-        (▷ |={⊤, Eo%I%I%I%I}=> ∃ x1, .. (∃ xn,
+  (□ ∀ Φ E,
+        ⌜ Eo ⊆ E ⌝ -∗
+        (|={⊤, E%I%I%I%I}=> ▷ ∃ x1, .. (∃ xn,
               α ∗
-              ∀ y1, .. (∀ yn, β -∗ |={Eo, ⊤}=> Φ v%V) .. ) .. ) -∗
+              ∀ y1, .. (∀ yn, β -∗ |={E, ⊤}=> Φ v%V) .. ) .. ) -∗
           WP e @[ip] ⊤ {{ Φ }})%I
   (at level 20, x1 closed binder, xn closed binder, y1 closed binder, yn closed binder,
    format "'[hv' '<<<'  '[' ∀∀  x1  ..  xn ,  '/' α  ']' '>>>'  '/  ' e  '/' @[ ip ]  Eo  '/' '<<<▷'  '[' ∃∃  y1  ..  yn ,  'RET' v ; '/' β ']' '>>>' ']'")
@@ -77,10 +78,11 @@ Notation "'<<<' ∀∀ x1 .. xn , α '>>>' e '@[' ip ] Eo '<<<▷' ∃∃ y1 .. 
 
 (* No post-quantifiers binders *)
 Notation "'<<<' ∀∀ x1 .. xn , α '>>>' e '@[' ip ] Eo '<<<▷' 'RET' v ; β '>>>'" :=
-  (□ ∀ Φ,
-        (▷ |={⊤, Eo%I%I%I%I}=> ∃ x1, .. (∃ xn,
+  (□ ∀ Φ E,
+        ⌜ Eo ⊆ E ⌝ -∗
+        (|={⊤, E%I%I%I%I}=> ▷ ∃ x1, .. (∃ xn,
               α ∗
-              (β -∗ |={Eo%I%I, ⊤}=> Φ v%V)) .. ) -∗
+              (β -∗ |={E%I%I, ⊤}=> Φ v%V)) .. ) -∗
           WP e @[ip] ⊤ {{ Φ }})%I
   (at level 20, x1 closed binder, xn closed binder,
    format "'[hv' '<<<'  '[' ∀∀  x1  ..  xn ,  '/' α  ']' '>>>'  '/  ' e  '/' @[ ip ]  Eo  '/' '<<<▷'  '[' 'RET' v ; '/' β ']' '>>>' ']'")
@@ -90,7 +92,7 @@ Notation "'<<<' ∀∀ x1 .. xn , α '>>>' e '@[' ip ] Eo '<<<▷' 'RET' v ; β 
 Notation "'{{{' P } } } '<<<' ∀∀ x1 .. xn , α '>>>' e '@[' ip ] Eo '<<<▷' β '>>>' {{{ z1 .. zn , 'RET' v ; Q } } }" :=
   (□ ∀ Φ E,
         ⌜Eo ⊆ E⌝ -∗
-        P -∗ (▷ |={⊤,E}=> ∃ x1, .. (∃ xn,
+        P -∗ (|={⊤,E}=> ▷ ∃ x1, .. (∃ xn,
                 α ∗
                 (β -∗ |={E,⊤}=> ∀ z1, .. (∀ zn, Q -∗ Φ v%V) .. )) .. ) -∗
           WP e @[ip] ⊤ {{ Φ }})%I
@@ -102,7 +104,7 @@ Notation "'{{{' P } } } '<<<' ∀∀ x1 .. xn , α '>>>' e '@[' ip ] Eo '<<<▷'
 Notation "'{{{' P } } } '<<<' ∀∀ x1 .. xn , α '>>>' e '@[' ip ] Eo '<<<▷' β '>>>' {{{ 'RET' v ; Q } } }" :=
   (□ ∀ Φ E,
         ⌜Eo ⊆ E⌝ -∗
-        P -∗ (▷ |={⊤,E}=> ∃ x1, .. (∃ xn,
+        P -∗ (|={⊤,E}=> ▷ ∃ x1, .. (∃ xn,
                 α ∗
                 (β -∗ |={E,⊤}=> (Q -∗ Φ v%V))) .. ) -∗
           WP e @[ip] ⊤ {{ Φ }})%I
@@ -114,7 +116,7 @@ Notation "'{{{' P } } } '<<<' ∀∀ x1 .. xn , α '>>>' e '@[' ip ] Eo '<<<▷'
 Notation "'{{{' P } } } '<<<' ∀∀ x1 .. xn , α '>>>' e '@[' ip ] Eo '<<<▷' ∃∃ y1 .. yn , β '>>>' {{{ 'RET' v ; Q } } }" :=
   (□ ∀ Φ E,
         ⌜Eo ⊆ E⌝ -∗
-        P -∗ (▷ |={⊤,E}=> ∃ x1, .. (∃ xn,
+        P -∗ (|={⊤,E}=> ▷ ∃ x1, .. (∃ xn,
                 α ∗
                 ∀ y1, .. (∀ yn, β -∗ |={E,⊤}=> (Q -∗ Φ v%V)) .. ) .. ) -∗
           WP e @[ip] ⊤ {{ Φ }})%I

@@ -65,10 +65,9 @@ Section Proof.
     (* Symbolic execution of write. *)
     wp_bind (wr _ _).
     iDestruct (write_spec_write_spec_atomic with "Hwr_spec") as "Hwr_spec'".
-    iApply ("Hwr_spec'" $! (⊤ ∖ ↑N) k1 (SerVal #1) with "[] [] [Hkwr]");
-      [ solve_ndisj | eauto with set_solver | ].
+    unshelve iApply ("Hwr_spec'" $! k1 (SerVal #1) _ _ (⊤∖↑N));
+      [ eauto with set_solver | solve_ndisj | ].
     (* Proving the write precondition *)
-    iNext.
     iInv N as ">Hri" "Hcl".
     iDestruct "Hri" as (h1 s1) "(Hkwr2 & Hkrd1 & #HobsInv & Hw & [%h0f %Hh1eq])".
     iMod (OwnMemKey_obs_frame_prefix_some k1 _ h0 h1 e0_wr
@@ -79,7 +78,7 @@ Section Proof.
     eauto. rewrite Hkwrv_eq.
     iExists h1, s1, (at_key k1 h1).
     rewrite Hkwrv_eq. rewrite Qp.half_half. iFrame "Hkwr Hw HobsInv". simpl in *.
-    iIntros "!#".
+    iIntros "!#!>".
     iSplit; [ done | ].
     iIntros (hkwr1f ewr1) "(%Hkwr1f & %Hkwr1k & %Hkwr1v & %Hkwr1o & %Hkwr1t & Hkwr & #Hkwr1Obs & Hw)".
     rewrite -{4}Qp.half_half.
@@ -100,10 +99,8 @@ Section Proof.
     (* Symbolic execution of read *)
     iDestruct (read_spec_read_spec_atomic rd sa with "[Hrd_spec]") as "Hrd_spec'".
     { iApply "Hrd_spec". }
-    iApply ("Hrd_spec'" $!(⊤ ∖ ↑N) k2
-              with "[] [] [Hkwr1]");
-      [solve_ndisj | eauto with set_solver|..|].
-    iNext.
+    unshelve iApply ("Hrd_spec'" $! k2 _ _ (⊤∖↑N));
+      [ eauto with set_solver | solve_ndisj | ] .
     iInv N as ">Hri" "Hcl".
     iDestruct "Hri" as (h2 s1) "(Hkwr2 & Hkrd1 & #HobsInv_rd & Hw & %Hh0h2)".
     iMod (Obs_lub with "[$Hginv] [$HobsInv_rd] [$Hkwr1Obs]") as (h3) "(%Hh3le1 & %Hh3le2 & #Hobsh3)";
@@ -117,7 +114,7 @@ Section Proof.
     rewrite Hrdh2h3.
     iMod (OwnMemKey_allocated k2 _ h0 h3 e_rd with "[$Hkrd1]") as (erd') "(Hkrd1 & %Herdh2 & _)";
       [ solve_ndisj | by apply (PreOrder_Transitive h0 h2 h3) | by simplify_list_eq | ].
-    iFrame "Hobsh3 Hkrd1". iModIntro.
+    iFrame "Hobsh3 Hkrd1". do 2 iModIntro.
     iSplit; [done|].
     iIntros "H".
     iDestruct "H" as "[[%Heq Hk] | H]".

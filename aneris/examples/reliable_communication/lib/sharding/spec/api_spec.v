@@ -16,11 +16,10 @@ Section Spec.
   Context `{!anerisG Mdl Σ, !DB_params, !DBG Σ}.
 
   Definition write_spec (wr : val) sa : iProp Σ :=
-    ∀ (E : coPset) (k : Key) v,
-    ⌜↑DB_inv_name ⊆ E⌝ -∗
+    ∀ (k : Key) v,
     ⌜k ∈ DB_keys⌝ -∗
     <<< ∀∀ old, k ↦ₖ old >>>
-      wr $k $v @[ip_of_address sa] E
+      wr $k $v @[ip_of_address sa] (↑DB_inv_name)
     <<<▷ RET #(); k ↦ₖ Some v >>>.
 
   Definition simplified_write_spec (wr : val) sa : iProp Σ :=
@@ -33,20 +32,20 @@ Section Spec.
     write_spec wr sa -∗ simplified_write_spec wr sa.
   Proof.
     iIntros "#write" (v old k k_keys Φ) "!>k_old HΦ".
-    wp_apply ("write" $! ⊤ with "[//] [//]").
-    iModIntro.
+    wp_apply ("write" with "[//] [//]").
+    iApply fupd_mask_intro; first done.
+    iIntros "Hmask!>".
     iExists old.
     iFrame.
-    iIntros "k_v".
+    iIntros "k_v". iMod "Hmask" as "_".
     iApply ("HΦ" with "k_v").
   Qed.
 
   Definition read_spec (rd : val) sa : iProp Σ :=
-    ∀ (E : coPset) (k : Key),
-    ⌜↑DB_inv_name ⊆ E⌝ -∗
+    ∀ (k : Key),
     ⌜k ∈ DB_keys⌝ -∗
     <<< ∀∀ v, k ↦ₖ v >>>
-      rd $k @[ip_of_address sa] E
+      rd $k @[ip_of_address sa] (↑DB_inv_name)
     <<<▷ RET $v; k ↦ₖ v >>>.
 
   Definition simplified_read_spec (rd : val) sa : iProp Σ :=
@@ -59,8 +58,8 @@ Section Spec.
     read_spec rd sa -∗ simplified_read_spec rd sa.
   Proof.
     iIntros "#read" (k v k_keys Φ) "!>k_v HΦ".
-    wp_apply ("read" $! ⊤ with "[//] [//]").
-    iModIntro.
+    unshelve wp_apply ("read" $! _ _ _ ⊤ with "[%//]"); first done.
+    do 2 iModIntro.
     iExists v.
     iFrame.
     iIntros "k_v".

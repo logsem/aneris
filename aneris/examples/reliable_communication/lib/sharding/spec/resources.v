@@ -309,10 +309,10 @@ Section user_params.
   Definition ReqPre (req : val) (data : ReqData) : iProp Σ :=
     (∃ E Q (k : Key) (v : Val), ⌜↑DB_inv_name ⊆ E⌝ ∗ ⌜k ∈ DB_keys⌝ ∗
       ⌜req = InjLV ($k, $v)%V⌝ ∗ ⌜data = inl (E, Q, k, v)⌝ ∗
-      (▷ |={⊤, E}=> ∃ old, k ↦ₖ old ∗ (k ↦ₖ Some v ={E, ⊤}=∗ Q))) ∨
+      (|={⊤, E}=> ▷ ∃ old, k ↦ₖ old ∗ (k ↦ₖ Some v ={E, ⊤}=∗ Q))) ∨
      (∃ E Q (k : Key), ⌜↑DB_inv_name ⊆ E⌝ ∗ ⌜k ∈ DB_keys⌝ ∗ ⌜req = InjRV $k⌝ ∗
       ⌜data = inr (E, Q, k)⌝ ∗
-      (▷ |={⊤, E}=> ∃ v, k ↦ₖ v ∗ (k ↦ₖ v ={E,⊤}=∗ Q v))).
+      (|={⊤, E}=> ▷ ∃ v, k ↦ₖ v ∗ (k ↦ₖ v ={E,⊤}=∗ Q v))).
 
   Definition ReqPost (rep : val) (data : ReqData) (_ : RepData) : iProp Σ :=
     (∃ E (Q : iProp Σ) (k : Key) (v : Val), Q ∗
@@ -339,10 +339,10 @@ Section user_params.
   Definition shardReqPre γ (req : val) (data : ReqData) : iProp Σ :=
     (∃ E Q (k : Key) (v : Val), ⌜↑DB_inv_name ⊆ E⌝ ∗ ⌜k ∈ DB_keys⌝ ∗
       ⌜req = InjLV ($k, $v)%V⌝ ∗ ⌜data = inl (E, Q, k, v)⌝ ∗ ⌜DBG_hash k = γ⌝ ∗
-      (▷ |={⊤, E}=> ∃ old, k ↦ₖ old ∗ (k ↦ₖ Some v ={E, ⊤}=∗ Q))) ∨
+      (|={⊤, E}=> ▷ ∃ old, k ↦ₖ old ∗ (k ↦ₖ Some v ={E, ⊤}=∗ Q))) ∨
      (∃ E Q (k : Key), ⌜↑DB_inv_name ⊆ E⌝ ∗ ⌜k ∈ DB_keys⌝ ∗ ⌜req = InjRV $k⌝ ∗
       ⌜data = inr (E, Q, k)⌝ ∗ ⌜DBG_hash k = γ⌝ ∗
-      (▷ |={⊤, E}=> ∃ v, k ↦ₖ v ∗ (k ↦ₖ v ={E,⊤}=∗ Q v))).
+      (|={⊤, E}=> ▷ ∃ v, k ↦ₖ v ∗ (k ↦ₖ v ={E,⊤}=∗ Q v))).
 
   Global Instance user_params_at_shard γ sa : MTS_user_params :=
     {|

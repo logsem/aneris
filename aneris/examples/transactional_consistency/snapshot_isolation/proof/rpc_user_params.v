@@ -75,7 +75,7 @@ Section RPC_user_params.
           ⌜Msnap_full !! k = Some h⌝ ∗
           ownTimeSnap γT ts ∗
           ownMemSeen γGsnap k h ∗
-          ownSnapFrag γTrs ts Msnap_full 
+          ownSnapFrag γTrs ts Msnap_full
 
       )
      ∨
@@ -87,10 +87,10 @@ Section RPC_user_params.
           ⌜↑KVS_InvName ⊆ E⌝ ∗
           P ∗
           (P
-           ={⊤, E}=∗
+           ={⊤, E}=∗ ▷
            (∃ (m : gmap Key (list val)),
                ([∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
-                 ▷ (∀ ts (Msnap Msnap_full: gmap Key (list write_event)),
+                   (∀ ts (Msnap Msnap_full: gmap Key (list write_event)),
                       ⌜Msnap ⊆ Msnap_full⌝ ∗
                       ⌜m = (λ h : list write_event, to_hist h) <$> Msnap⌝ ∗
                       ⌜kvs_valid_snapshot Msnap ts⌝ ∗
@@ -119,14 +119,14 @@ Section RPC_user_params.
           ⌜kvs_valid_snapshot Msnap ts⌝ ∗
           ⌜Msnap ⊆ Msnap_full⌝ ∗
           ownTimeSnap γT ts ∗
-          ownSnapFrag γTrs ts Msnap_full ∗ 
+          ownSnapFrag γTrs ts Msnap_full ∗
           ([∗ map] k ↦ h' ∈ Msnap, ownMemSeen γGsnap k h') ∗
           P ∗
-         (P ={⊤, E}=∗
+         (P ={⊤, E}=∗ ▷
           ∃ (m_current : gmap Key (list val)),
           ⌜dom m_current = dom Msnap⌝ ∗
           ([∗ map] k ↦ hv ∈ m_current, OwnMemKey_def γGauth γGsnap k hv) ∗
-           ▷ (∀ (b : bool),
+            (∀ (b : bool),
                 ((** Transaction has been commited. *)
                  (⌜b = true⌝ ∗ ⌜can_commit m_current ((λ h : list write_event, to_hist h) <$> Msnap) cache_logicalM⌝ ∗
                  ([∗ map] k↦ h;p ∈ m_current; cache_logicalM,

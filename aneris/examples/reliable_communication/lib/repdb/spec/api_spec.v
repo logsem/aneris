@@ -19,9 +19,9 @@ Section API_spec.
          (P : iProp Σ) (Q : we → ghst → ghst → iProp Σ),
         ⌜↑DB_InvName ⊆ E⌝ -∗
         ⌜k ∈ DB_keys⌝ -∗
-        □ (P -∗ ▷ 
+        □ (P -∗
             |={⊤, E}=>
-              ∃ (h : ghst) (a_old: option we),
+              ▷ ∃ (h : ghst) (a_old: option we),
                 ⌜at_key k h = a_old⌝ ∗
                 k ↦ₖ a_old ∗
                 Obs DB_addr h ∗
@@ -39,14 +39,13 @@ Section API_spec.
 
   Definition write_spec_atomic
       (wr : val) (sa : socket_address) : iProp Σ :=
-    ∀ (E : coPset) (k : Key) (v : SerializableVal),
-    ⌜↑DB_InvName ⊆ E⌝ -∗
+    ∀ (k : Key) (v : SerializableVal),
     ⌜k ∈ DB_keys⌝ -∗
     <<< ∀∀ (h : ghst) (a_old : option we),
       ⌜at_key k h = a_old⌝ ∗
       k ↦ₖ a_old ∗
       Obs DB_addr h >>>
-      wr #k v @[ip_of_address sa] E
+      wr #k v @[ip_of_address sa] (↑DB_InvName)
     <<<▷ ∃∃ hf a_new, RET #();
            ⌜at_key k hf = None⌝ ∗
            ⌜we_key a_new = k⌝ ∗
@@ -58,13 +57,13 @@ Section API_spec.
   Lemma write_spec_write_spec_atomic wr sa :
     write_spec wr sa -∗ write_spec_atomic wr sa.
   Proof.
-    iIntros "#Hwr" (E k v HE Hkeys Φ) "!> Hvs".
+    iIntros "#Hwr" (k v Hkeys Φ E HE) "!> Hvs".
     iApply ("Hwr" $! E k v _ (λ _ _ _, Φ #()) with "[] [] [] Hvs");
       [ done .. | | ].
     { iIntros "!> Hvs".
-      iNext.
-      iMod "Hvs" as (h a_old) "[(%Hatkey & Hk & Hobs) Hclose]".
-      iModIntro. iExists _, _. iFrame. iSplit; first done.
+      iMod "Hvs"; do 2 iModIntro;
+        iDestruct "Hvs" as (h a_old) "[(%Hatkey & Hk & Hobs) Hclose]".
+      iExists _, _. iFrame. iSplit; first done.
       iIntros (hf anew Hhf Hnk Hnv) "Hpre1 Hpre2 Hpre3".
       iApply "Hclose". eauto 10 with iFrame. }
     iIntros "!> H". iDestruct "H" as (_ _ _) "H". iApply "H".
@@ -110,10 +109,9 @@ Section API_spec.
     iDestruct (write_spec_write_spec_atomic with "Hwr") as "#Hswr".
     iIntros (Hk Φ) "!> HP HΦ".
     iApply "Hswr"; [done..|].
-    iNext.
     iApply fupd_mask_intro; [done|]; iIntros "Hclose".
     iDestruct "HP" as (wo) "(Hk & Hobs & %Hatkey)".
-    iExists _, _. iFrame "Hk Hobs". iSplit; [done|].
+    iExists _, _. iFrame "Hk Hobs". iNext. iSplit; [done|].
     iIntros (hf wo') "(%Hatkey'&%Hkew&%Hval&%Hle&Hk&#Hobs')".
     iMod "Hclose". iModIntro. iApply "HΦ".
     iExists _, _. by iFrame "#∗".

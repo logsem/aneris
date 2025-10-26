@@ -44,12 +44,13 @@ Section proof.
             lhst_user γLs i s' >>>.
 
 
-  Lemma broadcast_ghost_update i t Su Sl h v :
+  Lemma broadcast_ghost_update i t Su Sl h v (E:coPset) :
+    ↑RCB_InvName ⊆ E →
     RCBM_Lst_valid i {| Lst_time := t; Lst_hst := Su |} ->
     Global_Inv γGown γGsnap γLs  ⊢
     own_global_user γGown γGsnap h -∗
     lhst_user γLs i Su -∗
-    lhst_lock γLs i Sl ={↑RCB_InvName}=∗
+    lhst_lock γLs i Sl ={E}=∗
     let e := LocalEvent v (incr_time t i) i (S (size Su)) in
     ⌜e ∉ Su⌝ ∗
     ⌜le_payload e = v⌝ ∗
@@ -63,7 +64,7 @@ Section proof.
     lhst_user γLs i (Su ∪ {[ e ]}) ∗
     lhst_lock γLs i (Su ∪ {[ e ]}).
   Proof.
-    iIntros (HLvalid) "#HGinv Hglob Huser Hlock".
+    iIntros (HE HLvalid) "#HGinv Hglob Huser Hlock".
     set e := LocalEvent v (incr_time t i) i (S (size Su)).
     pose proof (RCBM_LSTV_at HLvalid) as Hlt.
     rewrite -(RCBM_LSTV_time_length HLvalid) in Hlt.
@@ -112,7 +113,7 @@ Section proof.
     wp_pures. iApply "HΦ". rewrite /internal_broadcast_spec.
     rewrite -Heqip.
     clear Φ.
-    iIntros (v) "%Hiz !> %Φ HΦ".
+    iIntros (v Hiz Φ E HE) "!> HΦ".
     wp_pures.
     wp_apply acquire_spec; [iFrame "#" |].
     iIntros (?) "(-> & Hlk & Hli)".
@@ -145,12 +146,12 @@ Section proof.
     wp_bind (_ <- _)%E.
     (* This is (one posssible) linearization point: we need to logically track the
        newly-broadcasted event. *)
-    iApply (aneris_wp_atomic _ _ (↑RCB_InvName)).
-    iMod "HΦ". iModIntro. wp_store.
+    iMod "HΦ". wp_store.
     iDestruct "HΦ" as (h s) "[[Hgu Hu] HΦ]".
     iDestruct (lhst_user_lock_agree with "Hu Hlock") as %<-.
-    iMod ((broadcast_ghost_update _ t _ _ _ v) with "[//] Hgu Hu Hlock") as
-        "(% & % & % & % & % & % & #HLvalid & Hgu & #Hgsnap & Hu & Hlock)"; [done |].
+    iMod ((broadcast_ghost_update _ t _ _ _ v) with "[$] Hgu Hu Hlock") as
+        "(% & % & % & % & % & % & #HLvalid & Hgu & #Hgsnap & Hu & Hlock)";
+      [ assumption | done | ].
     remember {| le_payload := v;
                 le_time := incr_time t i;
                 le_orig := i;
@@ -215,7 +216,7 @@ Section proof.
           rewrite contra in Heq.
           pose proof (Z.eqb_refl  i') as Heqb.
           rewrite Heqb in Heq.
-          done. } 
+          done. }
         rewrite Hiz; eauto.
       + iApply "Hϕ".
         apply bool_decide_eq_true in Heq.

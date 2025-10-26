@@ -45,7 +45,7 @@ Section Client_Proxy_Proof.
         ⌜↑DB_InvName ⊆ E⌝ -∗
         ⌜k ∈ DB_keys⌝ -∗
         □ (P -∗
-            ▷  |={⊤, E}=>
+           |={⊤, E}=> ▷
               ∃ (h : wrlog) (a_old: option write_event),
                 ⌜at_key k h = a_old⌝ ∗
                 own_mem_user γM k 1 a_old ∗

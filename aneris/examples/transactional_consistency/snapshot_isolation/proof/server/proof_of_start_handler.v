@@ -50,10 +50,10 @@ Section Proof_of_start_handler.
     server_lock_inv γGauth γT γlk lk kvs vnum -∗
     Global_Inv clients γKnownClients γGauth γGsnap γT γTrs -∗
     P -∗
-    (P ={⊤,E}=∗
+    (P ={⊤,E}=∗ ▷
           ∃ m : gmap Key (list val),
             ([∗ map] k↦h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
-              ▷ (∀ (ts : Time) (Msnap Msnap_full : gmap Key (list write_event)),
+              (∀ (ts : Time) (Msnap Msnap_full : gmap Key (list write_event)),
                  ⌜Msnap ⊆ Msnap_full⌝ ∗
                  ⌜m = (λ h : list write_event, to_hist h) <$> Msnap⌝ ∗
                  ⌜kvs_valid_snapshot Msnap ts⌝ ∗
@@ -87,8 +87,8 @@ Section Proof_of_start_handler.
     wp_load. wp_pures.
     (* This is where the viewshift is happening. *)
     wp_bind (Store _ _).
-    wp_apply (aneris_wp_atomic _ _ E).
-    iMod ("Hsh" with "[$HP]") as (mu) "(Hkeys & Hpost)".
+    iMod ("Hsh" with "HP") as "Hsh";
+      wp_store; iDestruct "Hsh" as (mu) "(Hkeys & Hpost)".
     iInv KVS_InvName
       as (Mg Sg Tg gMg) ">(HmemGlob & HsnapG & HtimeGlob & Hccls & %Hdom & %HkvsValid)".
     (* Logical updates. *)
@@ -131,7 +131,7 @@ Section Proof_of_start_handler.
             _ _ (● (((λ M, to_agree (global_memUR M)) <$> (<[(T + 1)%nat :=M]> Sg)) : gmap _ _) ⋅
                  ◯ ({[(T + 1)%nat := to_agree (global_memUR M) ]}))
       with "HsnapG") as "(HsnapG & #HsnapFrag)".
-    { 
+    {
       apply auth_update_alloc.
       simplify_eq /=.
       rewrite fmap_insert.
@@ -141,17 +141,17 @@ Section Proof_of_start_handler.
       assert (is_Some (Sg !! (T+1)%nat)) as Habs by naive_solver.
       apply elem_of_dom in Habs.
       destruct HkvsValid.
-      specialize (kvs_ValidSnapshotTimesTime (T+1)%nat Habs). 
+      specialize (kvs_ValidSnapshotTimesTime (T+1)%nat Habs).
       by lia. }
     iSplitL "HtimeGlob HmemGlob Hccls HsnapG".
      { iModIntro. iNext. iExists M, (<[(T + 1)%nat:=M]> Sg), (T+1)%nat, _.
       iFrame "#∗". iSplit; first done. iPureIntro.
       by apply kvs_valid_step_start_transaction. }
-     do 2 iModIntro. wp_store.
+     iModIntro.
      iDestruct ("Hpost" $! (T+1)%nat ((filter (λ k, k.1 ∈ dom mu) M)) M
                  with "[Hkeys]") as "HQ".
      { iFrame "#∗".
-       iSplit; first by iPureIntro; apply map_filter_subseteq. 
+       iSplit; first by iPureIntro; apply map_filter_subseteq.
        iSplit; first done.
        iPureIntro.
        split.
@@ -159,7 +159,7 @@ Section Proof_of_start_handler.
          apply map_filter_lookup_Some_1_1 in H_lookup.
          assert ((we_time e ≤ T)%nat).
          eapply kvs_ValidCommitTimes; eauto with lia.
-         lia. 
+         lia.
        - apply map_Forall_lookup_2.
          intros k x H_filter_some.
          apply map_filter_lookup_Some_1_1 in H_filter_some.

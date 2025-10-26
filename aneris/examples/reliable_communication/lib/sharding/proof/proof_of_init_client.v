@@ -35,19 +35,19 @@ Section proof.
     iApply "HΦ".
     iSplit.
     {
-      iIntros (E k inv_name k_keys Ψ) "!>HΨ".
+      iIntros (k k_keys Ψ E' HE') "!>HΨ".
       wp_pures.
       wp_apply (acquire_spec with "lock").
       iIntros "% (-> & locked & CanRequest)".
       wp_pures.
-      wp_apply ("request_srv" $! _ _ _ (inr (E, (λ vo, Ψ $vo)%I, k))
+      wp_apply ("request_srv" $! _ _ _ (inr (E', (λ vo, Ψ $vo)%I, k))
           with "[$CanRequest HΨ]").
       {
         iSplit.
         { iPureIntro=>/=. exists $k. right. split=>//=.
             apply DB_keys_serializable. }
         iRight.
-        iExists E, _, k.
+        iExists E', _, k.
         iFrame.
         by do 3 (iSplit; first done).
       }
@@ -60,13 +60,12 @@ Section proof.
       wp_pures.
       iApply "HΨ".
     }
-    iIntros (E k v inv_name k_keys Ψ) "!>HΨ".
+    iIntros (k v k_keys Ψ E HE) "!>HΨ".
     wp_pures.
     wp_apply (acquire_spec with "lock").
     iIntros "% (-> & locked & CanRequest)".
     wp_pures.
-    wp_apply ("request_srv" $! _ _ _ (inl (E, Ψ #(), k, v))
-            with "[$CanRequest HΨ]").
+    wp_apply ("request_srv" with "[$CanRequest HΨ]").
     {
       iSplitR.
       { iPureIntro=>/=. exists ($k, $v)%V. left. split=>//=. exists $k, $v.

@@ -60,12 +60,11 @@ Section with_Σ.
     iIntros (Hk) "#Hwr #Hinv Hobs Hwrites".
     wp_pures.
     iDestruct (write_spec_write_spec_atomic with "Hwr") as "Hwr'".
-    iApply ("Hwr'" $! (⊤ ∖ ↑N) k (SerVal #n1) with "[] []");
-      [ solve_ndisj | done |].
-    iNext.
+    unshelve iApply ("Hwr'" $! k (SerVal #n1) _ _ (⊤∖↑N) with "[]");
+      [ done | solve_ndisj | ].
     iInv N as ">HI" "Hclose".
     iDestruct "HI" as "[Hk | HI]".
-    { iModIntro.
+    { do 2 iModIntro.
       iExists [], [], None.
       iFrame "Hobs Hwrites Hk".
       iSplit; [done|].
@@ -103,7 +102,7 @@ Section with_Σ.
       apply prefix_app, prefix_nil. }
     iMod (Writes_obs_at_origin with "[$Hwrites $Hobs'']")
       as "[Hwrites %Horig_le]".
-    iModIntro.
+    do 2 iModIntro.
     iExists (h2f1 ++ [e] ++ h2f2), [], (Some e).
     rewrite -Hmval.
     iFrame "Hwrites Hobs' Hk".
@@ -167,9 +166,7 @@ Section with_Σ.
   Proof.
     iIntros (Hk Hsaneq Hkey Hmval Hatkey) "#HGinv #Hrd #Hinv #Hobs Hwrites".
     iDestruct (read_spec_read_spec_atomic with "Hrd") as "Hrd'".
-    iApply ("Hrd'" $! (⊤ ∖ ↑N) k with "[] []");
-      [ solve_ndisj | done |].
-    iNext.
+    unshelve iApply ("Hrd'" $! k _ _ (⊤∖↑N)); [ done | solve_ndisj | ].
     iInv N as ">HI" "Hclose".
     iDestruct "HI" as "[Hk | HI]".
     { iMod (OwnMemKey_none_obs with "[$Hk $Hobs]") as "[Hk %Hatkey']";
@@ -184,7 +181,7 @@ Section with_Σ.
       iMod (OwnMemKey_key with "Hk") as "[Hk %Hkkey]"; [solve_ndisj|].
       iMod (OwnMemKey_origin_in_Writes with "Hk Hwrites")
         as "(Hk & Hwrites & %Hin)"; [solve_ndisj|done|by inversion HI|].
-      iModIntro.
+      do 2 iModIntro.
       iExists _, _, (Some we).
       iFrame "Hobs Hk".
       assert (we = we1) as -> by set_solver.
@@ -196,7 +193,6 @@ Section with_Σ.
       iMod ("Hclose" with "[Hk]") as "_".
       { iRight. iNext. iExists we1. iFrame "Hk".
         iLeft. iPureIntro. apply HI. }
-      iModIntro.
       iExists [].
       iFrame "Hobs Hwrites".
       inversion HI as ([Hweval Hweorig]).
@@ -207,7 +203,7 @@ Section with_Σ.
     iMod (OwnMemKey_Obs_extend with "HGinv Hobs Hk") as "[Hk [%h2f #Hobs']]";
       [ solve_ndisj | by simplify_eq | by inversion Hmval;
                                        inversion HI; naive_solver |].
-    iModIntro.
+    do 2 iModIntro.
     iExists _, _, (Some we).
     iFrame "Hobs' Hk".
     iSplit; [eauto|].

@@ -80,7 +80,8 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
     rewrite /transaction1_client. wp_pures. rewrite Hip Hports.
     wp_apply ("Hinit_cli" with "[$Hunalloc $Hprot $Hmsghis $Hports $Hcc]").
     iIntros (rpc) "(Hcstate & #HiC)". wp_pures. rewrite /transaction1. wp_pures.
-    wp_apply ("Hst" $! rpc client_1_addr (⊤ ∖ ↑client_inv_name)); try solve_ndisj.
+    iPoseProof ("Hst" $! rpc client_1_addr with "[$]") as "Hst'".
+    wp_apply ("Hst'" $! _ (⊤ ∖ ↑client_inv_name)); try solve_ndisj.
     iInv (client_inv_name) as ">[%h (Hkx & [-> | (_ & Htok') ])]" "Hclose";
     try iDestruct (token_exclusive with "Htok Htok'") as "[]".
     iModIntro. iFrame.
@@ -88,19 +89,20 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
     rewrite !big_sepM_insert; try set_solver.
     rewrite big_sepM_empty.
     iSplitL "Hkx"; first iFrame.
-    iIntros "(Hcstate & (Hkx & _) & ((Hcx1 & Hcx2) & _) & _)".
+    iIntros "!>(Hcstate & (Hkx & _) & ((Hcx1 & Hcx2) & _) & _)".
     iMod ("Hclose" with "[Hkx]") as "_".
     { iNext. iExists _. iFrame. by iLeft. }
     iModIntro. wp_pures.
-    wp_apply ("Hwr" $! _ _  ⊤ _ (SerVal #1) with "[//][][$]"); first set_solver.
+    iPoseProof ("Hwr" $! _ _ "x" (SerVal #1) with "[%][$]") as "Hwr'";
+      first set_solver. wp_apply ("Hwr'" $! _  ⊤); first done.
     iModIntro.
     iExists _, _.
     iFrame.
-    iIntros "(Hcx1 & Hcx2)".
-    iModIntro.
+    iIntros "!>(Hcx1 & Hcx2)!>".
     wp_pures.
-    wp_apply (commitT_spec rpc client_1_addr (⊤ ∖ ↑client_inv_name));
-    try solve_ndisj. iFrame "#".
+    iPoseProof ((commitT_spec rpc client_1_addr) with "[$][$]") as "Hcom'".
+    wp_apply ("Hcom'" $! _ (⊤ ∖ ↑client_inv_name));first solve_ndisj.
+    iFrame "#".
     iInv (client_inv_name) as ">[%h' (Hkx & [-> | (_ & Htok') ])]" "Hclose";
     try iDestruct (token_exclusive with "Htok Htok'") as "[]".
     iModIntro.
@@ -113,7 +115,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
         rewrite !big_sepM_insert; try set_solver.
         rewrite !big_sepM_insert; try set_solver.
         rewrite !big_sepM_empty. iFrame.
-      + iIntros "[_ HBig]".
+      + iIntros "!>[_ HBig]".
         iMod ("Hclose" with "[HBig Htok]") as "_".
             * iNext. iExists _.
               rewrite !(big_sepM2_insert); try set_solver.
@@ -144,30 +146,30 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
     rewrite /transaction2_client. wp_pures. rewrite Hip Hports.
     wp_apply ("Hinit_cli" with "[$Hunalloc $Hprot $Hmsghis $Hports $Hcc]").
     iIntros (rpc) "(Hcstate & #HiC)". wp_pures. rewrite /transaction2. wp_pures.
-    wp_apply ("Hst" $! rpc client_2_addr (⊤ ∖ ↑client_inv_name)); try solve_ndisj.
-        iInv (client_inv_name) as ">[%h (Hkx & Hdisj)]" "Hclose".
+    iPoseProof ("Hst" $! rpc client_2_addr with "[$]") as "Hst'".
+    wp_apply ("Hst'" $! _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
+    iInv (client_inv_name) as ">[%h (Hkx & Hdisj)]" "Hclose".
     iModIntro. iFrame.
     iExists {["x" := h]}.
-    rewrite !big_sepM_insert; try set_solver.
-    rewrite big_sepM_empty.
+    rewrite !big_sepM_insert// big_sepM_empty.
     iSplitL "Hkx"; first iFrame.
-    iIntros "(Hcstate & (Hkx & _) & ((Hcx1 & Hcx2) & _) & _)".
+    iIntros "!>(Hcstate & (Hkx & _) & ((Hcx1 & Hcx2) & _) & _)".
     iMod ("Hclose" with "[Hkx Hdisj]") as "_".
     { iNext. iExists _. iFrame. }
     iModIntro. wp_pures.
-    wp_apply ("Hrd" $! _ _ ⊤ with "[//][][$]"); first set_solver.
+    iPoseProof ("Hrd" $! _ _ "x" with "[%][$]") as "Hrd'"; first set_solver.
+    wp_apply ("Hrd'" $! _ ⊤); first done.
     iModIntro.
     iExists _.
     iFrame.
-    iIntros "Hcx1".
-    iModIntro.
+    iIntros "!>Hcx1!>".
     wp_pures.
-    wp_apply ("Hrd" $! _ _ ⊤ with "[//][][$]"); first set_solver.
+    iPoseProof ("Hrd" $! _ _ "x" with "[%][$]") as "Hrd'"; first set_solver.
+    wp_apply ("Hrd'" $! _ ⊤); first done.
     iModIntro.
     iExists _.
     iFrame.
-    iIntros "Hcx1".
-    iModIntro.
+    iIntros "!>Hcx1!>".
     wp_pures.
     destruct (last h) eqn:Heq.
     - rewrite/assert.
@@ -178,8 +180,9 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
         by apply Heq'.
       }
       wp_pures.
-      wp_apply (commitT_spec rpc client_2_addr (⊤ ∖ ↑client_inv_name));
-      try solve_ndisj. iFrame "#".
+      iPoseProof ((commitT_spec rpc client_2_addr) with "[$][$]") as "Hcom'".
+      wp_apply ("Hcom'" $! _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
+      iFrame "#".
       iInv (client_inv_name) as ">[%h' (Hkx & Hdisj')]" "Hclose".
       iModIntro.
       iExists {["x" := h']} , _, {["x" := (Some v, false)]}.
@@ -191,7 +194,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
           rewrite !big_sepM_insert; try set_solver.
           rewrite !big_sepM_insert; try set_solver.
           rewrite !big_sepM_empty.  iFrame.
-        + iIntros "[_ HBig]".
+        + iIntros "!>[_ HBig]".
           iMod ("Hclose" with "[HBig Hdisj']") as "_".
               * iNext. iExists _.
                 rewrite !(big_sepM2_insert); try set_solver.
@@ -200,8 +203,9 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
               * iModIntro. by iApply "HΦ".
     - rewrite/assert.
       wp_pures.
-      wp_apply (commitT_spec rpc client_2_addr (⊤ ∖ ↑client_inv_name));
-      try solve_ndisj. iFrame "#".
+      iPoseProof ((commitT_spec rpc client_2_addr) with "[$][$]") as "Hcom'".
+      wp_apply ("Hcom'" $! _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
+      iFrame "#".
       iInv (client_inv_name) as ">[%h' (Hkx & Hdisj')]" "Hclose".
       iModIntro.
       iExists {["x" := h']} , _, {["x" := (None, false)]}.
@@ -213,7 +217,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
           rewrite !big_sepM_insert; try set_solver.
           rewrite !big_sepM_insert; try set_solver.
           rewrite !big_sepM_empty.  iFrame.
-        + iIntros "[_ HBig]".
+        + iIntros "!>[_ HBig]".
           iMod ("Hclose" with "[HBig Hdisj']") as "_".
               * iNext. iExists _.
                 rewrite !(big_sepM2_insert); try set_solver.

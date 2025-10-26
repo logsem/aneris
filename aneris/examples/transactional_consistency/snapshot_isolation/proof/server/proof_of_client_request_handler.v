@@ -63,10 +63,10 @@ Section Proof_of_handler.
       wp_pures.
       wp_lam.
       wp_pures.
-      iApply (read_handler_spec _ _ _ _ _ _ _ _ _ _ _ 
-                reqd ts h Msf Φ Hin Hreqd 
+      iApply (read_handler_spec _ _ _ _ _ _ _ _ _ _ _
+                reqd ts h Msf Φ Hin Hreqd
        with "[$Hlk][$HGlobInv][$HsnapT][$HsnapH][$Hfrag]"); try done.
-      intros e He. 
+      intros e He.
       specialize (Hts e He).
       replace ts with (Z.abs_nat ts) in Hts; lia. }
     2:{
@@ -77,14 +77,17 @@ Section Proof_of_handler.
       wp_pures.
       wp_lam.
       wp_pures.
-      by iApply (commit_handler_spec _ _ _ _ _ _ _ _ _ _ _ Φ _ _ _ _ _ _ _ _ _
-        Hreqd Hin Hmap Hcoh Hvalid Hall Hsubeq with "[][][$Hsnap][$HsnapFrag][$Hseen][$Hp][$Hshift]"). }
+      iApply (commit_handler_spec _ _ _ _ _ _ _ _ _ _ _ Φ _ _ _ _ _ _ _ _ _
+                Hreqd Hin Hmap Hcoh Hvalid Hall Hsubeq
+               with "[$][$][$][$][$][$][$][$]"). }
     iDestruct "HpreStart" as (E P Q Hreqd ->) "(%HinE & HP & Hsh)".
     wp_pures.
     wp_lam.
     wp_pures.
-    by iApply (start_handler_spec _ _ _ _ _ _ _ _ _ _ _ Φ _ _ _ Hreqd HinE
-             with "[$Hlk][$HGlobInv][$HP][$Hsh]").
+    iPoseProof (start_handler_spec _ _ _ _ _ _ _ _ _ _ _ Φ _ _ _ Hreqd HinE) as "h".
+    iApply ("h" with "[$][$][$][Hsh][$]").
+    iIntros "HP".
+    by iMod ("Hsh" with "HP") as "Hsh"; do 2 iModIntro.
    Qed.
 
 End Proof_of_handler.
