@@ -795,15 +795,15 @@ Section SimpleQueue.
 
     Definition rop_token: iProp Σ := own q_γ_tok_rop (Excl ()).
 
-    Definition safe_read i (r: nat) (h br fl: nat) (od: option nat): iProp Σ :=
-      ⌜ r = h ⌝ ∗ (ith_rp i rs_init ∨ ⌜ r = br ⌝ ∗ ith_rp i rs_going ∗ rop_token) ∨
-      ⌜ r = h - 1 /\ r = br /\ is_Some od ⌝ ∗ ith_rp i rs_protected ∨
-      ⌜ r = br /\ r = fl ⌝ ∗ ith_rp i rs_protected 
+    Definition safe_read (r: nat) (h br fl: nat) (od: option nat) rp: iProp Σ :=
+      ⌜ r = h ⌝ ∗ (⌜ rp = rs_init ⌝ ∨ ⌜ r = br ⌝ ∗ ⌜ rp = rs_going ⌝ ∗ rop_token) ∨
+      ⌜ r = h - 1 /\ r = br /\ is_Some od ⌝ ∗ ⌜ rp = rs_protected ⌝ ∨
+      ⌜ r = br /\ r = fl ⌝ ∗  ⌜ rp = rs_protected ⌝
     .
 
     Definition rop_interp (rop: option nat) (h br fl: nat) (od: option nat): iProp Σ :=
-      ∀ i, ⌜ rop = Some i  ⌝ -∗ ∃ r, ith_read i r 0 ∗                         
-                     (safe_read i r h br fl od ∨ ith_rp i rs_canceled ∗ cancel_witness r).
+      ∀ i, ⌜ rop = Some i  ⌝ -∗ ∃ r rp, ith_read i r 0 ∗ ith_rp i rp ∗
+                     (safe_read r h br fl od rp ∨ ⌜ rp = rs_canceled ⌝ ∗ cancel_witness r).
   
     Definition read_head_resources (t br: nat): iProp Σ :=
       @me_exact _ q_me_t t ∗ @me_exact _ q_me_br br ∗ rop_frag None ∗ rop_token.
@@ -1191,62 +1191,88 @@ Section SimpleQueue.
 
   Definition br_lb (b: nat) := @me_lb _ q_me_br b.
 
-  Definition hist_last_impl (hist: read_hist) rop h
-    (RH_WF: read_hist_wf hist rop h):
-    {i: nat | forall j, j ∈ dom hist -> j <= i}.
-    destruct (decide (hist = ∅)).
-    { subst. exfalso. red in RH_WF. destruct RH_WF as (? & DOM & ?).
-      set_solver. }
-    exists (set_fold max 0 (dom hist)).
-    intros ??.
-  Admitted.
+  (* Definition hist_last_impl (hist: read_hist) rop h *)
+  (*   (RH_WF: read_hist_wf hist rop h): *)
+  (*   {i: nat | forall j, j ∈ dom hist -> j <= i}. *)
+  (*   destruct (decide (hist = ∅)). *)
+  (*   { subst. exfalso. red in RH_WF. destruct RH_WF as (? & DOM & ?). *)
+  (*     set_solver. } *)
+  (*   exists (set_fold max 0 (dom hist)). *)
+  (*   intros ??. *)
+  (* Admitted. *)
 
-  Definition hist_last (hist: read_hist) rop h (RH_WF: read_hist_wf hist rop h) :=
-    proj1_sig $ hist_last_impl hist rop h RH_WF. 
+  (* Definition hist_last (hist: read_hist) rop h (RH_WF: read_hist_wf hist rop h) := *)
+  (*   proj1_sig $ hist_last_impl hist rop h RH_WF.  *)
 
-  (* Lemma hist_last_spec (hist: read_hist) rop h (RH_WF: read_hist_wf hist rop h): *)
-  (*   forall j *)
+  (* Lemma hist_last_spec (hist: read_hist) rop h (RH_WF: read_hist_wf hist rop h) n: *)
+  (*   hist_last hist rop h RH_WF = n <-> dom hist = set_seq 0 (S n). *)
+  (* Proof using. *)
+  (*   rewrite /hist_last. destruct (hist_last_impl hist rop h RH_WF). simpl. *)
+  (*   destruct RH_WF.  *)
+
+  Lemma dom_max_set_fold n:
+    set_fold max 0 (set_seq 0 (S n): gset nat) = n.
+  Proof using.
+    clear. induction n.
+    { done. }
+    rewrite set_seq_S_end_union_L.
+    rewrite union_comm_L. 
+    erewrite set_fold_union.
+    2-4: red; lia.
+    simpl. rewrite IHn.
+    rewrite set_fold_singleton. lia.
+  Qed. 
 
   Lemma read_hist_wf_bump (hist: read_hist) rop h rp
-    (RH_WF: read_hist_wf hist rop h):
+    (RH_WF: read_hist_wf hist rop h)
+    (n := set_fold max 0 (dom hist)):
   read_hist_auth hist
-    -∗ ith_rp (hist_last hist rop h RH_WF) rp
+    -∗ ith_rp n rp
     ==∗
     let rp' := (if decide (rp = rs_init) then rs_canceled
                    else if decide (rp = rs_going) then rs_protected
                    else rp) in
-  ∃ i r (* b *), let hist' := <[ i := ((r, h + 1), rp') ]> hist in
-         read_hist_auth hist' ∗ ith_read i r (h + 1) ∗ ⌜ read_hist_wf hist' rop (h + 1) ⌝ ∗
-         ith_rp (hist_last hist rop h RH_WF) rp' ∗
-         (from_option (fun i => ith_rp i rp') True rop) ∗
+  ∃ r (* b *), let hist' := <[ n := ((r, h + 1), rp') ]> hist in
+         read_hist_auth hist' ∗ ith_read n r (h + 1) ∗ ⌜ read_hist_wf hist' rop (h + 1) ⌝ ∗
+         ith_rp n rp' ∗
          (* ∗ br_lb b ∗ (⌜ b < h ⌝ -∗ ith_rp i rs_canceled) ∗ *)
          ⌜ r <= h ⌝.
   Proof using.
-    rewrite /read_hist_wf. iIntros "AUTH [%n %WF] RP".
-    destruct WF as (DOM & ROP & SEQ & BB).
+    rewrite /read_hist_wf. iIntros "AUTH RP".
+    destruct RH_WF as (n_ & DOM & ROP & SEQ & BB & FIN).
+
+    assert (n_ = n) as ->.
+    { subst n. rewrite DOM. by rewrite dom_max_set_fold. }
+
     destruct (hist !! n) as [[[r b0] p]| ] eqn:NTH.
     2: { apply not_elem_of_dom in NTH. rewrite DOM in NTH.
          rewrite elem_of_set_seq in NTH. lia. }
 
+    remember (if decide (rp = rs_init) then rs_canceled
+                   else if decide (rp = rs_going) then rs_protected
+                   else rp) as rp'. 
+
     (* destruct ROP as [-> | ->]; simpl.  *)
     (* {  *)
     
-    (* iDestruct (ith_rp_hist_compat with "[$] [$]") as %(? & ? & EQ'). *)
-    iAssert (⌜ rop = Some n -> p = rp ⌝)%I as %RP_EQ.
-    { iIntros (->).
-      iDestruct (ith_rp_hist_compat with "[$] [$]") as %(? & ? & EQ').
-      subst. iPureIntro. set_solver. }
+    iDestruct (ith_rp_hist_compat with "[$] [$]") as %(? & ? & EQ').
+    (* iAssert (⌜ rop = Some n -> p = rp ⌝)%I as %RP_EQ. *)
+    (* { iIntros (->). *)
+    (*   iDestruct (ith_rp_hist_compat with "[$] [$]") as %(? & ? & EQ'). *)
+    (*   subst. iPureIntro. set_solver. } *)
+    rewrite NTH in H. inversion H. subst x. simpl in EQ'. subst p. clear H.  
     
-    (* rewrite NTH in H.       *)
     iMod (read_hist_update' _ _ _ _ (h + 1) rp rp' with "AUTH RP") as "(AUTH & #ITH & RP)".
-    { apply NTH. 
+    { apply NTH. }
+    { rewrite Heqrp'. 
+      rewrite /rs_wip. destruct rp; tauto. }
     rewrite Nat.max_r.
     2: { apply BB in NTH. simpl in NTH. lia. }
-    iModIntro. do 2 iExists _. iFrame "#∗".
+    iModIntro. do 1 iExists _. iFrame "#∗".
     iPureIntro. split.
     2: { eapply BB in NTH; eauto. by apply NTH. }
 
-    exists n. split; [| split; [| split]]. 
+    exists n. split; [| split; [| split; [| split]]]. 
     - rewrite dom_insert_L. apply mk_is_Some, elem_of_dom in NTH. set_solver.
     - done.
     - intros ?????. rewrite !lookup_insert_Some.
@@ -1259,16 +1285,24 @@ Section SimpleQueue.
       intros [(? & ?) | (? & ITH) ]; subst; simpl; try lia.
       { eapply BB in NTH; eauto. simpl in NTH. lia. }
       eapply BB in ITH; eauto. lia.
+    - intros ??. rewrite lookup_insert_Some.
+      
+      intros ? [(? & ?) | (? & ITH) ]; subst; simpl; try lia.
+      + rewrite /rs_fin. destruct rp.
+        all: (erewrite decide_True; [| done]) || (erewrite decide_False; [| done]); tauto.
+      + eapply FIN; eauto.  
   Qed.
 
-  foobar. to add in post: { * exist br, br_lb br * br < h -> ith_rp i ∈ [compl; canc] }
   Lemma dequeue_upd_head_spec l τ π q h ph vh (nxh: loc) fl:
     {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_inv l) ∗
         (let _: heap1GS Σ := iem_phys _ EM in ith_node h (ph, (vh, nxh))) ∗ 
         th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel ∗
         (let _: heap1GS Σ := iem_phys _ EM in dequeue_resources h fl ph None) }}}
       #Head <- #nxh @τ
-    {{{ RET #(); th_phase_frag τ π q ∗ (let _: heap1GS Σ := iem_phys _ EM in dequeue_resources (h + 1) fl nxh (Some h)) ∗ ∃ i r, ith_read i r (h + 1) ∗ ⌜ r <= h ⌝ }}}.
+    {{{ RET #(); th_phase_frag τ π q ∗ (let _: heap1GS Σ := iem_phys _ EM in dequeue_resources (h + 1) fl nxh (Some h)) ∗
+                   ∃ i r b, ith_read i r (h + 1) ∗ ⌜ r <= h ⌝ ∗
+                               br_lb b ∗
+                               (⌜ b < r ⌝ -∗ (ith_rp i rs_canceled ∨ ith_rp i rs_completed)) }}}.
   Proof using.
     simpl.
     iIntros (Φ) "([#QAT #INV] & #HTH & PH & CPS & DR) POST".
@@ -1334,32 +1368,66 @@ Section SimpleQueue.
 
     iDestruct (cancel_rop with "[$]") as "#CNC".
     { red. rewrite Nat.add_1_r. reflexivity. }
+    
+    iDestruct (take_snapshot with "[$]") as "#SHT".
+    iDestruct "SHT" as "(_&_&#BR_LB&_)". 
 
-    iMod (read_hist_wf_bump with "[$] [//]") as "(%i & %r & RHIST & #READ & %RH_WF' & %READ_BOUND)".
-    iFrame "READ". 
+    rewrite /rop_interp.
+    destruct rop as [n| ]. 
+    - iDestruct ("ROP" with "[//]") as "(%r & %rp & READ_ & RP & ROP)".      
+      destruct RH_WF as (n' & DOM & [? | [=]] & RH_WF); [done| ]. subst n'. 
+      iMod (read_hist_wf_bump with "[$] [RP]") as "(%r' & RHIST & #READ & %RH_WF' & RP & %READ_BOUND)".
+      { eexists. eauto. }
+      { rewrite DOM dom_max_set_fold. iFrame. }
+      rewrite DOM dom_max_set_fold. 
+      iDestruct (ith_read_agree with "READ READ_") as %<-.
+      iFrame "READ". iFrame "%". iFrame "BR_LB". 
+      rewrite -(bi.sep_True' ( ⌜ _ ⌝ -∗ _ )%I). iApply fupd_frame_l. iSplit.
+      { iIntros (LT). iDestruct "ROP" as "[SAFE | [-> _]]".
+        2: { do 2 (erewrite decide_False; [| done]). iFrame. }
+        iDestruct "SAFE" as "[FROM_HEAD | [FROM_DANGLE | FROM_BR]]".
+        - iDestruct "FROM_HEAD" as "[-> [-> | (-> & -> & ?)]]".
+          + erewrite decide_True; [| done]. iFrame.
+          + lia. 
+        - iDestruct "FROM_DANGLE" as "[(-> & -> & %X) ?]".
+          clear -X. by destruct X. 
+        - iDestruct "FROM_BR" as "([-> ->] & ->)". lia. } 
 
-    iClear "HTH CPS".
-    iMod ("CLOS" with "[-]") as "_"; [| done].
-    iFrame "QI AUTHS OHV HQ RH DAUTH TOK RHIST". iNext.
-    iExists _. rewrite Nat.add_sub. rewrite HTH /=.
+      iClear "HTH CPS".
+      iMod ("CLOS" with "[-]") as "_"; [| done].
+      iFrame "QI AUTHS OHV HQ RH DAUTH TOK RHIST". iNext.
+      iExists _. rewrite Nat.add_sub. rewrite HTH /=.
+      
+      iSplitL "HNI". 
+      { iRight. by iFrame. }
+      iSplit.
+      { iPureIntro. red. red in ORDER. repeat split; try lia. }
+      rewrite DOM dom_max_set_fold in RH_WF'. 
+      iSplit; [| done].
+      rewrite /rop_interp. iIntros (i_ [=]). subst i_. 
 
-    iSplitL "HNI". 
-    { iRight. by iFrame. }
-    iSplit.
-    { iPureIntro. red. red in ORDER. repeat split; try lia. }
-    iSplit; [| done].
-    rewrite /rop_interp. iIntros (i_ ->).
+      iFrame "READ_ RP". 
+      iDestruct "ROP" as "[[HEAD | [DANGLE | FL]] | CANCEL_WITNESS]".
+      + iDestruct "HEAD" as "(-> & [-> | (-> & -> & TOK)])".
+        * iRight. iFrame "#∗". erewrite decide_True; [| done]. done.   
+        * iLeft. iRight. iLeft. iFrame.
+          iPureIntro. split.
+          ** split; [lia | done].
+          ** erewrite decide_False; [| done]. erewrite decide_True; [| done]. done.
+      + iDestruct "DANGLE" as "((_ & _ & %) & _)". by destruct H.
+      + iDestruct "FL"as "([-> ->] & ->)". 
+        iLeft. rewrite /safe_read.
+        repeat iRight.  iPureIntro. split; [done| ]. 
+        do 2 (erewrite decide_False; [| done]). done.
+      + iDestruct "CANCEL_WITNESS" as "(-> & CW)".
+        iRight. iFrame.
+        iPureIntro. do 2 (erewrite decide_False; [| done]). done.
+    - destruct RH_WF as (n & DOM & [? | [=]] & RH_WF). 
+      iMod (read_hist_wf_bump with "[$] [RP]") as "(%r' & RHIST & #READ & %RH_WF' & RP & %READ_BOUND)".
+      { eexists. eauto. }
+      { rewrite DOM dom_max_set_fold. iFrame. }
 
-    iDestruct ("ROP" with "[//]") as "(% & READ_ & ROP)". iFrame. 
-
-    iDestruct "ROP" as "[[HEAD | [DANGLE | FL]] | CANCEL_WITNESS]".
-    - iDestruct "HEAD" as "(-> & [CC | (-> & TOK)])".
-      + iRight. iFrame "#∗". 
-      + iLeft. iRight. iLeft. iFrame.
-        iPureIntro. split; [lia | done]. 
-    - iDestruct "DANGLE" as "((_ & _ & %) & _)". by destruct H.
-    - iLeft. rewrite /safe_read. iFrame. 
-    - iFrame. 
+ 
   Qed.
 
   Definition dequeue_fuel := 100.    
