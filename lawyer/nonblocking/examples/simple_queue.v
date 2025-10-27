@@ -275,6 +275,13 @@ Section ReadProtocol.
     intros ?. done. 
   Qed.
 
+  Lemma rp_mut_excl rp1 rp2
+    (NEQ: rp1 ≠ rp2):
+    ¬ ✓ (rs2cmra rp1 ⋅ rs2cmra rp2).
+  Proof using.
+    destruct rp1, rp2; simpl; intros V; done.
+  Qed.
+
 End ReadProtocol.
 
 
@@ -1570,14 +1577,6 @@ Section SimpleQueue.
 
   Definition dequeue_fuel := 100.    
 
-  (* Lemma wf_queue_head_br hq h t br fl od *)
-  (*   (ORDER: hq_state_wf h t br fl od): *)
-  (*     (let _: heap1GS Σ := iem_phys _ EM in queue_interp hq (h + 1) t br fl) -∗  *)
-  (*     ⌜ forall hn hbr, hq !! h = Some hn  -> hq !! br = Some hbr -> h ≠ br -> hn.1 ≠ hbr.1 ⌝ . *)
-  (* Proof using. *)
-  (*   simpl. iIntros "(%T_LEN &  HNIS & %pt & TAIL & TLI & %LL & HEAD & BR)". *)
-  (*   red in ORDER. destruct ORDER as (?&?&?&?&BR_EQ). *)
-
   Lemma check_BR_spec l τ π q h (* t *) (* br *) fl ph ndh i r b0
     (READ_BOUND: r <= h):
     {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_inv l) ∗
@@ -1755,6 +1754,26 @@ Section SimpleQueue.
     by iDestruct (hn_interp_ptr_excl with "[$] [$]") as "?".
   Qed.
 
+  Lemma ith_rp_mut_excl i rp1 rp2
+    (NEQ: rp1 ≠ rp2):
+    ith_rp i rp1 -∗ ith_rp i rp2 -∗ False.
+  Proof using.
+    rewrite bi.wand_curry -!own_op.
+    iIntros "X". iDestruct (own_valid with "[$]") as %V.
+    iPureIntro. revert V. 
+    rewrite -auth_frag_op.
+    rewrite gmap_op. simpl. erewrite @merge_singleton.
+    2: by apply _.
+    2: { rewrite -Some_op. rewrite -pair_op.
+         rewrite op_None_left_id.
+         rewrite -Some_op. reflexivity. }
+    rewrite auth_frag_valid singleton_valid.
+    rewrite pair_valid.
+    intros [? V]. revert V.
+    rewrite Some_valid. 
+    by apply rp_mut_excl.
+  Qed.    
+
   Lemma get_to_free_spec 
     l τ π q h (* t *) (* br *) fl (ph: loc) ndh i r b
     (READ_BOUND: r <= h):
@@ -1897,7 +1916,10 @@ Section SimpleQueue.
               rewrite READ in READ'. inversion READ'. subst r x1 x2.
               apply Nat.le_lteq in BR0 as [BR0 | ->].
               { iSpecialize ("NO_FL" with "[//]"). iExFalso.
-                admit. }
+                iAssert (∃ rp', ith_rp i rp' ∗ ⌜ rp' = rs_canceled \/ rp' = rs_completed⌝)%I as "(%rp' & RP' & %RP')".
+                { iDestruct "NO_FL" as "[$|$]"; set_solver. }
+                iApply (ith_rp_mut_excl with "RP' RP").
+                destruct RP' as [-> | ->]; done. }
               rename x into bi.
               red in RH_WF.
               destruct RH_WF as (n' & DOM & [? | [=]] & SEQ & BB'); [done| ].
