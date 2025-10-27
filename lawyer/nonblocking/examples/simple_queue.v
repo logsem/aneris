@@ -821,13 +821,62 @@ Section SimpleQueue.
       (* THIS IS FALSE: br can fall behind arbitrarily *)
       (* (br = h \/ br = fl \/ od = Some (h - 1) /\ br = h - 1).  *)
 
+    Definition br_lb (b: nat) := @me_lb _ q_me_br b.
+
     Definition read_hist_wf (hist: read_hist) (rop: option nat) (h: nat) :=
       exists n, dom hist = set_seq 0 (S n) /\ (rop = None \/ rop = Some n) /\ 
             (forall i j opi opj, i < j -> hist !! i = Some opi -> hist !! j = Some opj ->
                              opi.1.2 <= opj.1.1) /\
-            (forall i opi, hist !! i = Some opi -> opi.1.1 <= h /\ opi.1.2 <= h) /\
-            (let dom_fin := set_seq 0 (if rop then n else (S n)): gset nat in
-             forall i op, i ∈ dom_fin -> hist !! i = Some op -> rs_fin op.2).
+            (forall i opi, hist !! i = Some opi -> opi.1.1 <= h /\ opi.1.2 <= h).
+
+    Definition old_rps (hist: read_hist) (rop: option nat): iProp Σ :=
+      (* [∗ set] i ∈ (dom hist) ∖ (from_option (fun n => {[ n ]}) ∅ rop), *)
+      [∗ map] i ↦ '((r, b), rp) ∈ (from_option (fun n => delete n hist) hist rop),
+        (* (dom hist) ∖ (from_option (fun n => {[ n ]}) ∅ rop), *)
+              ∃ rp, ith_rp i rp ∗ ⌜ rs_fin rp ⌝ ∗
+                      (* (⌜ rp ≠ rs_canceled ⌝ -∗ br_lb b) *)
+                      br_lb r
+    
+    . 
+            (* (let dom_fin := set_seq 0 (if rop then n else (S n)): gset nat in *)
+            (*  forall i op, i ∈ dom_fin -> hist !! i = Some op -> rs_fin op.2). *)
+
+    (* TODO: upstream, find existing? *)
+    Global Instance Persistent_pure_helper P (R: iProp Σ) `{Decision P}:
+      (P -> Persistent R) -> Persistent (R ∗ ⌜ P ⌝).
+    Proof using.
+      intros PR. destruct (decide P).
+      - apply bi.sep_persistent; try by apply _. by apply PR.
+      - unshelve eapply bi.Persistent_proper. 1: exact (False)%I.
+        2: apply _. 
+        iSplit.
+        + by iIntros "(_&%)".
+        + by iIntros "?".
+    Qed.
+
+    Global Instance rs_fin_dec rs: Decision (rs_fin rs).
+    Proof.
+      rewrite /rs_fin. destruct rs.
+      all: try by (left; tauto).
+      all: right; intros ?; set_solver. 
+    Qed. 
+
+    (* Global Instance rs_fin_rp_pers i: Persistent (∃ rp, ith_rp i rp ∗ ⌜ rs_fin rp ⌝). *)
+    (* Proof using. *)
+    (*   apply bi.exist_persistent. intros rp. *)
+    (*   apply Persistent_pure_helper; [apply _| ].  *)
+    (*   intros. destruct H as [-> | [-> | ->]]; apply _. *)
+    (* Qed.       *)
+
+    Global Instance old_rps_pers: forall hist rop, Persistent (old_rps hist rop).
+    Proof using.
+      intros. rewrite /old_rps. apply big_sepM_persistent.
+      intros ? [[??] ?] ITH. simpl. 
+      apply bi.exist_persistent. intros rp.
+      rewrite bi.sep_assoc bi.sep_comm bi.sep_assoc. 
+      apply Persistent_pure_helper; [apply _| ]. 
+      intros. destruct H as [-> | [-> | ->]]; apply _.
+    Qed.
     
     Definition queue_inv_inner (hq: HistQueue) (h t br fl: nat)
       (rop od: option nat) (hist: read_hist) (ohv: val): iProp Σ :=
@@ -836,7 +885,7 @@ Section SimpleQueue.
       ⌜ hq_state_wf h t br fl ⌝ ∗
       auths h t br fl ∗
       rop_interp rop h br fl od ∗
-      read_hist_auth hist ∗ ⌜ read_hist_wf hist rop h ⌝ ∗
+      read_hist_auth hist ∗ ⌜ read_hist_wf hist rop h ⌝ ∗ old_rps hist rop ∗
       (read_head_resources t br ∨ read_head_token) ∗ 
       ((∃ ph, dequeue_resources h fl ph None) ∨ dequeue_token)
     .
@@ -1189,8 +1238,6 @@ Section SimpleQueue.
   all: by left.
   Defined.
 
-  Definition br_lb (b: nat) := @me_lb _ q_me_br b.
-
   (* Definition hist_last_impl (hist: read_hist) rop h *)
   (*   (RH_WF: read_hist_wf hist rop h): *)
   (*   {i: nat | forall j, j ∈ dom hist -> j <= i}. *)
@@ -1239,7 +1286,7 @@ Section SimpleQueue.
          ⌜ r <= h ⌝.
   Proof using.
     rewrite /read_hist_wf. iIntros "AUTH RP".
-    destruct RH_WF as (n_ & DOM & ROP & SEQ & BB & FIN).
+    destruct RH_WF as (n_ & DOM & ROP & SEQ & BB).
 
     assert (n_ = n) as ->.
     { subst n. rewrite DOM. by rewrite dom_max_set_fold. }
@@ -1272,7 +1319,7 @@ Section SimpleQueue.
     iPureIntro. split.
     2: { eapply BB in NTH; eauto. by apply NTH. }
 
-    exists n. split; [| split; [| split; [| split]]]. 
+    exists n. split; [| split; [| split]]. 
     - rewrite dom_insert_L. apply mk_is_Some, elem_of_dom in NTH. set_solver.
     - done.
     - intros ?????. rewrite !lookup_insert_Some.
@@ -1285,13 +1332,35 @@ Section SimpleQueue.
       intros [(? & ?) | (? & ITH) ]; subst; simpl; try lia.
       { eapply BB in NTH; eauto. simpl in NTH. lia. }
       eapply BB in ITH; eauto. lia.
-    - intros ??. rewrite lookup_insert_Some.
-      
-      intros ? [(? & ?) | (? & ITH) ]; subst; simpl; try lia.
-      + rewrite /rs_fin. destruct rp.
-        all: (erewrite decide_True; [| done]) || (erewrite decide_False; [| done]); tauto.
-      + eapply FIN; eauto.  
   Qed.
+
+  Lemma old_rps_olds hist n:
+    old_rps hist (Some n) ⊣⊢ old_rps (delete n hist) None.
+  Proof using.
+    rewrite /old_rps. simpl. done. 
+  Qed.
+
+  (* Lemma old_rps_incl hist hist' rp *)
+  (*   (SUB: dom hist' ⊆ dom hist): *)
+  (*   old_rps hist rp -∗ old_rps hist' rp.  *)
+  (* Proof using. *)
+  (*   rewrite /old_rps. simpl. *)
+  (*   iApply big_sepS_subseteq. set_solver.  *)
+  (* Qed. *)
+
+  (* Lemma old_rps_incl' hist n: *)
+  (*   old_rps hist None -∗ old_rps hist (Some n).  *)
+  (* Proof using. *)
+  (*   rewrite /old_rps. simpl. *)
+  (*   iApply big_sepS_subseteq. set_solver.  *)
+  (* Qed. *)
+
+  Lemma br_lb_bound b h t br fl:
+    br_lb b -∗ auths h t br fl -∗ ⌜ b <= br ⌝.
+  Proof using.
+    iIntros "LB (?&?&BR&?)".
+    iApply (me_auth_lb with "BR LB").
+  Qed.  
 
   Lemma dequeue_upd_head_spec l τ π q h ph vh (nxh: loc) fl:
     {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_inv l) ∗
@@ -1308,7 +1377,7 @@ Section SimpleQueue.
     iIntros (Φ) "([#QAT #INV] & #HTH & PH & CPS & DR) POST".
     iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od_ & %hist & %ohv & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as "(>HQ & >QI & >DANGLE & OHV & >%ORDER & >AUTHS & >ROP & >RHIST & >%RH_WF & >RH & >DQ)".
+    iDestruct "inv" as "(>HQ & >QI & >DANGLE & OHV & >%ORDER & >AUTHS & >ROP & >RHIST & >%RH_WF & >#OLDS & >RH & >DQ)".
     iDestruct "DQ" as "[(% & DR') | TOK]".
     { by iDestruct (dequeue_resources_excl with "[$] [$]") as "?". }
     iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[<- <-]. 
@@ -1402,8 +1471,12 @@ Section SimpleQueue.
       { iRight. by iFrame. }
       iSplit.
       { iPureIntro. red. red in ORDER. repeat split; try lia. }
-      rewrite DOM dom_max_set_fold in RH_WF'. 
-      iSplit; [| done].
+      rewrite DOM dom_max_set_fold in RH_WF'.
+      iFrame "%". 
+      iSplit.
+      2: { iApply old_rps_olds.
+           iDestruct (old_rps_olds with "OLDS") as "foo". 
+           by rewrite delete_insert_delete. }
       rewrite /rop_interp. iIntros (i_ [=]). subst i_. 
 
       iFrame "READ_ RP". 
@@ -1422,12 +1495,77 @@ Section SimpleQueue.
       + iDestruct "CANCEL_WITNESS" as "(-> & CW)".
         iRight. iFrame.
         iPureIntro. do 2 (erewrite decide_False; [| done]). done.
-    - destruct RH_WF as (n & DOM & [? | [=]] & RH_WF). 
-      iMod (read_hist_wf_bump with "[$] [RP]") as "(%r' & RHIST & #READ & %RH_WF' & RP & %READ_BOUND)".
-      { eexists. eauto. }
-      { rewrite DOM dom_max_set_fold. iFrame. }
+    - destruct RH_WF as (n & DOM & [? | [=]] & RH_WF).
+      destruct (hist !! n) as [[[??]?] | ] eqn:NTH. 
+      2: { apply not_elem_of_dom in NTH. rewrite DOM in NTH.
+           rewrite elem_of_set_seq in NTH. lia. }
+      iDestruct (big_sepM_lookup  with "OLDS") as "RP".
+      { simpl. apply NTH. } 
+      iDestruct "RP" as "(%rp & RP & %FIN & #LB)".
+      iDestruct (ith_rp_hist_compat with "[$] [$]") as %(? & ? & EQ').
+      rewrite NTH in H0. inversion H0. subst x. subst rp. simpl in *.
+      rename r into rp. clear H0.
 
- 
+      iDestruct (read_hist_get hist n with "RHIST") as "#READ".
+      { rewrite NTH. repeat f_equal. }
+      
+      iMod (read_hist_wf_bump with "[$] [RP]") as "(%r' & RHIST & #READ' & %RH_WF' & RP_ & %READ_BOUND)".
+      { eexists. eauto. }
+      { rewrite DOM dom_max_set_fold. iFrame "RP". }
+      rewrite decide_False.
+      2: { red in FIN. destruct rp; set_solver. }
+      rewrite decide_False.
+      2: { red in FIN. destruct rp; set_solver. }
+      rewrite DOM dom_max_set_fold.
+      iDestruct (ith_read_agree with "READ READ'") as %->.
+      iFrame "% READ' BR_LB".
+      rewrite -(bi.sep_True' ( ⌜ _ ⌝ -∗ _ )%I). iApply fupd_frame_l. iSplit.
+      { iIntros (LT). destruct FIN as [-> | [-> | ->]].
+        all: try by iFrame.
+        iDestruct (br_lb_bound with "[$] [$]") as %?. lia. }
+
+      iMod ("CLOS" with "[-]") as "_"; [| done].
+      iFrame "QI AUTHS OHV HQ RH DAUTH TOK RHIST". iNext.
+      iExists _. rewrite Nat.add_sub. rewrite HTH /=.
+      
+      iSplitL "HNI". 
+      { iRight. by iFrame. }
+      iSplit.
+      { iPureIntro. red. red in ORDER. repeat split; try lia. }
+      rewrite DOM dom_max_set_fold in RH_WF'.
+      do 2 (rewrite decide_False in RH_WF'; [| destruct FIN as [->| [->| ->]]; done]).
+      destruct RH_WF as (SEQ &  BB). 
+      Unshelve. 2: exact None. 
+      rewrite bi.sep_assoc.
+      
+      iSplitR.
+      2: { (* TODO: make a lemma? *)
+        rewrite /old_rps. simpl.
+        rewrite -insert_delete_insert.         
+        rewrite insert_union_singleton_l big_sepM_union.
+        2: { apply map_disjoint_dom. rewrite dom_insert_L. set_solver. }
+        iSplitL.
+        2: { iApply (big_sepM_subseteq with "[$]"). apply delete_subseteq. }
+        rewrite big_sepM_singleton. iFrame. iFrame "% #". } 
+      rewrite /rop_interp. iSplit. 
+      { iIntros (i_ [=]). }
+
+      (* TODO: make a lemma *)
+      rewrite /read_hist_wf.
+      iPureIntro. 
+
+      exists n. split; [| split; [| split]]. 
+    + rewrite dom_insert_L. apply mk_is_Some, elem_of_dom in NTH. set_solver.
+    + tauto. 
+    + intros ?????. rewrite !lookup_insert_Some.
+      intros [(? & ?) | (? & ITH) ] [(? & ?) | (? & JTH) ]; subst; simpl in *; try lia.
+      * apply mk_is_Some, elem_of_dom in JTH.
+        rewrite DOM elem_of_union elem_of_set_seq elem_of_singleton in JTH. lia.
+      * eapply SEQ in H0; eauto. done.
+      * eapply SEQ; eauto.
+    + intros ??. rewrite lookup_insert_Some.         
+      intros [(? & ?) | (? & ITH) ]; subst; simpl; try lia.
+      eapply BB in ITH; eauto. simpl in ITH. lia.
   Qed.
 
   Definition dequeue_fuel := 100.    
