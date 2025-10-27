@@ -298,11 +298,13 @@ Section SimpleQueue.
 
   Context (d: Degree).
 
-  Definition get_loc_fuel := 5. 
+  Definition get_loc_fuel := 5.
+
+  Let hGS: heap1GS Σ := iem_phys _ EM.
+  Existing Instance hGS. 
 
   Lemma get_head_spec l τ π q:
-    {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_at l) ∗
-        th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
+    {{{ queue_at l ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
       loc_head l @ τ
     {{{ RET #Head; th_phase_frag τ π q }}}.
   Proof using.
@@ -312,8 +314,7 @@ Section SimpleQueue.
   Qed.
 
   Lemma get_tail_spec l τ π q:
-    {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_at l) ∗
-        th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
+    {{{ queue_at l ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
       loc_tail l @ τ
     {{{ RET #Tail; th_phase_frag τ π q }}}.
   Proof using.
@@ -325,8 +326,7 @@ Section SimpleQueue.
   Qed.
 
   Lemma get_BR_spec l τ π q:
-    {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_at l) ∗
-        th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
+    {{{ queue_at l ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
       loc_BR l @ τ
     {{{ RET #BeingRead; th_phase_frag τ π q }}}.
   Proof using.
@@ -338,8 +338,7 @@ Section SimpleQueue.
   Qed.
 
   Lemma get_FL_spec l τ π q:
-    {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_at l) ∗
-        th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
+    {{{ queue_at l ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
       loc_FL l @ τ
     {{{ RET #FreeLater; th_phase_frag τ π q }}}.
   Proof using.
@@ -351,8 +350,7 @@ Section SimpleQueue.
   Qed.
 
   Lemma get_OHV_spec l τ π q:
-    {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_at l) ∗
-        th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
+    {{{ queue_at l ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
       loc_OHV l @ τ
     {{{ RET #OldHeadVal; th_phase_frag τ π q }}}.
   Proof using.
@@ -364,7 +362,6 @@ Section SimpleQueue.
   Qed.
 
   Lemma dequeue_token_excl:
-    let _: heap1GS Σ := iem_phys _ EM in 
     dequeue_token -∗ dequeue_token -∗ False.
   Proof using.
     simpl. 
@@ -373,7 +370,6 @@ Section SimpleQueue.
   Qed. 
 
   Lemma dequeue_resources_excl h1 fl1 ph1 od1 h2 fl2 ph2 od2:
-    let _: heap1GS Σ := iem_phys _ EM in 
     dequeue_resources h1 fl1 ph1 od1 -∗ dequeue_resources h2 fl2 ph2 od2 -∗ False.
   Proof using.
     simpl. rewrite /dequeue_resources.
@@ -382,7 +378,6 @@ Section SimpleQueue.
   Qed.
 
   Lemma access_queue_ends hq h t br fl:
-    let _: heap1GS Σ := iem_phys _ EM in
     hq_auth hq -∗ queue_interp hq h t br fl -∗
       ∃ (ph pt: loc), Head ↦{1/2} #ph ∗ Tail ↦ #pt ∗
         (⌜ h >= t /\ ph = pt ⌝ ∨ ⌜ h < t /\ ph ≠ pt ⌝ ∗ ∃ (nd: Node), ith_node h (ph, nd)) ∗
@@ -415,7 +410,6 @@ Section SimpleQueue.
   Qed.
 
   Lemma dequeue_resources_auth_agree h' fl' ph od h t br fl:
-    let _: heap1GS Σ := iem_phys _ EM in 
     dequeue_resources h' fl' ph od -∗ auths h t br fl -∗ ⌜ h' = h /\ fl' = fl ⌝.
   Proof using.
     simpl. iIntros "(H&FL&?&?) (H'&?&?&FL')".
@@ -425,7 +419,6 @@ Section SimpleQueue.
   Qed. 
 
   Lemma dangle_auth_frag_agree od1 od2:
-    let _: heap1GS Σ := iem_phys _ EM in 
     dangle_auth od1 -∗ dangle_frag od2 -∗ ⌜ od2 = od1 ⌝. 
   Proof using.
     simpl. rewrite /dangle_auth /dangle_frag.
@@ -435,7 +428,6 @@ Section SimpleQueue.
   Qed.  
 
   Lemma dangle_update od1 od2 od':
-    let _: heap1GS Σ := iem_phys _ EM in 
     dangle_auth od1 -∗ dangle_frag od2 ==∗ dangle_auth od' ∗ dangle_frag od'. 
   Proof using.
     simpl. rewrite /dangle_auth /dangle_frag.
@@ -444,7 +436,6 @@ Section SimpleQueue.
   Qed.  
 
   Lemma dequeue_resources_dangle_agree h fl ph od od' h' hq':
-    let _: heap1GS Σ := iem_phys _ EM in 
     dequeue_resources h fl ph od -∗ dangle_interp od' h' hq' -∗ ⌜ od' = od ⌝.
   Proof using.
     simpl. iIntros "(?&?&?&FRAG) (AUTH&?)".
@@ -453,7 +444,6 @@ Section SimpleQueue.
 
   Lemma access_queue hq h t br fl i hn
     (IN: h <= i < t):
-    let _: heap1GS Σ := iem_phys _ EM in 
     hq_auth hq -∗ queue_interp hq h t br fl -∗ ith_node i hn -∗
     hn_interp hn ∗ (hn_interp hn -∗ queue_interp hq h t br fl ∗ hq_auth hq).
   Proof using.
@@ -466,7 +456,6 @@ Section SimpleQueue.
   Qed. 
 
   Lemma get_head_val_spec Q τ π q h nd fl ph od:
-    let _: heap1GS Σ := iem_phys _ EM in
     {{{ queue_inv Q ∗ ith_node h (ph, nd) ∗ dequeue_resources h fl ph od ∗
         th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
       get_val #ph @τ
@@ -503,7 +492,6 @@ Section SimpleQueue.
 
   (* TODO: unify with the proof above *)
   Lemma get_head_next_spec Q τ π q h nd fl ph od:
-    let _: heap1GS Σ := iem_phys _ EM in
     {{{ queue_inv Q ∗ ith_node h (ph, nd) ∗ dequeue_resources h fl ph od ∗
         th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
       get_next #ph @τ
@@ -539,7 +527,6 @@ Section SimpleQueue.
   Qed.
 
   Lemma dequeue_res_head_agree h fl (ph ph': loc) od:
-    let _: heap1GS Σ := iem_phys _ EM in 
     dequeue_resources h fl ph od -∗ Head ↦{1 / 2} #ph' -∗ ⌜ ph' = ph ⌝.
   Proof using.
     simpl. rewrite /dequeue_resources. iIntros "(_&_&H'&?) H".
@@ -547,7 +534,7 @@ Section SimpleQueue.
   Qed.
 
   Lemma update_ohv_spec τ π q (v: val) l:
-    {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_inv l) ∗
+    {{{ queue_inv l ∗
           th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
       #OldHeadVal <- v @τ
     {{{ RET #(); th_phase_frag τ π q }}}.
@@ -673,12 +660,12 @@ Section SimpleQueue.
   Qed.  
 
   Lemma dequeue_upd_head_spec l τ π q h ph vh (nxh: loc) fl:
-    {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_inv l) ∗
-        (let _: heap1GS Σ := iem_phys _ EM in ith_node h (ph, (vh, nxh))) ∗ 
+    {{{ queue_inv l ∗
+        ith_node h (ph, (vh, nxh)) ∗ 
         th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel ∗
-        (let _: heap1GS Σ := iem_phys _ EM in dequeue_resources h fl ph None) }}}
+        dequeue_resources h fl ph None }}}
       #Head <- #nxh @τ
-    {{{ RET #(); th_phase_frag τ π q ∗ (let _: heap1GS Σ := iem_phys _ EM in dequeue_resources (h + 1) fl nxh (Some h)) ∗
+    {{{ RET #(); th_phase_frag τ π q ∗ dequeue_resources (h + 1) fl nxh (Some h) ∗
                    ∃ i r b, ith_read i r (h + 1) ∗ ⌜ r <= h ⌝ ∗
                                br_lb b ∗
                                (⌜ b < r ⌝ -∗ (ith_rp i rs_canceled ∨ ith_rp i rs_completed)) }}}.
@@ -882,17 +869,17 @@ Section SimpleQueue.
 
   Lemma check_BR_spec l τ π q h (* t *) (* br *) fl ph ndh i r b0
     (READ_BOUND: r <= h):
-    {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_inv l) ∗
-        (let _: heap1GS Σ := iem_phys _ EM in ith_node h (ph, ndh)) ∗
-        (let _: heap1GS Σ := iem_phys _ EM in dequeue_resources (h + 1) fl ndh.2 (Some h)) ∗ 
+    {{{ queue_inv l ∗
+        ith_node h (ph, ndh) ∗
+        dequeue_resources (h + 1) fl ndh.2 (Some h) ∗ 
         th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel ∗
         ith_read i r (h + 1) ∗ br_lb b0
     }}}
       ! #BeingRead @τ
     {{{ (pbr: loc), RET #pbr; th_phase_frag τ π q ∗
-            (let _: heap1GS Σ := iem_phys _ EM in dequeue_resources (h + 1) fl ndh.2 (if (decide (pbr = ph)) then Some h else None)) ∗
+            dequeue_resources (h + 1) fl ndh.2 (if (decide (pbr = ph)) then Some h else None) ∗
             (⌜ pbr = ph ⌝ ∨ 
-             ⌜ pbr ≠ ph ⌝ ∗ (let _: heap1GS Σ := iem_phys _ EM in  hn_interp (ph, ndh))) ∗
+             ⌜ pbr ≠ ph ⌝ ∗ hn_interp (ph, ndh)) ∗
             ∃ b' ndbr', br_lb b' ∗ ⌜ b0 <= b' ⌝ ∗ ith_node b' (pbr, ndbr')
     }}}.
   Proof using.
@@ -999,16 +986,14 @@ Section SimpleQueue.
   Qed.
 
   Lemma read_FL_spec τ π h q fl nd od:
-  {{{ (let _: heap1GS Σ := iem_phys _ EM in dequeue_resources h fl nd od) ∗
+  {{{ dequeue_resources h fl nd od ∗
       cp π d ∗ th_phase_frag τ π q }}}
   ! #FreeLater @τ
-  {{{ RET (#fl); (let _: heap1GS Σ := iem_phys _ EM in dequeue_resources h fl nd od) ∗
- th_phase_frag τ π q }}}.
+  {{{ RET (#fl); dequeue_resources h fl nd od ∗ th_phase_frag τ π q }}}.
   Proof using. Admitted.
 
   Lemma hn_interp_ptr_excl ptr nd1 nd2:
-    (let _: heap1GS Σ := iem_phys _ EM in hn_interp (ptr, nd1)) -∗
-    (let _: heap1GS Σ := iem_phys _ EM in hn_interp (ptr, nd2)) -∗ False.
+    hn_interp (ptr, nd1) -∗ hn_interp (ptr, nd2) -∗ False.
   Proof using.
     simpl. destruct nd1, nd2. iIntros "[P1 ?] [P2 ?]".
     iCombine "P1 P2" as "P". iDestruct (pointsto_valid with "P") as %V.
@@ -1017,8 +1002,8 @@ Section SimpleQueue.
 
   (* TODO: also holds if h is not in the hist queue (e.g. initially) *)
   Lemma queue_interp_ph_neq_pfl' (hq: HistQueue) h t br fl (ptr: loc):
-    (let _: heap1GS Σ := iem_phys _ EM in queue_interp hq h t br fl) -∗
-    ⌜ exists nd, hq !! h = Some (ptr, nd) ⌝ -∗ ⌜ exists nd, hq !! fl = Some (ptr, nd) ⌝ -∗
+    queue_interp hq h t br fl -∗ ⌜ exists nd, hq !! h = Some (ptr, nd) ⌝ -∗
+    ⌜ exists nd, hq !! fl = Some (ptr, nd) ⌝ -∗
       False.
   Proof using.
     simpl. 
@@ -1035,8 +1020,8 @@ Section SimpleQueue.
   Qed.    
 
   Lemma queue_interp_dangle_neq_pfl' (hq: HistQueue) h t br fl (ptr: loc):
-    (let _: heap1GS Σ := iem_phys _ EM in queue_interp hq h t br fl) -∗
-    (let _: heap1GS Σ := iem_phys _ EM in dangle_interp (Some (h - 1)) h hq) -∗
+    queue_interp hq h t br fl -∗
+     dangle_interp (Some (h - 1)) h hq -∗
     ⌜ exists nd, hq !! fl = Some (ptr, nd) ⌝ -∗
     ⌜ exists nd, hq !! (h - 1) = Some (ptr, nd) ⌝ -∗
       False.
@@ -1056,9 +1041,9 @@ Section SimpleQueue.
   Lemma get_to_free_spec 
     l τ π q h fl (ph: loc) ndh i r b
     (READ_BOUND: r <= h):
-    {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_inv l) ∗
-        (let _: heap1GS Σ := iem_phys _ EM in ith_node h (ph, ndh)) ∗
-        (let _: heap1GS Σ := iem_phys _ EM in dequeue_resources (h + 1) fl ndh.2 (Some h)) ∗ 
+    {{{ queue_inv l ∗
+        ith_node h (ph, ndh) ∗
+        dequeue_resources (h + 1) fl ndh.2 (Some h) ∗ 
         th_phase_frag τ π q ∗ cp_mul π d (get_loc_fuel + get_loc_fuel + get_loc_fuel) ∗
         ith_read i r (h + 1) ∗
         br_lb b ∗ (⌜ b < r ⌝ -∗ (ith_rp i rs_canceled ∨ ith_rp i rs_completed))
@@ -1070,7 +1055,7 @@ Section SimpleQueue.
             "old_fl"
             else #ph) @ τ
     {{{ (to_free: loc), RET #to_free;
-        ∃ hn, (let _: heap1GS Σ := iem_phys _ EM in hn_interp (to_free, hn)) ∗ th_phase_frag τ π q }}}.
+        ∃ hn, hn_interp (to_free, hn) ∗ th_phase_frag τ π q }}}.
   Proof using.
     simpl.
     iIntros (Φ) "([#QAT #INV] & #HTH & DR& PH & CPS & #READ & #BR0 & #NO_FL) POST".
@@ -1252,11 +1237,10 @@ Section SimpleQueue.
 
   
   Lemma dequeue_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
-    {{{ (let _: heap1GS Σ := iem_phys _ EM in queue_inv l) ∗
-        (let _: heap1GS Σ := iem_phys _ EM in dequeue_token) ∗ 
-          th_phase_frag τ π q ∗ cp_mul π d dequeue_fuel }}}
+    {{{ queue_inv l ∗ dequeue_token ∗ 
+        th_phase_frag τ π q ∗ cp_mul π d dequeue_fuel }}}
       dequeue l @ τ
-    {{{ (v: val), RET v; th_phase_frag τ π q ∗ (let _: heap1GS Σ := iem_phys _ EM in dequeue_token) }}}.
+    {{{ (v: val), RET v; th_phase_frag τ π q ∗ dequeue_token }}}.
   Proof using.
     simpl. iIntros (Φ) "([#QAT #INV] & TOK & PH & CPS) POST". rewrite /dequeue.
     pure_steps.
