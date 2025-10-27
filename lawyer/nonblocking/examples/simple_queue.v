@@ -1707,6 +1707,54 @@ Section SimpleQueue.
  th_phase_frag τ π q }}}.
   Proof using. Admitted.
 
+  Lemma hn_interp_ptr_excl ptr nd1 nd2:
+    (let _: heap1GS Σ := iem_phys _ EM in hn_interp (ptr, nd1)) -∗
+    (let _: heap1GS Σ := iem_phys _ EM in hn_interp (ptr, nd2)) -∗ False.
+  Proof using.
+    simpl. destruct nd1, nd2. iIntros "[P1 ?] [P2 ?]".
+    iCombine "P1 P2" as "P". iDestruct (pointsto_valid with "P") as %V.
+    done.
+  Qed.
+
+  (* TODO: also holds if h is not in the hist queue (e.g. initially) *)
+  Lemma queue_interp_ph_neq_pfl' (hq: HistQueue) h t br fl (ptr: loc):
+    (let _: heap1GS Σ := iem_phys _ EM in queue_interp hq h t br fl) -∗
+    ⌜ exists nd, hq !! h = Some (ptr, nd) ⌝ -∗ ⌜ exists nd, hq !! fl = Some (ptr, nd) ⌝ -∗
+      False.
+  Proof using.
+    simpl. 
+    iIntros "QI (%ndh & %HTH) (%ndfl & %FLTH)". rewrite /queue_interp.
+    rewrite /queue_interp. iDestruct "QI" as "(%T_LEN &  HNIS & %pt & TAIL & TLI & %LL & HEAD & BR & FL)".
+    iDestruct "FL" as "(% & %FLTH_ & FL & HNI_FL)".
+    rewrite FLTH in FLTH_. inversion FLTH_. subst. simpl.
+    rewrite HTH. simpl.
+    iDestruct (big_sepL_elem_of with "HNIS") as "II".
+    { apply elem_of_list_lookup. eexists.
+      erewrite lookup_drop with (i := 0).
+      by rewrite Nat.add_0_r. }
+    simpl. by iDestruct (hn_interp_ptr_excl with "[$] [$]") as "?".
+  Qed.    
+
+  (* TODO: also holds if h is not in the hist queue (e.g. initially) *)
+  Lemma queue_interp_dangle_neq_pfl' (hq: HistQueue) h t br fl (ptr: loc):
+    (let _: heap1GS Σ := iem_phys _ EM in queue_interp hq h t br fl) -∗
+    (let _: heap1GS Σ := iem_phys _ EM in dangle_interp (Some (h - 1)) h hq) -∗
+    ⌜ exists nd, hq !! fl = Some (ptr, nd) ⌝ -∗
+    ⌜ exists nd, hq !! (h - 1) = Some (ptr, nd) ⌝ -∗
+      False.
+  Proof using.
+    simpl. 
+    iIntros "QI DI (%ndfl & %FLTH) (% & %DTH)". rewrite /queue_interp.
+    rewrite /queue_interp. iDestruct "QI" as "(%T_LEN &  HNIS & %pt & TAIL & TLI & %LL & HEAD & BR & FL)".
+    iDestruct "FL" as "(% & %FLTH_ & FL & HNI_FL)".
+    rewrite FLTH in FLTH_. inversion FLTH_. subst. simpl.
+    rewrite /dangle_interp.
+    iDestruct "DI" as "(AUTH & [% | (_ & HNI)])".
+    { done. }
+    rewrite  DTH. simpl.
+    by iDestruct (hn_interp_ptr_excl with "[$] [$]") as "?".
+  Qed.
+
   Lemma get_to_free_spec 
     l τ π q h (* t *) (* br *) fl (ph: loc) ndh i r b
     (READ_BOUND: r <= h):
@@ -1777,9 +1825,14 @@ Section SimpleQueue.
     iAssert (⌜ t ≠ h ⌝)%I as %NEMPTY.
     { iIntros (->). red in ORDER. lia. }
 
+    iPoseProof (queue_interp_dangle_neq_pfl' _ _ _ _ _ ph with "QI [DANGLE]") as "#PFL_NEQ_D".
+    { by rewrite Nat.add_sub. }
+
     rewrite /dangle_interp. iDestruct "DANGLE" as "(DAUTH & [% | (_ & HNI)])"; [done| ].
     rewrite Nat.add_sub HTH /=. 
     rewrite /dequeue_resources. iDestruct "DR" as "(CH & CFL & HEAD' & DFRAG)".
+
+    
     rewrite /queue_interp. iDestruct "QI" as "(%T_LEN &  HNIS & %pt & TAIL & TLI & %LL & HEAD & BR & FL)".
     iDestruct "BR" as "(%nbr & %BRTH & BR)".
     
@@ -1852,13 +1905,11 @@ Section SimpleQueue.
               pose proof READ as EQ%BB'. simpl in EQ.
               assert (bi = h + 1) as -> by lia.  clear BB EQ.
               assert (b1 = fl) as -> by lia.
-              rewrite BRTH in BRTH1. inversion BRTH1. subst pbr ndbr1. 
-              
-              (* iDestruct "FROM_BR" as "[% ?]". red in ORDER. *)
-              (* destruct H as [-> <-]. *)
-              rewrite /safe_read. rewrite Nat.add_sub.
-              admit. 
-          }
+              rewrite BRTH in BRTH1. inversion BRTH1. subst pbr ndbr1.
+              iDestruct ("PFL_NEQ_D" with "[] []") as "?".
+              { eauto. }
+              { eauto. }
+              done. }
           
           assert (i < i') as NEW.
           { red in RH_WF. destruct RH_WF as (n' & DOM & [? | [=]] & RH_WF); [done| ].
@@ -1867,7 +1918,7 @@ Section SimpleQueue.
             lia. }
           clear n.
 
-          assert (h + 1 <= r') as READ'_BOUND.
+          assert (h + 1 <= r_) as READ'_BOUND.
           { red in RH_WF. destruct RH_WF as (n' & DOM & [? | [=]] & RH_WF); [done| ].
             apply proj1 in RH_WF. eapply RH_WF in NEW; eauto. simpl in NEW. lia. }
           rewrite {1}/safe_read.
@@ -1890,7 +1941,7 @@ Section SimpleQueue.
       iMod ("CLOS" with "[-POST CPS PH DR HNI_FL]") as "_".
       { iFrame. iExists _. iNext. iSplitR.
         { by iLeft. }
-        iFrame "%".
+        iFrame "% OLDS".
         iSplit; cycle 1.
         - rewrite /rop_interp. by iIntros (??). 
         - rewrite /hq_state_wf. iPureIntro.
