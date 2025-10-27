@@ -1596,7 +1596,7 @@ Section SimpleQueue.
     iIntros (Φ) "([#QAT #INV] & #HTH & DR& PH & CPS & #READ) POST".
     iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od_ & %hist & %ohv & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as "(>HQ & >QI & >DANGLE & OHV & >%ORDER & >AUTHS & >ROP & >RHIST & >%RH_WF & >RH & >DQ)".
+    iDestruct "inv" as "(>HQ & >QI & >DANGLE & OHV & >%ORDER & >AUTHS & >ROP & >RHIST & >%RH_WF & >#OLDS & >RH & >DQ)".
     iDestruct "DQ" as "[(% & DR') | TOK]".
     { by iDestruct (dequeue_resources_excl with "[$] [$]") as "?". }
     iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[<- <-]. 
@@ -1653,12 +1653,11 @@ Section SimpleQueue.
       iFrame. 
       iDestruct (take_snapshot with "[$]") as "#SHT".
       iMod ("CLOS" with "[-]") as "_".
-      { iFrame. iNext.
+      { iFrame "#∗ %". iNext.
         rewrite Nat.add_sub HTH /=.
-        iSplit; [| done].
         iRight. by iFrame. }
       iModIntro. by iLeft.
-    - iDestruct (ith_read_hist_compat with "[$] [$]") as %(b & READ & INCR_BOUND). 
+    - iDestruct (ith_read_hist_compat with "[$] [$]") as %(b & p & READ & INCR_BOUND). 
       iMod (dangle_update _ _ None with "[$] [$]") as "[DAUTH DFRAG]".
       iFrame.      
       iApply fupd_or. iRight. iFrame "HNI".
@@ -1667,21 +1666,19 @@ Section SimpleQueue.
 
       rewrite /rop_interp.
       destruct rop.
-      2: { iFrame. iExists _. iNext. iSplitR.
+      2: { iFrame "#∗ %". iNext. iSplitR.
            { by iLeft. }
-           iSplit; [done| ]. iSplit; [| done].  
            rewrite /rop_interp. by iIntros (??). }
       
-      iDestruct ("ROP" with "[//]") as "(%r' & #READ_ & ROP)".
-      iDestruct (ith_read_hist_compat with "[$] READ_") as %(? & READ' & _).
+      iDestruct ("ROP" with "[//]") as "(%r_ & %rp & READ_ & RP & ROP)".
+      iDestruct (ith_read_hist_compat with "[$] READ_") as %(?&? & READ' & _). 
 
-      iFrame. iExists _. iNext. iSplitR.
+      iFrame "#∗ %". iNext. iSplitR.
       { by iLeft. }
-      iSplit; [done| ]. iSplit; [| done].  
       rewrite /rop_interp.
       iIntros (i' [=]). subst n.
       iDestruct "ROP" as "[SAFE | $]".
-      2: done. 
+      2: { iFrame "#∗". }
 
       destruct (decide (i' = i)). 
       { subst. rewrite {1}/safe_read. rewrite Nat.add_sub.
@@ -1701,9 +1698,10 @@ Section SimpleQueue.
         apply mk_is_Some, elem_of_dom in READ. rewrite DOM elem_of_set_seq in READ.
         lia. }
       clear n.
-
-      assert (h + 1 <= r') as READ'_BOUND.
+      
+      assert (h + 1 <= r_) as READ'_BOUND.
       { red in RH_WF. destruct RH_WF as (n' & DOM & [? | [=]] & RH_WF); [done| ].
+        subst. 
         apply proj1 in RH_WF. eapply RH_WF in NEW; eauto. simpl in NEW. lia. }
       iFrame "READ_".
       rewrite {1}/safe_read.
