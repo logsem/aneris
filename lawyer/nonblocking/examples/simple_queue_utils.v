@@ -207,55 +207,373 @@ End HistQueue.
 
 Section ReadProtocol.
 
-  Inductive read_state := rs_init | rs_canceled | rs_going | rs_completed | rs_protected. 
+  Inductive read_state_proc := rsp_going | rsp_completed | rsp_protected. 
 
-  Definition read_state_cmra: cmra := csumR (exclR unit) (csumR (agreeR unit) (csumR (excl unit) (csumR (agreeR unit) (agreeR unit)))).
+  Inductive read_state := rs_init | rs_canceled | rs_proc (orsp: option read_state_proc).
 
-  Definition rs2cmra (rs: read_state) :=
+  Definition read_state_proc_cmra: cmra :=
+    let au := agreeR unit in csumR (exclR unit) (csumR au au). 
+
+  Definition read_state_cmra: cmra :=
+    csumR (exclR unit) (csumR (agreeR unit) (optionUR read_state_proc_cmra)). 
+  
+  Definition rsp2cmra (rsp: read_state_proc): read_state_proc_cmra :=
+    match rsp with 
+    | rsp_going => Cinl $ Excl ()
+    | rsp_completed => Cinr $ Cinl $ to_agree ()
+    | rsp_protected => Cinr $ Cinr $ to_agree ()
+    end.
+    
+  Definition rs_p0: read_state := rs_proc None. 
+
+  Definition rs2cmra (rs: read_state): read_state_cmra :=
     match rs with
     | rs_init => Cinl $ Excl ()
     | rs_canceled => Cinr $ Cinl $ to_agree ()
-    | rs_going => Cinr $ Cinr $ Cinl $ Excl ()
-    | rs_completed => Cinr $ Cinr $ Cinr $ Cinl $ to_agree ()
-    | rs_protected => Cinr $ Cinr $ Cinr $ Cinr $ to_agree ()
+    | rs_proc None => Cinr $ Cinr $ None
+    | rs_proc (Some rsp) => Cinr $ Cinr $ Some (rsp2cmra rsp)
     end.
 
-  Definition rs_wip p := p = rs_init \/ p = rs_going. 
-  Definition rs_fin p := p = rs_canceled \/ p = rs_completed \/ p = rs_protected. 
+  Definition rs_wip p := p = rs_init \/ p = rs_proc (Some rsp_going). 
+  Definition rs_fin p := 
+    p = rs_canceled \/ p = rs_proc (Some rsp_completed) \/ p = rs_proc (Some rsp_protected). 
   
-  Lemma rp_init_excl (rp: read_state_cmra):
-    ¬ ✓ (rs2cmra rs_init ⋅ rp).  
+  (* Lemma rp_init_excl (rp: read_state_cmra): *)
+  (*   ¬ ✓ (rs2cmra rs_init ⋅ rp).   *)
+  (* Proof using. *)
+  (*   intros ?. destruct rp; done. *)
+  (* Qed. *)
+
+  (* Lemma rp_going_excl (rp: read_state_cmra): *)
+  (*   ¬ ✓ (rs2cmra rs_going ⋅ rp).  *)
+  (* Proof using. *)
+  (*   intros ?.  *)
+  (*   destruct rp; try done. *)
+  (*   destruct c; try done. destruct c; try done.  *)
+  (* Qed. *)
+
+  (* Lemma rp_canceled_not_protected: *)
+  (*   ¬ ✓ (rs2cmra rs_canceled ⋅ rs2cmra rs_protected).  *)
+  (* Proof using.  *)
+  (*   intros ?. done.  *)
+  (* Qed. *)
+
+  Lemma rsp_mut_excl rsp1 rsp2
+    (NEQ: rsp1 ≠ rsp2):
+    ¬ ✓ (rsp2cmra rsp1 ⋅ rsp2cmra rsp2).
   Proof using.
-    intros ?. destruct rp; done.
+    destruct rsp1, rsp2; simpl; intros V; done.
   Qed.
 
-  Lemma rp_going_excl (rp: read_state_cmra):
-    ¬ ✓ (rs2cmra rs_going ⋅ rp). 
-  Proof using.
-    intros ?. 
-    destruct rp; try done.
-    destruct c; try done. destruct c; try done. 
-  Qed.
-
-  Lemma rp_canceled_not_protected:
-    ¬ ✓ (rs2cmra rs_canceled ⋅ rs2cmra rs_protected). 
-  Proof using. 
-    intros ?. done. 
-  Qed.
-
-  Lemma rp_mut_excl rp1 rp2
-    (NEQ: rp1 ≠ rp2):
-    ¬ ✓ (rs2cmra rp1 ⋅ rs2cmra rp2).
-  Proof using.
-    destruct rp1, rp2; simpl; intros V; done.
-  Qed.
+  Global Instance rsp_dec: EqDecision read_state_proc.
+  Proof. 
+    red. intros [] []; (by right) || (by left). 
+  Qed. 
 
   Global Instance rs_dec: EqDecision read_state.
-  red. intros [] [].
-  all: try by right.
-  all: by left.
-  Defined.
+  Proof. 
+    red. intros [] []; try (by right) || (by left).
+    solve_decision. 
+  Qed.
 
+  Lemma rsp0_proc rp:
+    ✓ (rs2cmra rs_p0 ⋅ rs2cmra rp) -> exists orsp, rp = rs_proc orsp.
+  Proof using.
+    intros ?. destruct rp; try done. eauto.
+  Qed.    
+
+  Global Instance rsp2cmra_inj: Inj eq equiv rsp2cmra.
+  Proof using.
+    red. intros [] []; simpl.
+    all: try by set_solver.
+    all: try by (intros X; inversion X).
+    all: try by (intros X; inversion X; subst; inversion H1).
+  Qed.
+
+  Global Instance rs2cmra_inj: Inj eq equiv rs2cmra.
+  Proof using.
+    clear. 
+    red. intros [] []; simpl.
+    all: try by set_solver.
+    all: try by (intros X; inversion X).
+    - destruct orsp; try by (intros X; inversion X).
+    - destruct orsp; try by (intros X; inversion X).
+      + intros X. inversion X; subst. inversion H1.
+      + intros X. inversion X; subst. inversion H1.
+    - destruct orsp; try by (intros X; inversion X).
+    - destruct orsp; try by (intros X; inversion X).
+      + intros X. inversion X; subst. inversion H1.
+      + intros X. inversion X; subst. inversion H1.
+    - destruct orsp, orsp0; try by (intros X; inversion X).
+      all: try by (intros X; inversion X; subst; inversion H1; subst; inversion H2).
+      intros EQ. inversion EQ. subst. inversion H1. subst.
+      inversion H2. subst.
+      apply rsp2cmra_inj in H3. congruence.
+  Qed.
+
+  Inductive rs_le : read_state -> read_state -> Prop :=
+  | rs_le_rsp_None rsp : rs_le (rs_proc None) (rs_proc (Some rsp))
+  | rs_le_refl rs : rs_le rs rs
+  .
+
+  Lemma rs2cmra_inv_init rs x:
+    rs2cmra rs = Cinl x -> rs = rs_init /\ x = Excl (). 
+  Proof.
+    destruct rs; simpl.
+    all: intros [=]; subst; eauto.  
+    destruct orsp; done. 
+  Qed.
+
+  Lemma rs2cmra_inv_cancel rs x:
+    rs2cmra rs = Cinr (Cinl x) -> rs = rs_canceled /\ x = to_agree (). 
+  Proof.
+    destruct rs; intros [=]; simpl; eauto.
+    destruct orsp; done. 
+  Qed.
+
+  Lemma rs2cmra_inv_proc_None rs:
+    rs2cmra rs = Cinr (Cinr None) -> rs = rs_p0. 
+  Proof.
+    destruct rs; simpl; eauto.
+    - intros [=].
+    - intros [=].
+    - destruct orsp; intros [=]. done. 
+  Qed.
+
+  Lemma rs2cmra_inv_proc_Some rs x:
+    rs2cmra rs = Cinr (Cinr (Some x)) -> exists y, rs = rs_proc (Some y) /\ x = rsp2cmra y.
+  Proof.
+    destruct rs; simpl; eauto.
+    - intros [=].
+    - intros [=].
+    - destruct orsp; intros [=]. subst. eauto. 
+  Qed.
+
+  Lemma rsp2cmra_inv_going rsp x:
+    rsp2cmra rsp = Cinl x -> rsp = rsp_going /\ x = Excl (). 
+  Proof. destruct rsp; by intros [=]. Qed. 
+
+  Lemma rsp2cmra_inv_completed rsp x:
+    rsp2cmra rsp = Cinr $ Cinl x -> rsp = rsp_completed /\ x = to_agree (). 
+  Proof. destruct rsp; try by intros [=]. Qed. 
+
+  Lemma rsp2cmra_inv_protected rsp x:
+    rsp2cmra rsp = Cinr $ Cinr x -> rsp = rsp_protected /\ x = to_agree (). 
+  Proof. destruct rsp; try by intros [=]. Qed. 
+
+  Lemma rsp_incl x y:
+    Some (rsp2cmra x) ≼ Some (rsp2cmra y) <-> x = y.
+  Proof using.
+    rewrite Some_csum_included.
+    repeat (setoid_rewrite Some_csum_included). 
+    split.
+    2: { intros ->. destruct y; simpl. 
+         - right. left. eauto.
+         - do 2 right. do 2 eexists.
+           do 2 (split; eauto).
+           right. left. eauto. 
+         - do 2 right. do 2 eexists.
+           do 2 (split; eauto).
+           do 2 right. eauto. }
+    intros [BOT | [L | R]].
+    { destruct y; done. }
+    { destruct L as (?&?&X&Y&INCL).
+      apply rsp2cmra_inv_going in X as [-> ->], Y as [-> ->]. by subst. }
+    destruct R as (?&?&X&Y&INCL).
+    destruct INCL as [BOT | [L | R]].
+    { subst. by destruct y. }
+    - destruct L as (?&?&X'&Y'&INCL). subst. 
+      apply rsp2cmra_inv_completed in X as [-> ->], Y as [-> ->]. by subst.
+    - destruct R as (?&?&X'&Y'&INCL). subst. 
+      apply rsp2cmra_inv_protected in X as [-> ->], Y as [-> ->]. by subst.
+  Qed.
+
+  Lemma rs_le_incl rs1 rs2:
+    rs_le rs1 rs2 <-> Some (rs2cmra rs1) ≼ Some (rs2cmra rs2). 
+  Proof using.
+    destruct (decide (rs1 = rs2)) as [-> | NEQ].
+    { split; intros.
+      - reflexivity.
+      - constructor. }
+    repeat (setoid_rewrite Some_csum_included).
+    repeat (setoid_rewrite Some_included).
+    repeat (setoid_rewrite Excl_included).
+    setoid_rewrite option_included.
+    repeat (setoid_rewrite agree_included).
+    
+    split; intros.
+    { inversion H; subst; [| done].
+      simpl.
+      do 2 right. do 2 eexists. repeat (split; eauto).
+      do 2 right. do 2 eexists. repeat (split; eauto). }
+    destruct H as [BOT | [L | R]].
+    * (destruct rs2; simpl in BOT); try congruence.
+      destruct orsp; congruence.
+    * destruct L as (?&?&?&?&?).
+      apply rs2cmra_inv_init in H as [-> ->], H0 as [-> ->]. subst. done. 
+    * destruct R as (?&?&?&?&?).
+      destruct H1 as [BOT | [L | R]].
+      ** subst. destruct rs2; simpl in H0; try set_solver.
+         by destruct orsp.
+      ** destruct L as (?&?&?&?&?). subst.
+         apply rs2cmra_inv_cancel in H as [-> ->], H0 as [-> ->]. subst. done. 
+      ** destruct R as (?&?&?&?&?). subst.
+         destruct x1.
+         2: { apply rs2cmra_inv_proc_None in H. subst.
+              destruct x2.
+              - apply rs2cmra_inv_proc_Some in H0 as (?&->&->).
+                constructor.
+              - apply rs2cmra_inv_proc_None in H0. by subst. }
+         apply rs2cmra_inv_proc_Some in H as (?&->&->).
+         destruct x2.
+         2: { apply rs2cmra_inv_proc_None in H0. subst.
+              inversion H3 as [? | [? | ?]].
+              1, 2: by inversion H.
+              set_solver. }
+         apply rs2cmra_inv_proc_Some in H0 as (?&->&->).
+         inversion H3 as [? | [? | ?]].
+         *** inversion H. subst. apply rsp2cmra_inj in H2. subst. constructor.
+         *** inversion H.
+         *** destruct H as (?&?&[=]&[=]&?). subst.
+             destruct H4 as [H4 | RSP].
+             **** apply rsp2cmra_inj in H4. by subst.
+             **** apply Some_included_mono in RSP.
+                  apply rsp_incl in RSP. subst. constructor.
+  Qed.
+
+  Lemma rs_le_incl' x y:
+    rs2cmra x ≼ rs2cmra y -> rs_le x y. 
+  Proof using.
+    intros. apply rs_le_incl. by apply Some_included_mono.
+  Qed. 
+
+  (*   rs1 rs2: *)
+  (*   Some (rs2cmra rs1) ≼ Some (rs2cmra rs2) <-> (rs2cmra rs1) ≼ (rs2cmra rs2). *)
+  (* Proof using. *)
+  (*   destruct (rs2cmra rs2) eqn:Y. *)
+  (*   3: { destruct rs2; try done. destruct orsp; done. } *)
+  (*   - apply rs2cmra_inv_init in Y as [-> ->]. subst. simpl. *)
+  (*     destruct (rs2cmra rs1) eqn:X. *)
+  (*     3: { destruct rs1; try done. destruct orsp; done. } *)
+  (*     + apply rs2cmra_inv_init in X as [-> ->]. *)
+  (*       split; try reflexivity.  *)
+  (*       intros EQ. apply Some_csum_included in EQ.  *)
+  (*       inversion EQ. subst. *)
+  (*       rewrite H1. apply Cinl_included. *)
+  (* TODO: move these 3 things *)
+  Ltac csum_valid_simpl := repeat (rewrite Cinl_valid || rewrite Cinr_valid || rewrite -Some_op Some_valid || rewrite op_None_right_id || rewrite op_None_left_id).
+
+  Lemma rsp2cmra_valid rsp: ✓ rsp2cmra rsp.
+  Proof using. destruct rsp; simpl; csum_valid_simpl; done. Qed. 
+
+  Lemma rs2cmra_valid rs: ✓ rs2cmra rs.
+  Proof using.
+    destruct rs; simpl; csum_valid_simpl; try done.
+    destruct orsp; csum_valid_simpl; try done.
+    apply rsp2cmra_valid.
+  Qed.
+
+  Inductive rsp_step : read_state_proc -> read_state_proc -> Prop :=
+  | rsp_refl rsp : rsp_step rsp rsp
+  | rsp_going_protected : rsp_step rsp_going rsp_protected
+  | rsp_going_completed : rsp_step rsp_going rsp_completed
+  .
+
+  Local Ltac contra_valid := 
+    match goal with
+    | H : forall mz, valid (?R1 ⋅? mz) → valid (?R2 ⋅? mz) |- _ =>
+        specialize (H (Some R1))
+    end. 
+
+  Lemma rsp_step_update rsp1 rsp2:
+    rsp_step rsp1 rsp2 <-> rsp2cmra rsp1 ~~> rsp2cmra rsp2.
+  Proof using.
+    split.
+    { intros STEP. inversion STEP.
+      - subst. reflexivity.
+      - subst. simpl. apply cmra_update_exclusive. done.
+      - subst. simpl. apply cmra_update_exclusive. done. }
+    intros STEP. destruct rsp1, rsp2; try constructor || tauto.
+    all: simpl in STEP; rewrite cmra_discrete_update in STEP;
+      contra_valid; simpl in STEP;
+      repeat (rewrite -?Cinr_op -?Cinl_op in STEP);
+      ospecialize * STEP; [| by csum_valid_simpl];
+      by destruct STEP.
+  Qed. 
+
+  Inductive rs_step : read_state -> read_state -> Prop :=
+  | rs_refl rs : rs_step rs rs
+  | rs_init_going : rs_step rs_init (rs_proc (Some rsp_going))
+  | rs_init_cancel : rs_step rs_init rs_canceled
+  | rs_going_protected rsp1 rsp2 (RSP_STEP: rsp_step rsp1 rsp2) :
+    rs_step (rs_proc (Some rsp1)) (rs_proc (Some rsp2))
+  . 
+
+  (* TODO: don't want to deal with updates to None rsp
+     and arbitrary jumps from init to cancel/prot *)
+  Lemma rs_step_update rs1 rs2:
+    (* rs_step rs1 rs2 <-> rs2cmra rs1 ~~> rs2cmra rs2. *)
+    rs_step rs1 rs2 -> rs2cmra rs1 ~~> rs2cmra rs2.
+  Proof using.
+    intros STEP. inversion STEP.
+    - subst. reflexivity.
+    - subst. simpl. apply cmra_update_exclusive. done.
+    - subst. simpl. apply cmra_update_exclusive. done.
+    - subst. simpl.
+      do 2 (apply csum_update_r). apply option_update.
+      by apply rsp_step_update.
+  Qed. 
+
+  Lemma rs_step_local_update rs1 rs2
+    (RS_STEP: rs_step rs1 rs2):
+    (Some (rs2cmra rs1), Some (rs2cmra rs1)) ~l~> (Some (rs2cmra rs2), Some (rs2cmra rs2)).
+    Proof using. 
+      inversion RS_STEP; subst; simpl.
+      { reflexivity. }
+      all: simpl; apply option_local_update; try by apply (exclusive_local_update).
+      do 2 apply csum_local_update_r. apply option_local_update.
+      inversion RSP_STEP; subst; simpl.
+      { reflexivity. }
+      all: by apply (exclusive_local_update).
+    Qed. 
+
+  Inductive rsp_compat : read_state_proc -> read_state_proc -> Prop :=
+  | rsp_cm_rsp_None : rsp_compat rsp_completed rsp_completed
+  | rsp_cm_refl : rsp_compat rsp_protected rsp_protected
+  .
+
+  Lemma rsp_compat_valid rsp1 rsp2 :
+    ✓ (rsp2cmra rsp1 ⋅ rsp2cmra rsp2) <-> rsp_compat rsp1 rsp2.
+  Proof using.
+    split. 
+    - destruct rsp1, rsp2; csum_valid_simpl.
+      all: done || constructor.
+    - intros P. inversion P; subst; done.
+  Qed.
+
+  Inductive rs_compat : read_state -> read_state -> Prop :=
+  | rs_cm_rsp_None_1 orsp : rs_compat (rs_proc None) (rs_proc orsp)
+  | rs_cm_rsp_None_2 orsp : rs_compat (rs_proc orsp) (rs_proc None)
+  | rs_cm_canc : rs_compat rs_canceled rs_canceled
+  | rs_cm_rsp_Some rsp1 rsp2 (RSP: rsp_compat rsp1 rsp2) :
+    rs_compat (rs_proc (Some rsp1)) (rs_proc (Some rsp2))
+  .
+
+  Lemma rs_compat_valid rs1 rs2 :
+    ✓ (rs2cmra rs1 ⋅ rs2cmra rs2) <-> rs_compat rs1 rs2.
+  Proof using.
+    split. 
+    - destruct rs1, rs2; csum_valid_simpl.
+      all: simpl; try done || constructor.
+      all: destruct orsp; try destruct orsp0; try done || constructor.
+      revert H. csum_valid_simpl. apply rsp_compat_valid.
+    - intros P. inversion P; subst; simpl; try done.
+      + destruct orsp; csum_valid_simpl; try done.
+        rewrite Some_valid. apply rsp2cmra_valid.
+      + destruct orsp; csum_valid_simpl; try done.
+        rewrite Some_valid. apply rsp2cmra_valid.
+      + csum_valid_simpl. by apply rsp_compat_valid. 
+  Qed.
 
 End ReadProtocol.
 
@@ -332,19 +650,8 @@ Section ReadsHistory.
   Definition ith_rp i (rp: read_state) := 
     own rh_γ__map (◯ {[ i := (None, Some $ rs2cmra rp) ]}).
 
-  Lemma rs2cmra_inj: Inj eq equiv rs2cmra.
-  Proof using.
-    clear. 
-    red. intros [] []; simpl.
-    all: try by set_solver.
-    all: try by (intros X; inversion X).
-    all: try by (intros X; inversion X; subst; inversion H1).
-    all: try by (intros X; inversion X; subst; inversion H1; subst; inversion H2). 
-    all: try by (intros X; inversion X; subst; inversion H1; subst; inversion H2; subst; inversion H3). 
-  Qed.
-
   Lemma ith_rp_hist_compat hist i rp:
-    read_hist_auth hist -∗ ith_rp i rp -∗ ⌜ exists op, hist !! i = Some op /\ op.2 = rp ⌝.
+    read_hist_auth hist -∗ ith_rp i rp -∗ ⌜ exists op, hist !! i = Some op /\ rs_le rp op.2 ⌝.
   Proof using.
     iIntros "[X _] Y". iCombine "X Y" as "X". iDestruct (own_valid with "X") as %V.
     iPureIntro.
@@ -362,9 +669,9 @@ Section ReadsHistory.
     (****)
     eexists. split; [reflexivity| ]. simpl.     
     rewrite Some_included in LE'. destruct LE'.
-    - by apply rs2cmra_inj in H0.
-    - admit.
-  Admitted.
+    - apply rs2cmra_inj in H0. subst. econstructor. 
+    - apply rs_le_incl'; eauto.
+  Qed.
 
   Goal forall i r b, Persistent (ith_read i r b). apply _. Abort.
 
@@ -383,7 +690,7 @@ Section ReadsHistory.
     apply pair_included. split; auto.
   Qed.    
 
-  Lemma ith_read_included i r b b'
+  Lemma ith_included i r b b'
     (LE: b' <= b):
   ith_read i r b -∗ ith_read i r b'.
   Proof using.
@@ -396,15 +703,101 @@ Section ReadsHistory.
     by apply max_nat_included.
   Qed.
 
+  (* Global Instance rs2cmra_wip_valid rs *)
+  (*   (WIP: rs_wip rs): Exclusive (rs2cmra rs). *)
+  (* Proof using.  *)
+  (*   destruct WIP as [-> | ->]; simpl; try by apply _. *)
+  (*   repeat apply Cinr_exclusive. *)
+    
+  (*   apply Some_Cinl_exclusive.  *)
+
+
   (* TODO: clean up unused update lemmas *)
 
-  Lemma read_hist_update hist i r b b' p p'
-    (ITH: hist !! i = Some ((r, b), p))
-    (P_WIP: rs_wip p):
-    read_hist_auth hist -∗ ith_rp i p ==∗ read_hist_auth (<[ i := ((r, max b b'), p') ]> hist) ∗ ith_read i r (max b b') ∗ ith_rp i p'. 
+  (* Lemma read_hist_update hist i r b b' p p' *)
+  (*   (ITH: hist !! i = Some ((r, b), p)) *)
+  (*   (RS_STEP: rs_step p p'): *)
+  (*   read_hist_auth hist -∗ ith_rp i p ==∗ read_hist_auth (<[ i := ((r, max b b'), p') ]> hist) ∗ ith_read i r (max b b') ∗ ith_rp i p'.  *)
+  (* Proof using. *)
+  (*   iIntros "AUTH RP". *)
+  (*   iAssert (|==> read_hist_auth (<[i:=((r, max b b'), p')]> hist) ∗ ith_rp i p')%I with "[AUTH RP]" as "AUTH". *)
+  (*   2: { iMod "AUTH" as "[AUTH $]".  *)
+  (*        iDestruct (read_hist_get with "[$]") as "#FRAG". *)
+  (*        { apply lookup_insert. } *)
+  (*        by iFrame "#∗". } *)
+
+  (*   rewrite -own_op. *)
+  (*   iCombine "AUTH RP" as "X".  *)
+  (*   rewrite -!cmra_assoc -!auth_frag_op.     *)
+  (*   iApply (own_update with "[$]"). *)
+
+  (*   apply auth_update. *)
+  (*   remember (λ '(r0, b0, p0), (Some (to_agree r0, MaxNat b0), Some (rs2cmra p0))) as f1. *)
+  (*   remember (λ '(r0, b0, _), (Some (to_agree r0, MaxNat b0), None)) as f2. *)
+  (*   rewrite fmap_insert. *)
+
+  (*   assert (((f2 <$> <[i:=(r, b `max` b', p')]> hist) ⋅ {[i := (None, Some (rs2cmra p'))]}) =  (<[i:=(Some (to_agree r, MaxNat (b `max` b')), Some (rs2cmra p'))]> ((f2 <$> hist) ⋅ {[i := (None, Some (rs2cmra p))]}))). *)
+  (*   { *)
+  (*     rewrite (fmap_insert f2). rewrite -insert_op. *)
+  (*     rewrite {1}Heqf2. rewrite -pair_op. rewrite op_None_right_id op_None_left_id. *)
+  (*     rewrite gmap_disj_op_union. *)
+  (*     2: { apply map_disjoint_dom. rewrite dom_empty_L. set_solver. } *)
+  (*     rewrite map_union_empty. *)
+
+  (*     apply map_eq. *)
+  (*     intros k. destruct (decide (k = i)). *)
+  (*     - subst. by rewrite !lookup_insert. *)
+  (*     - rewrite !lookup_insert_ne; try done. *)
+  (*       rewrite lookup_op. rewrite lookup_singleton_ne; [| done]. *)
+  (*       by rewrite op_None_right_id. } *)
+
+  (*   rewrite H0. *)
+  (*   rewrite Heqf1 Heqf2. *)
+    
+  (*   eapply insert_local_update.     *)
+  (*   3: { apply prod_local_update'; simpl. *)
+  (*        2: by apply rs_step_local_update.  *)
+  (*        apply option_local_update. *)
+  (*        apply prod_local_update'; simpl; [reflexivity| ]. *)
+  (*        eapply (max_nat_local_update (MaxNat _)). simpl. *)
+  (*        apply Nat.le_max_l. } *)
+  (*   - rewrite lookup_fmap ITH. simpl. reflexivity. *)
+  (*   - rewrite lookup_op. rewrite lookup_singleton. *)
+  (*     rewrite lookup_fmap ITH /=. *)
+  (*     rewrite -Some_op.        *)
+  (*     rewrite -pair_op. rewrite op_None_right_id op_None_left_id. *)
+  (*     reflexivity.  *)
+  (* Qed. *)
+
+  (** The ITH hypothesis (and in general not hiding the details of hist and hist')
+      is needed, because the obtained hist' must satisfy read_hist_wf,
+      proving which requires knowing the exact shape of hist'. *)
+  (* TODO: try to make read_hist_wf part of read_hist? *)
+  Lemma read_hist_update' hist i r ba pa b' p p'
+    (RS_STEP: rs_step p p')
+    (ITH: hist !! i = Some (r, ba, pa))
+    (pb := if decide (p = rs_proc None) then pa else p')
+    (hist' := <[i:=((r, max ba b'), pb)]> hist):
+    read_hist_auth hist -∗ ith_rp i p ==∗
+    read_hist_auth hist' ∗ ith_read i r (max ba b') ∗ ith_rp i p'.
   Proof using.
     iIntros "AUTH RP".
-    iAssert (|==> read_hist_auth (<[i:=((r, max b b'), p')]> hist) ∗ ith_rp i p')%I with "[AUTH RP]" as "AUTH".
+    iDestruct (ith_rp_hist_compat with "[$] [$]") as "(%x & %ITH' & %LE)".
+    (* iDestruct (ith_read_hist_compat with "[$] [$]") as "(%ba & %pa & %ITH' & %_)". *)
+    rewrite ITH in ITH'. inversion ITH'. subst. clear ITH'.    
+    simpl in LE.
+
+    assert ({pa = p /\ p ≠ rs_proc None} + {p = p' /\ p = rs_proc None}) as p_eq.
+    { destruct p eqn:PP.
+      - left.
+        inversion LE; inversion RS_STEP; subst; simpl; try set_solver.
+      - left. 
+        inversion LE; inversion RS_STEP; subst; simpl; try set_solver.
+      - destruct orsp.
+        + left. inversion LE; inversion RS_STEP; subst; simpl; try set_solver.
+        + right. inversion LE; inversion RS_STEP; subst; simpl; try set_solver. }
+
+    iAssert (|==> read_hist_auth (<[i:=((r, max ba b'), pb)]> hist) ∗ ith_rp i p')%I with "[AUTH RP]" as "AUTH".
     2: { iMod "AUTH" as "[AUTH $]". 
          iDestruct (read_hist_get with "[$]") as "#FRAG".
          { apply lookup_insert. }
@@ -420,7 +813,7 @@ Section ReadsHistory.
     remember (λ '(r0, b0, _), (Some (to_agree r0, MaxNat b0), None)) as f2.
     rewrite fmap_insert.
 
-    assert (((f2 <$> <[i:=(r, b `max` b', p')]> hist) ⋅ {[i := (None, Some (rs2cmra p'))]}) =  (<[i:=(Some (to_agree r, MaxNat (b `max` b')), Some (rs2cmra p'))]> ((f2 <$> hist) ⋅ {[i := (None, Some (rs2cmra p))]}))).
+    assert (((f2 <$> <[i:=(r, ba `max` b', pb)]> hist) ⋅ {[i := (None, Some (rs2cmra p'))]}) =  (<[i:=(Some (to_agree r, MaxNat (ba `max` b')), Some (rs2cmra p'))]> ((f2 <$> hist) ⋅ {[i := (None, Some (rs2cmra p))]}))).
     {
       rewrite (fmap_insert f2). rewrite -insert_op.
       rewrite {1}Heqf2. rewrite -pair_op. rewrite op_None_right_id op_None_left_id.
@@ -437,65 +830,7 @@ Section ReadsHistory.
 
     rewrite H0.
     rewrite Heqf1 Heqf2. 
-    eapply insert_local_update.    
-    3: { apply prod_local_update'; simpl.
-         - apply option_local_update.
-           apply prod_local_update'; simpl; [reflexivity| ].
-           eapply (max_nat_local_update (MaxNat _)). simpl.
-           apply Nat.le_max_l.
-         - apply option_local_update.
-           apply (@exclusive_local_update _ (rs2cmra p)).
-           2: { by destruct p'. }
-           red in P_WIP. 
-           destruct P_WIP as [?|?]; subst; apply _. }
-    - rewrite lookup_fmap ITH. simpl. reflexivity.
-    - rewrite lookup_op. rewrite lookup_singleton.
-      rewrite lookup_fmap ITH /=.
-      rewrite -Some_op.       
-      rewrite -pair_op. rewrite op_None_right_id op_None_left_id.
-      reflexivity. 
-  Qed.
-
-  Lemma read_hist_update' hist i r b b' p p'
-    (ITH: hist !! i = Some ((r, b), p))
-    (P_WIP: rs_wip p \/ p = p'):
-    read_hist_auth hist -∗ ith_rp i p ==∗ read_hist_auth (<[ i := ((r, max b b'), p') ]> hist) ∗ ith_read i r (max b b') ∗ ith_rp i p'. 
-  Proof using.
-    iIntros "AUTH RP".
-    iAssert (|==> read_hist_auth (<[i:=((r, max b b'), p')]> hist) ∗ ith_rp i p')%I with "[AUTH RP]" as "AUTH".
-    2: { iMod "AUTH" as "[AUTH $]". 
-         iDestruct (read_hist_get with "[$]") as "#FRAG".
-         { apply lookup_insert. }
-         by iFrame "#∗". }
-
-    rewrite -own_op.
-    iCombine "AUTH RP" as "X". 
-    rewrite -!cmra_assoc -!auth_frag_op.    
-    iApply (own_update with "[$]").
-
-    apply auth_update.
-    remember (λ '(r0, b0, p0), (Some (to_agree r0, MaxNat b0), Some (rs2cmra p0))) as f1.
-    remember (λ '(r0, b0, _), (Some (to_agree r0, MaxNat b0), None)) as f2.
-    rewrite fmap_insert.
-
-    assert (((f2 <$> <[i:=(r, b `max` b', p')]> hist) ⋅ {[i := (None, Some (rs2cmra p'))]}) =  (<[i:=(Some (to_agree r, MaxNat (b `max` b')), Some (rs2cmra p'))]> ((f2 <$> hist) ⋅ {[i := (None, Some (rs2cmra p))]}))).
-    {
-      rewrite (fmap_insert f2). rewrite -insert_op.
-      rewrite {1}Heqf2. rewrite -pair_op. rewrite op_None_right_id op_None_left_id.
-      rewrite gmap_disj_op_union.
-      2: { apply map_disjoint_dom. rewrite dom_empty_L. set_solver. }
-      rewrite map_union_empty.
-
-      apply map_eq.
-      intros k. destruct (decide (k = i)).
-      - subst. by rewrite !lookup_insert.
-      - rewrite !lookup_insert_ne; try done.
-        rewrite lookup_op. rewrite lookup_singleton_ne; [| done].
-        by rewrite op_None_right_id. }
-
-    rewrite H0.
-    rewrite Heqf1 Heqf2. 
-    eapply insert_local_update.    
+    eapply insert_local_update.
 
     - rewrite lookup_fmap ITH. simpl. reflexivity.
     - rewrite lookup_op. rewrite lookup_singleton.
@@ -504,62 +839,70 @@ Section ReadsHistory.
       rewrite -pair_op. rewrite op_None_right_id op_None_left_id.
       reflexivity. 
     - apply prod_local_update'; simpl.
-      + apply option_local_update.
-        apply prod_local_update'; simpl; [reflexivity| ].
-        eapply (max_nat_local_update (MaxNat _)). simpl.
-        apply Nat.le_max_l.
-      + apply option_local_update.
-        destruct P_WIP as [P_WIP | <-]. 
-        * apply (@exclusive_local_update _ (rs2cmra p)).
-          2: { by destruct p'. }
-          red in P_WIP. 
-          destruct P_WIP as [?|?]; subst; apply _.
-        * reflexivity.
+      2: { subst pb. destruct p_eq as [[-> ? ] | [-> ->]].
+           - rewrite decide_False; [| done]. 
+             by apply rs_step_local_update.
+           - rewrite decide_True; [| done]. reflexivity. }
+      apply option_local_update.
+      apply prod_local_update'; simpl; [reflexivity| ].
+      eapply (max_nat_local_update (MaxNat _)). simpl.
+      apply Nat.le_max_l.
   Qed.
 
-  Lemma read_hist_update_weak hist i r b b' p
-    (ITH: hist !! i = Some ((r, b), p)):
-    read_hist_auth hist ==∗ read_hist_auth (<[ i := ((r, max b b'), p) ]> hist) ∗ ith_read i r (max b b'). 
-  Proof using.
-    iIntros "AUTH".
-    iAssert (|==> read_hist_auth (<[i:=((r, max b b'), p)]> hist))%I with "[AUTH]" as "AUTH".
-    2: { iMod "AUTH" as "AUTH". 
-         iDestruct (read_hist_get with "[$]") as "#FRAG".
-         { apply lookup_insert. }
-         by iFrame "#∗". }
+  (* Lemma read_hist_update' hist i r b b' p p' *)
+  (*   (ITH: hist !! i = Some ((r, b), p)) *)
+  (*   (RS_STEP: rs_step p p'): *)
+  (*   read_hist_auth hist -∗ ith_rp i p ==∗ read_hist_auth (<[ i := ((r, max b b'), p') ]> hist) ∗ ith_read i r (max b b') ∗ ith_rp i p'.  *)
+  (* Proof using. *)
+  (*   iIntros "AUTH RP". *)
+  (*   iAssert (|==> read_hist_auth (<[i:=((r, max b b'), p')]> hist) ∗ ith_rp i p')%I with "[AUTH RP]" as "AUTH". *)
+  (*   2: { iMod "AUTH" as "[AUTH $]".  *)
+  (*        iDestruct (read_hist_get with "[$]") as "#FRAG". *)
+  (*        { apply lookup_insert. } *)
+  (*        by iFrame "#∗". } *)
 
-    iApply (own_update with "[$]").
+  (*   rewrite -own_op. *)
+  (*   iCombine "AUTH RP" as "X".  *)
+  (*   rewrite -!cmra_assoc -!auth_frag_op.     *)
+  (*   iApply (own_update with "[$]"). *)
 
-    apply auth_update.
-    remember (λ '(r0, b0, p0), (Some (to_agree r0, MaxNat b0), Some (rs2cmra p0))) as f1.
-    remember (λ '(r0, b0, _), (Some (to_agree r0, MaxNat b0), None)) as f2.
-    rewrite !fmap_insert.
+  (*   apply auth_update. *)
+  (*   remember (λ '(r0, b0, p0), (Some (to_agree r0, MaxNat b0), Some (rs2cmra p0))) as f1. *)
+  (*   remember (λ '(r0, b0, _), (Some (to_agree r0, MaxNat b0), None)) as f2. *)
+  (*   rewrite fmap_insert. *)
 
-    rewrite Heqf1 Heqf2. simpl. 
-    eapply insert_local_update.
-    3: { apply prod_local_update'; simpl.
-         2: reflexivity. 
-         apply option_local_update.
-         apply prod_local_update'; simpl; [reflexivity| ].
-         eapply (max_nat_local_update (MaxNat _)). simpl.
-         apply Nat.le_max_l. }
-    - rewrite lookup_fmap ITH. simpl. reflexivity.
-    - rewrite lookup_fmap ITH /=. reflexivity. 
-  Qed.
+  (*   assert (((f2 <$> <[i:=(r, b `max` b', p')]> hist) ⋅ {[i := (None, Some (rs2cmra p'))]}) =  (<[i:=(Some (to_agree r, MaxNat (b `max` b')), Some (rs2cmra p'))]> ((f2 <$> hist) ⋅ {[i := (None, Some (rs2cmra p))]}))). *)
+  (*   { *)
+  (*     rewrite (fmap_insert f2). rewrite -insert_op. *)
+  (*     rewrite {1}Heqf2. rewrite -pair_op. rewrite op_None_right_id op_None_left_id. *)
+  (*     rewrite gmap_disj_op_union. *)
+  (*     2: { apply map_disjoint_dom. rewrite dom_empty_L. set_solver. } *)
+  (*     rewrite map_union_empty. *)
 
-  Lemma read_hist_update_gen hist i r b b' p (op': option read_state)
-    (ITH: hist !! i = Some ((r, b), p))
-    (P_EXCL: is_Some op' -> rs_wip p):
-    read_hist_auth hist -∗ (⌜ is_Some op' ⌝ -∗ ith_rp i p) ==∗ read_hist_auth (<[ i := ((r,  max b b'), default p op') ]> hist) ∗ ith_read i r (max b b') ∗ (from_option (ith_rp i) True op'). 
-  Proof using.
-    destruct op'.
-    - simpl. iIntros "? RP". iSpecialize ("RP" with "[//]").
-      iApply (read_hist_update with "[$] [$]"); try done.
-      by apply P_EXCL.
-    - simpl. iIntros "? RP".
-      rewrite bi.sep_assoc -bupd_frame_r. iSplit; [| done].
-      iApply (read_hist_update_weak with "[$]"); try done.
-  Qed.
+  (*     apply map_eq. *)
+  (*     intros k. destruct (decide (k = i)). *)
+  (*     - subst. by rewrite !lookup_insert. *)
+  (*     - rewrite !lookup_insert_ne; try done. *)
+  (*       rewrite lookup_op. rewrite lookup_singleton_ne; [| done]. *)
+  (*       by rewrite op_None_right_id. } *)
+
+  (*   rewrite H0. *)
+  (*   rewrite Heqf1 Heqf2.  *)
+  (*   eapply insert_local_update.     *)
+
+  (*   - rewrite lookup_fmap ITH. simpl. reflexivity. *)
+  (*   - rewrite lookup_op. rewrite lookup_singleton. *)
+  (*     rewrite lookup_fmap ITH /=. *)
+  (*     rewrite -Some_op.        *)
+  (*     rewrite -pair_op. rewrite op_None_right_id op_None_left_id. *)
+  (*     reflexivity.  *)
+  (*   - apply prod_local_update'; simpl. *)
+  (*     2: by apply rs_step_local_update.  *)
+  (*     apply option_local_update. *)
+  (*     apply prod_local_update'; simpl; [reflexivity| ]. *)
+  (*     eapply (max_nat_local_update (MaxNat _)). simpl. *)
+  (*     apply Nat.le_max_l. *)
+  (* Qed. *)
 
   Lemma read_hist_alloc hist i r b 
     (NOITH: i ∉ dom hist):
@@ -599,9 +942,8 @@ Section ReadsHistory.
     by apply to_agree_op_inv_L in V. 
   Qed. 
 
-  Lemma ith_rp_mut_excl i rp1 rp2
-    (NEQ: rp1 ≠ rp2):
-    ith_rp i rp1 -∗ ith_rp i rp2 -∗ False.
+  Lemma ith_rp_le i rp1 rp2:
+    ith_rp i rp1 -∗ ith_rp i rp2 -∗ ⌜ rs_compat rp1 rp2 ⌝. 
   Proof using.
     rewrite bi.wand_curry -!own_op.
     iIntros "X". iDestruct (own_valid with "[$]") as %V.
@@ -614,9 +956,8 @@ Section ReadsHistory.
          rewrite -Some_op. reflexivity. }
     rewrite auth_frag_valid singleton_valid.
     rewrite pair_valid.
-    intros [? V]. revert V.
-    rewrite Some_valid. 
-    by apply rp_mut_excl.
-  Qed.    
+    intros [? V]. rewrite Some_valid in V.
+    by apply rs_compat_valid.
+  Qed.
 
 End ReadsHistory.
