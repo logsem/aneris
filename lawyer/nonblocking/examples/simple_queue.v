@@ -24,14 +24,18 @@ Class QueuePreG Σ := {
 }.
 
 
+Record SimpleQueue := SQ {     
+    Head: loc; Tail: loc; BeingRead: loc; 
+    FreeLater: loc; OldHeadVal: loc;
+}.
+
 Class QueueG Σ := {
     q_pre :: QueuePreG Σ; 
     
-    Head: loc; Tail: loc; BeingRead: loc; 
-    FreeLater: loc; OldHeadVal: loc;
-
     q_hq :: HistQueueG Σ;
     q_rh :: ReadHistG Σ;
+
+    q_sq: SimpleQueue;
 
     q_γ_tok_rh: gname;
     q_γ_tok_dq: gname;
@@ -50,34 +54,38 @@ Class QueueG Σ := {
 
 Section SimpleQueue.
 
-  Definition loc_head: val := λ: "q", Fst "q".
-  Definition loc_tail: val := λ: "q", Fst $ Snd "q".
-  Definition loc_BR: val := λ: "q", Fst $ Snd $ Snd "q".
-  Definition loc_FL: val := λ: "q", Fst $ Snd $ Snd $ Snd "q".
-  Definition loc_OHV: val := λ: "q", Snd $ Snd $ Snd $ Snd "q".
+  (* Definition loc_head: val := λ: "q", Fst "q". *)
+  (* Definition loc_tail: val := λ: "q", Fst $ Snd "q". *)
+  (* Definition loc_BR: val := λ: "q", Fst $ Snd $ Snd "q". *)
+  (* Definition loc_FL: val := λ: "q", Fst $ Snd $ Snd $ Snd "q". *)
+  (* Definition loc_OHV: val := λ: "q", Snd $ Snd $ Snd $ Snd "q". *)
 
   Definition get_val: val := λ: "nd", ! ("nd" +ₗ #0).
   Definition get_next: val := λ: "nd", ! ("nd" +ₗ #1).
 
   Definition free_el: val. Admitted.
 
-  Definition dequeue: val :=
+  Definition get_to_free '(SQ _ _ BR FL _): val :=
+    λ: "ph",
+      if: ("ph" = !#BR)
+      then
+        let: "old_fl" := !#FL in
+        #FL <- "ph" ;;
+        "old_fl"
+      else "ph"
+  .
+
+  Definition dequeue '(SQ H T BR FL OHV as sq): val :=
     λ: "q",
-      let: "c" := ! (loc_head "q") in
-      if: ("c" = ! (loc_tail "q"))
+      let: "c" := !#H in
+      if: ("c" = !#T)
         then NONE
         else
           let: "v" := get_val "c" in
-          (loc_OHV "q") <- "v" ;;
-          (loc_head "q") <- (get_next "c") ;;
-          let: "to_free" :=
-            if: ("c" = ! (loc_BR "q"))
-            then
-              let: "old_br" := ! (loc_FL "q") in
-              (loc_FL "q") <- "c" ;;
-              "old_vr"
-            else "c"
-          in free_el "to_free" ;;
+          #OHV <- "v" ;;
+          #H <- (get_next "c") ;;
+          let: "to_free" := get_to_free sq "c" in
+          free_el "to_free" ;;
           (SOME "v")
   .
 
@@ -115,11 +123,11 @@ Section SimpleQueue.
     Definition queue_interp (hq: HistQueue) (h t br fl: nat): iProp Σ :=
       ⌜ t = length hq ⌝ ∗ 
       ([∗ list] nd ∈ drop h hq, hn_interp nd) ∗
-      ∃ (pt: loc), Tail ↦ #pt ∗ hn_interp (pt, dummy_node) ∗ ⌜ is_LL_into hq pt ⌝ ∗
+      ∃ (pt: loc), Tail q_sq ↦ #pt ∗ hn_interp (pt, dummy_node) ∗ ⌜ is_LL_into hq pt ⌝ ∗
       let ph: loc := (from_option (fun hn => hn.1) pt (hq !! h)) in
-      Head ↦{1/2} #ph ∗
-      (∃ (nbr: HistNode), ⌜ hq !! br = Some nbr ⌝ ∗ BeingRead ↦#(nbr.1)) ∗
-      (∃ (nfl: HistNode), ⌜ hq !! fl = Some nfl ⌝ ∗ FreeLater ↦#(nfl.1) ∗ hn_interp nfl)
+      Head q_sq ↦{1/2} #ph ∗
+      (∃ (nbr: HistNode), ⌜ hq !! br = Some nbr ⌝ ∗ BeingRead q_sq ↦#(nbr.1)) ∗
+      (∃ (nfl: HistNode), ⌜ hq !! fl = Some nfl ⌝ ∗ FreeLater q_sq ↦#(nfl.1) ∗ hn_interp nfl)
     .
 
     Lemma queue_interp_cur_empty (hq: HistQueue) (h br fl: nat):
@@ -198,7 +206,7 @@ Section SimpleQueue.
 
     Definition dequeue_resources (h fl: nat) (ph: loc) (od: option nat): iProp Σ :=
       @me_exact _ q_me_h h ∗ @me_exact _ q_me_fl fl ∗
-      Head ↦{1/2} #ph ∗ dangle_frag od. 
+      Head q_sq ↦{1/2} #ph ∗ dangle_frag od. 
   
     Definition read_head_token: iProp Σ := own q_γ_tok_rh (Excl ()).
     Definition dequeue_token: iProp Σ := own q_γ_tok_dq (Excl ()).
@@ -255,7 +263,7 @@ Section SimpleQueue.
     Definition queue_inv_inner (hq: HistQueue) (h t br fl: nat)
       (rop od: option nat) (hist: read_hist) (ohv: val): iProp Σ :=
       hq_auth hq ∗ 
-      queue_interp hq h t br fl ∗ dangle_interp od h hq ∗ OldHeadVal ↦ ohv ∗
+      queue_interp hq h t br fl ∗ dangle_interp od h hq ∗ OldHeadVal q_sq↦ ohv ∗
       ⌜ hq_state_wf h t br fl ⌝ ∗
       auths h t br fl ∗
       rop_interp rop h br fl od ∗
@@ -269,7 +277,7 @@ Section SimpleQueue.
     (* Definition queue_at (q: loc): iProp Σ := *)
       (* pointsto q DfracDiscarded (#Head, #Tail, #BeingRead, #FreeLater, #OldHeadVal)%V.  *)
     Definition queue_at (q: val): iProp Σ :=
-      ⌜ q = (#Head, (#Tail, (#BeingRead, (#FreeLater, #OldHeadVal))))%V ⌝. 
+      ⌜ q = (#(Head q_sq), (#(Tail q_sq), (#(BeingRead q_sq), (#(FreeLater q_sq), #(OldHeadVal q_sq)))))%V ⌝. 
   
     (* Definition queue_inv (q: loc): iProp Σ := *)
     Definition queue_inv (q: val): iProp Σ :=
@@ -296,63 +304,63 @@ Section SimpleQueue.
   Let hGS: heap1GS Σ := iem_phys _ EM.
   Existing Instance hGS. 
 
-  Lemma get_head_spec l τ π q:
-    {{{ queue_at l ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
-      loc_head l @ τ
-    {{{ RET #Head; th_phase_frag τ π q }}}.
-  Proof using.
-    simpl. iIntros (Φ) "(#QAT & PH & CPS) POST". rewrite /loc_head.
-    rewrite /queue_at. iDestruct "QAT" as %->.
-    pure_steps. by iApply "POST".
-  Qed.
+  (* Lemma get_head_spec l τ π q: *)
+  (*   {{{ queue_at l ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}} *)
+  (*     loc_head l @ τ *)
+  (*   {{{ RET #Head q_sq; th_phase_frag τ π q }}}. *)
+  (* Proof using. *)
+  (*   simpl. iIntros (Φ) "(#QAT & PH & CPS) POST". rewrite /loc_head. *)
+  (*   rewrite /queue_at. iDestruct "QAT" as %->. *)
+  (*   pure_steps. by iApply "POST". *)
+  (* Qed. *)
 
-  Lemma get_tail_spec l τ π q:
-    {{{ queue_at l ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
-      loc_tail l @ τ
-    {{{ RET #Tail; th_phase_frag τ π q }}}.
-  Proof using.
-    simpl. iIntros (Φ) "(#QAT & PH & CPS) POST". rewrite /loc_tail.
-    rewrite /queue_at. iDestruct "QAT" as %->.
-    pure_steps.
-    wp_bind (Snd _)%E. pure_steps. 
-    by iApply "POST".
-  Qed.
+  (* Lemma get_tail_spec l τ π q: *)
+  (*   {{{ queue_at l ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}} *)
+  (*     loc_tail l @ τ *)
+  (*   {{{ RET #(Tail q_sq); th_phase_frag τ π q }}}. *)
+  (* Proof using. *)
+  (*   simpl. iIntros (Φ) "(#QAT & PH & CPS) POST". rewrite /loc_tail. *)
+  (*   rewrite /queue_at. iDestruct "QAT" as %->. *)
+  (*   pure_steps. *)
+  (*   wp_bind (Snd _)%E. pure_steps.  *)
+  (*   by iApply "POST". *)
+  (* Qed. *)
 
-  Lemma get_BR_spec l τ π q:
-    {{{ queue_at l ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
-      loc_BR l @ τ
-    {{{ RET #BeingRead; th_phase_frag τ π q }}}.
-  Proof using.
-    simpl. iIntros (Φ) "(#QAT & PH & CPS) POST". rewrite /loc_BR.
-    rewrite /queue_at. iDestruct "QAT" as %->.
-    pure_steps.
-    repeat (wp_bind (Snd (#_, _)%V)%E; pure_steps). 
-    by iApply "POST".
-  Qed.
+  (* Lemma get_BR_spec l τ π q: *)
+  (*   {{{ queue_at l ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}} *)
+  (*     loc_BR l @ τ *)
+  (*   {{{ RET #(BeingRead q_sq); th_phase_frag τ π q }}}. *)
+  (* Proof using. *)
+  (*   simpl. iIntros (Φ) "(#QAT & PH & CPS) POST". rewrite /loc_BR. *)
+  (*   rewrite /queue_at. iDestruct "QAT" as %->. *)
+  (*   pure_steps. *)
+  (*   repeat (wp_bind (Snd (#_, _)%V)%E; pure_steps).  *)
+  (*   by iApply "POST". *)
+  (* Qed. *)
 
-  Lemma get_FL_spec l τ π q:
-    {{{ queue_at l ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
-      loc_FL l @ τ
-    {{{ RET #FreeLater; th_phase_frag τ π q }}}.
-  Proof using.
-    simpl. iIntros (Φ) "(#QAT & PH & CPS) POST". rewrite /loc_FL.
-    rewrite /queue_at. iDestruct "QAT" as %->.
-    pure_steps.
-    repeat (wp_bind (Snd (#_, _)%V)%E; pure_steps). 
-    by iApply "POST".
-  Qed.
+  (* Lemma get_FL_spec l τ π q: *)
+  (*   {{{ queue_at l ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}} *)
+  (*     loc_FL l @ τ *)
+  (*   {{{ RET #(FreeLater q_sq); th_phase_frag τ π q }}}. *)
+  (* Proof using. *)
+  (*   simpl. iIntros (Φ) "(#QAT & PH & CPS) POST". rewrite /loc_FL. *)
+  (*   rewrite /queue_at. iDestruct "QAT" as %->. *)
+  (*   pure_steps. *)
+  (*   repeat (wp_bind (Snd (#_, _)%V)%E; pure_steps).  *)
+  (*   by iApply "POST". *)
+  (* Qed. *)
 
-  Lemma get_OHV_spec l τ π q:
-    {{{ queue_at l ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
-      loc_OHV l @ τ
-    {{{ RET #OldHeadVal; th_phase_frag τ π q }}}.
-  Proof using.
-    simpl. iIntros (Φ) "(#QAT & PH & CPS) POST". rewrite /loc_OHV.
-    rewrite /queue_at. iDestruct "QAT" as %->.
-    pure_steps.
-    repeat (wp_bind (Snd (#_, _)%V)%E; pure_steps). 
-    by iApply "POST".
-  Qed.
+  (* Lemma get_OHV_spec l τ π q: *)
+  (*   {{{ queue_at l ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}} *)
+  (*     loc_OHV l @ τ *)
+  (*   {{{ RET #(OldHeadVal q_sq); th_phase_frag τ π q }}}. *)
+  (* Proof using. *)
+  (*   simpl. iIntros (Φ) "(#QAT & PH & CPS) POST". rewrite /loc_OHV. *)
+  (*   rewrite /queue_at. iDestruct "QAT" as %->. *)
+  (*   pure_steps. *)
+  (*   repeat (wp_bind (Snd (#_, _)%V)%E; pure_steps).  *)
+  (*   by iApply "POST". *)
+  (* Qed. *)
 
   Lemma dequeue_token_excl:
     dequeue_token -∗ dequeue_token -∗ False.
@@ -372,9 +380,9 @@ Section SimpleQueue.
 
   Lemma access_queue_ends hq h t br fl:
     hq_auth hq -∗ queue_interp hq h t br fl -∗
-      ∃ (ph pt: loc), Head ↦{1/2} #ph ∗ Tail ↦ #pt ∗
+      ∃ (ph pt: loc), Head q_sq ↦{1/2} #ph ∗ (Tail q_sq) ↦ #pt ∗
         (⌜ h >= t /\ ph = pt ⌝ ∨ ⌜ h < t /\ ph ≠ pt ⌝ ∗ ∃ (nd: Node), ith_node h (ph, nd)) ∗
-        (Head ↦{1/2} #ph -∗ Tail ↦ #pt -∗ hq_auth hq ∗ queue_interp hq h t br fl).
+        (Head q_sq ↦{1/2} #ph -∗ (Tail q_sq) ↦ #pt -∗ hq_auth hq ∗ queue_interp hq h t br fl).
   Proof using.
     simpl. iIntros "[AUTH #FRAGS] QI".
     rewrite /queue_interp.
@@ -520,16 +528,15 @@ Section SimpleQueue.
   Qed.
 
   Lemma dequeue_res_head_agree h fl (ph ph': loc) od:
-    dequeue_resources h fl ph od -∗ Head ↦{1 / 2} #ph' -∗ ⌜ ph' = ph ⌝.
+    dequeue_resources h fl ph od -∗ Head q_sq ↦{1 / 2} #ph' -∗ ⌜ ph' = ph ⌝.
   Proof using.
     simpl. rewrite /dequeue_resources. iIntros "(_&_&H'&?) H".
     iDestruct (pointsto_agree with "[$] [$]") as %?. set_solver.
   Qed.
 
   Lemma update_ohv_spec τ π q (v: val) l:
-    {{{ queue_inv l ∗
-          th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
-      #OldHeadVal <- v @τ
+    {{{ queue_inv l ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
+      #(OldHeadVal q_sq) <- v @τ
     {{{ RET #(); th_phase_frag τ π q }}}.
   Proof using.
     iIntros (Φ) "([#QAT #INV] & PH & CPS) POST".
@@ -677,7 +684,7 @@ Section SimpleQueue.
         ith_node h (ph, (vh, nxh)) ∗ 
         th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel ∗
         dequeue_resources h fl ph None }}}
-      #Head <- #nxh @τ
+      #(Head q_sq) <- #nxh @τ
     {{{ RET #(); th_phase_frag τ π q ∗ dequeue_resources (h + 1) fl nxh (Some h) ∗
                    ∃ i r b, ith_read i r (h + 1) ∗ ⌜ r <= h ⌝ ∗
                                br_lb b ∗
@@ -886,7 +893,7 @@ Section SimpleQueue.
         th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel ∗
         ith_read i r (h + 1) ∗ br_lb b0
     }}}
-      ! #BeingRead @τ
+      ! #(BeingRead q_sq) @τ
     {{{ (pbr: loc), RET #pbr; th_phase_frag τ π q ∗
             dequeue_resources (h + 1) fl ndh.2 (if (decide (pbr = ph)) then Some h else None) ∗
             (⌜ pbr = ph ⌝ ∨ 
@@ -1001,7 +1008,7 @@ Section SimpleQueue.
   Lemma read_FL_spec τ π l h q fl nd od:
   {{{ queue_inv l ∗ dequeue_resources h fl nd od ∗
       cp π d ∗ th_phase_frag τ π q }}}
-    ! #FreeLater @τ
+    ! #(FreeLater q_sq) @τ
   {{{ (pfl: loc), RET (#pfl);
       ∃ ndfl, ith_node fl (pfl, ndfl) ∗ 
       dequeue_resources h fl nd od ∗ th_phase_frag τ π q }}}.
@@ -1082,21 +1089,19 @@ Section SimpleQueue.
         ith_read i r (h + 1) ∗
         br_lb b ∗ (⌜ b < r ⌝ -∗ (ith_rp i rs_canceled ∨ ith_rp i (rs_proc (Some rsp_completed))))
     }}}
-        (if: (#ph = !#BeingRead)
-        then
-            let: "old_fl" := !#FreeLater in
-            #FreeLater <- #ph ;;
-            "old_fl"
-            else #ph) @ τ
+      get_to_free q_sq #ph @ τ
     {{{ (to_free: loc), RET #to_free;
         ∃ hn fl', hn_interp (to_free, hn) ∗ th_phase_frag τ π q ∗
                     dequeue_resources (h + 1) fl' ndh.2 None }}}.
   Proof using.
     simpl.
     iIntros (Φ) "([#QAT #INV] & #HTH & DR& PH & CPS & #READ & #BR0 & #NO_FL) POST".
-
+    rewrite /get_to_free. destruct q_sq eqn:Q_SQ. 
+    pure_steps. 
+    
     split_cps "CPS" get_loc_fuel.
-    wp_bind (! _)%E.
+    wp_bind (! _)%E. 
+    replace BeingRead0 with (BeingRead q_sq) by (by rewrite Q_SQ). 
     iApply (check_BR_spec with "[-POST CPS]").
     { apply READ_BOUND. }
     { iFrame "#∗". }
@@ -1120,6 +1125,7 @@ Section SimpleQueue.
 
     wp_bind (! _)%E.
     split_cps "CPS" 1. rewrite -cp_mul_1.
+    replace FreeLater0 with (FreeLater q_sq) by (by rewrite Q_SQ). 
     iApply (read_FL_spec with "[-POST CPS]").
     { iFrame "#∗". }
     iIntros "!> %pfl (%ndfl & #FLTH & DR & PH)".
@@ -1276,24 +1282,21 @@ Section SimpleQueue.
   Lemma dequeue_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ queue_inv l ∗ dequeue_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d dequeue_fuel }}}
-      dequeue l @ τ
+      dequeue q_sq l @ τ
     {{{ (v: val), RET v; th_phase_frag τ π q ∗ dequeue_token }}}.
   Proof using.
-    simpl. iIntros (Φ) "([#QAT #INV] & TOK & PH & CPS) POST". rewrite /dequeue.
+    simpl. iIntros (Φ) "([#QAT #INV] & TOK & PH & CPS) POST".
+    rewrite /dequeue. destruct q_sq eqn:Q_SQ.
     pure_steps.
 
-    split_cps "CPS" get_loc_fuel.
-    { cbv. lia. } 
-    iApply (get_head_spec with "[$QAT $CPS' $PH]").
-    iIntros "!> PH".
-
     wp_bind (! _)%E.
-    iInv "INV" as "(%hq & %h & %t & %br & %fl & %hob & %od & %ohv & inv)" "CLOS".
+    iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od_ & %hist & %ohv & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as "(>HQ & >QI & DANGLE & OHV & >%ORDER & >AUTHS & >%SAFE_BR & RH & DQ)".
+    iDestruct "inv" as "(>HQ & >QI & >DANGLE & OHV & >%ORDER & >AUTHS & >ROP & >RHIST & >%RH_WF & >#OLDS & >RH & >DQ)".
     
     iApply sswp_MU_wp; [done| ].
     iDestruct (access_queue_ends with "[$] [$]") as "(%ph & %pt & HEAD & TAIL & HT & CLOS')".
+    replace Head0 with (Head q_sq) by (by rewrite Q_SQ).
     iApply (wp_load with "HEAD"). iIntros "!> HEAD".
     iDestruct "DQ" as "[[%ph_ DR] | TOK']".
     2: { by iDestruct (dequeue_token_excl with "[$] [$]") as "?". }
@@ -1302,20 +1305,17 @@ Section SimpleQueue.
     MU_by_burn_cp. iApply wp_value.
 
     iMod ("CLOS" with "[-POST CPS PH DR]") as "_".
-    { by iFrame. }
+    { iFrame. by iFrame "OLDS". }
     iModIntro.
+
     (* TODO: do we need to keep track of previous values at this point? *)
-    clear t br hob od ohv ORDER SAFE_BR hq.
+    clear t br ohv ORDER hq.
     clear pt.
 
     wp_bind (Rec _ _ _)%E. pure_steps. 
     
-    split_cps "CPS" get_loc_fuel.
-    { cbv. lia. } 
-    iApply (get_tail_spec with "[$QAT $CPS' $PH]").
-    iIntros "!> PH".
-
     wp_bind (! _)%E.
+    foobar. 
     iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %hob & %od & %ohv & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
     iDestruct "inv" as "(>HQ & >QI & DANGLE & OHV & >%ORDER & AUTHS & >%SAFE_BR & RH & DQ)".
