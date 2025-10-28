@@ -925,7 +925,7 @@ Section SimpleQueue.
 
     iDestruct (br_lb_bound with "BR0 AUTHS") as %BR0. 
     iDestruct (take_snapshot with "[$]") as "#SHT".
-    iDestruct (hq_auth_get_ith with "HQ") as "[#BRTH' HQ]".
+    iDestruct (hq_auth_get_ith with "HQ") as "#BRTH'".
     { apply BRTH. }
     iFrame "BRTH'". 
 
@@ -998,12 +998,33 @@ Section SimpleQueue.
       + iFrame.
   Qed.
 
-  Lemma read_FL_spec τ π h q fl nd od:
-  {{{ dequeue_resources h fl nd od ∗
+  Lemma read_FL_spec τ π l h q fl nd od:
+  {{{ queue_inv l ∗ dequeue_resources h fl nd od ∗
       cp π d ∗ th_phase_frag τ π q }}}
-  ! #FreeLater @τ
-  {{{ RET (#fl); dequeue_resources h fl nd od ∗ th_phase_frag τ π q }}}.
-  Proof using. Admitted.
+    ! #FreeLater @τ
+  {{{ (pfl: loc), RET (#pfl);
+      ∃ ndfl, ith_node fl (pfl, ndfl) ∗ 
+      dequeue_resources h fl nd od ∗ th_phase_frag τ π q }}}.
+  Proof using.
+    iIntros (Φ) "([#QAT #INV] & DR & CPS & PH) POST".
+    iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od_ & %hist & %ohv & inv)" "CLOS".
+    iEval (rewrite /queue_inv_inner) in "inv".
+    iDestruct "inv" as "(>HQ & >QI & >DANGLE & OHV & >%ORDER & >AUTHS & >ROP & >RHIST & >%RH_WF & >#OLDS & >RH & >DQ)".
+    iDestruct "DQ" as "[(% & DR') | TOK]".
+    { by iDestruct (dequeue_resources_excl with "[$] [$]") as "?". }
+    iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[<- <-].
+    rewrite /queue_interp. iDestruct "QI" as "(%T_LEN &  HNIS & %pt & TAIL & TLI & %LL & HEAD & BR & FL)".
+    iDestruct "FL" as "(%x & %FLTH & FL & HNI_FL)". 
+    iDestruct (hq_auth_get_ith with "[$]") as "#FLTH"; [by eauto| ].
+    iApply sswp_MU_wp; [done| ].     
+    iApply (wp_load with "FL"). iIntros "!> FL".
+    rewrite cp_mul_1. 
+    MU_by_burn_cp. iApply wp_value.
+    iMod ("CLOS" with "[-POST DR PH]") as "_".
+    { iFrame. iFrame "OLDS". done. }
+    iModIntro. iApply "POST". iFrame.
+    destruct x. iFrame "FLTH".     
+  Qed.
 
   Lemma hn_interp_ptr_excl ptr nd1 nd2:
     hn_interp (ptr, nd1) -∗ hn_interp (ptr, nd2) -∗ False.
@@ -1068,7 +1089,8 @@ Section SimpleQueue.
             "old_fl"
             else #ph) @ τ
     {{{ (to_free: loc), RET #to_free;
-        ∃ hn, hn_interp (to_free, hn) ∗ th_phase_frag τ π q }}}.
+        ∃ hn fl', hn_interp (to_free, hn) ∗ th_phase_frag τ π q ∗
+                    dequeue_resources (h + 1) fl' ndh.2 None }}}.
   Proof using.
     simpl.
     iIntros (Φ) "([#QAT #INV] & #HTH & DR& PH & CPS & #READ & #BR0 & #NO_FL) POST".
@@ -1100,7 +1122,7 @@ Section SimpleQueue.
     split_cps "CPS" 1. rewrite -cp_mul_1.
     iApply (read_FL_spec with "[-POST CPS]").
     { iFrame "#∗". }
-    iIntros "!> [DR PH]".
+    iIntros "!> %pfl (%ndfl & #FLTH & DR & PH)".
 
     wp_bind (Rec _ _ _)%E. pure_steps.
 
@@ -1140,7 +1162,9 @@ Section SimpleQueue.
     (* iCombine "HEAD HEAD'" as "HEAD".  *)
     iApply sswp_MU_wp; [done| ].
 
-    iDestruct "FL" as "(%nfl & %FLTH & FL & HNI_FL)". 
+    iDestruct "FL" as "(%ndfl_ & %FLTH & FL & HNI_FL)".
+    iDestruct (hq_auth_lookup with "[$] FLTH") as %FLTH_.
+    rewrite FLTH in FLTH_. inversion FLTH_. subst ndfl_. clear FLTH_. 
     iApply (wp_store with "FL"). iIntros "!> FL".
     MU_by_burn_cp. iApply wp_value.
 
@@ -1230,8 +1254,7 @@ Section SimpleQueue.
           red in ORDER. lia. }
 
       iModIntro. wp_bind (Rec _ _ _)%E. pure_steps.
-      (* TODO: fix a mistake in fl read spec *)
-      admit.
+      iApply "POST". iFrame. 
     - 
       iAssert (dequeue_resources (h + 1) h ndh.2 None)%I with "[CH CFL HEAD' DFRAG]" as "DR".
       { iFrame. }
@@ -1246,9 +1269,8 @@ Section SimpleQueue.
           red in ORDER. lia. }
 
       iModIntro. wp_bind (Rec _ _ _)%E. pure_steps.
-      (* TODO: fix a mistake in fl read spec *)
-      admit.
-  Qed. 
+      iApply "POST". iFrame. 
+  Qed.
 
   
   Lemma dequeue_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
