@@ -245,7 +245,7 @@ Section QueueResources.
     apply Persistent_pure_helper; [apply _| ]. 
     intros. destruct H as [-> | [-> | ->]]; apply _.
   Qed.
-    
+  
   Definition queue_inv_inner (hq: HistQueue) (h t br fl: nat)
     (rop od: option nat) (hist: read_hist) (ohv: val): iProp Σ :=
     hq_auth hq ∗ 
