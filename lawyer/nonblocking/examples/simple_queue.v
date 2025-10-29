@@ -5,11 +5,12 @@ From trillium.program_logic Require Export weakestpre adequacy ectx_lifting.
 From fairness Require Import utils.
 From lawyer.examples Require Import obls_tactics.
 From lawyer.nonblocking.examples Require Import simple_queue_utils.
-From lawyer.obligations Require Import obligations_model obligations_resources obligations_am obligations_em obligations_logic env_helpers.
-From lawyer Require Import sub_action_em program_logic.
 From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From iris.base_logic.lib Require Import invariants.
+From heap_lang Require Import heap_lang_defs lang notation.
 
+
+Close Scope Z. 
 
 Class QueuePreG Σ := {
   q_pre_max :: MaxExactPreG Σ;
@@ -108,13 +109,22 @@ Section QueueResources.
       which doesn NOT belong to the logical queue hq.
       Upon enqueuing, this dummy note is updated and appended to hq.
    *)
-  (* TODO: enforce it explicitly? *)
+  Definition phys_queue_interp (pq: HistQueue): iProp Σ :=
+    ([∗ list] nd ∈ pq, hn_interp nd) ∗
+    ∃ (pt: loc), Tail q_sq ↦ #pt ∗ hn_interp (pt, dummy_node) ∗ ⌜ is_LL_into pq pt ⌝ ∗
+    let ph: loc := (from_option (fun hn => hn.1) pt (pq !! 0)) in
+    Head q_sq ↦{1/2} #ph
+  . 
+      
+  
   Definition queue_interp (hq: HistQueue) (h t br fl: nat): iProp Σ :=
+    let pq := drop h hq in
     ⌜ t = length hq ⌝ ∗ 
-    ([∗ list] nd ∈ drop h hq, hn_interp nd) ∗
-    ∃ (pt: loc), Tail q_sq ↦ #pt ∗ hn_interp (pt, dummy_node) ∗ ⌜ is_LL_into hq pt ⌝ ∗
-    let ph: loc := (from_option (fun hn => hn.1) pt (hq !! h)) in
-    Head q_sq ↦{1/2} #ph ∗
+    (* ([∗ list] nd ∈ pq, hn_interp nd) ∗ *)
+    (* ∃ (pt: loc), Tail q_sq ↦ #pt ∗ hn_interp (pt, dummy_node) ∗ ⌜ is_LL_into pq pt ⌝ ∗ *)
+    (* let ph: loc := (from_option (fun hn => hn.1) pt (hq !! h)) in *)
+    (* Head q_sq ↦{1/2} #ph ∗ *)
+    phys_queue_interp pq ∗ 
     (∃ (nbr: HistNode), ⌜ hq !! br = Some nbr ⌝ ∗ BeingRead q_sq ↦#(nbr.1)) ∗
     (∃ (nfl: HistNode), ⌜ hq !! fl = Some nfl ⌝ ∗ FreeLater q_sq ↦#(nfl.1) ∗ hn_interp nfl)
   .
@@ -245,15 +255,20 @@ Section QueueResources.
     apply Persistent_pure_helper; [apply _| ]. 
     intros. destruct H as [-> | [-> | ->]]; apply _.
   Qed.
+
+  Definition ohv_interp: iProp Σ := ∃ ohv, OldHeadVal q_sq↦ ohv.
+
+  Definition read_hist_interp hist rop h br fl od: iProp Σ :=
+    rop_auth rop ∗
+    rop_interp rop h br fl od ∗ read_hist_auth hist ∗
+    ⌜ read_hist_wf hist rop h ⌝ ∗ old_rps hist rop
+  . 
   
   Definition queue_inv_inner (hq: HistQueue) (h t br fl: nat)
-    (rop od: option nat) (hist: read_hist) (ohv: val): iProp Σ :=
-    hq_auth hq ∗ 
-    queue_interp hq h t br fl ∗ dangle_interp od h hq ∗ OldHeadVal q_sq↦ ohv ∗
-    ⌜ hq_state_wf h t br fl ⌝ ∗
-    auths h t br fl ∗
-    rop_interp rop h br fl od ∗
-    read_hist_auth hist ∗ ⌜ read_hist_wf hist rop h ⌝ ∗ old_rps hist rop ∗
+    (rop od: option nat) (hist: read_hist): iProp Σ :=
+    hq_auth hq ∗ auths h t br fl ∗ ⌜ hq_state_wf h t br fl ⌝ ∗
+    queue_interp hq h t br fl ∗ dangle_interp od h hq ∗ ohv_interp ∗
+    read_hist_interp hist rop h br fl od ∗ 
     (read_head_resources t br ∨ read_head_token) ∗ 
     ((∃ ph, dequeue_resources h fl ph None) ∨ dequeue_token)
   .
@@ -266,7 +281,7 @@ Section QueueResources.
   (* Definition queue_inv (q: loc): iProp Σ := *)
   Definition queue_inv (q: val): iProp Σ :=
     queue_at q ∗ inv queue_ns 
-      (∃ hq h t br fl rop od hist ohv, queue_inv_inner hq h t br fl rop od hist ohv)
+      (∃ hq h t br fl rop od hist, queue_inv_inner hq h t br fl rop od hist)
   .
   
   Lemma dequeue_token_excl:
@@ -363,12 +378,13 @@ Section QueueResources.
         (Head q_sq ↦{1/2} #ph -∗ (Tail q_sq) ↦ #pt -∗ hq_auth hq ∗ queue_interp hq h t br fl).
   Proof using.
     simpl. iIntros "[AUTH #FRAGS] QI".
-    rewrite /queue_interp.
-    iDestruct "QI" as "(%T_LEN & Q & (%pt & TAIL & DUMMY & %LL & HEAD & BR))".
-    iFrame "HEAD TAIL".    
+    rewrite /queue_interp. iDestruct "QI" as "(%T_LEN & PQI & BR & FL)".
+    rewrite /phys_queue_interp. iDestruct "PQI" as "(Q & (%pt & TAIL & DUMMY & %LL & HEAD))".
+    
+    iFrame "HEAD TAIL".
+    rewrite lookup_drop Nat.add_0_r. 
     destruct (Nat.lt_ge_cases h t) as [LT | GE]; subst t.     
-    - 
-      pose proof LT as [[ph [??]] HTH]%lookup_lt_is_Some_2.
+    - pose proof LT as [[ph [??]] HTH]%lookup_lt_is_Some_2.
       rewrite HTH. simpl.
       iDestruct (big_sepL_lookup_acc with "FRAGS") as "[ITH _]"; [by eauto| ].
       iFrame "ITH BR". 
@@ -393,32 +409,33 @@ Section QueueResources.
     hq_auth hq -∗ queue_interp hq h t br fl -∗ ith_node i hn -∗
     hn_interp hn ∗ (hn_interp hn -∗ queue_interp hq h t br fl ∗ hq_auth hq).
   Proof using.
-    simpl. rewrite /queue_interp. iIntros "AUTH (% & Q & $) #ITH".
+    simpl. rewrite /queue_interp. iIntros "AUTH (% & PQI & $) #ITH".
+    rewrite /phys_queue_interp. iDestruct "PQI" as "(Q & (%pt & TAIL & DUMMY & %LL & HEAD))".
     iDestruct (hq_auth_lookup with "[$] [$]") as %ITH.
     apply proj1, Nat.le_sum in IN as [? ->].
     iDestruct (big_sepL_lookup_acc with "Q") as "[HNI CLOS]".
     { erewrite lookup_drop; eauto. }
-    iFrame. iIntros. iSplit; [done| ]. by iApply "CLOS".     
+    iFrame. iIntros. iFrame. repeat iSplit; try done. by iApply "CLOS".     
   Qed. 
 
-  (* TODO: also holds if h is not in the hist queue (e.g. initially) *)
-  Lemma queue_interp_ph_neq_pfl' (hq: HistQueue) h t br fl (ptr: loc):
-    queue_interp hq h t br fl -∗ ⌜ exists nd, hq !! h = Some (ptr, nd) ⌝ -∗
-    ⌜ exists nd, hq !! fl = Some (ptr, nd) ⌝ -∗
-      False.
-  Proof using.
-    simpl. 
-    iIntros "QI (%ndh & %HTH) (%ndfl & %FLTH)". rewrite /queue_interp.
-    rewrite /queue_interp. iDestruct "QI" as "(%T_LEN &  HNIS & %pt & TAIL & TLI & %LL & HEAD & BR & FL)".
-    iDestruct "FL" as "(% & %FLTH_ & FL & HNI_FL)".
-    rewrite FLTH in FLTH_. inversion FLTH_. subst. simpl.
-    rewrite HTH. simpl.
-    iDestruct (big_sepL_elem_of with "HNIS") as "II".
-    { apply elem_of_list_lookup. eexists.
-      erewrite lookup_drop with (i := 0).
-      by rewrite Nat.add_0_r. }
-    simpl. by iDestruct (hn_interp_ptr_excl with "[$] [$]") as "?".
-  Qed.    
+  (* (* TODO: also holds if h is not in the hist queue (e.g. initially) *) *)
+  (* Lemma queue_interp_ph_neq_pfl' (hq: HistQueue) h t br fl (ptr: loc): *)
+  (*   queue_interp hq h t br fl -∗ ⌜ exists nd, hq !! h = Some (ptr, nd) ⌝ -∗ *)
+  (*   ⌜ exists nd, hq !! fl = Some (ptr, nd) ⌝ -∗ *)
+  (*     False. *)
+  (* Proof using. *)
+  (*   simpl.  *)
+  (*   iIntros "QI (%ndh & %HTH) (%ndfl & %FLTH)". rewrite /queue_interp. *)
+  (*   rewrite /queue_interp. iDestruct "QI" as "(%T_LEN &  HNIS & %pt & TAIL & TLI & %LL & HEAD & BR & FL)". *)
+  (*   iDestruct "FL" as "(% & %FLTH_ & FL & HNI_FL)". *)
+  (*   rewrite FLTH in FLTH_. inversion FLTH_. subst. simpl. *)
+  (*   rewrite HTH. simpl. *)
+  (*   iDestruct (big_sepL_elem_of with "HNIS") as "II". *)
+  (*   { apply elem_of_list_lookup. eexists. *)
+  (*     erewrite lookup_drop with (i := 0). *)
+  (*     by rewrite Nat.add_0_r. } *)
+  (*   simpl. by iDestruct (hn_interp_ptr_excl with "[$] [$]") as "?". *)
+  (* Qed.     *)
 
   Lemma queue_interp_dangle_neq_pfl' (hq: HistQueue) h t br fl (ptr: loc):
     queue_interp hq h t br fl -∗
@@ -428,8 +445,9 @@ Section QueueResources.
       False.
   Proof using.
     simpl. 
-    iIntros "QI DI (%ndfl & %FLTH) (% & %DTH)". rewrite /queue_interp.
-    rewrite /queue_interp. iDestruct "QI" as "(%T_LEN &  HNIS & %pt & TAIL & TLI & %LL & HEAD & BR & FL)".
+    iIntros "QI DI (%ndfl & %FLTH) (% & %DTH)".
+    rewrite /queue_interp. iDestruct "QI" as "(%T_LEN & PQI & BR & FL)".
+    rewrite /phys_queue_interp. iDestruct "PQI" as "(Q & (%pt & TAIL & DUMMY & %LL & HEAD))".
     iDestruct "FL" as "(% & %FLTH_ & FL & HNI_FL)".
     rewrite FLTH in FLTH_. inversion FLTH_. subst. simpl.
     rewrite /dangle_interp.
