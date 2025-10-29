@@ -1278,6 +1278,12 @@ Section SimpleQueue.
       iApply "POST". iFrame. 
   Qed.
 
+  Lemma free_el_spec τ π q ptr nd:
+    {{{ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel ∗ 
+        hn_interp (ptr, nd) }}}
+      free_el #ptr @ τ
+    {{{ v, RET v; th_phase_frag τ π q }}}.
+  Proof using. Admitted. 
   
   Lemma dequeue_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ queue_inv l ∗ dequeue_token ∗ 
@@ -1290,7 +1296,7 @@ Section SimpleQueue.
     pure_steps.
 
     wp_bind (! _)%E.
-    iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od_ & %hist & %ohv & inv)" "CLOS".
+    iInv "INV" as "(%hq & %h & %t & %br & %fl & %rop & %od & %hist & %ohv & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
     iDestruct "inv" as "(>HQ & >QI & >DANGLE & OHV & >%ORDER & >AUTHS & >ROP & >RHIST & >%RH_WF & >#OLDS & >RH & >DQ)".
     
@@ -1301,6 +1307,7 @@ Section SimpleQueue.
     iDestruct "DQ" as "[[%ph_ DR] | TOK']".
     2: { by iDestruct (dequeue_token_excl with "[$] [$]") as "?". }
     iDestruct (dequeue_res_head_agree with "DR [$]") as %<-. 
+    iDestruct (dequeue_resources_dangle_agree with "DR [$]") as %->.
     iDestruct ("CLOS'" with "[$] [$]") as "(HQ & QI)".
     MU_by_burn_cp. iApply wp_value.
 
@@ -1310,35 +1317,35 @@ Section SimpleQueue.
 
     (* TODO: do we need to keep track of previous values at this point? *)
     clear t br ohv ORDER hq.
-    clear pt.
+    iClear "OLDS". 
+    clear pt rop RH_WF hist.
 
     wp_bind (Rec _ _ _)%E. pure_steps. 
     
     wp_bind (! _)%E.
-    foobar. 
-    iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %hob & %od & %ohv & inv)" "CLOS".
+    iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od_ & %hist & %ohv & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as "(>HQ & >QI & DANGLE & OHV & >%ORDER & AUTHS & >%SAFE_BR & RH & DQ)".
+    iDestruct "inv" as "(>HQ & >QI & >DANGLE & OHV & >%ORDER & >AUTHS & >ROP & >RHIST & >%RH_WF & >#OLDS & >RH & >DQ)".
     iApply sswp_MU_wp; [done| ].
     iDestruct (access_queue_ends with "[$] [$]") as "(%ph_ & %pt & HEAD & TAIL & #HT & CLOS')".
+    replace Tail0 with (Tail q_sq) by (by rewrite Q_SQ).
     iApply (wp_load with "[$]"). iIntros "!> TAIL".
     iDestruct (dequeue_res_head_agree with "DR [$]") as %->. 
     iDestruct (dequeue_resources_auth_agree with "DR [$]") as %[<- <-].
     iDestruct (take_snapshot with "[$]") as "#SHT".
+    iDestruct "DQ" as "[(% & DR') | TOK]".
+    { by iDestruct (dequeue_resources_excl with "DR DR'") as "?". }
 
     iDestruct ("CLOS'" with "[$] [$]") as "(HQ & QI)".
     MU_by_burn_cp. iApply wp_value.
     iMod ("CLOS" with "[-POST CPS PH DR]") as "_".
-    { by iFrame. }
+    { iFrame. by iFrame "OLDS". }
     iModIntro.
 
     (* TODO: do we need to keep track of previous values at this point? *)
     (* clear br hob od ohv ORDER SAFE_BR hq. *)
-    clear od ohv
-      (* ORDER *)
-      SAFE_BR
-      hq
-    .
+    iClear "OLDS SHT". 
+    clear ohv hist hq RH_WF od_ (* ORDER *) rop (* br *).    
 
     wp_bind (_ = _)%E.
     iApply sswp_MU_wp; [done| ].
@@ -1348,12 +1355,13 @@ Section SimpleQueue.
 
     (* destruct bool_decide. *)
     iDestruct "HT" as "[[%GE <-] | (%NEMPTY & %ndh & #HTH)]". 
-    { assert (t = h) as -> by lia.
+    { assert (t = h) as ->.
+      { red in ORDER. lia. }
       rewrite bool_decide_true; [| done]. 
       iApply sswp_MU_wp_fupd; [done| ]. 
-      iInv "INV" as "(%hq & %h_ & %t' & %br' & %fl_ & %hob' & %od & %ohv & inv)" "CLOS".
+      iInv "INV" as "(%hq & %h_ & %t & %br' & %fl_ & %rop & %od_ & %hist & %ohv & inv)" "CLOS".
       iEval (rewrite /queue_inv_inner) in "inv".
-      iDestruct "inv" as "(>HQ & >QI & DANGLE & OHV & >%ORDER' & AUTHS & >%SAFE_BR & RH & DQ)".
+      iDestruct "inv" as "(>HQ & >QI & >DANGLE & OHV & >%ORDER' & >AUTHS & >ROP & >RHIST & >%RH_WF & >#OLDS & >RH & >DQ)".
       iModIntro.
       iApply sswp_pure_step; [done| ].
       do 2 iNext. MU_by_burn_cp.
@@ -1361,7 +1369,7 @@ Section SimpleQueue.
       { by iDestruct (dequeue_resources_excl with "[$] [$]") as "?". }
       iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[-> ->]. 
       iMod ("CLOS" with "[-POST CPS PH TOK]") as "_".
-      { by iFrame. }
+      { iFrame. by iFrame "OLDS". }
       iModIntro. pure_steps.
       iApply "POST". iFrame. }
 
@@ -1371,12 +1379,10 @@ Section SimpleQueue.
     { iFrame "#∗". }
     iIntros "!> [PH DR]".
     wp_bind (Rec _ _ _)%E. pure_steps.
-    split_cps "CPS" get_loc_fuel; [cbv; lia| ]. 
-    iApply (get_OHV_spec with "[$PH $CPS' $QAT]").
-    iIntros "!> PH".
 
     destruct ndh as [vh nxh]. simpl.
     wp_bind (_ <- _)%E.
+    replace OldHeadVal0 with (OldHeadVal q_sq) by (by rewrite Q_SQ).
     split_cps "CPS" get_loc_fuel; [cbv; lia| ].     
     iApply (update_ohv_spec with "[$QAT $PH $CPS' $INV]").
     iIntros "!> PH".
@@ -1387,25 +1393,49 @@ Section SimpleQueue.
     { iFrame "#∗". }
     iIntros "!> [PH DR]". simpl.
 
-    wp_bind (loc_head l)%E. 
-    split_cps "CPS" get_loc_fuel; [cbv; lia| ].
-    iApply (get_head_spec with "[$QAT $CPS' $PH]").
-    iIntros "!> PH".
-
     wp_bind (_ <- _)%E.
     split_cps "CPS" get_loc_fuel; [cbv; lia| ].
     iApply (dequeue_upd_head_spec with "[$QAT $CPS' $PH $INV $HTH $DR]").
-    iIntros "!> (PH & DR)".
+    iIntros "!> (PH & DR & (%i & %r & %b & #ITHR & %BR & #TOKS))".
 
+    wp_bind (Rec _ _ _)%E. do 3 pure_step_cases.
+    fold (get_to_free (SQ Head0 Tail0 BeingRead0 FreeLater0 OldHeadVal0)).
+    rewrite -Q_SQ. 
+    wp_bind (get_to_free _ _)%E.         
+    split_cps "CPS" (3 * get_loc_fuel); [cbv; lia| ].
+    iApply (get_to_free_spec with "[-POST CPS]").
+    { apply BR. }
+    { iFrame "#∗". }
+    
+    iIntros "!> %to_free (%hfr & %fl' & HNFR & PH & DR)".
     wp_bind (Rec _ _ _)%E. pure_steps.
+    wp_bind (free_el _)%E.
     split_cps "CPS" get_loc_fuel; [cbv; lia| ].
-    iApply (get_BR_spec with "[$QAT $CPS' $PH]").
-    iIntros "!> PH".
+    iApply (free_el_spec with "[CPS' PH HNFR]").
+    { iFrame. }
+    iIntros "!> %v PH".
 
-    wp_bind (! _)%E.
-    
-    
-    
+    wp_bind (Rec _ _ _)%E. do 2 pure_step_cases. 
+    iClear "TOKS ITHR HTH". 
+    clear dependent r t hfr to_free br ph b. 
 
+    iApply sswp_MU_wp_fupd; [done| ]. 
+    iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od & %hist & %ohv & inv)" "CLOS".
+    iEval (rewrite /queue_inv_inner) in "inv".
+    iDestruct "inv" as "(>HQ & >QI & >DANGLE & OHV & >%ORDER & >AUTHS & >ROP & >RHIST & >%RH_WF & >#OLDS & >RH & >DQ)".
+    iDestruct "DQ" as "[(% & DR') | TOK]".
+    { by iDestruct (dequeue_resources_excl with "DR DR'") as "?". }
+    (* iDestruct (dequeue_res_head_agree with "DR [$]") as %->.  *)
+    iDestruct (dequeue_resources_auth_agree with "DR [$]") as %[<- <-].
+    iDestruct (dequeue_resources_dangle_agree with "DR [$]") as %->.
+
+    iModIntro. iApply sswp_pure_step; [done| ]. 
+    MU_by_burn_cp. simpl.
+    iMod ("CLOS" with "[-POST CPS PH TOK]") as "_".
+    { iFrame. by iFrame "OLDS". }
+ 
+    iModIntro. pure_steps.
+    iApply "POST". iFrame.
+  Qed. 
     
 End SimpleQueue.
