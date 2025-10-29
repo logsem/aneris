@@ -54,12 +54,6 @@ Class QueueG Σ := {
 
 Section SimpleQueue.
 
-  (* Definition loc_head: val := λ: "q", Fst "q". *)
-  (* Definition loc_tail: val := λ: "q", Fst $ Snd "q". *)
-  (* Definition loc_BR: val := λ: "q", Fst $ Snd $ Snd "q". *)
-  (* Definition loc_FL: val := λ: "q", Fst $ Snd $ Snd $ Snd "q". *)
-  (* Definition loc_OHV: val := λ: "q", Snd $ Snd $ Snd $ Snd "q". *)
-
   Definition get_val: val := λ: "nd", ! ("nd" +ₗ #0).
   Definition get_next: val := λ: "nd", ! ("nd" +ₗ #1).
 
@@ -119,7 +113,6 @@ Section SimpleQueue.
         Upon enqueuing, this dummy note is updated and appended to hq.
      *)
     (* TODO: enforce it explicitly? *)
-    (* TODO: add other components *)
     Definition queue_interp (hq: HistQueue) (h t br fl: nat): iProp Σ :=
       ⌜ t = length hq ⌝ ∗ 
       ([∗ list] nd ∈ drop h hq, hn_interp nd) ∗
@@ -234,8 +227,6 @@ Section SimpleQueue.
                       br_lb r
     
     . 
-            (* (let dom_fin := set_seq 0 (if rop then n else (S n)): gset nat in *)
-            (*  forall i op, i ∈ dom_fin -> hist !! i = Some op -> rs_fin op.2). *)
 
     (* TODO: upstream, find existing? *)
     Global Instance Persistent_pure_helper P (R: iProp Σ) `{Decision P}:
@@ -274,8 +265,6 @@ Section SimpleQueue.
   
     Definition queue_ns := nroot .@ "queue".
 
-    (* Definition queue_at (q: loc): iProp Σ := *)
-      (* pointsto q DfracDiscarded (#Head, #Tail, #BeingRead, #FreeLater, #OldHeadVal)%V.  *)
     Definition queue_at (q: val): iProp Σ :=
       ⌜ q = (#(Head q_sq), (#(Tail q_sq), (#(BeingRead q_sq), (#(FreeLater q_sq), #(OldHeadVal q_sq)))))%V ⌝. 
   
@@ -285,6 +274,93 @@ Section SimpleQueue.
         (∃ hq h t br fl rop od hist ohv, queue_inv_inner hq h t br fl rop od hist ohv)
     .
   
+    Lemma dequeue_token_excl:
+      dequeue_token -∗ dequeue_token -∗ False.
+    Proof using.
+      simpl. 
+      rewrite bi.wand_curry -own_op.
+      iIntros "X". by iDestruct (own_valid with "[$]") as %V.
+    Qed. 
+    
+    Lemma dequeue_resources_excl h1 fl1 ph1 od1 h2 fl2 ph2 od2:
+      dequeue_resources h1 fl1 ph1 od1 -∗ dequeue_resources h2 fl2 ph2 od2 -∗ False.
+    Proof using.
+      simpl. rewrite /dequeue_resources.
+      iIntros "(X&_) (Y&_)".
+      by iApply (me_exact_excl with "X [$]"). 
+    Qed.
+
+    Lemma dequeue_resources_auth_agree h' fl' ph od h t br fl:
+      dequeue_resources h' fl' ph od -∗ auths h t br fl -∗ ⌜ h' = h /\ fl' = fl ⌝.
+    Proof using.
+      simpl. iIntros "(H&FL&?&?) (H'&?&?&FL')".
+      iDestruct (me_auth_exact with "H' H") as %?. 
+      iDestruct (me_auth_exact with "FL' FL") as %?.
+      done. 
+    Qed. 
+    
+    Lemma dangle_auth_frag_agree od1 od2:
+      dangle_auth od1 -∗ dangle_frag od2 -∗ ⌜ od2 = od1 ⌝. 
+    Proof using.
+      simpl. rewrite /dangle_auth /dangle_frag.
+      rewrite bi.wand_curry -own_op.
+      iIntros "X". iDestruct (own_valid with "[$]") as %V.
+      iPureIntro. symmetry. by apply excl_auth_agree_L.
+    Qed.  
+    
+    Lemma dangle_update od1 od2 od':
+      dangle_auth od1 -∗ dangle_frag od2 ==∗ dangle_auth od' ∗ dangle_frag od'. 
+    Proof using.
+      simpl. rewrite /dangle_auth /dangle_frag.
+      rewrite bi.wand_curry -!own_op.
+      iApply own_update. apply excl_auth_update. 
+    Qed.  
+    
+    Lemma dequeue_resources_dangle_agree h fl ph od od' h' hq':
+      dequeue_resources h fl ph od -∗ dangle_interp od' h' hq' -∗ ⌜ od' = od ⌝.
+    Proof using.
+      simpl. iIntros "(?&?&?&FRAG) (AUTH&?)".
+      by iDestruct (dangle_auth_frag_agree with "[$] [$]") as %?. 
+    Qed.
+    
+    Lemma dequeue_res_head_agree h fl (ph ph': loc) od:
+      dequeue_resources h fl ph od -∗ Head q_sq ↦{1 / 2} #ph' -∗ ⌜ ph' = ph ⌝.
+    Proof using.
+      simpl. rewrite /dequeue_resources. iIntros "(_&_&H'&?) H".
+      iDestruct (pointsto_agree with "[$] [$]") as %?. set_solver.
+    Qed.
+    
+    Lemma cancel_rop h t br fl h'
+      (LT: h' < h):
+      auths h t br fl -∗ cancel_witness h'.
+    Proof using.
+      iIntros "(H&?&?&?)".
+      rewrite /cancel_witness.
+      iDestruct (me_auth_save with "H") as "LB".
+      iExists _. by iFrame.
+    Qed.
+    
+    Lemma old_rps_olds hist n:
+      old_rps hist (Some n) ⊣⊢ old_rps (delete n hist) None.
+    Proof using.
+      rewrite /old_rps. simpl. done. 
+    Qed.
+    
+    Lemma br_lb_bound b h t br fl:
+      br_lb b -∗ auths h t br fl -∗ ⌜ b <= br ⌝.
+    Proof using.
+      iIntros "LB (?&?&BR&?)".
+      iApply (me_auth_lb with "BR LB").
+    Qed.  
+
+    Lemma hn_interp_ptr_excl ptr nd1 nd2:
+      hn_interp (ptr, nd1) -∗ hn_interp (ptr, nd2) -∗ False.
+    Proof using.
+      simpl. destruct nd1, nd2. iIntros "[P1 ?] [P2 ?]".
+      iCombine "P1 P2" as "P". iDestruct (pointsto_valid with "P") as %V.
+      done.
+    Qed.
+
   End QueueResources.
 
 
@@ -303,80 +379,6 @@ Section SimpleQueue.
 
   Let hGS: heap1GS Σ := iem_phys _ EM.
   Existing Instance hGS. 
-
-  (* Lemma get_head_spec l τ π q: *)
-  (*   {{{ queue_at l ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}} *)
-  (*     loc_head l @ τ *)
-  (*   {{{ RET #Head q_sq; th_phase_frag τ π q }}}. *)
-  (* Proof using. *)
-  (*   simpl. iIntros (Φ) "(#QAT & PH & CPS) POST". rewrite /loc_head. *)
-  (*   rewrite /queue_at. iDestruct "QAT" as %->. *)
-  (*   pure_steps. by iApply "POST". *)
-  (* Qed. *)
-
-  (* Lemma get_tail_spec l τ π q: *)
-  (*   {{{ queue_at l ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}} *)
-  (*     loc_tail l @ τ *)
-  (*   {{{ RET #(Tail q_sq); th_phase_frag τ π q }}}. *)
-  (* Proof using. *)
-  (*   simpl. iIntros (Φ) "(#QAT & PH & CPS) POST". rewrite /loc_tail. *)
-  (*   rewrite /queue_at. iDestruct "QAT" as %->. *)
-  (*   pure_steps. *)
-  (*   wp_bind (Snd _)%E. pure_steps.  *)
-  (*   by iApply "POST". *)
-  (* Qed. *)
-
-  (* Lemma get_BR_spec l τ π q: *)
-  (*   {{{ queue_at l ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}} *)
-  (*     loc_BR l @ τ *)
-  (*   {{{ RET #(BeingRead q_sq); th_phase_frag τ π q }}}. *)
-  (* Proof using. *)
-  (*   simpl. iIntros (Φ) "(#QAT & PH & CPS) POST". rewrite /loc_BR. *)
-  (*   rewrite /queue_at. iDestruct "QAT" as %->. *)
-  (*   pure_steps. *)
-  (*   repeat (wp_bind (Snd (#_, _)%V)%E; pure_steps).  *)
-  (*   by iApply "POST". *)
-  (* Qed. *)
-
-  (* Lemma get_FL_spec l τ π q: *)
-  (*   {{{ queue_at l ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}} *)
-  (*     loc_FL l @ τ *)
-  (*   {{{ RET #(FreeLater q_sq); th_phase_frag τ π q }}}. *)
-  (* Proof using. *)
-  (*   simpl. iIntros (Φ) "(#QAT & PH & CPS) POST". rewrite /loc_FL. *)
-  (*   rewrite /queue_at. iDestruct "QAT" as %->. *)
-  (*   pure_steps. *)
-  (*   repeat (wp_bind (Snd (#_, _)%V)%E; pure_steps).  *)
-  (*   by iApply "POST". *)
-  (* Qed. *)
-
-  (* Lemma get_OHV_spec l τ π q: *)
-  (*   {{{ queue_at l ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}} *)
-  (*     loc_OHV l @ τ *)
-  (*   {{{ RET #(OldHeadVal q_sq); th_phase_frag τ π q }}}. *)
-  (* Proof using. *)
-  (*   simpl. iIntros (Φ) "(#QAT & PH & CPS) POST". rewrite /loc_OHV. *)
-  (*   rewrite /queue_at. iDestruct "QAT" as %->. *)
-  (*   pure_steps. *)
-  (*   repeat (wp_bind (Snd (#_, _)%V)%E; pure_steps).  *)
-  (*   by iApply "POST". *)
-  (* Qed. *)
-
-  Lemma dequeue_token_excl:
-    dequeue_token -∗ dequeue_token -∗ False.
-  Proof using.
-    simpl. 
-    rewrite bi.wand_curry -own_op.
-    iIntros "X". by iDestruct (own_valid with "[$]") as %V.
-  Qed. 
-
-  Lemma dequeue_resources_excl h1 fl1 ph1 od1 h2 fl2 ph2 od2:
-    dequeue_resources h1 fl1 ph1 od1 -∗ dequeue_resources h2 fl2 ph2 od2 -∗ False.
-  Proof using.
-    simpl. rewrite /dequeue_resources.
-    iIntros "(X&_) (Y&_)".
-    by iApply (me_exact_excl with "X [$]"). 
-  Qed.
 
   Lemma access_queue_ends hq h t br fl:
     hq_auth hq -∗ queue_interp hq h t br fl -∗
@@ -408,39 +410,6 @@ Section SimpleQueue.
       2: { iIntros "??". by iFrame "#∗". }
       iLeft. iSplit; [done| ].
       rewrite (lookup_ge_None_2 _ h) /=; done.      
-  Qed.
-
-  Lemma dequeue_resources_auth_agree h' fl' ph od h t br fl:
-    dequeue_resources h' fl' ph od -∗ auths h t br fl -∗ ⌜ h' = h /\ fl' = fl ⌝.
-  Proof using.
-    simpl. iIntros "(H&FL&?&?) (H'&?&?&FL')".
-    iDestruct (me_auth_exact with "H' H") as %?. 
-    iDestruct (me_auth_exact with "FL' FL") as %?.
-    done. 
-  Qed. 
-
-  Lemma dangle_auth_frag_agree od1 od2:
-    dangle_auth od1 -∗ dangle_frag od2 -∗ ⌜ od2 = od1 ⌝. 
-  Proof using.
-    simpl. rewrite /dangle_auth /dangle_frag.
-    rewrite bi.wand_curry -own_op.
-    iIntros "X". iDestruct (own_valid with "[$]") as %V.
-    iPureIntro. symmetry. by apply excl_auth_agree_L.
-  Qed.  
-
-  Lemma dangle_update od1 od2 od':
-    dangle_auth od1 -∗ dangle_frag od2 ==∗ dangle_auth od' ∗ dangle_frag od'. 
-  Proof using.
-    simpl. rewrite /dangle_auth /dangle_frag.
-    rewrite bi.wand_curry -!own_op.
-    iApply own_update. apply excl_auth_update. 
-  Qed.  
-
-  Lemma dequeue_resources_dangle_agree h fl ph od od' h' hq':
-    dequeue_resources h fl ph od -∗ dangle_interp od' h' hq' -∗ ⌜ od' = od ⌝.
-  Proof using.
-    simpl. iIntros "(?&?&?&FRAG) (AUTH&?)".
-    by iDestruct (dangle_auth_frag_agree with "[$] [$]") as %?. 
   Qed.
 
   Lemma access_queue hq h t br fl i hn
@@ -527,13 +496,6 @@ Section SimpleQueue.
     iModIntro. iApply "POST". iFrame.
   Qed.
 
-  Lemma dequeue_res_head_agree h fl (ph ph': loc) od:
-    dequeue_resources h fl ph od -∗ Head q_sq ↦{1 / 2} #ph' -∗ ⌜ ph' = ph ⌝.
-  Proof using.
-    simpl. rewrite /dequeue_resources. iIntros "(_&_&H'&?) H".
-    iDestruct (pointsto_agree with "[$] [$]") as %?. set_solver.
-  Qed.
-
   Lemma update_ohv_spec τ π q (v: val) l:
     {{{ queue_inv l ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
       #(OldHeadVal q_sq) <- v @τ
@@ -564,16 +526,6 @@ Section SimpleQueue.
     simpl in LL. destruct a as [? [? ?]].
     destruct hq; try done.
     destruct h as [? [? ?]]. tauto.
-  Qed.
-
-  Lemma cancel_rop h t br fl h'
-    (LT: h' < h):
-    auths h t br fl -∗ cancel_witness h'.
-  Proof using.
-    iIntros "(H&?&?&?)".
-    rewrite /cancel_witness.
-    iDestruct (me_auth_save with "H") as "LB".
-    iExists _. by iFrame.
   Qed.
 
   Lemma dom_max_set_fold n:
@@ -609,11 +561,10 @@ Section SimpleQueue.
   read_hist_auth hist
     -∗ ith_rp n rp
     ==∗
-  ∃ r rp'(* b *),
+  ∃ r rp',
          let hist' := <[ n := ((r, h + 1), rp') ]> hist in
          read_hist_auth hist' ∗ ith_read n r (h + 1) ∗ ⌜ read_hist_wf hist' rop (h + 1) ⌝ ∗
          ith_rp n (upd_rp rp) ∗
-         (* ∗ br_lb b ∗ (⌜ b < h ⌝ -∗ ith_rp i rs_canceled) ∗ *)
          ⌜ r <= h ⌝.
   Proof using.
     rewrite /read_hist_wf. iIntros "AUTH RP".
@@ -625,7 +576,6 @@ Section SimpleQueue.
     destruct (hist !! n) as [[[r b0] p]| ] eqn:NTH.
     2: { apply not_elem_of_dom in NTH. rewrite DOM in NTH.
          rewrite elem_of_set_seq in NTH. lia. }
-    (* iDestruct (read_hist_get with "[$]") as "#READ"; [by apply NTH| ].  *)
     iDestruct (ith_rp_hist_compat with "[$] [$]") as %(? & ? & EQ').
     rewrite NTH in H. inversion H. subst x. simpl in EQ'. clear H.
     rename rp into p_. 
@@ -633,9 +583,6 @@ Section SimpleQueue.
     iMod (read_hist_update' _ _ _ _ _ (h + 1) with "AUTH RP") as "(AUTH & #ITH & RP)".
     { apply upd_rp_rs_step. }
     { apply NTH. }
-
-    (* iDestruct (ith_read_hist_compat with "[$] [$]") as %(?&?&EQ&?). *)
-    (* rewrite NTH in EQ.  *)
 
     rewrite Nat.max_r.
     2: { apply BB in NTH. simpl in NTH. lia. }
@@ -657,19 +604,6 @@ Section SimpleQueue.
       { eapply BB in NTH; eauto. simpl in NTH. lia. }
       eapply BB in ITH; eauto. lia.
   Qed.
-
-  Lemma old_rps_olds hist n:
-    old_rps hist (Some n) ⊣⊢ old_rps (delete n hist) None.
-  Proof using.
-    rewrite /old_rps. simpl. done. 
-  Qed.
-
-  Lemma br_lb_bound b h t br fl:
-    br_lb b -∗ auths h t br fl -∗ ⌜ b <= br ⌝.
-  Proof using.
-    iIntros "LB (?&?&BR&?)".
-    iApply (me_auth_lb with "BR LB").
-  Qed.  
 
   Lemma upd_rp_fin_pres rs
     (FIN: rs_fin rs):
@@ -819,7 +753,6 @@ Section SimpleQueue.
       iDestruct "RP" as "(%rp & RP & %FIN & #LB)".
       iDestruct (ith_rp_hist_compat with "[$] [$]") as %(? & ? & LE').
       rewrite NTH in H0. inversion H0. subst x. simpl in *.
-      (* rename r into rp. clear H0. *)
 
       iDestruct (read_hist_get hist n with "RHIST") as "#READ".
       { rewrite NTH. repeat f_equal. }
@@ -827,10 +760,6 @@ Section SimpleQueue.
       iMod (read_hist_wf_bump with "[$] [RP]") as "(%r' & %rp' & RHIST & #READ' & %RH_WF' & RP_ & %READ_BOUND)".
       { eexists. eauto. }
       { rewrite DOM dom_max_set_fold. iFrame "RP". }
-      (* rewrite decide_False. *)
-      (* 2: { red in FIN. destruct rp; set_solver. } *)
-      (* rewrite decide_False. *)
-      (* 2: { red in FIN. destruct rp; set_solver. } *)
       rewrite DOM dom_max_set_fold.
       iDestruct (ith_read_agree with "READ READ'") as %->.
       iFrame "% READ' BR_LB".
@@ -885,7 +814,7 @@ Section SimpleQueue.
 
   Definition dequeue_fuel := 100.    
 
-  Lemma check_BR_spec l τ π q h (* t *) (* br *) fl ph ndh i r b0
+  Lemma check_BR_spec l τ π q h fl ph ndh i r b0
     (READ_BOUND: r <= h):
     {{{ queue_inv l ∗
         ith_node h (ph, ndh) ∗
@@ -923,7 +852,6 @@ Section SimpleQueue.
     rewrite /queue_interp. iDestruct "QI" as "(%T_LEN &  HNIS & %pt & TAIL & TLI & %LL & HEAD & BR & FL)".
     iDestruct "BR" as "(%nbr & %BRTH & BR)". destruct nbr as [pbr nbr].
 
-    (* iCombine "HEAD HEAD'" as "HEAD".  *)
     iApply sswp_MU_wp; [done| ]. 
     iApply (wp_load with "BR"). iIntros "!> BR".
     MU_by_burn_cp. iApply wp_value.
@@ -1031,14 +959,6 @@ Section SimpleQueue.
     { iFrame. iFrame "OLDS". done. }
     iModIntro. iApply "POST". iFrame.
     destruct x. iFrame "FLTH".     
-  Qed.
-
-  Lemma hn_interp_ptr_excl ptr nd1 nd2:
-    hn_interp (ptr, nd1) -∗ hn_interp (ptr, nd2) -∗ False.
-  Proof using.
-    simpl. destruct nd1, nd2. iIntros "[P1 ?] [P2 ?]".
-    iCombine "P1 P2" as "P". iDestruct (pointsto_valid with "P") as %V.
-    done.
   Qed.
 
   (* TODO: also holds if h is not in the hist queue (e.g. initially) *)
@@ -1436,6 +1356,8 @@ Section SimpleQueue.
  
     iModIntro. pure_steps.
     iApply "POST". iFrame.
-  Qed. 
+  Qed.
+
+  Print Assumptions dequeue_spec.
     
 End SimpleQueue.
