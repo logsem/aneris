@@ -589,7 +589,7 @@ Section Dequeue.
     
     split_cps "CPS" get_loc_fuel.
     wp_bind (! _)%E. 
-    replace BeingRead0 with (BeingRead q_sq) by (by rewrite Q_SQ). 
+    replace BeingRead with (simple_queue.BeingRead q_sq) by (by rewrite Q_SQ). 
     iApply (check_BR_spec with "[-POST CPS]").
     { apply READ_BOUND. }
     { iFrame "#∗". }
@@ -613,7 +613,7 @@ Section Dequeue.
 
     wp_bind (! _)%E.
     split_cps "CPS" 1. rewrite -cp_mul_1.
-    replace FreeLater0 with (FreeLater q_sq) by (by rewrite Q_SQ). 
+    replace FreeLater with (simple_queue.FreeLater q_sq) by (by rewrite Q_SQ). 
     iApply (read_FL_spec with "[-POST CPS]").
     { iFrame "#∗". }
     iIntros "!> %pfl (%ndfl & #FLTH & DR & PH)".
@@ -790,7 +790,7 @@ Section Dequeue.
     
     iApply sswp_MU_wp; [done| ].
     iDestruct (access_queue_ends with "[$] [$]") as "(%ph & %pt & HEAD & TAIL & HT & CLOS')".
-    replace Head0 with (Head q_sq) by (by rewrite Q_SQ).
+    replace Head with (simple_queue.Head q_sq) by (by rewrite Q_SQ).
     iApply (wp_load with "HEAD"). iIntros "!> HEAD".
     iDestruct "DQ" as "[[%ph_ DR] | TOK']".
     2: { by iDestruct (dequeue_token_excl with "[$] [$]") as "?". }
@@ -816,7 +816,7 @@ Section Dequeue.
     iDestruct "inv" as "(>HQ & >QI & >DANGLE & OHV & >%ORDER & >AUTHS & >ROP & >RHIST & >%RH_WF & >#OLDS & >RH & >DQ)".
     iApply sswp_MU_wp; [done| ].
     iDestruct (access_queue_ends with "[$] [$]") as "(%ph_ & %pt & HEAD & TAIL & #HT & CLOS')".
-    replace Tail0 with (Tail q_sq) by (by rewrite Q_SQ).
+    replace Tail with (simple_queue.Tail q_sq) by (by rewrite Q_SQ).
     iApply (wp_load with "[$]"). iIntros "!> TAIL".
     iDestruct (dequeue_res_head_agree with "DR [$]") as %->. 
     iDestruct (dequeue_resources_auth_agree with "DR [$]") as %[<- <-].
@@ -870,7 +870,7 @@ Section Dequeue.
 
     destruct ndh as [vh nxh]. simpl.
     wp_bind (_ <- _)%E.
-    replace OldHeadVal0 with (OldHeadVal q_sq) by (by rewrite Q_SQ).
+    replace OldHeadVal with (simple_queue.OldHeadVal q_sq) by (by rewrite Q_SQ).
     split_cps "CPS" get_loc_fuel; [cbv; lia| ].     
     iApply (update_ohv_spec with "[$QAT $PH $CPS' $INV]").
     iIntros "!> PH".
@@ -887,7 +887,7 @@ Section Dequeue.
     iIntros "!> (PH & DR & (%i & %r & %b & #ITHR & %BR & #TOKS))".
 
     wp_bind (Rec _ _ _)%E. do 3 pure_step_cases.
-    fold (get_to_free (SQ Head0 Tail0 BeingRead0 FreeLater0 OldHeadVal0)).
+    fold (get_to_free (SQ Head Tail BeingRead FreeLater OldHeadVal)).
     rewrite -Q_SQ. 
     wp_bind (get_to_free _ _)%E.         
     split_cps "CPS" (3 * get_loc_fuel); [cbv; lia| ].
