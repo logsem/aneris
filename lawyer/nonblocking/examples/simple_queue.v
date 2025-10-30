@@ -229,7 +229,7 @@ Section QueueResources.
       (* (dom hist) ∖ (from_option (fun n => {[ n ]}) ∅ rop), *)
       ∃ rp, ith_rp i rp ∗ ⌜ rs_fin rp ⌝ ∗
               (* (⌜ rp ≠ rs_canceled ⌝ -∗ br_lb b) *)
-              br_lb r
+              (br_lb r ∨ ⌜ rp = rs_aborted ⌝)
   . 
 
   (* TODO: upstream, find existing? *)
@@ -252,7 +252,7 @@ Section QueueResources.
     apply bi.exist_persistent. intros rp.
     rewrite bi.sep_assoc bi.sep_comm bi.sep_assoc. 
     apply Persistent_pure_helper; [apply _| ]. 
-    intros. destruct H as [-> | [-> | ->]]; apply _.
+    intros. destruct H as [-> | [-> | [-> | ->]]]; apply _.
   Qed.
 
   Definition ohv_interp: iProp Σ := ∃ ohv, OldHeadVal q_sq↦ ohv.

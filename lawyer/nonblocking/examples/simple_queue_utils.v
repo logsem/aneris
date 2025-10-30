@@ -209,14 +209,19 @@ Section ReadProtocol.
 
   Inductive read_state_proc := rsp_going | rsp_completed | rsp_protected. 
 
-  Inductive read_state := rs_init | rs_canceled | rs_proc (orsp: option read_state_proc).
+  (* TODO: rename rs_canceled to rs_prevented *)
+  Inductive read_state :=
+    rs_init | rs_aborted | rs_canceled | rs_proc (orsp: option read_state_proc).
 
   Definition read_state_proc_cmra: cmra :=
     let au := agreeR unit in csumR (exclR unit) (csumR au au). 
 
   Definition read_state_cmra: cmra :=
-    csumR (exclR unit) (csumR (agreeR unit) (optionUR read_state_proc_cmra)). 
-  
+    csumR (exclR unit) $
+    csumR (agreeR unit) $
+    csumR (agreeR unit) $
+    optionR read_state_proc_cmra. 
+    
   Definition rsp2cmra (rsp: read_state_proc): read_state_proc_cmra :=
     match rsp with 
     | rsp_going => Cinl $ Excl ()
@@ -229,14 +234,15 @@ Section ReadProtocol.
   Definition rs2cmra (rs: read_state): read_state_cmra :=
     match rs with
     | rs_init => Cinl $ Excl ()
-    | rs_canceled => Cinr $ Cinl $ to_agree ()
-    | rs_proc None => Cinr $ Cinr $ None
-    | rs_proc (Some rsp) => Cinr $ Cinr $ Some (rsp2cmra rsp)
+    | rs_aborted => Cinr $ Cinl $ to_agree ()
+    | rs_canceled => Cinr $ Cinr $ Cinl $  to_agree ()
+    | rs_proc None => Cinr $ Cinr $ Cinr $ None
+    | rs_proc (Some rsp) => Cinr $ Cinr $ Cinr $ Some (rsp2cmra rsp)
     end.
 
   Definition rs_wip p := p = rs_init \/ p = rs_proc (Some rsp_going). 
   Definition rs_fin p := 
-    p = rs_canceled \/ p = rs_proc (Some rsp_completed) \/ p = rs_proc (Some rsp_protected). 
+    p = rs_aborted \/ p = rs_canceled \/ p = rs_proc (Some rsp_completed) \/ p = rs_proc (Some rsp_protected). 
   
   Lemma rsp_mut_excl rsp1 rsp2
     (NEQ: rsp1 ≠ rsp2):
@@ -270,26 +276,29 @@ Section ReadProtocol.
     all: try by (intros X; inversion X; subst; inversion H1).
   Qed.
 
+  Local Ltac csum_option_inv_act H := inversion H; subst; clear H. 
+
+  Ltac csum_option_inv := repeat (try intros ?; match goal with
+      | [H : Cinl _ ≡ _ |- _  ] => csum_option_inv_act H
+      | [H : Cinr _ ≡ _ |- _  ] => csum_option_inv_act H
+      | [H : Some _ ≡ _ |- _  ] => csum_option_inv_act H
+      | [H : None ≡ _ |- _  ] => csum_option_inv_act H
+      (* | [H : Cinl _ = _ |- _  ] => csum_option_inv_act H *)
+      (* | [H : Cinr _ = _ |- _  ] => csum_option_inv_act H *)
+      (* | [H : Some _ = _ |- _  ] => csum_option_inv_act H *)
+      (* | [H : None = _ |- _  ] => csum_option_inv_act H *)
+  end). 
+
   Global Instance rs2cmra_inj: Inj eq equiv rs2cmra.
-  Proof using.
+  Proof using.    
     clear. 
     red. intros [] []; simpl.
-    all: try by set_solver.
-    all: try by (intros X; inversion X).
-    - destruct orsp; try by (intros X; inversion X).
-    - destruct orsp; try by (intros X; inversion X).
-      + intros X. inversion X; subst. inversion H1.
-      + intros X. inversion X; subst. inversion H1.
-    - destruct orsp; try by (intros X; inversion X).
-    - destruct orsp; try by (intros X; inversion X).
-      + intros X. inversion X; subst. inversion H1.
-      + intros X. inversion X; subst. inversion H1.
-    - destruct orsp, orsp0; try by (intros X; inversion X).
-      all: try by (intros X; inversion X; subst; inversion H1; subst; inversion H2).
-      intros EQ. inversion EQ. subst. inversion H1. subst.
-      inversion H2. subst.
-      apply rsp2cmra_inj in H3. congruence.
-  Qed.
+    all: try by csum_option_inv.
+    all: destruct orsp; try by csum_option_inv. 
+    all: destruct orsp0; try by csum_option_inv.
+    csum_option_inv. repeat f_equal.
+    eapply rsp2cmra_inj; eauto.
+  Qed. 
 
   Inductive rs_le : read_state -> read_state -> Prop :=
   | rs_le_rsp_None rsp : rs_le (rs_proc None) (rs_proc (Some rsp))
@@ -304,29 +313,35 @@ Section ReadProtocol.
     destruct orsp; done. 
   Qed.
 
+  Lemma rs2cmra_inv_abort rs x:
+    rs2cmra rs = Cinr (Cinl x) -> rs = rs_aborted /\ x = to_agree (). 
+  Proof.
+    destruct rs; intros [=]; simpl; eauto.
+    destruct orsp; done. 
+  Qed.
+
   Lemma rs2cmra_inv_cancel rs x:
-    rs2cmra rs = Cinr (Cinl x) -> rs = rs_canceled /\ x = to_agree (). 
+    rs2cmra rs = Cinr $ Cinr $ Cinl x -> rs = rs_canceled /\ x = to_agree (). 
   Proof.
     destruct rs; intros [=]; simpl; eauto.
     destruct orsp; done. 
   Qed.
 
   Lemma rs2cmra_inv_proc_None rs:
-    rs2cmra rs = Cinr (Cinr None) -> rs = rs_p0. 
+    rs2cmra rs = Cinr $ Cinr $ Cinr None -> rs = rs_p0. 
   Proof.
     destruct rs; simpl; eauto.
-    - intros [=].
-    - intros [=].
-    - destruct orsp; intros [=]. done. 
+    all: intros [=].
+    destruct orsp; try intros [=]; done. 
   Qed.
 
   Lemma rs2cmra_inv_proc_Some rs x:
-    rs2cmra rs = Cinr (Cinr (Some x)) -> exists y, rs = rs_proc (Some y) /\ x = rsp2cmra y.
+    rs2cmra rs = Cinr $ Cinr $ Cinr $ Some x -> exists y, rs = rs_proc (Some y) /\ x = rsp2cmra y.
   Proof.
     destruct rs; simpl; eauto.
-    - intros [=].
-    - intros [=].
-    - destruct orsp; intros [=]. subst. eauto. 
+    all: intros [=].
+    destruct orsp; try done.
+    inversion H0. subst. eauto. 
   Qed.
 
   Lemma rsp2cmra_inv_going rsp x:
@@ -385,49 +400,62 @@ Section ReadProtocol.
     { inversion H; subst; [| done].
       simpl.
       do 2 right. do 2 eexists. repeat (split; eauto).
+      do 2 right. do 2 eexists. repeat (split; eauto).
       do 2 right. do 2 eexists. repeat (split; eauto). }
     destruct H as [BOT | [L | R]].
-    * (destruct rs2; simpl in BOT); try congruence.
-      destruct orsp; congruence.
-    * destruct L as (?&?&?&?&?).
-      apply rs2cmra_inv_init in H as [-> ->], H0 as [-> ->]. subst. done. 
-    * destruct R as (?&?&?&?&?).
-      destruct H1 as [BOT | [L | R]].
-      ** subst. destruct rs2; simpl in H0; try set_solver.
-         by destruct orsp.
-      ** destruct L as (?&?&?&?&?). subst.
-         apply rs2cmra_inv_cancel in H as [-> ->], H0 as [-> ->]. subst. done. 
-      ** destruct R as (?&?&?&?&?). subst.
-         destruct x1.
-         2: { apply rs2cmra_inv_proc_None in H. subst.
-              destruct x2.
-              - apply rs2cmra_inv_proc_Some in H0 as (?&->&->).
-                constructor.
-              - apply rs2cmra_inv_proc_None in H0. by subst. }
-         apply rs2cmra_inv_proc_Some in H as (?&->&->).
-         destruct x2.
-         2: { apply rs2cmra_inv_proc_None in H0. subst.
-              inversion H3 as [? | [? | ?]].
-              1, 2: by inversion H.
-              set_solver. }
-         apply rs2cmra_inv_proc_Some in H0 as (?&->&->).
+    { (destruct rs2; simpl in BOT); try congruence.
+      destruct orsp; congruence. }
+    { destruct L as (?&?&?&?&?).
+      apply rs2cmra_inv_init in H as [-> ->], H0 as [-> ->]. subst. done. }
+    destruct R as (?&?&?&?&?).
+    destruct H1 as [BOT | [L | R]].
+    { subst. destruct rs2; simpl in H0; try set_solver.
+      by destruct orsp. }
+    { destruct L as (?&?&?&?&?). subst.
+      apply rs2cmra_inv_abort in H as [-> ->], H0 as [-> ->]. subst. done. }
+    destruct R as (?&?&?&?&?). subst.
+    destruct H3 as [BOT | [L | R]].
+    { subst. destruct rs2; simpl in H0; try set_solver.
+      by destruct orsp. }
+    { destruct L as (?&?&?&?&?). subst.
+      apply rs2cmra_inv_cancel in H as [-> ->], H0 as [-> ->]. subst. done. }
+    destruct R as (?&?&?&?&?). subst.
+    destruct x.
+    2: { apply rs2cmra_inv_proc_None in H. subst.
+         destruct x0.
+         - apply rs2cmra_inv_proc_Some in H0 as (?&->&->).
+           constructor.
+         - apply rs2cmra_inv_proc_None in H0. by subst. }
+    apply rs2cmra_inv_proc_Some in H as (?&->&->).
+    destruct x0.
+    2: { apply rs2cmra_inv_proc_None in H0. subst.
          inversion H3 as [? | [? | ?]].
-         *** inversion H. subst. apply rsp2cmra_inj in H2. subst. constructor.
-         *** inversion H.
-         *** destruct H as (?&?&[=]&[=]&?). subst.
-             destruct H4 as [H4 | RSP].
-             **** apply rsp2cmra_inj in H4. by subst.
-             **** apply Some_included_mono in RSP.
-                  apply rsp_incl in RSP. subst. constructor.
+         1, 2: by inversion H.
+         set_solver. }
+    apply rs2cmra_inv_proc_Some in H0 as (?&->&->).
+    inversion H3 as [? | [? | ?]].
+    ** inversion H. subst. apply rsp2cmra_inj in H2. subst. constructor.
+    ** inversion H.
+    ** destruct H as (?&?&[=]&[=]&?). subst.
+       destruct H4 as [H4 | RSP].
+       *** apply rsp2cmra_inj in H4. by subst.
+       *** apply Some_included_mono in RSP.
+           apply rsp_incl in RSP. subst. constructor.
   Qed.
 
   Lemma rs_le_incl' x y:
     rs2cmra x ≼ rs2cmra y -> rs_le x y. 
   Proof using.
     intros. apply rs_le_incl. by apply Some_included_mono.
-  Qed. 
+  Qed.
 
-  Ltac csum_valid_simpl := repeat (rewrite Cinl_valid || rewrite Cinr_valid || rewrite -Some_op Some_valid || rewrite op_None_right_id || rewrite op_None_left_id).
+  (* Ltac csum_valid_simpl := *)
+  (*   repeat (rewrite Cinl_valid || rewrite Cinr_valid || rewrite -Some_op Some_valid || rewrite op_None_right_id || rewrite op_None_left_id). *)
+  Ltac csum_valid_simpl := repeat (rewrite
+    ?Cinl_valid ?Cinr_valid 
+    -?Some_op ?Some_valid
+    ?op_None_right_id ?op_None_left_id
+  ).
 
   Lemma rsp2cmra_valid rsp: ✓ rsp2cmra rsp.
   Proof using. destruct rsp; simpl; csum_valid_simpl; done. Qed. 
@@ -470,6 +498,7 @@ Section ReadProtocol.
   Inductive rs_step : read_state -> read_state -> Prop :=
   | rs_refl rs : rs_step rs rs
   | rs_init_going : rs_step rs_init (rs_proc (Some rsp_going))
+  | rs_init_abort : rs_step rs_init rs_aborted
   | rs_init_cancel : rs_step rs_init rs_canceled
   | rs_going_protected rsp1 rsp2 (RSP_STEP: rsp_step rsp1 rsp2) :
     rs_step (rs_proc (Some rsp1)) (rs_proc (Some rsp2))
@@ -485,8 +514,9 @@ Section ReadProtocol.
     - subst. reflexivity.
     - subst. simpl. apply cmra_update_exclusive. done.
     - subst. simpl. apply cmra_update_exclusive. done.
+    - subst. simpl. apply cmra_update_exclusive. done.
     - subst. simpl.
-      do 2 (apply csum_update_r). apply option_update.
+      repeat (apply csum_update_r). apply option_update.
       by apply rsp_step_update.
   Qed. 
 
@@ -497,7 +527,7 @@ Section ReadProtocol.
       inversion RS_STEP; subst; simpl.
       { reflexivity. }
       all: simpl; apply option_local_update; try by apply (exclusive_local_update).
-      do 2 apply csum_local_update_r. apply option_local_update.
+      repeat apply csum_local_update_r. apply option_local_update.
       inversion RSP_STEP; subst; simpl.
       { reflexivity. }
       all: by apply (exclusive_local_update).
@@ -521,6 +551,7 @@ Section ReadProtocol.
   | rs_cm_rsp_None_1 orsp : rs_compat (rs_proc None) (rs_proc orsp)
   | rs_cm_rsp_None_2 orsp : rs_compat (rs_proc orsp) (rs_proc None)
   | rs_cm_canc : rs_compat rs_canceled rs_canceled
+  | rs_cm_abort : rs_compat rs_aborted rs_aborted
   | rs_cm_rsp_Some rsp1 rsp2 (RSP: rsp_compat rsp1 rsp2) :
     rs_compat (rs_proc (Some rsp1)) (rs_proc (Some rsp2))
   .
@@ -535,9 +566,9 @@ Section ReadProtocol.
       revert H. csum_valid_simpl. apply rsp_compat_valid.
     - intros P. inversion P; subst; simpl; try done.
       + destruct orsp; csum_valid_simpl; try done.
-        rewrite Some_valid. apply rsp2cmra_valid.
+        apply rsp2cmra_valid.
       + destruct orsp; csum_valid_simpl; try done.
-        rewrite Some_valid. apply rsp2cmra_valid.
+        apply rsp2cmra_valid.
       + csum_valid_simpl. by apply rsp_compat_valid. 
   Qed.
 
@@ -689,13 +720,10 @@ Section ReadsHistory.
 
     assert ({pa = p /\ p ≠ rs_proc None} + {p = p' /\ p = rs_proc None}) as p_eq.
     { destruct p eqn:PP.
-      - left.
-        inversion LE; inversion RS_STEP; subst; simpl; try set_solver.
-      - left. 
-        inversion LE; inversion RS_STEP; subst; simpl; try set_solver.
-      - destruct orsp.
-        + left. inversion LE; inversion RS_STEP; subst; simpl; try set_solver.
-        + right. inversion LE; inversion RS_STEP; subst; simpl; try set_solver. }
+      1-3: by (left; inversion LE; inversion RS_STEP; subst; simpl; set_solver).
+      destruct orsp.
+      - left. inversion LE; inversion RS_STEP; subst; simpl; set_solver.
+      - right. inversion LE; inversion RS_STEP; subst; simpl; set_solver. }
 
     iAssert (|==> read_hist_auth (<[i:=((r, max ba b'), pb)]> hist) ∗ ith_rp i p')%I with "[AUTH RP]" as "AUTH".
     2: { iMod "AUTH" as "[AUTH $]". 

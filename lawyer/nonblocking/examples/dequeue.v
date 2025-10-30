@@ -30,7 +30,7 @@ Section Dequeue.
   Definition get_loc_fuel := 5.
 
   Let hGS: heap1GS Σ := iem_phys _ EM.
-  Existing Instance hGS. 
+  Existing Instance hGS.
 
   Lemma get_head_val_spec Q τ π q h nd fl ph od:
     {{{ queue_inv Q ∗ ith_node h (ph, nd) ∗ dequeue_resources h fl ph od ∗
@@ -212,8 +212,7 @@ Section Dequeue.
     (FIN: rs_fin rs):
     rs_fin (upd_rp rs).
   Proof using.
-    red. destruct FIN; subst; simpl; try by eauto.
-    destruct H; subst; try by eauto.
+    red. destruct FIN as [-> | [-> | [-> | ->]]]; subst; simpl; try by eauto.
   Qed.
   
   Lemma drop_drop_comm: ∀ {A : Type} (l : list A) (n1 n2 : nat),
@@ -231,7 +230,7 @@ Section Dequeue.
     {{{ RET #(); th_phase_frag τ π q ∗ dequeue_resources (h + 1) fl nxh (Some h) ∗
                    ∃ i r b, ith_read i r (h + 1) ∗ ⌜ r <= h ⌝ ∗
                                br_lb b ∗
-                               (⌜ b < r ⌝ -∗ (ith_rp i rs_canceled ∨ ith_rp i (rs_proc (Some rsp_completed)))) }}}.
+                               (⌜ b < r ⌝ -∗ (ith_rp i rs_canceled ∨ ith_rp i rs_aborted ∨ ith_rp i (rs_proc (Some rsp_completed)))) }}}.
   Proof using.
     simpl.
     iIntros (Φ) "([#QAT #INV] & #HTH & PH & CPS & DR) POST".
@@ -374,8 +373,10 @@ Section Dequeue.
       iDestruct (ith_read_agree with "READ READ'") as %->.
       iFrame "% READ' BR_LB".
       rewrite -(bi.sep_True' ( ⌜ _ ⌝ -∗ _ )%I). iApply fupd_frame_l. iSplit.
-      { iIntros (LT). destruct FIN as [-> | [-> | ->]].
+      { iIntros (LT). destruct FIN as [-> | [-> | [-> | ->]]].
         all: try by iFrame.
+        iDestruct "LB" as "[LB | %RS_AB]".
+        2: { done. }
         iDestruct (br_lb_bound with "[$] [$]") as %?. lia. }
 
       iMod ("CLOS" with "[-]") as "_"; [| done].
@@ -402,7 +403,10 @@ Section Dequeue.
         iSplitL.
         2: { iApply (big_sepM_subseteq with "[$]"). apply delete_subseteq. }
         rewrite big_sepM_singleton. iFrame. iFrame "% #".
-        iPureIntro. by apply upd_rp_fin_pres. }
+        iSplit. 
+        { iPureIntro. by apply upd_rp_fin_pres. }
+        iDestruct "LB" as "[$ | ->]".
+        simpl. by iRight. }
 
       (* TODO: make a lemma *)
       rewrite /read_hist_wf.
@@ -580,7 +584,7 @@ Section Dequeue.
         dequeue_resources (h + 1) fl ndh.2 (Some h) ∗ 
         th_phase_frag τ π q ∗ cp_mul π d (get_loc_fuel + get_loc_fuel + get_loc_fuel) ∗
         ith_read i r (h + 1) ∗
-        br_lb b ∗ (⌜ b < r ⌝ -∗ (ith_rp i rs_canceled ∨ ith_rp i (rs_proc (Some rsp_completed))))
+        br_lb b ∗ (⌜ b < r ⌝ -∗ (ith_rp i rs_canceled ∨ ith_rp i rs_aborted ∨ ith_rp i (rs_proc (Some rsp_completed))))
     }}}
       get_to_free q_sq #ph @ τ
     {{{ (to_free: loc), RET #to_free;
@@ -713,11 +717,11 @@ Section Dequeue.
             rewrite READ in READ'. inversion READ'. subst r x1 x2.
             apply Nat.le_lteq in BR0 as [BR0 | ->].
             { iSpecialize ("NO_FL" with "[//]"). iExFalso.
-              iAssert (∃ rp', ith_rp i rp' ∗ ⌜ rp' = rs_canceled \/ rp' = (rs_proc (Some rsp_completed))⌝)%I as "(%rp' & RP' & %RP')".
-              { iDestruct "NO_FL" as "[$|$]"; set_solver. }
+              iAssert (∃ rp', ith_rp i rp' ∗ ⌜ rp' = rs_canceled \/ rp' = rs_aborted \/ rp' = (rs_proc (Some rsp_completed))⌝)%I as "(%rp' & RP' & %RP')".
+              { iDestruct "NO_FL" as "[$|[$|$]]"; set_solver. }
               iDestruct (ith_rp_le with "RP RP'") as %CM.
               exfalso. clear -RP' CM.
-              inversion CM; destruct RP' as [-> | ->]; try done.
+              inversion CM; destruct RP' as [-> | [-> | ->]]; try done.
               subst. inversion RSP. by subst. }
             rename x into bi.
             red in RH_WF.
