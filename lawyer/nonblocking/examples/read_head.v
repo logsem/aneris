@@ -289,7 +289,75 @@ Section ReadHead.
     (* by iLeft. *)
   Abort.
     
+
+  Lemma start_read l (τ: locale heap_lang) (π: Phase) (q: Qp):
+    {{{ queue_inv l ∗ read_head_token ∗ 
+        th_phase_frag τ π q ∗ cp_mul π d 1 }}}
+       !#(Head q_sq) @ τ
+    {{{ (ph: loc), RET #ph; th_phase_frag τ π q ∗
+          ∃ t br pt rop, read_head_resources t br pt rop ∗
+           (⌜ pt = ph /\ rop = None ⌝ ∨ ⌜ pt ≠ ph /\ is_Some rop ⌝) }}}.
+  Proof using. 
+    simpl. iIntros (Φ) "([#QAT #INV] & TOK & PH & CPS) POST".
+
+    iInv "INV" as "(%hq & %h & %t & %br & %fl & %rop & %od & %hist & inv)" "CLOS".
+    iEval (rewrite /queue_inv_inner) in "inv".
+    iDestruct "inv" as ">(HQ & AUTHS & %ORDER0 & QI & DANGLE & OHV & RHI & RH & DQ)".
     
+    iApply sswp_MU_wp; [done| ].
+    iDestruct (access_queue_ends with "[$] [$]") as "(%ph & %pt & HEAD & TAIL & #HT & CLOS')".    
+    iApply (wp_load with "HEAD"). iIntros "!> HEAD".
+    iDestruct "RH" as "[(%pt_ & RH) | TOK']".
+    2: { by iDestruct (read_head_token_excl with "[$] [$]") as "?". }
+    iDestruct (read_head_res_Tail_agree with "RH [$]") as %EQ.
+    inversion EQ. subst pt_. clear EQ. 
+      
+    iDestruct ("CLOS'" with "[$] [$]") as "(HQ & QI)".
+    MU_by_burn_cp. iApply wp_value.
+
+    iApply "POST". iFrame "PH". 
+
+    iDestruct "HT" as "[(%GE & <-) | ((%LT & %NEQ) & (%ndh & #HTH))]".
+    - iFrame.
+      iMod ("CLOS" with "[-]") as "_".
+      { by iFrame. }
+      set_solver.
+    - iMod (start_rop with "RHI RH") as "(%i & %hist' & RHI & RH & #ITH)". 
+      iFrame.
+      iMod ("CLOS" with "[-]") as "_".
+      { by iFrame. }
+      set_solver.
+  Qed. 
+
+  Lemma read_tail_exact l (τ: locale heap_lang) (π: Phase) (q: Qp) t br pt rop:
+    {{{ queue_inv l ∗ read_head_resources t br pt rop ∗
+        th_phase_frag τ π q ∗ cp_mul π d 1 }}}
+       !#(Tail q_sq) @ τ
+    {{{ RET #pt; th_phase_frag τ π q ∗ read_head_resources t br pt rop }}}.
+  Proof using.
+    simpl. iIntros (Φ) "([#QAT #INV] & RH & PH & CPS) POST".
+
+    iInv "INV" as "(%hq & %h & %t_ & %br_ & %fl & %rop_ & %od & %hist & inv)" "CLOS".
+    iEval (rewrite /queue_inv_inner) in "inv".
+    iDestruct "inv" as ">(HQ & AUTHS & %ORDER0 & QI & DANGLE & OHV & RHI & RH' & DQ)".
+    
+    iApply sswp_MU_wp; [done| ].
+    iDestruct (access_queue_ends with "[$] [$]") as "(%ph & %pt_ & HEAD & TAIL & #HT & CLOS')".    
+    iDestruct (read_head_res_Tail_agree with "RH [$]") as %EQ.
+    inversion EQ. subst pt_. clear EQ. 
+    iApply (wp_load with "TAIL"). iIntros "!> TAIL".
+    iDestruct "RH'" as "[(% & RH') | TOK']".
+    { by iDestruct (read_head_resources_excl with "RH RH'") as "?". }
+      
+    iDestruct ("CLOS'" with "[$] [$]") as "(HQ & QI)".
+    MU_by_burn_cp. iApply wp_value.
+
+    iApply "POST". iFrame.
+    iMod ("CLOS" with "[-]") as "_".
+    { by iFrame. }
+    done.
+  Qed.
+
   Lemma read_head_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ queue_inv l ∗ read_head_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d read_head_fuel }}}
@@ -301,32 +369,50 @@ Section ReadHead.
     pure_steps.
 
     wp_bind (! _)%E.
-    iInv "INV" as "(%hq & %h0 & %t & %br & %fl0 & %rop & %od & %hist & inv)" "CLOS".
-    iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as ">(HQ & AUTHS & %ORDER0 & QI & DANGLE & OHV & RHI & RH & DQ)".
-    
-    iApply sswp_MU_wp; [done| ].
-    iDestruct (access_queue_ends with "[$] [$]") as "(%ph & %pt & HEAD & TAIL & #HT & CLOS')".
+    split_cps "CPS" 1.
     replace Head with (simple_queue.Head q_sq) by (by rewrite Q_SQ).
-    iApply (wp_load with "HEAD"). iIntros "!> HEAD".
-    iDestruct "RH" as "[(%pt_ & RH) | TOK']".
-    2: { by iDestruct (read_head_token_excl with "[$] [$]") as "?". }
-    iDestruct (read_head_res_Tail_agree with "RH [$]") as %EQ.
-    inversion EQ. subst pt_. clear EQ. 
-    iAssert (h_lb h0)%I as "#H_LB". 
-    { iDestruct (take_snapshot with "[$]") as "($&?&?&?)". }
-      
-    iDestruct ("CLOS'" with "[$] [$]") as "(HQ & QI)".
-    MU_by_burn_cp. iApply wp_value.
-
-    iMod (start_rop with "RHI RH") as "(%i & %hist' & RHI & RH & #ITH)". 
-
-    iMod ("CLOS" with "[-POST CPS PH RH]") as "_".
-    { by iFrame. }
-    iModIntro. clear hist hq od fl0 ORDER0 rop hist'. 
+    iApply (start_read with "[$QAT $INV $CPS' $PH $TOK]").
+    iIntros "!> %ph (PH & (%t & %br & %pt & %rop & RH & %CASES))". 
 
     wp_bind (Rec _ _ _)%E. pure_steps.
     wp_bind (! _)%E.
+    split_cps "CPS" 1.
+    replace Tail with (simple_queue.Tail q_sq) by (by rewrite Q_SQ).
+    iApply (read_tail_exact with "[$QAT $INV $CPS' $PH $RH]").
+    iIntros "!> (PH & RH)".
+
+    wp_bind (Rec _ _ _)%E. pure_steps.
+    wp_bind (_ = _)%E.
+    iApply sswp_MU_wp; [done| ].
+    iApply sswp_pure_step.
+    { set_solver. }
+    MU_by_burn_cp. iApply wp_value.
+
+    destruct CASES as [[-> ->] | [NEQ [i ->]]].
+    { rewrite bool_decide_true; [| done].
+      iApply sswp_MU_wp_fupd; [done| ].
+
+      iInv "INV" as "(%hq & %h & %t_ & %br_ & %fl & %rop_ & %od & %hist & inv)" "CLOS".
+      iEval (rewrite /queue_inv_inner) in "inv".
+      iDestruct "inv" as ">(HQ & AUTHS & %ORDER0 & QI & DANGLE & OHV & RHI & RH' & DQ)".
+      iModIntro. 
+      iApply sswp_pure_step.
+      { set_solver. }
+      MU_by_burn_cp.
+      iDestruct "RH'" as "[(% & RH') | TOK']".
+      { by iDestruct (read_head_resources_excl with "RH RH'") as "?". }
+      iDestruct (read_head_resources_auth_agree with "[$] [$]") as %[<- <-].
+      iMod ("CLOS" with "[-PH CPS POST TOK']") as "_".
+      { by iFrame. }
+      iModIntro.
+      pure_steps. iApply "POST". iFrame. }
+
+    
+      
+
+
+    
+    
     iInv "INV" as "(%hq & %h1 & %t_ & %br_ & %fl1 & %rop_ & %od & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
     iDestruct "inv" as ">(HQ & AUTHS & %ORDER1 & QI & DANGLE & OHV & RHI & RH' & DQ)".
