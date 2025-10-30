@@ -315,12 +315,12 @@ Section Dequeue.
       { iIntros (LT). iDestruct "ROP" as "[SAFE | [-> _]]".
         2: { iFrame. }
         iDestruct "SAFE" as "[FROM_HEAD | [FROM_DANGLE | FROM_BR]]".
-        - iDestruct "FROM_HEAD" as "[-> [-> | (-> & ->)]]".
+        - iDestruct "FROM_HEAD" as "[-> [-> | (-> & -> & ?)]]".
           + simpl. iFrame. 
           + lia. 
         - iDestruct "FROM_DANGLE" as "[(-> & -> & %X) ?]".
           clear -X. by destruct X. 
-        - iDestruct "FROM_BR" as "([-> ->] & ->)". lia. } 
+        - iDestruct "FROM_BR" as "([-> ->] & -> & ?)". lia. } 
 
       iClear "HTH CPS".
       iMod ("CLOS" with "[-]") as "_"; [| done].
@@ -341,16 +341,16 @@ Section Dequeue.
 
       iFrame "READ_ RP". 
       iDestruct "ROP" as "[[HEAD | [DANGLE | FL]] | CANCEL_WITNESS]".
-      + iDestruct "HEAD" as "(-> & [-> | (-> & ->)])".
+      + iDestruct "HEAD" as "(-> & [-> | (-> & -> & ?)])".
         * iRight. simpl. by iFrame "#∗".
         * iLeft. iRight. iLeft. iFrame.
           iPureIntro. split.
           ** split; [lia | done].
           ** simpl. done. 
       + iDestruct "DANGLE" as "((_ & _ & %) & _)". by destruct H.
-      + iDestruct "FL"as "([-> ->] & ->)". 
-        iLeft. rewrite /safe_read.
-        repeat iRight. done.
+      + iDestruct "FL"as "([-> ->] & -> & ?)". 
+        iLeft. rewrite /safe_read. iFrame. 
+        repeat iRight. iFrame. done.
       + iDestruct "CANCEL_WITNESS" as "(-> & CW)".
         iRight. by iFrame.
     - destruct RH_WF as (n & DOM & [? | [=]] & RH_WF).
@@ -709,11 +709,11 @@ Section Dequeue.
         { subst. rewrite {1}/safe_read. rewrite Nat.add_sub.
           iDestruct "SAFE" as "[FROM_HEAD | [FROM_DANGLE | FROM_BR]]".
           - iFrame.
-          - iDestruct "FROM_DANGLE" as "[(-> & -> & _) ->]".
+          - iDestruct "FROM_DANGLE" as "((-> & -> & _) & -> & ?)".
             iFrame "RP". 
             iLeft. rewrite /safe_read. rewrite Nat.add_sub.
             do 2 iRight. by iFrame. 
-          - iDestruct "FROM_BR" as "([-> ->] & ->)". 
+          - iDestruct "FROM_BR" as "([-> ->] & -> & ?)". 
             rewrite READ in READ'. inversion READ'. subst r x1 x2.
             apply Nat.le_lteq in BR0 as [BR0 | ->].
             { iSpecialize ("NO_FL" with "[//]"). iExFalso.

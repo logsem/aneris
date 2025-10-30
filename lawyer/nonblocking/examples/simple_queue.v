@@ -188,10 +188,12 @@ Section QueueResources.
   Definition cancel_witness (r: nat): iProp Σ :=
     ∃ r', ⌜ r < r' ⌝ ∗ @me_lb _ q_me_h r'.
 
+  Definition rop_token: iProp Σ := own q_γ_tok_rop (Excl ()).
+
   Definition safe_read (r: nat) (h br fl: nat) (od: option nat) rp: iProp Σ :=
-    ⌜ r = h ⌝ ∗ (⌜ rp = rs_init ⌝ ∨ ⌜ r = br ⌝ ∗ ⌜ rp = rs_proc (Some rsp_going) ⌝) ∨
-    ⌜ r = h - 1 /\ r = br /\ is_Some od ⌝ ∗ ⌜ rp = rs_proc (Some rsp_protected) ⌝ ∨
-    ⌜ r = br /\ r = fl ⌝ ∗  ⌜ rp = rs_proc (Some rsp_protected) ⌝
+    ⌜ r = h ⌝ ∗ (⌜ rp = rs_init ⌝ ∨ ⌜ r = br ⌝ ∗ ⌜ rp = rs_proc (Some rsp_going) ⌝ ∗ rop_token) ∨
+    ⌜ r = h - 1 /\ r = br /\ is_Some od ⌝ ∗ ⌜ rp = rs_proc (Some rsp_protected) ⌝  ∗ rop_token ∨
+    ⌜ r = br /\ r = fl ⌝ ∗  ⌜ rp = rs_proc (Some rsp_protected) ⌝  ∗ rop_token
   .
 
   Definition rop_interp (rop: option nat) (h br fl: nat) (od: option nat): iProp Σ :=
@@ -268,7 +270,7 @@ Section QueueResources.
     hq_auth hq ∗ auths h t br fl ∗ ⌜ hq_state_wf h t br fl ⌝ ∗
     queue_interp hq h t br fl ∗ dangle_interp od h hq ∗ ohv_interp ∗
     read_hist_interp hist rop h br fl od ∗ 
-    ((∃ pt, read_head_resources t br pt None) ∨ read_head_token) ∗ 
+    ((∃ pt, read_head_resources t br pt None ∗ rop_token) ∨ read_head_token) ∗ 
     ((∃ ph, dequeue_resources h fl ph None) ∨ dequeue_token)
   .
   
