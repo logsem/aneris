@@ -192,6 +192,103 @@ Section ReadHead.
     simpl. rewrite /read_head_resources. iIntros "(_&_&T&?) T'".
     iDestruct (pointsto_agree with "[$] [$]") as %?. set_solver.
   Qed.
+
+  Lemma old_rps_extend hist n r rp
+    (NTH: exists b, hist !! n = Some ((r, b), rp)):
+    old_rps hist (Some n) -∗
+    (ith_rp n rp ∗ ⌜rs_fin rp⌝ ∗ (br_lb r ∨ ⌜rp = rs_aborted ∨ rp = rs_canceled⌝)) -∗
+    old_rps hist None.
+  Proof using.
+    iIntros "OLDS (RP & %FIN & #ADD)".
+    rewrite /old_rps. simpl.
+    rewrite {2}(map_split hist n).
+    destruct NTH as (b & NTH). rewrite NTH /=.  
+    rewrite big_sepM_union.
+    2: { destruct lookup; simpl; apply map_disjoint_dom; set_solver. }
+    iFrame.     
+    rewrite big_sepM_singleton.
+    iFrame "#∗ %".
+  Qed.
+
+  Lemma finish_read_op t br pt i hist h fl od:
+  read_head_resources t br pt (Some i) -∗ read_hist_interp hist (Some i) h br fl od -∗
+  br_lb br
+ ==∗
+  ∃ hist', read_head_resources t br pt None ∗ read_hist_interp hist' None h br fl od.
+  Proof using.
+    iIntros "RH ROP #BR".
+    rewrite {1}/read_hist_interp {1}/read_head_resources.
+    iDestruct "ROP" as "(ROPA & ROP & RHIST & %RH_WF & #OLDS)".
+    iDestruct "RH" as "(TLA & BRA & TAIL & ROPF)".
+    rewrite /rop_interp. iDestruct ("ROP" with "[//]") as "(%r & %rp & READ_ & RP & ROP)". 
+
+    iMod (rop_update _ _ None with "[$] [$]") as "(ROPA & ROPF)".
+    iAssert (read_head_resources t br pt None)%I with "[ROPF TAIL TLA BRA]" as "$".
+    { iFrame. }
+
+    destruct RH_WF as (n & DOM & ROP & SEQ & BB).
+    iDestruct (ith_read_hist_compat with "[$] [$]") as %(?&rpa&NTH&_). 
+    iDestruct (ith_rp_hist_compat with "[$] [$]") as %(xx&NTH_&RS_LE).
+    rewrite NTH in NTH_. inversion NTH_. subst xx. simpl in *. clear NTH_. 
+
+    iDestruct "ROP" as "[SAFE | [-> #CW]]".
+    2: { iModIntro. iFrame "RHIST". iFrame "#∗". iSplitR.
+         { rewrite /rop_interp. by iIntros "% %". }
+         iSplit.
+         { iPureIntro. red. eexists. eauto. }
+         
+         destruct ROP as [[=] | [=]]. subst.
+         iApply (old_rps_extend with "[$]").
+         { eauto. }
+         inversion RS_LE; subst. iFrame "#∗".
+         iSplit; [iPureIntro; red; tauto| ].
+         iRight. set_solver. }
+
+    rewrite /safe_read.
+    (* TODO: refactor *)
+    iDestruct "SAFE" as "[FROM_HEAD | GOING]".
+    2: { iFrame "RHIST". iFrame "#∗". iModIntro.
+         iSplitR.
+         { rewrite /rop_interp. by iIntros "% %". }
+         iSplit.
+         { iPureIntro. red. eexists. eauto. }
+         destruct ROP as [[=] | [=]]. subst.
+         iApply (old_rps_extend with "[$]").
+         { eauto. }
+         iDestruct "GOING" as "[((-> & -> & ?) & ->) | ((-> & ->) & ->)]".
+         { inversion RS_LE; subst. iFrame "#∗".
+           iPureIntro. red. tauto. }
+         inversion RS_LE; subst. iFrame "#∗".
+         iPureIntro. red. tauto. }
+         
+    (* iDestruct "FROM_HEAD" as "(-> & [-> | (<- & ->)])". *)
+    (* 2: {  *)
+    
+    (* iEval (rewrite bi.or_assoc) in "SAFE".  *)
+
+    
+
+    (* iDestruct  *)
+
+    (* iMod (read_hist_alloc with "[$]") as "(AUTH & #READ & %RH_WF' & RP)"; [done| ]. *)
+    (* red in RH_WF. *)
+    (* destruct RH_WF as (n & DOM & ROP & SEQ & BB). *)
+    (* assert (set_fold Init.Nat.max 0 (dom hist) + 1 = S n) as EQ.  *)
+    (* { rewrite DOM dom_max_set_fold. lia. } *)
+    (* rewrite EQ. rewrite EQ in RH_WF'. *)
+
+    (* iFrame "#∗". *)
+    (* iModIntro. iSplitL. *)
+    (* 2: { iSplit; [done| ]. *)
+    (*      iApply old_rps_olds. rewrite delete_insert; [done| ]. *)
+    (*      apply not_elem_of_dom. rewrite DOM. rewrite elem_of_set_seq. lia. } *)
+    (* rewrite /rop_interp. iIntros (? [=<-]). *)
+    (* iFrame "RP". iExists _. iSplit. *)
+    (* { iApply (ith_included with "READ"). lia. } *)
+    (* iLeft. rewrite /safe_read. iLeft. iSplit; try done. *)
+    (* by iLeft. *)
+  Abort.
+    
     
   Lemma read_head_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ queue_inv l ∗ read_head_token ∗ 
@@ -272,9 +369,13 @@ Section ReadHead.
       MU_by_burn_cp.
       iDestruct "RH'" as "[(% & RH') | TOK]".
       { by iDestruct (read_head_resources_excl with "RH RH'") as "?". }
+      iDestruct (read_head_resources_rop_interp_agree with "[$] [$]") as %<-. 
+      iDestruct (read_head_resources_auth_agree with "[$] [$]") as %[<- <-].
+
+      
       iMod ("CLOS" with "[-POST CPS PH TOK]") as "_".
-      { iDestruct (read_head_resources_rop_interp_agree with "[$] [$]") as %<-. 
-        iDestruct (read_head_resources_auth_agree with "[$] [$]") as %[<- <-]. 
+      { 
+        
         iFrame. iNext. iSplit; [done| ].
         by iLeft. 
       }
