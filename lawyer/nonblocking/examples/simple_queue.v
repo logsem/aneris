@@ -188,10 +188,8 @@ Section QueueResources.
   Definition cancel_witness (r: nat): iProp Σ :=
     ∃ r', ⌜ r < r' ⌝ ∗ @me_lb _ q_me_h r'.
 
-  Definition rop_token: iProp Σ := own q_γ_tok_rop (Excl ()).
-
   Definition safe_read (r: nat) (h br fl: nat) (od: option nat) rp: iProp Σ :=
-    ⌜ r = h ⌝ ∗ (⌜ rp = rs_init ⌝ ∨ ⌜ r = br ⌝ ∗ ⌜ rp = rs_proc (Some rsp_going) ⌝ ∗ rop_token) ∨
+    ⌜ r = h ⌝ ∗ (⌜ rp = rs_init ⌝ ∨ ⌜ r = br ⌝ ∗ ⌜ rp = rs_proc (Some rsp_going) ⌝) ∨
     ⌜ r = h - 1 /\ r = br /\ is_Some od ⌝ ∗ ⌜ rp = rs_proc (Some rsp_protected) ⌝ ∨
     ⌜ r = br /\ r = fl ⌝ ∗  ⌜ rp = rs_proc (Some rsp_protected) ⌝
   .
@@ -201,7 +199,7 @@ Section QueueResources.
         (safe_read r h br fl od rp ∨ ⌜ rp = rs_canceled ⌝ ∗ cancel_witness r).
   
   Definition read_head_resources (t br: nat): iProp Σ :=
-    @me_exact _ q_me_t t ∗ @me_exact _ q_me_br br ∗ rop_frag None ∗ rop_token.
+    @me_exact _ q_me_t t ∗ @me_exact _ q_me_br br ∗ rop_frag None.
 
   Definition dequeue_resources (h fl: nat) (ph: loc) (od: option nat): iProp Σ :=
     @me_exact _ q_me_h h ∗ @me_exact _ q_me_fl fl ∗

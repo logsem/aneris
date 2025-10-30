@@ -316,7 +316,7 @@ Section Dequeue.
       { iIntros (LT). iDestruct "ROP" as "[SAFE | [-> _]]".
         2: { iFrame. }
         iDestruct "SAFE" as "[FROM_HEAD | [FROM_DANGLE | FROM_BR]]".
-        - iDestruct "FROM_HEAD" as "[-> [-> | (-> & -> & ?)]]".
+        - iDestruct "FROM_HEAD" as "[-> [-> | (-> & ->)]]".
           + simpl. iFrame. 
           + lia. 
         - iDestruct "FROM_DANGLE" as "[(-> & -> & %X) ?]".
@@ -342,7 +342,7 @@ Section Dequeue.
 
       iFrame "READ_ RP". 
       iDestruct "ROP" as "[[HEAD | [DANGLE | FL]] | CANCEL_WITNESS]".
-      + iDestruct "HEAD" as "(-> & [-> | (-> & -> & TOK)])".
+      + iDestruct "HEAD" as "(-> & [-> | (-> & ->)])".
         * iRight. simpl. by iFrame "#∗".
         * iLeft. iRight. iLeft. iFrame.
           iPureIntro. split.
