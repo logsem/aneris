@@ -749,29 +749,40 @@ Section ReadsHistory.
       apply Nat.le_max_l.
   Qed.
 
-  Lemma read_hist_alloc hist i r b 
+  Lemma read_hist_alloc hist i r b rs
     (NOITH: i ∉ dom hist):
-    read_hist_auth hist ==∗ read_hist_auth (<[ i := ((r, b), rs_init) ]> hist) ∗ ith_read i r b ∗ ith_rp i rs_init. 
+    read_hist_auth hist ==∗ read_hist_auth (<[ i := ((r, b), rs) ]> hist) ∗ ith_read i r b ∗ ith_rp i rs. 
   Proof using.
-  (*   iIntros "AUTH". *)
-  (*   iAssert (|==> read_hist_auth (<[i:=((r, b), rs_init)]> hist) ∗ ith_rp i rs_init)%I with "[AUTH]" as "X". *)
-  (*   2: { iMod "X" as "[AUTH $]". *)
-  (*        iDestruct (read_hist_get with "[$]") as "#FRAG". *)
-  (*        { apply lookup_insert. } *)
-  (*        iFrame. iModIntro. *)
-  (*        iApply (ith_read_included with "[$]"). lia. } *)
+    iIntros "AUTH".
+    iAssert (|==> read_hist_auth (<[i:=((r, b), rs)]> hist) ∗ ith_rp i rs)%I with "[AUTH]" as "X".
+    2: { iMod "X" as "[AUTH $]".
+         iDestruct (read_hist_get with "[$]") as "#FRAG".
+         { apply lookup_insert. }
+         by iFrame. }
 
-  (*   rewrite -own_op.  *)
-  (*   iApply (own_update with "[$]"). *)
+    rewrite -own_op.
+    iApply (own_update with "[$]").
 
-  (*   rewrite -cmra_assoc. rewrite -auth_frag_op.   *)
-  (*   apply auth_update.     *)
-  (*   rewrite fmap_insert. *)
-  (*   eapply alloc_local_update. *)
-  (*   2: done.  *)
-  (*   rewrite lookup_fmap. apply not_elem_of_dom in NOITH. by rewrite NOITH. *)
-  (* Qed. *)
-  Admitted. 
+    rewrite -cmra_assoc. rewrite -auth_frag_op.
+
+    set (f1 := λ '(r0, b0, p0), (Some (to_agree r0, MaxNat b0), Some (rs2cmra p0))). 
+    set (f2 := λ '(r0, b0, _), (Some (to_agree r0, MaxNat b0), None)). 
+    rewrite !fmap_insert.
+
+    rewrite -insert_op.
+    rewrite {2}/f2. rewrite -pair_op. rewrite op_None_right_id op_None_left_id.
+    rewrite gmap_disj_op_union.
+    2: { apply map_disjoint_dom. rewrite dom_empty_L. set_solver. }
+    rewrite map_union_empty.
+    replace (Some _, Some _) with (f1 (r, b, rs)) by reflexivity. 
+
+    apply auth_update. eapply alloc_local_update.
+    { apply not_elem_of_dom. by rewrite dom_fmap. }
+    subst f1. simpl.
+    apply pair_valid. split; apply Some_valid.
+    - done.
+    - apply rs2cmra_valid.
+  Qed.
 
   Lemma ith_read_agree i r1 r2 b1 b2:
     ith_read i r1 b1 -∗ ith_read i r2 b2 -∗ ⌜ r2 = r1  ⌝.

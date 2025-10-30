@@ -111,7 +111,7 @@ Section QueueResources.
    *)
   Definition phys_queue_interp (pq: HistQueue): iProp Σ :=
     ([∗ list] nd ∈ pq, hn_interp nd) ∗
-    ∃ (pt: loc), Tail q_sq ↦ #pt ∗ hn_interp (pt, dummy_node) ∗ ⌜ is_LL_into pq pt ⌝ ∗
+    ∃ (pt: loc), Tail q_sq ↦{1/2} #pt ∗ hn_interp (pt, dummy_node) ∗ ⌜ is_LL_into pq pt ⌝ ∗
     let ph: loc := (from_option (fun hn => hn.1) pt (pq !! 0)) in
     Head q_sq ↦{1/2} #ph
   . 
@@ -198,8 +198,9 @@ Section QueueResources.
     ∀ i, ⌜ rop = Some i  ⌝ -∗ ∃ r rp, ith_read i r 0 ∗ ith_rp i rp ∗
         (safe_read r h br fl od rp ∨ ⌜ rp = rs_canceled ⌝ ∗ cancel_witness r).
   
-  Definition read_head_resources (t br: nat): iProp Σ :=
-    @me_exact _ q_me_t t ∗ @me_exact _ q_me_br br ∗ rop_frag None.
+  Definition read_head_resources (t br: nat) (pt: loc) (rop: option nat): iProp Σ :=
+    @me_exact _ q_me_t t ∗ @me_exact _ q_me_br br ∗ 
+    Tail q_sq ↦{1/2} #pt ∗ rop_frag rop.
 
   Definition dequeue_resources (h fl: nat) (ph: loc) (od: option nat): iProp Σ :=
     @me_exact _ q_me_h h ∗ @me_exact _ q_me_fl fl ∗
@@ -267,7 +268,7 @@ Section QueueResources.
     hq_auth hq ∗ auths h t br fl ∗ ⌜ hq_state_wf h t br fl ⌝ ∗
     queue_interp hq h t br fl ∗ dangle_interp od h hq ∗ ohv_interp ∗
     read_hist_interp hist rop h br fl od ∗ 
-    (read_head_resources t br ∨ read_head_token) ∗ 
+    ((∃ pt, read_head_resources t br pt None) ∨ read_head_token) ∗ 
     ((∃ ph, dequeue_resources h fl ph None) ∨ dequeue_token)
   .
   
@@ -371,9 +372,9 @@ Section QueueResources.
 
   Lemma access_queue_ends hq h t br fl:
     hq_auth hq -∗ queue_interp hq h t br fl -∗
-      ∃ (ph pt: loc), Head q_sq ↦{1/2} #ph ∗ (Tail q_sq) ↦ #pt ∗
+      ∃ (ph pt: loc), Head q_sq ↦{1/2} #ph ∗ (Tail q_sq) ↦{1/2} #pt ∗
         (⌜ h >= t /\ ph = pt ⌝ ∨ ⌜ h < t /\ ph ≠ pt ⌝ ∗ ∃ (nd: Node), ith_node h (ph, nd)) ∗
-        (Head q_sq ↦{1/2} #ph -∗ (Tail q_sq) ↦ #pt -∗ hq_auth hq ∗ queue_interp hq h t br fl).
+        (Head q_sq ↦{1/2} #ph -∗ (Tail q_sq) ↦{1/2} #pt -∗ hq_auth hq ∗ queue_interp hq h t br fl).
   Proof using.
     simpl. iIntros "[AUTH #FRAGS] QI".
     rewrite /queue_interp. iDestruct "QI" as "(%T_LEN & PQI & BR & FL)".
