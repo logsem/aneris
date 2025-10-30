@@ -375,8 +375,8 @@ Section Dequeue.
       rewrite -(bi.sep_True' ( ⌜ _ ⌝ -∗ _ )%I). iApply fupd_frame_l. iSplit.
       { iIntros (LT). destruct FIN as [-> | [-> | [-> | ->]]].
         all: try by iFrame.
-        iDestruct "LB" as "[LB | %RS_AB]".
-        2: { done. }
+        iDestruct "LB" as "[LB | [%RS_AB | %RS_CANC]]".
+        2, 3: done. 
         iDestruct (br_lb_bound with "[$] [$]") as %?. lia. }
 
       iMod ("CLOS" with "[-]") as "_"; [| done].
@@ -405,8 +405,8 @@ Section Dequeue.
         rewrite big_sepM_singleton. iFrame. iFrame "% #".
         iSplit. 
         { iPureIntro. by apply upd_rp_fin_pres. }
-        iDestruct "LB" as "[$ | ->]".
-        simpl. by iRight. }
+        iDestruct "LB" as "[$ | [-> | ->]]".
+        all: simpl; iRight; iPureIntro; tauto. }
 
       (* TODO: make a lemma *)
       rewrite /read_hist_wf.

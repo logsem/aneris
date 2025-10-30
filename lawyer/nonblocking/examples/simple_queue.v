@@ -229,7 +229,7 @@ Section QueueResources.
       (* (dom hist) ∖ (from_option (fun n => {[ n ]}) ∅ rop), *)
       ∃ rp, ith_rp i rp ∗ ⌜ rs_fin rp ⌝ ∗
               (* (⌜ rp ≠ rs_canceled ⌝ -∗ br_lb b) *)
-              (br_lb r ∨ ⌜ rp = rs_aborted ⌝)
+              (br_lb r ∨ ⌜ rp = rs_aborted \/ rp = rs_canceled ⌝)
   . 
 
   (* TODO: upstream, find existing? *)
