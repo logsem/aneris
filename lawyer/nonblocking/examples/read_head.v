@@ -667,22 +667,130 @@ Section ReadHead.
     by iFrame.
   Qed.
                
+  Lemma read_ohv_spec τ π q l:
+    {{{ queue_inv l ∗ th_phase_frag τ π q ∗ cp_mul π d 1 }}}
+      !#(OldHeadVal q_sq) @τ
+    {{{ v, RET v; th_phase_frag τ π q }}}.
+  Proof using.
+    iIntros (Φ) "([#QAT #INV] & PH & CPS) POST".
+    iInv "INV" as "(%hq & %h & %t & %br & %fl & %rop & %od & %hist & inv)" "CLOS".
+    iEval (rewrite /queue_inv_inner) in "inv".
+    iDestruct "inv" as ">(HQ & AUTHS & %ORDER & QI & DANGLE & OHV & RHI & RH & DQ)".
+    iDestruct "OHV" as "(% & OHV)". 
+    iApply sswp_MU_wp; [done| ].
+    iApply (wp_load with "[$]"). iIntros "!> ?".
+    MU_by_burn_cp. iApply wp_value.
+    iMod ("CLOS" with "[-POST PH]") as "_". 
+    { by iFrame. }
+    by iApply "POST".
+  Qed.
+
+  Lemma get_op_node_val l (τ: locale heap_lang) (π: Phase) (q: Qp)
+    t h pt i ph ndh:
+    {{{ queue_inv l ∗ read_head_resources t h pt (Some i) ∗
+        ith_node h (ph, ndh) ∗ ith_read i h 0 ∗ ith_rp i (rs_proc None) ∗
+        cp_mul π d small_fuel ∗ th_phase_frag τ π q }}}
+      get_val #ph @τ
+    {{{ v, RET #v; th_phase_frag τ π q ∗ read_head_resources t h pt (Some i) ∗
+                   ∃ rs, ith_rp i rs ∗ ⌜ rs_fin rs ⌝ }}}.
+  Proof using.
+    simpl. iIntros (Φ) "([#QAT #INV] & RH & #ITH & #READ & #RP0 & CPS & PH) POST".
+    rewrite /get_val. pure_steps.
+
+    wp_bind (_ +ₗ _)%E.
+    iApply sswp_MU_wp; [done| ].
+    iApply sswp_pure_step; [done| ].
+    MU_by_burn_cp. rewrite loc_add_0. iApply wp_value.
+
+    iInv "INV" as "(%hq & %h' & %t_ & %br_ & %fl & %rop_ & %od & %hist & inv)" "CLOS".
+    iEval (rewrite /queue_inv_inner) in "inv".
+    iDestruct "inv" as ">(HQ & AUTHS & %ORDER0 & QI & DANGLE & OHV & RHI & RH' & DQ)".
+    iDestruct "RH'" as "[(% & RH' & RTOK') | TOK']".
+    { by iDestruct (read_head_resources_excl with "RH RH'") as "?". }
+    iDestruct (read_head_resources_auth_agree with "[$] [$]") as %[<- <-].
+    iDestruct (read_head_resources_rop_interp_agree with "[$] [$]") as %<-.
+
+    rewrite /read_hist_interp. iDestruct "RHI" as "(ROPA & ROP & RHIST & %RH_WF & #OLDS)".
+    rewrite /rop_interp. iDestruct ("ROP" with "[//]") as "(%r & %rp & READ_ & RP & ROP)".
+    iDestruct (ith_read_agree with "READ READ_") as %->. iClear "READ_".
+
+    iDestruct "ROP" as "[SAFE | [-> #CW]]".
+    2: { iDestruct (ith_rp_le with "RP RP0") as %CM. inversion CM. }
+    rewrite /safe_read. 
+    iDestruct "SAFE" as "[FROM_HEAD | PROT]".
+    - iDestruct "FROM_HEAD" as "[<- [-> | (% & -> & RTOK')]]".
+      { iDestruct (ith_rp_le with "RP RP0") as %CM. inversion CM. }
+      iDestruct (hq_auth_lookup with "[$] ITH") as %ITH.
+      iAssert (⌜ t ≠ h ⌝)%I as %NEMPTY.
+      { iIntros (->). iDestruct (queue_interp_cur_empty with "[$]") as %NO.
+        specialize (NO 0). rewrite Nat.add_0_r in NO. congruence. }
+      
+
+
+      iApply sswp_MU_wp; [done| ].
+      iApply (wp_load with "[$]"). 
+
+      
+      iDestruct "HT" as "[[%GE ->] | ((%LT & NEQ') & (%nd' & ITH'))]".
+      { red in ORDER0. assert (h = t) as -> by lia.        
+        rewrite /queue_interp. iDestruct "QI" as "(-> & _)".
+        apply mk_is_Some, lookup_lt_is_Some in TTH. lia. }
+      
+    
+ 
+      
+    2: { iAssert (rop_token)%I with "[PROT]" as "RTOK'".
+         { iDestruct "PROT" as "[((% & % & %X) & ? & RTOK') | ([% %] & % & RTOK')]"; iFrame. }
+         by iDestruct (rop_token_excl with "[$] [$]") as "?". } 
+    
+    2: { by iDestruct (rop_token_excl with "[$] [$]") as "?". }
+
+    
+
+    
+    
 
   Lemma get_head_val_spec l (τ: locale heap_lang) (π: Phase) (q: Qp)
-    t pt h ndh i ph:
+    t pt h ndh i ph
+    (NEQ: pt ≠ ph):
     {{{ queue_inv l ∗ read_head_resources t h pt (Some i) ∗
         rop_token ∗ ith_node h (ph, ndh) ∗
-        ith_read i h 0 ∗ 
+        ith_read i h 0 ∗ disj_range h t ∗ 
         cp_mul π d small_fuel ∗ th_phase_frag τ π q }}}
       get_head_val #ph @τ
     {{{ v, RET v; th_phase_frag τ π q ∗ read_head_resources t h pt (Some i) ∗
-                  read_head_token }}}.
+                  ∃ rs, ith_rp i rs ∗ ⌜ rs_fin rs ⌝ }}}.
   Proof using. 
-    simpl. iIntros (Φ) "([#QAT #INV] & RH & TOK & #ITH & #READ & CPS & PH) POST".
+    simpl. iIntros (Φ) "([#QAT #INV] & RH & TOK & #ITH & #READ & #DISJ & CPS & PH) POST".
     rewrite /get_head_val. 
     pure_steps.
 
-    wp_bind (! _)%E.    
+    wp_bind (! _)%E.
+    split_cps "CPS" 1. 
+    iApply (check_head_change with "[-POST CPS]").
+    { apply NEQ. }
+    { iFrame "#∗". }
+    iIntros "!> %ph' (PH & %rp & RH & RP & CASES)".
+
+    wp_bind (Rec _ _ _)%E. pure_steps.
+    wp_bind (_ = _)%E.
+    iApply sswp_MU_wp; [done| ].
+    iApply sswp_pure_step.
+    { set_solver. }
+    MU_by_burn_cp. iApply wp_value.
+
+    iDestruct "CASES" as "[(-> & ->) | ((%NEQ' & ->) & RTOK)]".
+    2: { rewrite bool_decide_false; [| set_solver].
+         pure_steps.
+         split_cps "CPS" 1. 
+         iApply (read_ohv_spec with "[$QAT $INV $CPS' $PH]").
+         iIntros "!> % PH".
+         iApply "POST". iFrame.
+         iPureIntro. red. tauto. }
+    
+    rewrite bool_decide_true; [| set_solver].
+    pure_steps.
+    split_cps "CPS" 1.     
 
   Proof using. 
     simpl. iIntros (Φ) "([#QAT #INV] & RH & TOK & #ITH & #READ & CPS & PH) POST".
