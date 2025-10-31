@@ -37,22 +37,19 @@ Section Write_Proof.
   Import code_api.
 
  Definition write_spec_internal `{!MTS_resources} : Prop :=
-    ∀ (c : val) (sa : socket_address)
-      (k : Key) (v : SerializableVal)
-      (E : coPset),
-    ⌜↑KVS_InvName ⊆ E⌝ -∗
+    ∀ (c : val) (sa : socket_address) (k : Key) (v : SerializableVal),
     ⌜k ∈ KVS_keys⌝ -∗
     is_connected γGsnap γT γTrs γKnownClients c sa -∗
     <<< ∀∀ (vo : option val) (b : bool),
         ownCacheUser γKnownClients k c vo ∗
         key_upd_status γKnownClients c k b >>>
-      TC_write c #k v @[ip_of_address sa] E
+      TC_write c #k v @[ip_of_address sa] (↑KVS_InvName)
     <<<▷ RET #(); ownCacheUser γKnownClients k c (Some v.(SV_val)) ∗
                  key_upd_status γKnownClients c k true >>>.
 
   Lemma write_spec_internal_holds `{!MTS_resources} : write_spec_internal.
   Proof.
-    iIntros (c sa k v E HsubE Hk) "#Hisc %Φ !# Hshift".
+    iIntros (c sa k v Hk) "#Hisc %Φ %E %HsubE !# Hshift".
     iDestruct "Hisc" as (lk cst l) "Hisc".
     iDestruct "Hisc" as (γCst γlk γS γA γCache γMsnap γU ->) "#(Hc1 & Hisc)".
     rewrite /TC_write /= /write.
@@ -63,8 +60,10 @@ Section Write_Proof.
     iDestruct "Hres"
       as (?) "(Hl & Hcr & [( -> & Hres_abs & _ & Htk) | Hres])".
     {
-      iApply fupd_aneris_wp.
-      iMod "Hshift" as "[%vo [%b ((Hcache & _) & _)]]".
+      wp_pures; wp_bind (!_)%E.
+      iMod "Hshift".
+      wp_load.
+      iDestruct "Hshift" as "[%vo [%b ((Hcache & _) & _)]]".
       iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? ?) "Hcache".
       iDestruct "Hcache" as (Heq) "Hcache".
       symmetry in Heq. simplify_eq.
@@ -73,7 +72,7 @@ Section Write_Proof.
       simplify_eq /=.
       by iDestruct (@ghost_map.ghost_map_lookup
                   with "[$Hres_abs][$Helem]")
-                  as "%Habs". 
+                  as "%Habs".
     }
     iDestruct "Hres"
       as (ts Msnap Msnap_full cuL cuV cuM cM -> Hcoh Hser) "Hres".
@@ -86,8 +85,9 @@ Section Write_Proof.
     wp_apply (wp_map_insert $! Hm).
     iIntros (cuV' Hm').
     wp_bind (Store _ _).
-    wp_apply (aneris_wp_atomic _ _ E).
-    iMod "Hshift" as "[%vo [%b ((Hcache & Hkds) & Hclose)]]".
+    iMod "Hshift".
+    wp_store.
+    iDestruct "Hshift" as "[%vo [%b ((Hcache & Hkds) & Hclose)]]".
     iDestruct "Hcache" as (? ? ? ? ? ? ? ? ? ?) "Hcache".
     iDestruct "Hcache" as (Heq) "(#Hc3 & HcacheHalf1 & %Hv)".
     symmetry in Heq. simplify_eq /=.
@@ -105,8 +105,6 @@ Section Write_Proof.
                 "[$Hauth][$Hcache]") as "%Hkin".
     iMod (ghost_map.ghost_map_update ((Some v.(SV_val)), true)
            with "[$Hauth][$Hcache]") as "(Hauth & (H1 & H2))".
-    iModIntro.
-    wp_store.
     iMod ("Hclose" with "[H1 H2]") as "HΦ".
     - iSplitL "H1".
       + iExists _, _, _, _, _, _, _, _.
@@ -123,7 +121,7 @@ Section Write_Proof.
       wp_pures.
       wp_apply (release_spec with
                 "[$Hisc $Hlk Hl Hcr HcM Hauth Htk] [HΦ]").
-      { 
+      {
         iExists _.
         iFrame "#∗".
         iRight.
@@ -132,8 +130,8 @@ Section Write_Proof.
         iFrame "#∗".
         iSplit; first done.
         iSplit.
-        { 
-          iPureIntro; by eapply is_coherent_cache_upd. 
+        {
+          iPureIntro; by eapply is_coherent_cache_upd.
         }
         iSplit; last done.
         iPureIntro.

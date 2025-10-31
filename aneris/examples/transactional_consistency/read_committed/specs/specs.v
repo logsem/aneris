@@ -31,52 +31,46 @@ Section Specification.
             !KVS_transaction_api, !RC_resources Mdl Σ}.
 
   Definition write_spec : iProp Σ :=
-    □ ∀ (c : val) (sa : socket_address) (E : coPset) 
-    (k : Key) (v : SerializableVal),
-    ⌜↑KVS_InvName ⊆ E⌝ -∗
+    □ ∀ (c : val) (sa : socket_address) (k : Key) (v : SerializableVal),
     ⌜k ∈ KVS_keys⌝ -∗
     IsConnected c sa -∗
     <<< ∀∀ (vo : option val), k ↦{c} vo >>>
-      TC_write c #k v @[ip_of_address sa] E
+      TC_write c #k v @[ip_of_address sa] (↑KVS_InvName)
     <<<▷ RET #(); k ↦{c} Some v.(SV_val) >>>.
 
   Definition read_spec : iProp Σ :=
-    □ ∀ (c : val) (sa : socket_address) (E : coPset) 
-    (k : Key),
-    ⌜↑KVS_InvName ⊆ E⌝ -∗
+    □ ∀ (c : val) (sa : socket_address) (k : Key),
     ⌜k ∈ KVS_keys⌝ -∗
     IsConnected c sa -∗
-    <<< ∀∀ (vo : option val) (V : Vals), 
+    <<< ∀∀ (vo : option val) (V : Vals),
       k ↦{c} vo ∗ k ↦ₖ V >>>
-      TC_read c #k @[ip_of_address sa] E
-    <<<▷ ∃∃ (wo : option val), RET $wo; 
-      k ↦{c} vo ∗ k ↦ₖ V ∗ 
-      ((⌜vo = None⌝ ∧ ⌜(∃ v, wo = Some v ∧ v ∈ V) ∨ wo = None⌝) ∨ 
+      TC_read c #k @[ip_of_address sa] (↑KVS_InvName)
+    <<<▷ ∃∃ (wo : option val), RET $wo;
+      k ↦{c} vo ∗ k ↦ₖ V ∗
+      ((⌜vo = None⌝ ∧ ⌜(∃ v, wo = Some v ∧ v ∈ V) ∨ wo = None⌝) ∨
       (⌜vo ≠ None⌝ ∧ ⌜wo = vo⌝)) >>>.
 
   Definition start_spec : iProp Σ :=
-    □ ∀ (c : val) (sa : socket_address) (E : coPset),
-    ⌜↑KVS_InvName ⊆ E⌝ -∗
+    □ ∀ (c : val) (sa : socket_address),
     IsConnected c sa -∗
-    <<< ∀∀ (m : gmap Key Vals), 
+    <<< ∀∀ (m : gmap Key Vals),
       ConnectionState c sa CanStart ∗
       [∗ map] k ↦ V ∈ m, k ↦ₖ V >>>
-      TC_start c @[ip_of_address sa] E
-    <<<▷ RET #(); 
+      TC_start c @[ip_of_address sa] (↑KVS_InvName)
+    <<<▷ RET #();
       ConnectionState c sa (Active (dom m)) ∗
-      ([∗ map] k ↦ V ∈ m, k ↦ₖ V) ∗ 
+      ([∗ map] k ↦ V ∈ m, k ↦ₖ V) ∗
       ([∗ map] k ↦ _ ∈ m, k ↦{c} None) >>>.
 
   Definition commit_spec : iProp Σ :=
-    □ ∀ (c : val) (sa : socket_address) (E : coPset),
-    ⌜↑KVS_InvName ⊆ E⌝ -∗
+    □ ∀ (c : val) (sa : socket_address),
     IsConnected c sa -∗
-    <<< ∀∀ (s : gset Key) (mc : gmap Key (option val)) (m : gmap Key Vals), 
+    <<< ∀∀ (s : gset Key) (mc : gmap Key (option val)) (m : gmap Key Vals),
       ConnectionState c sa (Active s) ∗
       ⌜s = dom mc⌝ ∗ ⌜dom mc = dom m⌝ ∗
       ([∗ map] k ↦ vo ∈ mc, k ↦{c} vo) ∗
       ([∗ map] k ↦ V ∈ m, k ↦ₖ V) >>>
-      TC_commit c @[ip_of_address sa] E
+      TC_commit c @[ip_of_address sa] (↑KVS_InvName)
     <<<▷ ∃∃ (b : bool), RET #b;
       ConnectionState c sa CanStart ∗
       (** Transaction has been commited. *)
@@ -97,7 +91,7 @@ Section Specification.
                             IsConnected cstate sa }}}.
 
   Definition init_kvs_spec : iProp Σ :=
-    {{{ KVS_address ⤇ KVS_rc ∗ 
+    {{{ KVS_address ⤇ KVS_rc ∗
         KVS_address ⤳ (∅,∅) ∗
         free_ports (ip_of_address KVS_address) {[port_of_address KVS_address]} ∗
         KVS_Init }}}
@@ -110,11 +104,11 @@ End Specification.
 Section RC_Module.
   Context `{!User_params}.
 
-  Definition RC_client_toolbox `{!anerisG Mdl Σ, !KVS_transaction_api, 
+  Definition RC_client_toolbox `{!anerisG Mdl Σ, !KVS_transaction_api,
   !RC_resources Mdl Σ} : iProp Σ :=
     init_kvs_spec ∗ init_client_proxy_spec ∗ read_spec ∗
     write_spec ∗ start_spec ∗ commit_spec.
- 
+
   Definition RC_spec clients `{!anerisG Mdl Σ} (lib : KVS_transaction_api) : iProp Σ :=
     ∃ (res : RC_resources Mdl Σ),
         ([∗ set] k ∈ KVS_keys, k ↦ₖ ∅) ∗
@@ -128,5 +122,5 @@ Section RC_Module.
       ↑KVS_InvName ⊆ E →
        ⊢ |={E}=> RC_spec clients lib
      }.
-   
+
 End RC_Module.

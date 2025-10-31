@@ -27,8 +27,8 @@ From aneris.examples.transactional_consistency.snapshot_isolation.util Require I
 From aneris.examples.transactional_consistency.snapshot_isolation Require Import snapshot_isolation_code.
 From aneris.examples.transactional_consistency Require Import resource_algebras user_params.
 
-(** This is a proof of concept that examples can be used with our trace adequacy theorem, 
-    as such the contents of this example has been choosen arbitrarily 
+(** This is a proof of concept that examples can be used with our trace adequacy theorem,
+    as such the contents of this example has been choosen arbitrarily
     (for convinience, we use the dirty_read example). *)
 
 Definition server_addr := SocketAddressInet "0.0.0.0" 80.
@@ -55,7 +55,7 @@ Section proof_of_code.
   Definition client_inv : iProp Σ :=
     inv client_inv_name client_inv_def.
 
-  Local Instance KVS_api : KVS_transaction_api :=  
+  Local Instance KVS_api : KVS_transaction_api :=
     KVS_wrapped_api KVS_snapshot_isolation_api_implementation.
 
   Lemma transaction1_spec :
@@ -67,32 +67,28 @@ Section proof_of_code.
     {{{ RET #(); True }}}.
   Proof.
     iIntros (cst sa) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) #inv %Φ !> (CanStart & #HiC) HΦ".
+    iSpecialize ("Hcom" with "[$]"); iSpecialize ("Hst" with "[$]").
     rewrite/transaction1.
     wp_pures.
-    wp_apply ("Hst" $! _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj; eauto.
+    wp_apply ("Hst" $! _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
     iInv "inv" as ">Hkx" "Hclose".
     unfold client_inv_def.
-    iModIntro.
     iExists {[ "x" := ∅ ]}.
+    rewrite !big_sepM_insert// big_sepM_empty.
     iFrame.
-    rewrite !big_sepM_insert; try set_solver.
-    rewrite big_sepM_empty.
-    iSplitL "Hkx"; first iFrame.
-    iIntros "(Hcstate & (Hkx & _) & Hcx & _)".
+    iIntros "!>!>(Hcstate & (Hkx & _) & Hcx & _)".
     iMod ("Hclose" with "[Hkx]") as "_".
     { iNext. iFrame. }
     iModIntro. wp_pures.
-    wp_apply ("Hwr" $! _ _  ⊤ _ (SerVal #1) with "[//][][$]"); first set_solver.
-    iModIntro.
-    iExists _.
-    iFrame.
-    iIntros "Hcx".
-    iModIntro.
+    iSpecialize ("Hwr" $! _ _ "x" (SerVal #1) with "[%][$]"); first set_solver.
+    wp_apply ("Hwr" $! _ ⊤); first done.
+    iExists _; iFrame.
+    iIntros "!>!>Hcx!>".
     wp_pures.
     iLöb as "IH".
     rewrite /util_code.loop.
     wp_pures.
-    iApply ("IH" with "[$][$][$]").
+    by iApply ("IH" with "[$][$][$]").
   Qed.
 
   Lemma transaction2_spec :
@@ -104,28 +100,25 @@ Section proof_of_code.
     {{{ RET #(); True }}}.
   Proof.
     iIntros (cst sa) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) #inv %Φ !> (CanStart & #HiC) HΦ".
+    iSpecialize ("Hcom" with "[$]"); iSpecialize ("Hst" with "[$]").
     rewrite/transaction2.
     wp_pures.
-    wp_apply ("Hst" $! _ _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj; eauto.
+    wp_apply ("Hst" $! _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
     iInv "inv" as ">Hkx" "Hclose".
     unfold client_inv_def.
-    iModIntro.
     iExists {[ "x" := ∅ ]}.
     iFrame.
-    rewrite !big_sepM_insert; try set_solver.
-    rewrite big_sepM_empty.
-    iSplitL "Hkx"; first iFrame.
-    iIntros "(Hcstate & (Hkx & _) & Hcx & _)".
+    rewrite !big_sepM_insert// big_sepM_empty.
+    iFrame.
+    iIntros "!>!>(Hcstate & (Hkx & _) & Hcx & _)".
     iMod ("Hclose" with "[Hkx]") as "_".
     { iNext. iFrame. }
     iModIntro. wp_pures.
-    wp_apply ("Hrd" $! _ _ (⊤ ∖ ↑client_inv_name) with "[][][$][HΦ Hcx Hcstate]"); 
-      first solve_ndisj; first set_solver.
-    iNext.
+    iSpecialize ("Hrd" $! _ _ "x" with "[%][$]"); first set_solver.
+    wp_apply ("Hrd" $! _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
     iInv "inv" as ">Hkx" "Hclose".
-    iModIntro.
-    iExists _, _.
-    iFrame.
+    iExists _, _. iFrame.
+    do 2 iModIntro.
     iIntros  (wo) "(Hcx & Hkx & Hdisj)".
     iMod ("Hclose" with "[Hkx]") as "_".
     { iNext. iFrame. }
@@ -136,28 +129,28 @@ Section proof_of_code.
       + set_solver.
       + rewrite /assert.
         wp_pures.
-        wp_apply ("Hcom" $! _ _ (⊤ ∖ ↑client_inv_name) with "[][$]"); first solve_ndisj.
+        wp_apply ("Hcom" $! _ (⊤ ∖ ↑client_inv_name)); first solve_ndisj.
         iInv "inv" as ">Hkx" "Hclose".
         iModIntro.
         iExists (dom {["x" := ∅]}), ({["x" := None]}), ({["x" := ∅]}).
         iFrame.
         iSplitL "Hcx Hkx".
-        * iSplitR. iPureIntro. set_solver. 
+        * iSplitR. iPureIntro. set_solver.
           iSplitR. iPureIntro. set_solver.
           rewrite !big_sepM_insert; try set_solver.
           rewrite !big_sepM_empty. iFrame.
-        * iIntros (b) "(Hstate & Hdisj)".
+        * iIntros (b) "!>(Hstate & Hdisj)".
           iMod ("Hclose" with "[Hdisj]") as "_".
-          { 
+          {
             iNext. iDestruct "Hdisj" as "[(_ & Hkey)|(_ & Hkey)]".
             - rewrite !big_sepM2_insert; try set_solver.
               simpl. iDestruct "Hkey" as "(Hey & _)". by iFrame.
             - rewrite !big_sepM_insert; try set_solver.
-              iDestruct "Hkey" as "(Hey & _)". by iFrame. 
+              iDestruct "Hkey" as "(Hey & _)". by iFrame.
           }
           iModIntro.
           wp_pures.
-          by iApply "HΦ". 
+          by iApply "HΦ".
     - exfalso.
       by apply Hfalse.
   Qed.
@@ -261,7 +254,7 @@ Section proof_of_runner.
     & Hcli2unalloc & ? & ? & ?) HΦ".
     iDestruct "Hlib" as (RC_res) "(mem & KVS_Init & #Hginv & Hcc & #specs)".
     iMod (inv_alloc client_inv_name ⊤ (client_inv_def) with "[mem]") as "#Hinv".
-    { 
+    {
       iNext.
       iDestruct (big_sepS_delete _ _ "x" with "mem") as "(Hx & HKVSres)";
         first set_solver.
@@ -320,20 +313,20 @@ Theorem trace_valid :
 Proof.
   intros.
   set (Σ := #[anerisΣ adequacy_no_model.unit_model; KVSΣ]).
-  eapply (@adequacy_trace_rc Σ _ _ _ _ init_state _ _ 
+  eapply (@adequacy_trace_rc Σ _ _ _ _ init_state _ _
     {[server_addr; client_1_addr; client_2_addr]} ips); try done.
   - iIntros (Ag).
     assert (specs.SI_init) as SI_init; first apply _.
     apply implication_si_rc in SI_init.
-    iMod (@RC_init_module _ _ _ _ KVS_snapshot_isolation_api_implementation 
-      _ _ {[server_addr; client_1_addr; client_2_addr]}) 
+    iMod (@RC_init_module _ _ _ _ KVS_snapshot_isolation_api_implementation
+      _ _ {[server_addr; client_1_addr; client_2_addr]})
       as "RC_spec";
       first solve_ndisj.
     iModIntro.
     iFrame.
   - iIntros.
     iIntros (Φ) "!# (Hlib & Hunalloc & Hmes & Hfree) HΦ".
-    iApply (@example_runner_spec adequacy_no_model.unit_model Σ anerisG0 with 
+    iApply (@example_runner_spec adequacy_no_model.unit_model Σ anerisG0 with
       "[$Hlib Hunalloc Hmes Hfree]"); last done.
     do 2 (iDestruct (unallocated_split with "Hunalloc") as "[Hunalloc ?]";
       [set_solver|]); iFrame.

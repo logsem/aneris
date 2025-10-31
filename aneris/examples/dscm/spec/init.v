@@ -18,8 +18,8 @@ Section Specification.
          (P : iProp Σ) (Q : we → ghst → ghst → ghst → iProp Σ),
         ⌜↑DB_InvName ⊆ E⌝ -∗
         ⌜k ∈ DB_keys⌝ -∗
-        □ (P -∗ ▷ 
-            |={⊤, E}=>
+        □ (P -∗
+            |={⊤, E}=> ▷
               ∃ (h s: ghst) (a_old: option we),
                 ⌜at_key k h = a_old⌝ ∗
                 Obs h ∗
@@ -41,15 +41,14 @@ Section Specification.
 
   Definition write_spec_atomic
       (wr : val) (sa : socket_address) : iProp Σ :=
-    ∀ (E : coPset) (k : Key) (v : SerializableVal),
-    ⌜↑DB_InvName ⊆ E⌝ -∗
+    ∀ (k : Key) (v : SerializableVal),
     ⌜k ∈ DB_keys⌝ -∗
     <<< ∀∀ (h s : ghst) (a_old : option we),
       ⌜at_key k h = a_old⌝ ∗
       Obs h ∗
       k ↦ₖ mval_of_we_opt a_old ∗
       Writes sa s >>>
-      wr #k v @[ip_of_address sa] E
+      wr #k v @[ip_of_address sa] (↑DB_InvName)
     <<<▷ ∃∃ hf a_new, RET #();
            ⌜at_key k hf = None⌝ ∗
            ⌜WE_key a_new = k⌝ ∗
@@ -63,12 +62,12 @@ Section Specification.
   Lemma write_spec_write_spec_atomic wr sa :
     write_spec wr sa -∗ write_spec_atomic wr sa.
   Proof.
-    iIntros "#Hwr" (E k v HE Hkeys Φ) "!> Hvs".
+    iIntros "#Hwr" (k v Hkeys Φ E HE) "!> Hvs".
     iApply ("Hwr" $! E k v _ (λ _ _ _ _, Φ #()) with "[] [] [] Hvs"); [ done .. | | ].
     { iIntros "!> Hvs".
-      iNext.
-      iMod "Hvs" as (h s a_old) "[(%Hatkey & Hobs & Hk & writes) Hclose]".
-      iModIntro.
+      iMod "Hvs".
+      do 2 iModIntro.
+      iDestruct "Hvs" as (h s a_old) "[(%Hatkey & Hobs & Hk & writes) Hclose]".
       eauto 10 with iFrame. }
     iIntros "!> H".
     iDestruct "H" as (_ _ _ _) "H".
@@ -84,7 +83,7 @@ Section Specification.
          (Q2 : we → ghst → ghst → iProp Σ),
         ⌜↑DB_InvName ⊆ E⌝ -∗
         ⌜k ∈ DB_keys⌝ -∗
-        □ (P -∗ ▷ |={⊤, E}=>
+        □ (P -∗ |={⊤, E}=> ▷
            ∃ (h s : ghst) (q : Qp) (ao: option we),
                ⌜at_key k h = ao⌝ ∗
                Obs h ∗
@@ -101,14 +100,13 @@ Section Specification.
 
   Definition read_spec_atomic
       (rd : val) (sa : socket_address) : iProp Σ :=
-    ∀ (E : coPset) (k : Key),
-    ⌜↑DB_InvName ⊆ E⌝ -∗
+    ∀ (k : Key),
     ⌜k ∈ DB_keys⌝ -∗
     <<< ∀∀ (h : ghst) (q : Qp) (ao : option we),
       ⌜at_key k h = ao⌝ ∗
       Obs h ∗
       k ↦ₖ{q} mval_of_we_opt ao >>>
-      rd #k @[ip_of_address sa] E
+      rd #k @[ip_of_address sa] (↑DB_InvName)
     <<<▷ RET match ao with None => NONEV | Some a => SOMEV (WE_val a) end;
            (⌜ao = None⌝ ∗ k ↦ₖ{q} None) ∨
            (∃ e, ⌜ao = Some e⌝ ∗
@@ -117,14 +115,13 @@ Section Specification.
   Lemma read_spec_read_spec_atomic rd sa :
     read_spec rd sa -∗ read_spec_atomic rd sa.
   Proof.
-    iIntros "#Hrd" (E k HE Hkeys Φ) "!> Hvs".
+    iIntros "#Hrd" (k Hkeys Φ E HE) "!> Hvs".
     iApply ("Hrd" $! E k _ (λ _ _ _, Φ NONEV)
                   (λ e _ _, Φ (SOMEV (WE_val e))) with "[] [] [] Hvs");
       [ done .. | | ].
     { iIntros "!> Hvs".
-      iNext.
-      iMod "Hvs" as (h q ao) "[(%Hatkey & Hobs & Hk) Hclose]".
-      iModIntro.
+      iMod "Hvs"; do 2 iModIntro;
+        iDestruct "Hvs" as (h q ao) "[(%Hatkey & Hobs & Hk) Hclose]".
       iExists h, [], q, ao.
       iSplit; [done|].
       iFrame.
@@ -233,7 +230,7 @@ Section Specification.
       unfold P, Q.
       iModIntro.
       iExists h, s, (at_key k h). iFrame. iFrame "#".
-      iModIntro.
+      iNext.
       iSplit; first done.
       iIntros (hf a_new) "(% & % & % & % & % & Hk & #Hobs' & Hw)".
       iFrame. iFrame "#". eauto.

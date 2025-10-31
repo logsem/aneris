@@ -25,7 +25,7 @@ Section Broadcast_1_2_spec.
     wp_lam.
 
     (* First broadcast *)
-    wp_apply ("Hbroadcast" $! (SerVal #1)); first done.
+    wp_apply ("Hbroadcast" $! (SerVal #1)); [done | iPureIntro; reflexivity | ].
     iInv "Inv" as ">HInv" "Hclose_inv".
     iDestruct "HInv" as (h) "[HGlob [-> | Hnot_zero]]"; last first.
     { iExFalso.
@@ -34,7 +34,7 @@ Section Broadcast_1_2_spec.
     }
     iApply fupd_mask_intro; first solve_ndisj.
     iIntros "Hclose_other".
-    iExists ∅, ∅. iFrame.
+    iExists ∅, ∅. iFrame. iNext.
     iIntros (u e1) "(%Hu & _ & _ & %He1 & _ & _ & _ & HGlob & HLoc)".
     iMod "Hclose_other" as "_".
     rewrite !left_id_L.
@@ -46,8 +46,7 @@ Section Broadcast_1_2_spec.
     iModIntro. wp_seq.
 
     (* Second broadcast *)
-    iApply ("Hbroadcast" $! (SerVal #2)); first done.
-    iNext.
+    iApply ("Hbroadcast" $! (SerVal #2)); [ done | done | ].
     iInv "Inv" as ">HInv" "Hclose_inv".
     iDestruct "HInv" as (h) "[HGlob [-> | [Hone | Htwo]]]".
     - iMod (Local_included_Global e1 with "HGlobinv HGlob HLoc") as "%absurd";
@@ -59,7 +58,7 @@ Section Broadcast_1_2_spec.
       apply elem_of_singleton in e1_e1'; subst.
       iApply fupd_mask_intro; first solve_ndisj.
       iIntros "Hclose_other".
-      iExists {[ erasure e1 ]}, {[ e1 ]}; iFrame.
+      iExists {[ erasure e1 ]}, {[ e1 ]}; iFrame. iNext.
       iIntros (v e2) "(%Hv & %He1_e2 & _ & %He2 & _ & _ & %Hmax & HGlob & HLoc)".
       iMod (OwnLocal_local_ext' with "HGlobinv HLoc") as "[HLoc %ext]"; first solve_ndisj.
       apply compute_maximum_correct in Hmax; last assumption.

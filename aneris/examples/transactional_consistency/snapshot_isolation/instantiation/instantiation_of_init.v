@@ -49,7 +49,7 @@ From aneris.examples.transactional_consistency.snapshot_isolation.proof.client_p
 From aneris.examples.transactional_consistency.snapshot_isolation.proof.server Require Import
   proof_of_init_server.
 
- Notation snapsTy := (gmapUR nat 
+ Notation snapsTy := (gmapUR nat
                         (agreeR
                            (gmapUR Key
                               (max_prefix_listR write_eventO)))).
@@ -57,11 +57,11 @@ From aneris.examples.transactional_consistency.snapshot_isolation.proof.server R
                                    (agreeR (leibnizO gname))).
 
  Notation csumTy := (csum.csumR (exclR unitR) (agreeR (prodO (prodO (prodO (prodO (prodO gnameO gnameO) gnameO) gnameO) gnameO) gnameO))).
- 
+
 Section Init_setup_proof.
   Context `{!anerisG Mdl Σ, DB : !User_params, !KVSG Σ}.
   Context `{!ras.SpecChanG Σ}.
-  
+
   Lemma init_setup_holds (E : coPset) (clients : gset socket_address) :
     ↑KVS_InvName ⊆ E →
     ⊢ |={E}=>
@@ -86,7 +86,7 @@ Section Init_setup_proof.
       first by apply auth_auth_valid.
     iMod (own_alloc
             (● (∅ : gmapUR Key (max_prefix_listR write_eventO))))
-      as (γGsnap) "HGsnap". 
+      as (γGsnap) "HGsnap".
      { apply auth_auth_valid. done. }
     iAssert (|==>
                own γGsnap
@@ -118,22 +118,22 @@ Section Init_setup_proof.
           eapply (alloc_local_update); last done.
           apply not_elem_of_dom.
           by rewrite dom_fmap dom_gset_to_gmap. }
-        rewrite fmap_insert. by iFrame. 
-      } 
+        rewrite fmap_insert. by iFrame.
+      }
     iAssert (|==> ∃ M,
                  own γClts (● ((to_agree <$> M) :gnamesTy)) ∗
                  ⌜dom M = clients⌝ ∗
                  [∗ set] sa ∈ clients,
                  client_can_connect γClts sa)%I with
-      "[HauthClts]" as "HauthClts". 
-    { 
+      "[HauthClts]" as "HauthClts".
+    {
       iInduction clients as [|x xs] "IH" using set_ind_L.
       - iModIntro. iExists ∅. iFrame; eauto.
         rewrite dom_empty_L. rewrite fmap_empty. iFrame. iSplit; first done.
-        set_solver. 
+        set_solver.
       - iMod ("IH" with "HauthClts") as (M) "(Hauth & %Hdom & Hclts)".
         iMod (own_alloc (csum.Cinl (Excl ()) : csumTy
-                  )) as (γsa) "Hsa". 
+                  )) as (γsa) "Hsa".
         done.
         iMod (own_update _ _
                 (● ((to_agree<$>(<[x := γsa]>M)) : gnamesTy) ⋅
@@ -145,7 +145,7 @@ Section Init_setup_proof.
           eapply (alloc_local_update); last done.
           apply not_elem_of_dom. set_solver. }
         iModIntro; iExists _; iFrame.
-        iSplit; first by rewrite dom_insert_L Hdom. 
+        iSplit; first by rewrite dom_insert_L Hdom.
         rewrite big_sepS_insert; last done.
         iFrame. rewrite /client_can_connect. eauto. }
     iMod "HauthClts" as (M) "(HauthClts & %Hdom & Hclts)".
@@ -161,13 +161,13 @@ Section Init_setup_proof.
     set (MTSC := client_handler_rpc_user_params clients
                    γClts γGauth γGsnap γT γTrs).
     iMod (MTS_init_setup E MTSC)
-      as (srv_si SrvInit MTRC) "(Hsinit & #HsrvS & #HcltS & #HreqS)". 
+      as (srv_si SrvInit MTRC) "(Hsinit & #HsrvS & #HcltS & #HreqS)".
     { simplify_eq /=; solve_ndisj. }
     iModIntro.
     iExists (SI_resources_instance clients
                γClts γGauth γGsnap γT γTrs srv_si SrvInit).
     iSplitL "Hkeys".
-    { 
+    {
       rewrite !big_sepM_gset_to_gmap.
       iDestruct (big_sepS_sep with "[$Hkeys $Hseens]") as "Hkeys".
       iApply (big_sepS_mono with "Hkeys").
@@ -183,16 +183,16 @@ Section Init_setup_proof.
        - iApply big_sepS_dup; eauto.
        - iApply big_sepS_sep.
        iFrame "#∗".
-       iApply big_sepS_dup; eauto. 
+       iApply big_sepS_dup; eauto.
     }
     iSplit.
-    { 
+    {
       iIntros (Φ) "!# (#Hsi & Hh & Hfs & Hinit) HΦ".
       iDestruct "Hinit" as "(? & ? & ? & ? & ?)".
-      wp_apply (init_server_spec_internal_holds with "[$][$HΦ]"). 
-    } 
+      wp_apply (init_server_spec_internal_holds with "[$][$HΦ]").
+    }
     iSplit.
-    {  
+    {
       iIntros (sa Φ) "!# (Ha & #Hsi & Hm & (#Hc1 & Hc2 & #Hc3 & #Hc4) & Hf) HΦ".
       wp_apply (init_client_leader_proxy_internal_holds clients
                  with "[$][HΦ]").
@@ -204,36 +204,32 @@ Section Init_setup_proof.
     iSplit.
     {
       iModIntro.
-      iIntros (??????) "#(H1 & H2 & H3) !#". 
-      iIntros (Φ) "HΦ".
-      rewrite /OwnLocalKey /IsConnected //=.
-      wp_apply (read_spec_internal_holds clients γClts γGauth γGsnap γT γTrs
-                 with "[//][$][$][$][$HΦ]").
-    }
-    iSplit.
-    {
-      iModIntro.
-      iIntros (???????) "#(H1 & H2 & H3) !#".
-      iIntros (Φ) "HΦ".
-      rewrite /OwnLocalKey /IsConnected //=.  
-      wp_apply (write_spec_internal_holds γClts γGsnap γT γTrs
-                 with "[//][//][$][$]").
-    }
-    iSplit.
-    {
-      iModIntro.
       iIntros (????) "#(H1 & H2 & H3) !#".
-      iIntros (Φ) "HΦ".
-      wp_apply (start_spec_internal_holds clients γClts γGauth γGsnap γT γTrs
-                 with "[//][$][$][$][$HΦ]").
+      iIntros (Φ??) "HΦ".
+      rewrite /OwnLocalKey /IsConnected //=.
+      wp_apply (read_spec_internal_holds with "[//][$][$][$][%//][$]").
+    }
+    iSplit.
+    {
+      iModIntro.
+      iIntros (?????) "#(H1 & H2 & H3) !#".
+      iIntros (Φ??) "HΦ".
+      rewrite /OwnLocalKey /IsConnected //=.
+      wp_apply (write_spec_internal_holds with "[//][$][%//][$]").
+    }
+    iSplit.
+    {
+      iModIntro.
+      iIntros (??) "#(H1 & H2 & H3) !#".
+      iIntros (Φ??) "HΦ".
+      wp_apply (start_spec_internal_holds with "[//][$][$][%//][$]").
     }
     iModIntro.
-    iIntros (????) "#(H1 & H2 & H3) !#".
-    iIntros (Φ) "HΦ".
-    wp_apply (commit_spec_internal_holds clients γClts γGauth γGsnap γT γTrs
-                with "[//][$][$][$][$HΦ]").
+    iIntros (??) "#(H1 & H2 & H3) !#".
+    iIntros (Φ??) "HΦ".
+    wp_apply (commit_spec_internal_holds with "[//][$][$][%//][$]").
   Qed.
-  
+
 End Init_setup_proof.
 
 Global Instance SI_init_instanciation

@@ -61,10 +61,10 @@ Section Clients_MT_spec_params.
       wp_apply (wp_map_insert $! Hkvs).
       iIntros (m' Hm').
       wp_bind (Store _ _).
-      wp_apply (aneris_wp_atomic _ _ E).
       set (a := {|we_key := k; we_val := v;
                                we_time := (length lM : int_time.(Time))|}).
-      iMod "Hvsh" as (h a_old) "(%Hkh & Hk & Hobsh & Hpost)".
+      iMod "Hvsh"; wp_store;
+       iDestruct "Hvsh" as (h a_old) "(%Hkh & Hk & Hobsh & Hpost)".
       iDestruct (own_obs_prefix with "[$HlogL][Hobsh]") as "%Hprefixh".
       { by iApply Obs_own_log_obs. }
       rewrite -{1} Hkh.
@@ -111,9 +111,7 @@ Section Clients_MT_spec_params.
           rewrite Heqe - He'time. lia. }
         done. }
       { iLeft. list_simplifier. iSplit; first done. iFrame "#". }
-      { iModIntro.
-        wp_store.
-        iMod "HQ".
+      { iMod "HQ".
         iModIntro.
         wp_pures.
         wp_apply (wp_log_length with "[$Hpl]"); [done|].

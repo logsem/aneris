@@ -37,16 +37,14 @@ Section Start_Proof.
   Import code_api.
 
   Definition start_spec_internal {MTR : MTS_resources} : Prop :=
-    ∀ (c : val) (sa : socket_address)
-       (E : coPset),
-      ⌜↑KVS_InvName ⊆ E⌝ -∗
+    ∀ (c : val) (sa : socket_address),
     Global_Inv clients γKnownClients γGauth γGsnap γT γTrs -∗
     is_connected γGsnap γT γTrs γKnownClients c sa -∗
     @make_request_spec _ _ _ _ MTC _ -∗
     <<< ∀∀ (m : gmap Key (list val)),
         ConnectionState_def γKnownClients γGsnap c sa CanStart ∗
        [∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h >>>
-      TC_start c @[ip_of_address sa] E
+      TC_start c @[ip_of_address sa] (↑KVS_InvName)
     <<<▷ RET #();
         ConnectionState_def γKnownClients γGsnap c sa (Active m) ∗
        ([∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
@@ -57,8 +55,8 @@ Section Start_Proof.
 
   Lemma start_spec_internal_holds `{!MTS_resources} : start_spec_internal.
   Proof.
-    iIntros (c sa E HE).
-    iIntros "#Hinv #Hlk #Hspec %Φ !# Hsh".
+    iIntros (c sa).
+    iIntros "#Hinv #Hlk #Hspec %Φ %E %HE !# Hsh".
     rewrite /TC_start /= /start.
     wp_pures.
     iDestruct "Hlk" as (lk cst l γCst γlk γS γA γCache γMsnap γU) "(-> & Hcc1 & Hlk)".
@@ -72,8 +70,8 @@ Section Start_Proof.
     { iDestruct "Habs" as (? ? ? ? ? ? ? ->) "Habs".
       wp_pure _.
       wp_bind (Lam _ _).
-      wp_apply (aneris_wp_atomic _ _ (E)).
-      iMod "Hsh" as (m) "[(Hcst & _) Hclose]".
+      iMod "Hsh"; wp_pure _;
+        iDestruct "Hsh" as (m) "[(Hcst & _) Hclose]".
       iDestruct "Habs" as (? ? ? ? ?) "(? & ? & ? & ? & ? & Habs)".
       iDestruct "Hcst" as (sp) "(Hcst & %Heq)".
       iDestruct "Hcst" as (? ? ? ? ? ? ? ? ->) "(Hut & #Habs1 & Hsp)".
@@ -120,11 +118,10 @@ Section Start_Proof.
         iSplit; first done.
         iSplit; first done.
         iIntros "_".
-        iMod "Hsh" as (m) "[(Hst' & Hpts) Hclose]".
-        iModIntro.
+        iMod "Hsh"; do 2 iModIntro.
+          iDestruct "Hsh" as (m) "[(Hst' & Hpts) Hclose]".
         iExists m.
         iFrame.
-        iNext.
         iIntros (ts M Mf) "Hpost".
         iDestruct "Hpost" as "(%Hsub & -> & %Hvsn & Hser & Hts & Hfrag & Hpts & #Hseen)".
         iDestruct "Hst'" as (sp) "(Hst' & %Heq')".
@@ -187,7 +184,7 @@ Section Start_Proof.
     wp_store.
     iDestruct "Hpost"
       as (t Msnap Msnap_full ?)
-           "(Htk & Hgh & Hmfr & Hf & Htm & %Hsub & -> & %Hcoh & %Hval & Hseen & Hpost)".  
+           "(Htk & Hgh & Hmfr & Hf & Htm & %Hsub & -> & %Hcoh & %Hval & Hseen & Hpost)".
     wp_apply (release_spec with "[$Hlkd $Hlk Hl Hcr Hgh Htk Hseen Hf Htm Hc Hmfr]").
     {
       iExists (InjRV (#t, #cm))%V.

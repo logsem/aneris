@@ -81,10 +81,8 @@ Section Commit_Proof.
   Qed.
 
   Definition commit_spec_internal {MTR : MTS_resources} : Prop :=
-   ∀ (c : val) (sa : socket_address)
-     (E : coPset),
-     ⌜↑KVS_InvName ⊆ E⌝ -∗
-       Global_Inv clients γKnownClients γGauth γGsnap γT γTrs -∗
+   ∀ (c : val) (sa : socket_address),
+    Global_Inv clients γKnownClients γGauth γGsnap γT γTrs -∗
     is_connected γGsnap γT γTrs γKnownClients c sa -∗
     @make_request_spec _ _ _ _ MTC _ -∗
     <<< ∀∀ (m ms: gmap Key Hist)
@@ -94,7 +92,7 @@ Section Commit_Proof.
         ([∗ map] k ↦ h ∈ m, OwnMemKey_def γGauth γGsnap k h) ∗
         ([∗ map] k ↦ p ∈ mc,
            ownCacheUser γKnownClients k c p.1 ∗ key_upd_status γKnownClients c k p.2) >>>
-      TC_commit c @[ip_of_address sa] E
+      TC_commit c @[ip_of_address sa] (↑KVS_InvName)
     <<<▷∃∃ b, RET #b;
          ConnectionState_def γKnownClients γGsnap c sa CanStart ∗
         (** Transaction has been commited. *)
@@ -108,8 +106,8 @@ Section Commit_Proof.
   Lemma commit_spec_internal_holds `{!MTS_resources} :
     commit_spec_internal.
   Proof.
-    iIntros (c sa E HE).
-    iIntros "#Hinv #Hlk #Hspec %Φ !# Hsh".
+    iIntros (c sa).
+    iIntros "#Hinv #Hlk #Hspec %Φ %E %HE !# Hsh".
     rewrite /TC_commit /= /commit.
     wp_pures.
     unfold is_connected.
@@ -126,8 +124,7 @@ Section Commit_Proof.
       iDestruct "Habs" as (->) "(Hgh & Hst & Htk')".
       wp_pure _.
       wp_bind (Lam _ _).
-      wp_apply (aneris_wp_atomic _ _ (E)).
-      iMod "Hsh" as (m ms mc) "[(Hcst & _) Hclose]".
+      iMod "Hsh"; wp_pure _; iDestruct "Hsh" as (m ms mc) "[(Hcst & _) Hclose]".
       iDestruct "Hcst" as (sp) "(Hcst & %Heq)".
       iDestruct "Hcst" as (? ? ? ? ? ? ? ? ->) "(Hut & #Habs1 & Hsp)".
       destruct sp; simplify_eq /=.
@@ -137,7 +134,7 @@ Section Commit_Proof.
       by iDestruct (own_valid_2 with "Htk' Hsp") as %?.
     }
     iDestruct "Hst" as (ts Msnap Msnap_full cache_updatesL cache_updatesV cache_updatesM cacheM)
-      "( -> & (%Hcoh & %Hser & %Hvalid & %Hismap & %Hsub & 
+      "( -> & (%Hcoh & %Hser & %Hvalid & %Hismap & %Hsub &
               #Htime & #Hseen & #Hfrag & Hupd & Hauth & HauthMsnap & Htok))".
     wp_pures.
     wp_load.
@@ -147,9 +144,8 @@ Section Commit_Proof.
     (* Case 1: cache is empty (read-only transaction). *)
     - wp_bind (_ <- _)%E.
       wp_apply (aneris_wp_atomic _ _ (E)).
-      iMod "Hsh" as (m ms mc) "((Hcon & %Hdomm & %Hdomms & Hkeys & Hcache) & Hclose)".
-      iModIntro.
-      wp_store.
+      iMod "Hsh"; iModIntro; wp_store; iDestruct "Hsh" as (m ms mc) "(Hsh & Hclose)".
+      iDestruct "Hsh" as "(Hcon & %Hdomm & %Hdomms & Hkeys & Hcache)".
       iSpecialize ("Hclose" $! true).
       unfold is_coherent_cache.
       rewrite /is_map in Hismap.
@@ -412,11 +408,12 @@ Section Commit_Proof.
             iFrame "#∗".
             iSplit; first done.
             iIntros "_".
-            iMod "Hsh" as (m ms mc) "[Hpre Hclose]".
+            iMod "Hsh"; do 2 iModIntro;
+              iDestruct "Hsh" as (m ms mc) "[Hpre Hclose]".
             iDestruct "Hpre" as "(Hst & %Hdom1 & %Hdom2 & Hkeys & Hcache)".
-            iModIntro.
             iExists m.
             destruct Hcoh as (Hc1 & Hc2 & Hc3 & Hc4 & Hc5 & Hc6 & Hc7 & Hc8).
+            iFrame "Hkeys".
             iDestruct "Hst" as (sp) "(Hst' & %Heq')".
             iDestruct "Hst'" as (???????? Heq2) "(Hut & #Hcc2 & Hst')".
             destruct sp as [|Msnap']; simplify_eq /=.
@@ -435,7 +432,6 @@ Section Commit_Proof.
               by iSplitL "H1"; iFrame "∗". }
             iSplit; first by iPureIntro; set_solver.
             iFrame.
-            iNext.
             iIntros (b) "Hpost".
             iDestruct (ghost_map.ghost_map_delete_big mc with "[$Hauth][Hcache]") as ">Hcache".
             { iApply (big_sepM_mono with "[$Hcache]").

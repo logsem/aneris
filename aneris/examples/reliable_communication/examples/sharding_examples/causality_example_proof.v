@@ -100,23 +100,22 @@ Section spec.
     iIntros "#inv #write !> %Φ (Written_x & Written_y) HΦ".
     rewrite/do_writes.
     wp_pures.
-    wp_apply ("write" $! (⊤ ∖ ↑N) with "[] []");
-        [solve_ndisj|set_solver|].
+    wp_apply ("write" $! _ _ _ _ (⊤∖↑N) with "[%]");
+      [solve_ndisj|].
     iInv "inv" as ">[(x_none & y_none & CanWrite & NotRead) |
                     [(_ & _ & Written_x' & _) |
                     [(_ & _ & Written_x' & _ & _) |
                     (_ & Written_x' & _ & _)]]]" "close".
     2, 3, 4: by iCombine "Written_x Written_x'" gives "%abs".
-    iModIntro.
     iExists None.
     iFrame.
-    iIntros "x_37".
+    iIntros "!>!>x_37".
     iMod ("close" with "[x_37 y_none Written_x NotRead]") as "_".
     { iNext. iRight. iLeft. iFrame. }
     iModIntro.
     wp_pures.
-    wp_apply ("write" $! (⊤ ∖ ↑N) with "[] []");
-        [solve_ndisj|set_solver|].
+    wp_apply ("write" $! _ _ _ _ (⊤ ∖ ↑N) with "[%]");
+        [solve_ndisj|].
     iInv "inv" as ">[(_ & _ & CanWrite' & _) |
                     [(x_37 & y_none & Written_x & NotRead) |
                     [(_ & _ & _ & Written_y' & _) |
@@ -126,10 +125,11 @@ Section spec.
     iModIntro.
     iExists None.
     iFrame.
-    iIntros "y_1".
+    iIntros "!>y_1".
     iMod ("close" with "[x_37 y_1 Written_x Written_y NotRead]") as "_".
     { iNext. do 2 iRight. iLeft. iFrame. }
     iApply ("HΦ" with "[//]").
+    Unshelve. all: set_solver.
   Qed.
 
   Lemma wait_on_read_spec rd sa
@@ -144,8 +144,8 @@ Section spec.
     rewrite/wait_on_read.
     wp_pures.
     iLöb as "IH".
-    wp_apply ("read" $! (⊤ ∖ ↑N) with "[] []");
-        [solve_ndisj|set_solver|].
+    unshelve wp_apply ("read" $! _ _ _ (⊤ ∖ ↑N));
+      [set_solver | solve_ndisj | ].
     iInv "inv" as ">[(x_none & y_none & CanWrite & NotRead) |
                     [(x_37 & y_none & Written_x & NotRead) |
                     [(x_37 & y_1 & Written_x & Written_y & NotRead) |
@@ -154,7 +154,7 @@ Section spec.
     all: iModIntro.
     all: iExists _.
     all: iFrame.
-    all: iIntros "y_vy".
+    all: iIntros "!>y_vy".
     1: iMod ("close" with "[x_none y_vy CanWrite NotRead]") as "_";
       first (iNext; iLeft; iFrame).
     2: iMod ("close" with "[x_37 y_vy Written_x NotRead]") as "_";
@@ -181,8 +181,8 @@ Section spec.
     wp_apply (wait_on_read_spec with "inv read Read").
     iIntros "NotRead".
     wp_pures.
-    wp_apply ("read" $! (⊤ ∖ ↑N) with "[] []");
-        [solve_ndisj|set_solver|].
+    unshelve wp_apply ("read" $! _ _ _ (⊤ ∖ ↑N));
+        [set_solver | solve_ndisj | ].
     iInv "inv" as ">[(_ & _ & _ & NotRead') |
                     [(_ & _ & _ & NotRead') |
                     [(_ & _ & _ & _ & NotRead') |
@@ -191,7 +191,7 @@ Section spec.
     iModIntro.
     iExists (Some 37).
     iFrame.
-    iIntros "x_37".
+    iIntros "!>x_37".
     iMod ("close" with "[x_37 Written_x Written_y Read]") as "_".
     { iNext. repeat iRight. iFrame. }
     iModIntro.
@@ -207,7 +207,7 @@ Section spec.
     addr ⤇ srv_si -∗
     {{{
       token Written_x ∗ token Written_y ∗
-      unallocated {[clt]} ∗ 
+      unallocated {[clt]} ∗
       clt ⤳ (∅, ∅) ∗
       free_ports (ip_of_address clt) {[port_of_address clt]}
     }}}
@@ -232,7 +232,7 @@ Section spec.
     addr ⤇ srv_si -∗
     {{{
       token Read ∗
-      unallocated {[clt]} ∗ 
+      unallocated {[clt]} ∗
       clt ⤳ (∅, ∅) ∗
       free_ports (ip_of_address clt) {[port_of_address clt]}
     }}}

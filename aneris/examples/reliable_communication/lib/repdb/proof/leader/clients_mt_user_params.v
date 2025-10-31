@@ -42,7 +42,7 @@ Section MT_user_params.
      ⌜k ∈ DB_keys⌝ ∗
      P ∗
      □ (P -∗
-         ▷ |={⊤, E}=>
+         |={⊤, E}=> ▷
          ∃ (h : wrlog) (a_old: option we),
            ⌜at_key k h = a_old⌝ ∗
             own_mem_user γM k 1 a_old ∗

@@ -67,7 +67,7 @@ Section OpLib_Proof.
     iApply "HΦ". clear Φ.
     iIntros "%Haddr".
     iModIntro.
-    iIntros (Φ) "Hpre".
+    iIntros (Φ ? ?) "Hpre".
     wp_pures.
     wp_apply (acquire_spec with "Hislock").
     iIntros (v) "[-> [Hlocked Haux]]".
@@ -79,8 +79,7 @@ Section OpLib_Proof.
     wp_load.
     (* find an atomic step around which to viewshift *)
     wp_bind (Lam _ _).
-    wp_apply (aneris_wp_atomic _ _ (↑CRDT_InvName)).
-    iMod "Hpre" as (s1 s2) "[Huser Hclose]".
+    iMod "Hpre"; wp_pure _; iDestruct "Hpre" as (s1 s2) "[Huser Hclose]".
     (* open invariant *)
     iInv OpLib_InvName as "> Hinvp" "Hclose'".
     iDestruct (oplib_loc_st_user_lt with "Huser") as "%Hlt".
@@ -95,8 +94,6 @@ Section OpLib_Proof.
     iDestruct ("Hacc" with "[Hinv Hglob]") as "Hinv"; [eauto with iFrame|].
     (* close invariant *)
     iMod ("Hclose'" with "[Hinv]") as "_"; [eauto|].
-    iModIntro.
-    wp_pures.
     (* complete view shift *)
     iMod ("Hclose" with "[$Huser]") as "HΦ"; [eauto |].
     iModIntro.
@@ -176,18 +173,19 @@ Section OpLib_Proof.
     rewrite /internal_update_spec.
     iIntros (op log_op) "%Haddr %Hcoh".
     iModIntro.
-    iIntros (Φ) "Hvs".
+    iIntros (Φ??) "Hvs".
     wp_pures.
     wp_apply (acquire_spec with "Hlockinv").
     iIntros (v) "(Heq & Hlocked & HPlock)".
     pose proof (op_coh_sv_val Hcoh) as [sv ->].
     wp_pures.
     wp_bind (broadcast__fun _).
-    iApply "Hbc"; [done |].
-    iNext.
-    iMod "Hvs" as (h s1 s2) "[(Hglobu & Huser) Hclose]".
+    unshelve wp_apply ("Hbc" $! _ _ _ (E∖↑OpLib_InvName) with "[%]");
+      [ done | by apply rcb_invname_subseteq_mask | ].
+    iMod "Hvs".
     iDestruct "Hinv" as "[#Hrcbinv #Hopinv]".
-    iInv OpLib_InvName as "> Hinvp" "Hclose'".
+    iInv OpLib_InvName as ">Hinvp" "Hclose'".
+    iDestruct "Hvs" as (h s1 s2) "[>(Hglobu & Huser) Hclose]".
     iDestruct (oplib_loc_st_user_lt with "Huser") as "%Hlt".
     iAssert (⌜i < length CRDT_Addresses⌝%I) as "#Hlt2"; [done |].
     iDestruct (oplib_inv_lookup_acc' with "Hinvp Hlt2") as
@@ -199,26 +197,28 @@ Section OpLib_Proof.
     subst.
     iDestruct (oplib_loc_st_inv_wrap_pure with "Hlocinv") as "(%Hownorig&%Hfororig&%Hsuborig&%Hcc)".
     iDestruct (oplib_glob_agree with "Hglobu [Hglobi]") as "[Hglobu Hglobi]"; [eauto |].
-    iMod (fupd_mask_subseteq (↑RCB_InvName)) as "Hcl".
-    {  apply rcb_invname_diff_subseteq. }
-    iMod (oplib_loc_inv_subset_glob_internal (↑RCB_InvName) with "Hrcbinv Hlocinv Hlock Hglobi") as "(Hlocinv & Hlock & Hglobi & %Hsubsetglob)"; [done|].
-    iModIntro.
+    iMod (oplib_loc_inv_subset_glob_internal with "Hrcbinv Hlocinv Hlock Hglobi") as "(Hlocinv & Hlock & Hglobi & %Hsubsetglob)";
+      first by apply rcb_invname_subseteq_mask.
+    do 2 iModIntro.
     iDestruct (update_own (↑RCB_InvName) with "Hrcbinv Hglobu Hglobi Huser Hlock Hlocinv") as
       (hglob' hloc) "(Hglob'&Hloc&%Hsetcoh&Hacc)"; [set_solver| done |].
     iExists hglob', hloc.
     iFrame.
     iIntros (w a) "(%&%&%&%&%&%&%&Hglob&Hloc)".
-    iMod (OwnGlobal_ext with "Hrcbinv Hglob") as "[Hglob %Hglobext]"; [done |].
-    iMod (OwnLocal_local_ext' with "Hrcbinv Hloc") as "[Hloc %Hlocext]"; [done |].
-    iMod ("Hacc" $! a log_op with "[$Hglob $Hloc]") as "Hres".
+    iMod (OwnGlobal_ext with "Hrcbinv Hglob") as "[Hglob %Hglobext]";
+      first by apply rcb_invname_subseteq_mask.
+    iMod (OwnLocal_local_ext' with "Hrcbinv Hloc") as "[Hloc %Hlocext]";
+      first by apply rcb_invname_subseteq_mask.
+    iDestruct ("Hacc" $! a log_op with "[$Hglob $Hloc]") as "Hres".
     { iPureIntro.
       subst.
       match goal with
       | [ H : LE_payload ?x = ?y |- _ ] => rewrite H
       end.
       repeat split; auto. }
-    iMod "Hcl" as "_".
-    iDestruct "Hres" as (e) "(%&%&%&%&%&%&Hglobi&Hglobu&Hloc&Hlock&Hinv)".
+    iMod (fupd_mask_subseteq (↑RCB_InvName)) as "Hpreclose";
+      first by apply rcb_invname_subseteq_mask.
+    iMod "Hres" as (e) "(%&%&%&%&%&%&Hglobi&Hglobu&Hloc&Hlock&Hinv)".
     iDestruct ("Hinvcl" with "[Hinv Hglobi]") as "Hinvcl".
     { iExists _, _, _, _.
       iFrame. }
@@ -232,9 +232,10 @@ Section OpLib_Proof.
       | [ H : LE_payload _ = _ |- _ ] =>
           rewrite H; done
       end. }
+    iMod "Hpreclose" as "_".
     iMod ("Hclose'" with "Hinvcl") as "_".
     iDestruct (oplib_loc_st_take_snap with "Hloc") as "[Hloc #Hsnap]".
-    iMod (oplib_loc_snap_ext (↑CRDT_InvName) with "[] Hsnap Hsnap") as "%Hext"; [set_solver | iFrame "#" |].
+    iMod (oplib_loc_snap_ext E with "[] Hsnap Hsnap") as "%Hext"; [set_solver | iFrame "#" |].
     iMod ("Hclose" $! e _ _ hfor' with "[Hglobu Hloc]") as "HΦres".
     { iFrame.
       iPureIntro.
@@ -390,7 +391,8 @@ Section OpLib_Proof.
     { rewrite /lock_inv. iFrame "#". }
     iIntros (v) "(-> & Hlocked & Hlockp)".
     wp_pures.
-    wp_apply "Hdeliver"; [done |].
+    wp_apply ("Hdeliver" with "[%//][%]").
+    { by apply (rcb_invname_subseteq_mask ⊤). }
     iInv OpLib_InvName as "> Hinvp" "Hclose'".
     iDestruct "Hlockp" as (ip phys log hown hfor) "(%&Hstptr&%Hopcoh&Hlockwrap&%Hdenot)".
     iDestruct (oplib_loc_st_lock_lt with "Hlockwrap") as "%Hlt".
@@ -401,13 +403,10 @@ Section OpLib_Proof.
     (* iDestruct (loc_st_inv_subseteq with "Hlocinv") as "%Hsubseteq". *)
     subst.
     iDestruct (update_foreign with "Hlockwrap Hlocinv") as (s) "[Hownloc [%Hsetcoh Hacc]]".
-    iApply fupd_mask_intro.
-    { apply rcb_invname_subseteq_mask. done. }
-    iIntros "Hmaskcl".
+    do 2 iModIntro.
     iExists s. iFrame.
     iIntros (s' vo) "(Hownloc & [[-> ->] | Hr])".
     - (* received nothing *)
-      iMod ("Hmaskcl").
       iDestruct "Hacc" as "[_ Hacc]".
       iDestruct ("Hacc" with "Hownloc") as "[Hlock'' Hinv'']".
       iDestruct ("Hinvcl" with "[Hinv'' Hglob]") as "Hinvprop".
@@ -427,19 +426,21 @@ Section OpLib_Proof.
       (* produce the operation corresponding to the message *)
       (* use the fact that the snapshot is included in OwnGlobal *)
       iMod (glob_st_snapshot_coh with "Hrcbinv Hglob Hglobsnap") as
-        (e) "[Hglob [%Hglobcoh %Hin]]"; [done |].
+        (e) "[Hglob [%Hglobcoh %Hin]]".
+      { by apply rcb_invname_subseteq_mask. }
       apply glob_st_coh_op_coh in Hglobcoh as Hopcoh'.
       rewrite erasure_payload in Hopcoh'.
       subst.
-      iMod (OwnLocal_local_ext' with "Hrcbinv Hownloc") as "[Hownloc %Hext]"; [done |].
+      iMod (OwnLocal_local_ext' with "Hrcbinv Hownloc") as "[Hownloc %Hext]".
+      { by apply rcb_invname_subseteq_mask. }
       iMod ("Hacc" $! a (EV_Op e) with "[$Hownloc]") as
         (e') "(%Hloccoh&%Henotin&%Hemaxi&Hlock&Hinv')"; [eauto |].
       assert (e = e') as ->.
       { apply loc_st_coh_glob_st_coh in Hloccoh.
         eapply glob_st_coh_inj; done. }
       iDestruct (oplib_glob_st_inv_total with "Hglob") as "%Htot".
-      iMod (oplib_loc_inv_subset_glob_internal with "Hrcbinv Hinv' Hlock Hglob") as "(Hinv' & Hlock & Hglob & %Hsubseteq')"; [done|].
-      iMod ("Hmaskcl") as "_".
+      iMod (oplib_loc_inv_subset_glob_internal with "Hrcbinv Hinv' Hlock Hglob") as "(Hinv' & Hlock & Hglob & %Hsubseteq')".
+      { by apply rcb_invname_subseteq_mask. }
       iDestruct ("Hinvcl" with "[Hglob Hinv']") as "Hinvprop".
       { iExists _, _, _, _.
         iFrame. }

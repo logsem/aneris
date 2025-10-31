@@ -122,7 +122,7 @@ Section proof.
     iIntros (Φ) "(#Ginv & #Linv & %Hip) HΦ".
     wp_pures.
     iApply "HΦ"; clear Φ.
-    iIntros "#Haddr". iIntros "!>" (Φ) "Hvs".
+    iIntros "#Haddr". iIntros "!>" (Φ E HE) "Hvs".
     wp_pures.
     rewrite Heqip.
     wp_apply acquire_spec; first iExact "Linv".
@@ -154,8 +154,7 @@ Section proof.
       { eauto 20 with iFrame. }
       iIntros (v ->).
       wp_bind (Rec _ _ _).
-      iApply (aneris_wp_atomic _ _ (↑RCB_InvName)).
-      iMod "Hvs". iModIntro.
+      iMod "Hvs".
       wp_pure _.
       iDestruct "Hvs" as (x) "[Hu Hupd]".
       iMod ("Hupd" with "[$Hu]") as "HΦ".
@@ -188,7 +187,7 @@ Section proof.
     { apply (RCBM_system_local_event_fresh_lhst e i t); eauto with lia. }
     wp_bind (InjR _).
     do 2 wp_pure _.
-    iApply (aneris_wp_atomic _ _ (↑RCB_InvName)).
+    iApply (aneris_wp_atomic _ _ E).
     iMod "Hvs". iModIntro. wp_pures.
     iDestruct "Hvs" as (s) "[Hu Himpl]".
     iDestruct (lhst_user_lock_agree with "Hu Hlhst") as %->.

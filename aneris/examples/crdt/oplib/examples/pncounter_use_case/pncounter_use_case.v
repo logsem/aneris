@@ -102,14 +102,15 @@ Section use_case_proof.
       iPureIntro; set_solver. }
     iIntros (get upd) "(Hls & #Hget & #Hupd)".
     wp_pures.
-    wp_apply ("Hupd" $! _ (Add _)); [done|done|].
+    iPoseProof ("Hupd" $! _ (Add _) with "[%][%]") as "Hupd'";
+      [ done | done | ].
+    wp_apply ("Hupd'" $! _ (⊤ ∖ ↑use_case_inv_name)); first solve_ndisj.
     iInv use_case_inv_name as (ges) ">[HGs Hstate]" "Hclose".
-    iMod fupd_mask_subseteq as "Hmask"; [|iModIntro]; [solve_ndisj|].
     iExists _, _, _; iFrame.
+    do 2 iModIntro.
     iIntros (add_1_ev h' s1' s2').
     rewrite !left_id_L.
     iIntros "(%Hadd_1_val & %Hadd_1_orig & -> & -> & % & % & % & % & % & HGs & HLs)".
-    iMod "Hmask" as "_".
     iMod ("Hclose" with "[HGs Hstate Htok]") as "_".
     { iNext.
       iDestruct "Hstate" as "[->|[Hstate|[Hstate|Hstate]]]".
@@ -128,11 +129,10 @@ Section use_case_proof.
         iDestruct (own_valid_2 with "Htok Htok'") as %?; done. }
     iModIntro.
     wp_pures.
-    wp_apply "Hget"; first done.
-    iMod fupd_mask_subseteq as "Hmask"; [|iModIntro]; [solve_ndisj|].
+    iPoseProof ("Hget" with "[%]") as "Hget'"; first done.
+    wp_apply ("Hget'" $! _ ⊤); first done.
     iExists _, _; iFrame "HLs".
-    iIntros (s3 pst lst) "(% & HLs & %Hop & %Hst)".
-    iMod "Hmask" as "_".
+    do 2 iModIntro. iIntros (s3 pst lst) "(% & HLs & %Hop & %Hst)".
     iInv use_case_inv_name as (ges') ">[HGs Hstate]" "Hclose".
     iDestruct (LocState_TakeSnap with "HLs") as "[HLs HLsnap]".
     assert (↑CRDT_InvName ⊆ ⊤ ∖ ↑use_case_inv_name) by solve_ndisj.
@@ -215,14 +215,13 @@ Section use_case_proof.
       iPureIntro; set_solver. }
     iIntros (get upd) "(Hls & #Hget & #Hupd)".
     wp_pures.
-    wp_apply ("Hupd" $! _ (Add _)); [done|done|].
+    iPoseProof ("Hupd" $! _ (Add _) with "[%][%]") as "Hupd'"; [done | done | ].
+    wp_apply ("Hupd'" $! _ (⊤ ∖ ↑use_case_inv_name)); first solve_ndisj.
     iInv use_case_inv_name as (ges) ">[HGs Hstate]" "Hclose".
-    iMod fupd_mask_subseteq as "Hmask"; [|iModIntro]; [solve_ndisj|].
-    iExists _, _, _; iFrame.
+    iExists _, _, _; iFrame. do 2 iModIntro.
     iIntros (add_2_ev h' s1' s2').
     rewrite !left_id_L.
     iIntros "(%Hadd_2_val & %Hadd_2_orig & -> & -> & % & % & % & % & % & HGs & HLs)".
-    iMod "Hmask" as "_".
     iMod ("Hclose" with "[HGs Hstate Htok]") as "_".
     { iNext.
       iDestruct "Hstate" as "[->|[Hstate|[Hstate|Hstate]]]".
@@ -241,11 +240,10 @@ Section use_case_proof.
         iDestruct (own_valid_2 with "Htok Htok'") as %?; done. }
     iModIntro.
     wp_pures.
-    wp_apply "Hget"; first done.
-    iMod fupd_mask_subseteq as "Hmask"; [|iModIntro]; [solve_ndisj|].
+    iPoseProof ("Hget" with "[%]") as "Hget'"; first done.
+    wp_apply ("Hget'" $! _ ⊤); first done.
     iExists _, _; iFrame "HLs".
-    iIntros (s3 pst lst) "(% & HLs & %Hop & %Hst)".
-    iMod "Hmask" as "_".
+    do 2 iModIntro; iIntros (s3 pst lst) "(% & HLs & %Hop & %Hst)".
     iInv use_case_inv_name as (ges') ">[HGs Hstate]" "Hclose".
     iDestruct (LocState_TakeSnap with "HLs") as "[HLs HLsnap]".
     assert (↑CRDT_InvName ⊆ ⊤ ∖ ↑use_case_inv_name) by solve_ndisj.

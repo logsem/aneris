@@ -49,7 +49,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
     server #KVS_address @[ip]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (-> ->) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) 
+    iIntros (-> ->) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom)
       %Φ !>(? & ? & ? & ?) HΦ".
     rewrite /server. wp_pures.
     by wp_apply ("Hinit_kvs" with "[$]").
@@ -68,51 +68,39 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
       RET #(); True
     }}}.
   Proof.
-    iIntros (cst sa h) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) 
+    iIntros (cst sa h) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom)
       %Φ !>(CanStart & #HiC & x_h) HΦ".
     rewrite/transaction1.
     wp_pures.
-    wp_apply ("Hst" $! _ _ ⊤); try solve_ndisj.
-    iModIntro.
+    iPoseProof ("Hst" with "[$]") as "Hst'".
+    wp_apply ("Hst'" $! _ ⊤); first done.
     iExists {[ "x" := h ]}.
     iFrame.
-    iSplitL "x_h"; first by iApply big_sepM_insert; first done; iFrame.
-    iIntros "(Active & mem & cache & _)".
+    rewrite big_sepM_insert// big_sepM_empty; iFrame.
+    iIntros "!>!>(Active & mem & cache & _)".
     iPoseProof (big_sepM_insert with "cache") as
       "((x_h & x_upd) & _)"; first done.
     iModIntro.
     wp_pures.
-    wp_apply ("Hwr"  $! _ _ ⊤ _ (SerVal #1) with "[//][][$]"); first set_solver.
-    iModIntro.
-    iExists _, _.
-    iFrame.
-    iIntros "(x_h & x_upd)".
-    iModIntro.
+    iPoseProof ("Hwr" $! _ _ "x" (SerVal #1) with "[%][$]") as "Hwr'";
+      first set_solver.
+    wp_apply ("Hwr'"  $! _ ⊤); first done.
+    iExists _, _. iFrame.
+    iIntros "!>!>(x_h & x_upd)!>".
     wp_pures.
-    wp_apply (commitT_spec _ _ ⊤ with "[//]"); eauto.
-    iFrame "#".
-    iModIntro.
-    iExists _, _, {[ "x" := (Some #1, true) ]}.
+    iPoseProof (commitT_spec with "[$][$]") as "Hcom'".
+    wp_apply ("Hcom'" $! _ ⊤ with "[%]"); first set_solver.
+    iExists {["x":=_]}, {["x":=h]}, {[ "x" := (Some #1, true) ]}.
+    do 2 iModIntro.
+    rewrite !big_sepM_insert//!big_sepM_empty.
     iFrame.
-    iSplitL "x_h x_upd".
-    {
-      iSplit.
-      {
-        iPureIntro.
-        rewrite bool_decide_spec=>k k_key.
-        case eq: ("x" =? k)%string.
-        { apply String.eqb_eq in eq.
-          by rewrite -eq !lookup_insert bool_decide_true. }
-        apply eqb_neq in eq.
-        by rewrite (proj2 (lookup_insert_None _ _ _ _)).
-      }
-      rewrite !dom_insert_L !dom_empty_L.
-      do 2 (iSplit; first done).
-      iApply big_sepM_insert; first done.
-      by iFrame.
-    }
-    iIntros "_".
-    by iApply "HΦ".
+    iSplit.
+    { iPureIntro. rewrite /can_commit bool_decide_eq_true_2; first set_solver.
+      intros k _.
+      destruct (decide ("x" = k)) as [<- | Hneq].
+      - rewrite lookup_singleton bool_decide_eq_true_2//.
+      - rewrite lookup_singleton_ne//. }
+    iIntros "_!>". by iApply "HΦ".
   Qed.
 
   Lemma transaction2_spec :
@@ -128,51 +116,36 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
       RET #(); True
     }}}.
   Proof.
-    iIntros (cst sa h) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) 
+    iIntros (cst sa h) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom)
       %Φ !>(CanStart & #HiC & y_h) HΦ".
     rewrite/transaction2.
     wp_pures.
-    wp_apply ("Hst" $! _ _ ⊤); try solve_ndisj.
-    iModIntro.
+    iPoseProof ("Hst" with "[$]") as "Hst'".
+    wp_apply ("Hst'" $! _ ⊤); first done.
     iExists {[ "y" := h ]}.
     iFrame.
-    iSplitL "y_h"; first by iApply big_sepM_insert; first done; iFrame.
-    iIntros "(Active & mem & cache & _)".
-    iPoseProof (big_sepM_insert with "cache") as
-      "((y_h & y_upd) & _)"; first done.
-    iModIntro.
+    rewrite!big_sepM_insert// !big_sepM_empty. iFrame.
+    iIntros "!>!>(Active & [Hy _] & [Hcy _] & Hseeny & _)!>".
     wp_pures.
-    wp_apply ("Hwr"  $! _ _ ⊤ _ (SerVal #1) with "[//][][$]"); first set_solver.
-    iModIntro.
-    iExists _, _.
-    iFrame.
-    iIntros "(y_h & y_upd)".
-    iModIntro.
+    iPoseProof ("Hwr" $! _ _ "y" (SerVal #1) with "[%][$]") as "Hwr'";
+      first set_solver.
+    wp_apply ("Hwr'"  $! _ ⊤); first done.
+    iExists _, _. iFrame.
+    iIntros "!>!>(y_h & y_upd)!>".
     wp_pures.
-    wp_apply (commitT_spec _ _ ⊤ with "[//][$]").
-    iFrame "#".
-    iModIntro.
-    iExists _, _, {[ "y" := (Some #1, true) ]}.
-    iFrame.
-    iSplitL "y_h y_upd".
-    {
-      iSplit.
-      {
-        iPureIntro.
-        rewrite bool_decide_spec=>k k_key.
-        case eq: ("y" =? k)%string.
-        { apply String.eqb_eq in eq.
-          by rewrite -eq !lookup_insert bool_decide_true. }
-        apply eqb_neq in eq.
-        by rewrite (proj2 (lookup_insert_None _ _ _ _)).
-      }
-      rewrite !dom_insert_L !dom_empty_L.
-      do 2 (iSplit; first done).
-      iApply big_sepM_insert; first done.
-      by iFrame.
-    }
-    iIntros "_".
-    by iApply "HΦ".
+    iPoseProof (commitT_spec with "[$][$]") as "Hcom'".
+    wp_apply ("Hcom'" $! _ ⊤); first done.
+    iExists {["y":=_]}, {["y":=h]}, {[ "y" := (Some #1, true) ]}.
+    rewrite !big_sepM_insert//!big_sepM_empty. iFrame.
+    do 2 iModIntro.
+    iSplit.
+    { iPureIntro. repeat split; try set_solver.
+      rewrite/can_commit bool_decide_eq_true_2//.
+      intros k _.
+      destruct (decide ("y" = k)) as [<- | Hneq].
+      - rewrite lookup_singleton bool_decide_eq_true_2//.
+      - rewrite lookup_singleton_ne//. }
+    iIntros "_". by iApply "HΦ".
   Qed.
 
   Lemma transaction1_client_spec :
@@ -189,7 +162,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
       transaction1_client $sa $KVS_address @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (sa h) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) 
+    iIntros (sa h) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom)
       %Φ !>(∅ & unalloc & Hcc & free & #KVS_si & x_h) HΦ".
     rewrite/transaction1_client.
     wp_pures.
@@ -213,7 +186,7 @@ Context `{!anerisG Mdl Σ, !SI_resources Mdl Σ, !KVSG Σ}.
       transaction2_client $sa $KVS_address @[ip_of_address sa]
     {{{ RET #(); True }}}.
   Proof.
-    iIntros (sa h) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom) 
+    iIntros (sa h) "(#Hinit_kvs & #Hinit_cli & #Hrd & #Hwr & #Hst & #Hcom)
       %Φ !>(∅ & unalloc & free & Hcc & #KVS_si & y_h) HΦ".
     rewrite/transaction2_client.
     wp_pures.

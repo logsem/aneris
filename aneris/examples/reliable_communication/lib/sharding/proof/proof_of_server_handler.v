@@ -41,10 +41,7 @@ Section proof.
       wp_apply (wp_map_insert $! db_M).
       iIntros "%db' %db'_M".
       wp_bind (Store _ _).
-      iApply aneris_wp_atomic.
-      iMod "HQ" as "(%old & k_old & HQ)".
-      iModIntro.
-      wp_store.
+      iMod "HQ"; wp_store; iDestruct "HQ" as "(%old & k_old & HQ)".
       iMod (shard_update _ _ _ _ (Some v) with "[//] ●_γ k_old")
             as "(●_γ & k_v)".
       iMod ("HQ" with "k_v") as "Q".
@@ -80,10 +77,7 @@ Section proof.
                   %db_M & ●_γ & l_db & %M_shard))".
     wp_pures.
     wp_bind (Load _).
-    iApply aneris_wp_atomic.
-    iMod "HQ" as "(%v & k_v & HQ)".
-    iModIntro.
-    wp_load.
+    iMod "HQ"; wp_load; iDestruct "HQ" as "(%v & k_v & HQ)".
     iPoseProof (shard_valid with "[//] ●_γ k_v") as "%M_k".
     move: M_k (M_shard k k_keys)=>->[->] {v}.
     iMod ("HQ" with "k_v") as "Q".

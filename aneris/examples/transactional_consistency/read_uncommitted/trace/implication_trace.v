@@ -9,7 +9,7 @@ From aneris.aneris_lang.lib.serialization Require Import serialization_proof.
 From aneris.aneris_lang.program_logic Require Import lightweight_atomic.
 From aneris.examples.transactional_consistency Require Import code_api wrapped_library.
 From aneris.examples.transactional_consistency.read_uncommitted.specs Require Import specs resources.
-From aneris.examples.transactional_consistency 
+From aneris.examples.transactional_consistency
   Require Import resource_algebras user_params aux_defs state_based_model implication_trace_util.
 
 Section trace_proof.
@@ -17,17 +17,17 @@ Section trace_proof.
 
   (** Wrapped resources *)
 
-  Global Program Instance wrapped_resources (γmstate γmlin γmpost γmname γl : gname) (clients : gset socket_address) 
+  Global Program Instance wrapped_resources (γmstate γmlin γmpost γmname γl : gname) (clients : gset socket_address)
   `(res : !RU_resources Mdl Σ) : RU_resources Mdl Σ :=
     {|
-      GlobalInv := (GlobalInv ∗ trace_inv trace_inv_name valid_trace_ru ∗ 
+      GlobalInv := (GlobalInv ∗ trace_inv trace_inv_name valid_trace_ru ∗
                     inv KVS_InvName (∃ T exec, GlobalInvExt commit_test_ru T extract γmstate γmlin γmpost γmname γl clients exec))%I;
-      OwnMemKey k V := (OwnMemKey k V  ∗ (∀ v, ⌜v ∈ V⌝ → ∃ lh tag c, OwnLinHist γl lh ∗ 
+      OwnMemKey k V := (OwnMemKey k V  ∗ (∀ v, ⌜v ∈ V⌝ → ∃ lh tag c, OwnLinHist γl lh ∗
                         ⌜(#(LitString tag), (c, (#"WrLin", (#(LitString k), v))))%V ∈ lh⌝))%I;
-      OwnLocalKey k c ov := (OwnLocalKey k c ov ∗ ∃ (sa : socket_address) (γ : gname), ghost_map_elem γmname sa DfracDiscarded (γ, c) ∗ 
+      OwnLocalKey k c ov := (OwnLocalKey k c ov ∗ ∃ (sa : socket_address) (γ : gname), ghost_map_elem γmname sa DfracDiscarded (γ, c) ∗
                              ⌜extract c = Some #sa⌝ ∗ (⌜k ∈ KVS_keys⌝ → ghost_map_elem γ k (DfracOwn 1%Qp) ov) ∗ ⌜sa ∈ clients⌝)%I;
-      ConnectionState c sa s := (ConnectionState c sa s ∗ ghost_map_elem γmstate sa (DfracOwn 1%Qp) (s, Some c))%I; 
-      IsConnected c sa := (IsConnected c sa ∗ ⌜sa ∈ clients⌝ ∗ ⌜extract c = Some #sa⌝ ∗ 
+      ConnectionState c sa s := (ConnectionState c sa s ∗ ghost_map_elem γmstate sa (DfracOwn 1%Qp) (s, Some c))%I;
+      IsConnected c sa := (IsConnected c sa ∗ ⌜sa ∈ clients⌝ ∗ ⌜extract c = Some #sa⌝ ∗
                            ∃ (γ : gname), ghost_map_elem γmname sa DfracDiscarded (γ, c))%I;
       KVS_ru := KVS_ru;
       KVS_Init := KVS_Init%I;
@@ -37,7 +37,7 @@ Section trace_proof.
     |}.
   Next Obligation.
     iIntros (??????????) "(Hkey & [%sa [%γ (Hghost_elem_per & %Hextract & Hghost_elem  & %Hin_sa)]])".
-    iDestruct (res.(read_uncommitted.specs.resources.OwnLocalKey_serializable) 
+    iDestruct (res.(read_uncommitted.specs.resources.OwnLocalKey_serializable)
       with "Hkey") as "(Hkey & Hser)".
     iFrame.
     iExists sa, γ.
@@ -45,14 +45,14 @@ Section trace_proof.
   Qed.
   Next Obligation.
     iIntros (????????????) "#(HGinv & Hinv) (#Hseen & Hkey & Hin)".
-    iMod (res.(read_uncommitted.specs.resources.Seen_valid) 
+    iMod (res.(read_uncommitted.specs.resources.Seen_valid)
       with "[$HGinv][$Hseen $Hkey]") as "(Hkey & Hsub)"; first done.
     iModIntro.
     iFrame "∗#".
   Qed.
   Next Obligation.
     iIntros (???????????) "#(HGinv & Hinv) (Hkey & Hin)".
-    iMod (res.(read_uncommitted.specs.resources.Seen_creation) 
+    iMod (res.(read_uncommitted.specs.resources.Seen_creation)
       with "[$HGinv][$Hkey]") as "(Hkey & #Hseen)"; first done.
     iModIntro.
     iFrame "∗#".
@@ -60,7 +60,7 @@ Section trace_proof.
   Next Obligation.
     simpl.
     iIntros (????? clients res sa c) "(Hconn & _)".
-    iApply (res.(read_uncommitted.specs.resources.Extraction_of_address) 
+    iApply (res.(read_uncommitted.specs.resources.Extraction_of_address)
       with "[$Hconn]").
   Qed.
   Next Obligation.
@@ -71,8 +71,8 @@ Section trace_proof.
 
   (** Per operation implications *)
 
-  Lemma read_implication γmstate γmlin γmpost γmname γl clients (res : RU_resources Mdl Σ) 
-  (lib : KVS_transaction_api) : 
+  Lemma read_implication γmstate γmlin γmpost γmname γl clients (res : RU_resources Mdl Σ)
+  (lib : KVS_transaction_api) :
     ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
     trace_inv trace_inv_name valid_trace_ru -∗
     inv KVS_InvName (∃ T exec, GlobalInvExt commit_test_ru T extract γmstate γmlin γmpost γmname γl clients exec) -∗
@@ -82,14 +82,14 @@ Section trace_proof.
     iIntros "%Hkvs_inv_name #Htr_inv #HinvExt #Hread".
     rewrite /read_spec.
     iModIntro.
-    iIntros (c sa E k) "%Hsub %Hin (#Hconn & %Hsa_in_clients & %Hsa_extract & #Hpers_pointer) !# %Φ Hshift".
+    iIntros (c sa k) "%Hin (#Hconn & %Hsa_in_clients & %Hsa_extract & #Hpers_pointer) !# %Φ %E %Hsub Hshift".
     rewrite /TC_read /KVS_wrapped_api /wrap_read.
     wp_pures.
     wp_bind (ast.Fresh _).
     rewrite /read_pre_emit_event.
     wp_pures.
-    iInv "HinvExt" as ">[%T [%exec [%t [%lt 
-      (Htr_is & HOwnLin & %HlinOf & %Hno_empty & %Hex & %Hvalid_trans & %Hvalid_seq 
+    iInv "HinvExt" as ">[%T [%exec [%t [%lt
+      (Htr_is & HOwnLin & %HlinOf & %Hno_empty & %Hex & %Hvalid_trans & %Hvalid_seq
        & %Hbased & %Hvalid_exec & Hstate_res & Hlin_res & Hpost_res & %Hopen_later)]]]]" "Hclose".
     wp_apply (aneris_wp_fresh with "[$Htr_inv $Htr_is]").
     {
@@ -103,26 +103,26 @@ Section trace_proof.
     }
     iIntros (tag1) "(Htr_is & %Htag1_nin)".
     iDestruct (alloc_trace_hist with "[$Htr_is]") as "(Htr_is & #Htr_hist)".
-    iMod (lin_tag_create lt t γmlin (#tag1, (c, #"RdPre"))%V with "[$Hlin_res]") 
+    iMod (lin_tag_create lt t γmlin (#tag1, (c, #"RdPre"))%V with "[$Hlin_res]")
       as "(Hlin_res & Hlin_tag_res)".
     {
       iPureIntro.
       simpl.
       do 2 (split; first done).
       intros Hfalse.
-      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]]; 
-        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse; 
+      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]];
+        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse;
         set_solver.
     }
-    iMod (post_tag_create t γmpost (#tag1, (c, #"RdPre"))%V with "[$Hpost_res]") 
+    iMod (post_tag_create t γmpost (#tag1, (c, #"RdPre"))%V with "[$Hpost_res]")
       as "(Hpost_res & Hpost_tag_res)".
     {
       iPureIntro.
       simpl.
       do 2 (split; first done).
       intros Hfalse.
-      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]]; 
-        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse; 
+      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]];
+        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse;
         set_solver.
     }
     iMod ("Hclose" with "[Htr_is HOwnLin Hstate_res Hlin_res Hpost_res]").
@@ -140,16 +140,16 @@ Section trace_proof.
     wp_pures.
     wp_apply "Hread"; try done.
     iClear "Hread".
-    iMod "Hshift" as "(%vo & %V & (Hkey_c & Hkey) & Hshift)".
+    iMod "Hshift"; do 2 iModIntro;
+     iDestruct "Hshift" as "(%vo & %V & (Hkey_c & Hkey) & Hshift)".
     iDestruct "Hkey_c" as "(Hkey_c & (%sa' & %γ & #Hsa'_pointer & %Hsa'_extract & Himp & %Hsa'_in))".
     destruct (decide (sa = sa')) as [<- | Hfalse]; last set_solver.
     iDestruct "Hkey" as "(Hkey & Hall)".
-    iModIntro.
     iExists vo, V.
     iFrame.
     iIntros (wo) "(Hkey_c & Hkey)".
-    iInv "HinvExt" as ">[%T' [%exec' [%t' [%lt' 
-      (Htr_is' & HOwnLin' & %HlinOf' & %Hno_empty' & %Hex' & %Hvalid_trans' & 
+    iInv "HinvExt" as ">[%T' [%exec' [%t' [%lt'
+      (Htr_is' & HOwnLin' & %HlinOf' & %Hno_empty' & %Hex' & %Hvalid_trans' &
       %Hbased' & %Hvalid_exec' & %Hvalid_seq' & HstateRes' & Hlin_res' & Hpost_res' & %Hopen_later')]]]]" "Hclose'".
     iMod (own_lin_add _ _ (#tag1, (c, (#"RdLin", (#k, $wo))))%V with "[$HOwnLin']") as "HOwnLin'".
     iMod (own_lin_hist with "[$HOwnLin']") as "(HOwnLin' & #HOwnLinHist')".
@@ -161,7 +161,7 @@ Section trace_proof.
     }
     iPoseProof (lin_tag_not_in lt' t' γmlin with "[$Hlin_res' $Hlin_tag_res]") as "%Hnot_lin_in".
     iPoseProof (post_tag_not_in t' γmpost with "[$Hpost_res' $Hpost_tag_res]") as "%Hnot_post_in".
-    iDestruct (lin_tag_add lt' t' γmlin (#tag1, (c, (#"RdLin", (#k, $wo))))%V tag1 with "[$Hlin_res' $Hlin_tag_res]") 
+    iDestruct (lin_tag_add lt' t' γmlin (#tag1, (c, (#"RdLin", (#k, $wo))))%V tag1 with "[$Hlin_res' $Hlin_tag_res]")
       as "Hlin_res'".
     {
       iPureIntro.
@@ -179,7 +179,7 @@ Section trace_proof.
     rewrite big_sepS_singleton.
     iDestruct (@ghost_map_lookup with "[$Hmap_mname][$Hsa'_pointer]") as "%Hlookup_mname".
     iDestruct "Hdisj_trace_res_sa" as "[(_ & %Hnot & _) | Htrace_res]"; first set_solver.
-    iAssert (ghost_map_elem γ k (DfracOwn 1%Qp) vo) with "[Himp]" as "Hkey_internal"; 
+    iAssert (ghost_map_elem γ k (DfracOwn 1%Qp) vo) with "[Himp]" as "Hkey_internal";
       first by iApply "Himp".
     assert (KVS_keys = {[k]} ∪ (KVS_keys ∖ {[k]})) as Heq_k_keys.
     {
@@ -206,14 +206,14 @@ Section trace_proof.
     }
     iDestruct "Hkey" as "(Hkey & %Hkey_res)".
     iAssert ((⌜∀ v, wo = Some v → ∃ t' s', t' ∈ T' ∧ Wr s' k v ∈ t'⌝ ∗
-             ⌜latest_write c k vo T'⌝)%I) 
+             ⌜latest_write c k vo T'⌝)%I)
             as "(%Hread_res_1 & %Hread_res_2)".
     {
       iDestruct (@ghost_map_lookup with "[$Hmap_m][$Hkey_internal]") as "%Hlookup_m".
       iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & %Hopen_tail &
           Hkeys & Hkey_info)".
       destruct (decide (k ∈ domain ∩ KVS_keys)) as [Hk_in_dom|Hk_nin_dom].
-      - iAssert (⌜latest_write c k vo T'⌝%I) as "%Hlatest_write"; 
+      - iAssert (⌜latest_write c k vo T'⌝%I) as "%Hlatest_write";
             first iApply "Hkey_info"; try done.
         iSplit; last iPureIntro; last eauto.
         destruct Hkey_res as [(-> & [(v & -> & Hin_V)|Heq])| (Hneq & ->)].
@@ -221,10 +221,10 @@ Section trace_proof.
         + iDestruct ("Hall" $! v with "[//]") as "(%lh & %tag' & %c' & #Hlh_lin_hist & %Hin_lh)".
           iAssert (⌜(#tag', (c', (#"WrLin", (#k, v))))%V ∈ lt'⌝%I) as "%Hin_lt'".
           {
-            iDestruct (own_lin_prefix with "[$HOwnLin' $Hlh_lin_hist]") 
+            iDestruct (own_lin_prefix with "[$HOwnLin' $Hlh_lin_hist]")
               as "(HOwnLin' & Hlh_lin_hist' & %Hprefix_lh)".
             iPureIntro.
-            assert ((#tag', (c', (#"WrLin", (#k, v))))%V ∈ 
+            assert ((#tag', (c', (#"WrLin", (#k, v))))%V ∈
               lt' ++ [(#tag1, (c, (#"RdLin", (#k, $ (Some v)))))%V]) as Hin_lt_app;
               first by apply (elem_of_prefix _ _ _ Hin_lh Hprefix_lh).
             rewrite elem_of_app in Hin_lt_app.
@@ -242,17 +242,17 @@ Section trace_proof.
           intros v' Heq_some.
           inversion Heq_some as [Heq_v_v'].
           rewrite Heq_v_v' in Hlatest_write.
-          destruct Hlatest_write as [Hfalse | 
+          destruct Hlatest_write as [Hfalse |
             (v & t_wr & s & Heq_some' & (_ & Ht_wr_in & _) & Hwr_in & _)];
             set_solver.
-      - assert ((KVS_keys ∖ (domain ∩ KVS_keys)) = 
+      - assert ((KVS_keys ∖ (domain ∩ KVS_keys)) =
             {[k]} ∪ ((KVS_keys ∖ (domain ∩ KVS_keys)) ∖ {[k]})) as Heq_k_keys'.
         {
           apply union_difference_L.
           set_solver.
         }
         rewrite Heq_k_keys'.
-        rewrite (big_sepS_union _ {[k]} ((KVS_keys ∖ (domain ∩ KVS_keys)) ∖ {[k]})); 
+        rewrite (big_sepS_union _ {[k]} ((KVS_keys ∖ (domain ∩ KVS_keys)) ∖ {[k]}));
           last set_solver.
         iDestruct "Hkeys" as "(Hkeys_k & _)".
         rewrite big_sepS_singleton.
@@ -261,19 +261,19 @@ Section trace_proof.
         iDestruct (ghost_map_elem_valid with "Hfalse") as "%Hfalse".
         by rewrite dfrac_valid_own in Hfalse.
     }
-    iMod ("Hclose'" with "[Htr_is' Hmap_mstate Hmap_mname Hmap_m Htrace_res Hdisj_trace_res 
+    iMod ("Hclose'" with "[Htr_is' Hmap_mstate Hmap_mname Hmap_m Htrace_res Hdisj_trace_res
       HOwnLin' Hpost_res' Hlin_res']").
     {
       iNext.
-      assert (Decision (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation), 
-        op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans)) 
+      assert (Decision (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation),
+        op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans))
         as Hdecision.
       {
         do 2 (apply list_exist_dec; intros).
         apply _.
       }
-      destruct (decide (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation), 
-        op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans)) 
+      destruct (decide (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation),
+        op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans))
           as [(trans & Htrans_in & Hop)|Hdec].
       - destruct (elem_of_list_split _ _ Htrans_in) as (T1 & T2 & ->).
         iExists (T1 ++ (trans ++ [Rd (tag1, c) k wo]) :: T2), exec', t', (lt' ++ [(#tag1, (c, (#"RdLin", (#k, $ wo))))%V]).
@@ -289,7 +289,7 @@ Section trace_proof.
             by apply trans_add_non_empty.
           * iSplit.
             -- iPureIntro.
-               assert (∀ op, op ∈ trans → ¬ is_cm_op op) as Hno_cm; 
+               assert (∀ op, op ∈ trans → ¬ is_cm_op op) as Hno_cm;
                 first by eapply last_not_cm_impl_no_cm.
                apply (extraction_of_add2 tag1); try done; try by destruct wo.
                intros op' c'.
@@ -301,9 +301,9 @@ Section trace_proof.
                   ** by apply (extraction_of_not_tag trans lt' tag1 (T1 ++ trans :: T2)).
                   ** intros s' k' ov' tag' v' Heq Hin_wr Hnot.
                      destruct Hkey_res as [(-> & Hdisj)| (Hneq & <-)].
-                     --- exfalso. 
+                     --- exfalso.
                          destruct Hread_res_2 as [(_ & Hno_write)|Hfalse]; last set_solver.
-                         assert (open_trans trans c (T1 ++ trans :: T2)) as Hopen_trans; 
+                         assert (open_trans trans c (T1 ++ trans :: T2)) as Hopen_trans;
                           last set_solver.
                          destruct Hop as (op_last & Hop_in & Hlast_trans & Hconn_last & Hcm_last).
                          exists op_last.
@@ -315,7 +315,7 @@ Section trace_proof.
                          apply Hnot.
                          destruct wo as [v|]; last done.
                          assert (k = k') as <-; first set_solver.
-                         destruct Hread_res_2 as [Hfalse| (v'' & trans' & tag_wr & Heq_some' & Hopen_trans & Hwr_in & Hrel)]; 
+                         destruct Hread_res_2 as [Hfalse| (v'' & trans' & tag_wr & Heq_some' & Hopen_trans & Hwr_in & Hrel)];
                           first set_solver.
                          assert (v  = v'') as <-; first set_solver.
                          exists tag_wr, v.
@@ -338,14 +338,14 @@ Section trace_proof.
                          split.
                          +++ apply rel_list_imp.
                              set_solver.
-                         +++ assert (i < length trans) as Hlength; 
+                         +++ assert (i < length trans) as Hlength;
                               first by eapply lookup_lt_Some.
                              rewrite /rel_list.
                              exists i, (length trans).
-                             split_and!; try done; 
+                             split_and!; try done;
                               first by apply lookup_app_l_Some.
-                             assert (Init.Nat.pred (length (trans ++ [Rd (tag1, c) k (Some v)])) = 
-                              length trans) as <-; 
+                             assert (Init.Nat.pred (length (trans ++ [Rd (tag1, c) k (Some v)])) =
+                              length trans) as <-;
                               last by rewrite -last_lookup last_snoc.
                              rewrite last_length.
                              lia.
@@ -355,7 +355,7 @@ Section trace_proof.
                      intros (s' & b' & ->).
                      set_solver.
                ++ iSplit.
-                  ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & 
+                  ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> &
                        %Hopen_start & Hrest)".
                      iPureIntro.
                      apply (valid_sequence_wr_rd_cm_lin _ _ tag1 c tail); try done.
@@ -375,7 +375,7 @@ Section trace_proof.
                          simpl in Hex'.
                          eauto.
                   ** iSplit.
-                     --- iPureIntro. 
+                     --- iPureIntro.
                          eapply based_on_add1; rewrite /is_cm_op; set_solver.
                      --- iSplit; first by simpl.
                          iSplit; last first.
@@ -430,7 +430,7 @@ Section trace_proof.
                      exfalso.
                      eauto.
                ++ iSplit.
-                  ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & 
+                  ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> &
                        %Hopen_start & Hrest)".
                      iPureIntro.
                      apply (valid_sequence_wr_rd_cm_lin _ _ tag1 c tail); try done.
@@ -449,7 +449,7 @@ Section trace_proof.
                          destruct s1.
                          simpl in Hex'.
                          eauto.
-                  ** iSplit. 
+                  ** iSplit.
                      --- iPureIntro.
                          apply based_on_add2; rewrite /is_cm_op; set_solver.
                      --- iSplit; first by simpl.
@@ -483,10 +483,10 @@ Section trace_proof.
     rewrite /read_post_emit_event.
     wp_pures.
     wp_bind (Emit _).
-    iInv "HinvExt" as ">[%T'' [%exec'' [%t'' [%lt'' 
-      (Htr_is'' & HOwnLin'' & %HlinOf'' & %Hno_empty'' & %Hex'' & %Hvalid_trans'' & 
+    iInv "HinvExt" as ">[%T'' [%exec'' [%t'' [%lt''
+      (Htr_is'' & HOwnLin'' & %HlinOf'' & %Hno_empty'' & %Hex'' & %Hvalid_trans'' &
       %Hbased'' & %Hvalid_exec'' & %Hvalid_seq'' & HstateRes'' & Hlin_res'' & Hpost_res'' & %Hopen_later'')]]]]" "Hclose''".
-    iDestruct (own_lin_prefix with "[$HOwnLin'' $HOwnLinHist']") 
+    iDestruct (own_lin_prefix with "[$HOwnLin'' $HOwnLinHist']")
       as "(HOwnLin'' & HOwnLinHist & %Hprefix')".
     assert ((#tag1, (c, (#"RdLin", (#k, $ wo))))%V ∈ lt'') as HstLinIn.
     {
@@ -532,8 +532,8 @@ Section trace_proof.
     destruct wo; simpl; iFrame.
   Qed.
 
-  Lemma write_implication γmstate γmlin γmpost γmname γl clients (res : RU_resources Mdl Σ) 
-  (lib : KVS_transaction_api) : 
+  Lemma write_implication γmstate γmlin γmpost γmname γl clients (res : RU_resources Mdl Σ)
+  (lib : KVS_transaction_api) :
     ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
     trace_inv trace_inv_name valid_trace_ru -∗
     inv KVS_InvName (∃ T exec, GlobalInvExt commit_test_ru T extract γmstate γmlin γmpost γmname γl clients exec) -∗
@@ -543,13 +543,13 @@ Section trace_proof.
     iIntros "%Hkvs_inv_name #Htr_inv #HinvExt #Hwrite".
     rewrite /write_spec.
     iModIntro.
-    iIntros (c sa E k v) "%Hsub %Hin (#Hconn & %Hsa_in_clients & %Hsa_extract & #Hpers_pointer) !# %Φ Hshift".
+    iIntros (c sa k v) "%Hin (#Hconn & %Hsa_in_clients & %Hsa_extract & #Hpers_pointer) !# %Φ %E %HE Hshift".
     rewrite /TC_write /KVS_wrapped_api /wrap_write.
     wp_pures.
     wp_bind (ast.Fresh _).
     rewrite /write_pre_emit_event.
     wp_pures.
-    iInv "HinvExt" as ">[%T [%exec [%t [%lt  
+    iInv "HinvExt" as ">[%T [%exec [%t [%lt
       (Htr_is & HOwnLin & %HlinOf & %Hno_empty & %Hex & %Hvalid_trans & %Hvalid_seq &
       %Hbased & %Hvalid_exec & Hstate_res & Hlin_res & Hpost_res & %Hopen_later)]]]]" "Hclose".
     wp_apply (aneris_wp_fresh with "[$Htr_inv $Htr_is]").
@@ -564,26 +564,26 @@ Section trace_proof.
     }
     iIntros (tag1) "(Htr_is & %Htag1_nin)".
     iDestruct (alloc_trace_hist with "[$Htr_is]") as "(Htr_is & #Htr_hist)".
-    iMod (lin_tag_create lt t γmlin (#tag1, (c, #"WrPre"))%V with "[$Hlin_res]") 
+    iMod (lin_tag_create lt t γmlin (#tag1, (c, #"WrPre"))%V with "[$Hlin_res]")
       as "(Hlin_res & Hlin_tag_res)".
     {
       iPureIntro.
       simpl.
       do 2 (split; first done).
       intros Hfalse.
-      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]]; 
-        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse; 
+      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]];
+        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse;
         set_solver.
     }
-    iMod (post_tag_create t γmpost (#tag1, (c, #"WrPre"))%V with "[$Hpost_res]") 
+    iMod (post_tag_create t γmpost (#tag1, (c, #"WrPre"))%V with "[$Hpost_res]")
       as "(Hpost_res & Hpost_tag_res)".
     {
       iPureIntro.
       simpl.
       do 2 (split; first done).
       intros Hfalse.
-      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]]; 
-        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse; 
+      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]];
+        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse;
         set_solver.
     }
     iMod ("Hclose" with "[Htr_is HOwnLin Hstate_res Hlin_res Hpost_res]").
@@ -601,16 +601,16 @@ Section trace_proof.
     wp_pures.
     wp_apply "Hwrite"; try done.
     iClear "Hwrite".
-    iMod "Hshift" as "(%vo & %V & (Hkey_c & Hkey) & Hshift)".
+    iMod "Hshift"; do 2 iModIntro;
+      iDestruct "Hshift" as "(%vo & %V & (Hkey_c & Hkey) & Hshift)".
     iDestruct "Hkey_c" as "(Hkey_c & (%sa' & %γ & #Hsa'_pointer & %Hsa'_extract & Himp & %Hsa'_in))".
     destruct (decide (sa = sa')) as [<- | Hfalse]; last set_solver.
     iDestruct "Hkey" as "(Hkey & Hall)".
-    iModIntro.
     iExists vo, V.
     iFrame.
     iIntros "(Hkey_c & Hkey)".
-    iInv "HinvExt" as ">[%T' [%exec' [%t' [%lt' 
-      (Htr_is' & HOwnLin' & %HlinOf' & %Hno_empty' & %Hex' & %Hvalid_trans' & 
+    iInv "HinvExt" as ">[%T' [%exec' [%t' [%lt'
+      (Htr_is' & HOwnLin' & %HlinOf' & %Hno_empty' & %Hex' & %Hvalid_trans' &
       %Hbased' & %Hvalid_exec' & %Hvalid_seq' & HstateRes' & Hlin_res' & Hpost_res' & %Hopen_later')]]]]" "Hclose'".
     iMod (own_lin_add _ _ (#tag1, (c, (#"WrLin", (#k, v))))%V with "[$HOwnLin']") as "HOwnLin'".
     iMod (own_lin_hist with "[$HOwnLin']") as "(HOwnLin' & #HOwnLinHist')".
@@ -622,7 +622,7 @@ Section trace_proof.
     }
     iPoseProof (lin_tag_not_in lt' t' γmlin with "[$Hlin_res' $Hlin_tag_res]") as "%Hnot_lin_in".
     iPoseProof (post_tag_not_in t' γmpost with "[$Hpost_res' $Hpost_tag_res]") as "%Hnot_post_in".
-    iDestruct (lin_tag_add lt' t' γmlin (#tag1, (c, (#"WrLin", (#k, v))))%V tag1 with "[$Hlin_res' $Hlin_tag_res]") 
+    iDestruct (lin_tag_add lt' t' γmlin (#tag1, (c, (#"WrLin", (#k, v))))%V tag1 with "[$Hlin_res' $Hlin_tag_res]")
       as "Hlin_res'".
     {
       iPureIntro.
@@ -640,7 +640,7 @@ Section trace_proof.
     rewrite big_sepS_singleton.
     iDestruct (@ghost_map_lookup with "[$Hmap_mname][$Hsa'_pointer]") as "%Hlookup_mname".
     iDestruct "Hdisj_trace_res_sa" as "[(_ & %Hnot & _) | Htrace_res]"; first set_solver.
-    iAssert (ghost_map_elem γ k (DfracOwn 1%Qp) vo) with "[Himp]" as "Hkey_internal"; 
+    iAssert (ghost_map_elem γ k (DfracOwn 1%Qp) vo) with "[Himp]" as "Hkey_internal";
       first by iApply "Himp".
     assert (KVS_keys = {[k]} ∪ (KVS_keys ∖ {[k]})) as Heq_k_keys.
     {
@@ -665,37 +665,37 @@ Section trace_proof.
       iDestruct (ghost_map_elem_valid with "Hfalse") as "%Hfalse".
       by rewrite dfrac_valid_own in Hfalse.
     }
-    iMod (@ghost_map_update _ Key (option val) _ _ _ _ _ k vo (Some v.(SV_val)) with "[$Hmap_m] [$Hkey_internal]") 
+    iMod (@ghost_map_update _ Key (option val) _ _ _ _ _ k vo (Some v.(SV_val)) with "[$Hmap_m] [$Hkey_internal]")
       as "(Hmap_m & Hkey_internal)".
-    iMod ("Hclose'" with "[Htr_is' Hmap_mstate Hmap_mname Hmap_m Htrace_res Hdisj_trace_res 
+    iMod ("Hclose'" with "[Htr_is' Hmap_mstate Hmap_mname Hmap_m Htrace_res Hdisj_trace_res
       HOwnLin' Hpost_res' Hlin_res']").
     {
       iNext.
-      assert (Decision (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation), 
-        op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans)) 
+      assert (Decision (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation),
+        op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans))
         as Hdecision.
       {
         do 2 (apply list_exist_dec; intros).
         apply _.
       }
-      destruct (decide (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation), 
-        op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans)) 
+      destruct (decide (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation),
+        op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans))
           as [(trans & Htrans_in & Hop)|Hdec].
       - destruct (elem_of_list_split _ _ Htrans_in) as (T1 & T2 & ->).
         iExists (T1 ++ (trans ++ [Wr (tag1, c) k v]) :: T2), exec', t', (lt' ++ [(#tag1, (c, (#"WrLin", (#k, v))))%V]).
         iFrame.
         iSplit.
         + iPureIntro.
-          apply (lin_trace_lin lt' (#tag1, (c, #"WrPre"))%V 
+          apply (lin_trace_lin lt' (#tag1, (c, #"WrPre"))%V
             (#tag1, (c, (#"WrLin", (#k, v))))%V tag1 c t'); try done;
-            rewrite /is_lin_event /is_wr_lin_event /is_pre_event /is_wr_pre_event; 
+            rewrite /is_lin_event /is_wr_lin_event /is_pre_event /is_wr_pre_event;
             do 2 right; left; eauto.
         + iSplit.
           * iPureIntro.
             by apply trans_add_non_empty.
           * iSplit.
             -- iPureIntro.
-               assert (∀ op, op ∈ trans → ¬ is_cm_op op) as Hno_cm; 
+               assert (∀ op, op ∈ trans → ¬ is_cm_op op) as Hno_cm;
                 first by eapply last_not_cm_impl_no_cm.
                apply (extraction_of_add2 tag1); try done.
                intros op' c'.
@@ -711,7 +711,7 @@ Section trace_proof.
                     intros (s' & b' & ->).
                     set_solver.
                ++ iSplit.
-                  ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & 
+                  ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> &
                        %Hopen_start & Hrest)".
                      iPureIntro.
                      apply (valid_sequence_wr_rd_cm_lin _ _ tag1 c tail); try done.
@@ -719,7 +719,7 @@ Section trace_proof.
                          set_solver.
                      --- by exists t'.
                   ** iSplit.
-                    --- iPureIntro. 
+                    --- iPureIntro.
                         eapply based_on_add1; rewrite /is_cm_op; set_solver.
                     --- iSplit; first by simpl.
                         iSplit; last first.
@@ -729,7 +729,7 @@ Section trace_proof.
                           rewrite /is_wr_lin_event.
                           set_solver.
                         }
-                        iApply (trace_state_resources_write_lin2 clients c tag1 lt' T1 T2 trans k v sa 
+                        iApply (trace_state_resources_write_lin2 clients c tag1 lt' T1 T2 trans k v sa
                           s γ γmstate γmname extract mstate mname m with "[][][][][][][][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
                           [$Hmap_m][$Hdisj_trace_res][$Htrace_res]"); try by iPureIntro.
                         +++ iPureIntro.
@@ -739,14 +739,14 @@ Section trace_proof.
                             destruct Hinit as (e & Hin'' & Hconn'' & Hevent'').
                             exists e.
                             split_and!; try done.
-                            apply elem_of_app; eauto. 
+                            apply elem_of_app; eauto.
       - iExists (T' ++ [[Wr (tag1, c) k v]]), exec', t', (lt' ++ [(#tag1, (c, (#"WrLin", (#k, v))))%V]).
         iFrame.
         iSplit.
         + iPureIntro.
-          apply (lin_trace_lin lt' (#tag1, (c, #"WrPre"))%V 
+          apply (lin_trace_lin lt' (#tag1, (c, #"WrPre"))%V
             (#tag1, (c, (#"WrLin", (#k, v))))%V tag1 c t'); try done;
-            rewrite /is_lin_event /is_wr_lin_event /is_pre_event /is_wr_pre_event; 
+            rewrite /is_lin_event /is_wr_lin_event /is_pre_event /is_wr_pre_event;
             do 2 right; left; eauto.
         + iSplit.
           * iPureIntro.
@@ -772,14 +772,14 @@ Section trace_proof.
                      exfalso.
                      eauto.
                ++ iSplit.
-                  ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> & 
+                  ** iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & -> & -> &
                        %Hopen_start & Hrest)".
                      iPureIntro.
                      apply (valid_sequence_wr_rd_cm_lin _ _ tag1 c tail); try done.
                      --- rewrite /is_wr_lin_event.
                          set_solver.
                      --- by exists t'.
-                  ** iSplit. 
+                  ** iSplit.
                      --- iPureIntro.
                          apply based_on_add2; rewrite /is_cm_op; set_solver.
                      --- iSplit; first by simpl.
@@ -820,10 +820,10 @@ Section trace_proof.
     iModIntro.
     rewrite /write_post_emit_event.
     wp_pures.
-    iInv "HinvExt" as ">[%T'' [%exec'' [%t'' [%lt'' 
-      (Htr_is'' & HOwnLin'' & %HlinOf'' & %Hno_empty'' & %Hex'' & %Hvalid_trans'' & 
+    iInv "HinvExt" as ">[%T'' [%exec'' [%t'' [%lt''
+      (Htr_is'' & HOwnLin'' & %HlinOf'' & %Hno_empty'' & %Hex'' & %Hvalid_trans'' &
       %Hbased'' & %Hvalid_exec'' & %Hvalid_seq'' & HstateRes'' & Hlin_res'' & Hpost_res'' & %Hopen_later'')]]]]" "Hclose''".
-    iDestruct (own_lin_prefix with "[$HOwnLin'' $HOwnLinHist']") 
+    iDestruct (own_lin_prefix with "[$HOwnLin'' $HOwnLinHist']")
       as "(HOwnLin'' & HOwnLinHist & %Hprefix')".
     assert ((#tag1, (c, (#"WrLin", (#k, v))))%V ∈ lt'') as HstLinIn.
     {
@@ -836,7 +836,7 @@ Section trace_proof.
       solve_ndisj.
     }
     {
-      eapply valid_trace_post; 
+      eapply valid_trace_post;
       rewrite /is_post_event /is_wr_post_event;
       set_solver.
     }
@@ -865,8 +865,8 @@ Section trace_proof.
     set_solver.
   Qed.
 
-  Lemma start_implication γmstate γmlin γmpost γmname γl clients (res : RU_resources Mdl Σ) 
-  (lib : KVS_transaction_api) : 
+  Lemma start_implication γmstate γmlin γmpost γmname γl clients (res : RU_resources Mdl Σ)
+  (lib : KVS_transaction_api) :
     ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
     trace_inv trace_inv_name valid_trace_ru -∗
     inv KVS_InvName (∃ T exec, GlobalInvExt commit_test_ru T extract γmstate γmlin γmpost γmname γl clients exec) -∗
@@ -876,13 +876,13 @@ Section trace_proof.
     iIntros "%Hkvs_inv_name #Htr_inv #HinvExt #Hstart".
     rewrite /start_spec.
     iModIntro.
-    iIntros (c sa E) "%Hsub (#Hconn & %Hsa_in_clients & %Hsa_extract & #Hpers_pointer) !# %Φ Hshift".
+    iIntros (c sa) "(#Hconn & %Hsa_in_clients & %Hsa_extract & #Hpers_pointer) !# %Φ %E %HE Hshift".
     rewrite /TC_start /KVS_wrapped_api /wrap_start.
     wp_pures.
     wp_bind (ast.Fresh _).
     rewrite /start_pre_emit_event.
     wp_pures.
-    iInv "HinvExt" as ">[%T [%exec [%t [%lt 
+    iInv "HinvExt" as ">[%T [%exec [%t [%lt
       (Htr_is & HOwnLin & %HlinOf & %Hno_empty & %Hex & %Hvalid_trans & %Hvalid_seq &
       %Hbased & %Hvalid_exec & Hstate_res & Hlin_res & Hpost_res & %Hopen_later)]]]]" "Hclose".
     wp_apply (aneris_wp_fresh with "[$Htr_inv $Htr_is]").
@@ -897,26 +897,26 @@ Section trace_proof.
     }
     iIntros (tag1) "(Htr_is & %Htag1_nin)".
     iDestruct (alloc_trace_hist with "[$Htr_is]") as "(Htr_is & #Htr_hist)".
-    iMod (lin_tag_create lt t γmlin (#tag1, (c, #"StPre"))%V with "[$Hlin_res]") 
+    iMod (lin_tag_create lt t γmlin (#tag1, (c, #"StPre"))%V with "[$Hlin_res]")
       as "(Hlin_res & Hlin_tag_res)".
     {
       iPureIntro.
       simpl.
       do 2 (split; first done).
       intros Hfalse.
-      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]]; 
-        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse; 
+      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]];
+        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse;
         set_solver.
     }
-    iMod (post_tag_create t γmpost (#tag1, (c, #"StPre"))%V with "[$Hpost_res]") 
+    iMod (post_tag_create t γmpost (#tag1, (c, #"StPre"))%V with "[$Hpost_res]")
       as "(Hpost_res & Hpost_tag_res)".
     {
       iPureIntro.
       simpl.
       do 2 (split; first done).
       intros Hfalse.
-      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]]; 
-        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse; 
+      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]];
+        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse;
         set_solver.
     }
     iMod ("Hclose" with "[Htr_is HOwnLin Hstate_res Hlin_res Hpost_res]").
@@ -934,16 +934,16 @@ Section trace_proof.
     wp_pures.
     wp_apply "Hstart"; try done.
     iClear "Hstart".
-    iMod "Hshift" as "[%m (((Hconn_state & Hsa_pointer) & Hkeys) & Hshift)]".
-    iModIntro.
+    iMod "Hshift"; do 2 iModIntro;
+      iDestruct "Hshift" as "[%m (((Hconn_state & Hsa_pointer) & Hkeys) & Hshift)]".
     iExists m.
     iFrame.
     rewrite big_sepM_sep.
     iDestruct "Hkeys" as "(Hkeys1 & Hkeys2)".
     iFrame.
     iIntros "(Hconn_state & Hkeys1 & Hkeys_conn)".
-    iInv "HinvExt" as ">[%T' [%exec' [%t' [%lt' 
-      (Htr_is' & HOwnLin' & %HlinOf' & %Hno_empty' & %Hex' & %Hvalid_trans' & 
+    iInv "HinvExt" as ">[%T' [%exec' [%t' [%lt'
+      (Htr_is' & HOwnLin' & %HlinOf' & %Hno_empty' & %Hex' & %Hvalid_trans' &
       %Hbased' & %Hvalid_exec' & %Hvalid_seq' & HstateRes' & Hlin_res' & Hpost_res' & %Hopen_later')]]]]" "Hclose'".
     simpl; rewrite /trace_state_resources.
     iDestruct "HstateRes'" as "(%mstate' & Hghost_map_mstate' & %mname' & Hghost_map_mname' & Hdisj_trace_res)".
@@ -961,23 +961,23 @@ Section trace_proof.
     {
       iDestruct "Hfalse" as "[%Hfalse | %Hfalse]"; set_solver.
     }
-    iDestruct "Htrace_res" as "(%ls & %c' & %γ & %m' & %Hlookup_mstate'' & %Hextract & 
+    iDestruct "Htrace_res" as "(%ls & %c' & %γ & %m' & %Hlookup_mstate'' & %Hextract &
       #Hsa_c'_pointer & Hghost_map_m' & %Hinit & [(-> & %Hclosed & %Hopen_trans & Hkeys_conn_res) | Hfalse])"; last first.
     {
       assert (ls = CanStart) as ->; first set_solver.
       by iDestruct "Hfalse" as "(%domain & %sub_domain & %tail & %Hfalse & _)".
     }
-    iMod (ghost_map_update (Active (dom m), Some c) with "[$Hghost_map_mstate'] [$Hsa_pointer]") 
+    iMod (ghost_map_update (Active (dom m), Some c) with "[$Hghost_map_mstate'] [$Hsa_pointer]")
       as "(Hghost_map_mstate' & Hsa_pointer)".
-    iAssert ((|==> (([∗ set] k ∈ KVS_keys, ghost_map_elem γ k (DfracOwn 1%Qp) None) ∗ 
-              (∃ m'', ghost_map_auth γ 1 m'' ∧ ⌜∀ k, k ∈ KVS_keys → m'' !! k = Some None⌝)))%I) 
+    iAssert ((|==> (([∗ set] k ∈ KVS_keys, ghost_map_elem γ k (DfracOwn 1%Qp) None) ∗
+              (∃ m'', ghost_map_auth γ 1 m'' ∧ ⌜∀ k, k ∈ KVS_keys → m'' !! k = Some None⌝)))%I)
       with "[Hkeys_conn_res Hghost_map_m']" as ">(Hkeys_conn_res & (%m'' & Hghost_map_m' & %Hnone))".
     {
       iRevert "Hghost_map_m'".
       iRevert (m').
       iInduction KVS_keys as [|k KVS_Keys Hnin] "IH" using set_ind_L.
       - iIntros (m') "Hghost_map_m'".
-        iModIntro. 
+        iModIntro.
         iSplitR "Hghost_map_m'"; first done.
         iExists m'.
         iFrame.
@@ -986,16 +986,16 @@ Section trace_proof.
       - iIntros (m') "Hghost_map_m'".
         rewrite big_sepS_union; last set_solver.
         iDestruct "Hkeys_conn_res" as "(Hkeys_conn_key & Hkeys_conn_res)".
-        iMod ("IH" with "[$Hkeys_conn_res][$Hghost_map_m']") 
+        iMod ("IH" with "[$Hkeys_conn_res][$Hghost_map_m']")
           as "(Hkeys_conn_res & [%m'' (Hghost_map' & %Hnone)])".
         rewrite big_sepS_singleton.
         iDestruct "Hkeys_conn_key" as "(%ov & Hkeys_conn_key)".
-        iMod (@ghost_map_update _ Key (option val) _ _ _ _ _ k ov None with "[$Hghost_map'] [$Hkeys_conn_key]") 
+        iMod (@ghost_map_update _ Key (option val) _ _ _ _ _ k ov None with "[$Hghost_map'] [$Hkeys_conn_key]")
           as "(Hghost_map' & Hkeys_conn_key)".
         iModIntro.
         iSplitR "Hghost_map'".
         + rewrite big_sepS_union; last set_solver.
-          iFrame. 
+          iFrame.
           rewrite big_sepS_singleton.
           iFrame.
         + iExists _.
@@ -1008,8 +1008,8 @@ Section trace_proof.
             apply Hnone.
             set_solver.
     }
-    iAssert ((([∗ set] k ∈ (dom m) ∩ KVS_keys, ghost_map_elem γ k (DfracOwn 1%Qp) None) ∗ 
-              ([∗ set] k ∈ KVS_keys ∖ ((dom m) ∩ KVS_keys), ghost_map_elem γ k (DfracOwn 1%Qp) None))%I) 
+    iAssert ((([∗ set] k ∈ (dom m) ∩ KVS_keys, ghost_map_elem γ k (DfracOwn 1%Qp) None) ∗
+              ([∗ set] k ∈ KVS_keys ∖ ((dom m) ∩ KVS_keys), ghost_map_elem γ k (DfracOwn 1%Qp) None))%I)
       with "[Hkeys_conn_res]" as "(Hkeys_conn_res1 & Hkeys_conn_res2)".
     {
       assert (KVS_keys = (dom m ∩ KVS_keys) ∪ (KVS_keys ∖ (dom m ∩ KVS_keys))) as Heq.
@@ -1029,13 +1029,13 @@ Section trace_proof.
     }
     iPoseProof (lin_tag_not_in lt' t' γmlin with "[$Hlin_res' $Hlin_tag_res]") as "%Hnot_lin_in".
     iPoseProof (post_tag_not_in t' γmpost with "[$Hpost_res' $Hpost_tag_res]") as "%Hnot_post_in".
-    iDestruct (lin_tag_add lt' t' γmlin (#tag1, (c, #"StLin"))%V tag1 with "[$Hlin_res' $Hlin_tag_res]") 
+    iDestruct (lin_tag_add lt' t' γmlin (#tag1, (c, #"StLin"))%V tag1 with "[$Hlin_res' $Hlin_tag_res]")
       as "Hlin_res'".
     {
       iPureIntro.
-      by simpl. 
+      by simpl.
     }
-    iMod ("Hclose'" with "[Htr_is' HOwnLin' Hghost_map_mname' Hghost_map_m' 
+    iMod ("Hclose'" with "[Htr_is' HOwnLin' Hghost_map_mname' Hghost_map_m'
       Hghost_map_mstate' Hkeys_conn_res2 Hlin_res' Hpost_res' Hdisj_trace_res]").
     {
       iModIntro.
@@ -1044,7 +1044,7 @@ Section trace_proof.
       iSplitR.
       {
         iPureIntro.
-        apply (lin_trace_lin lt' ((#tag1, (c, #"StPre"))%V) ((#tag1, (c, #"StLin"))%V) tag1 c t'); 
+        apply (lin_trace_lin lt' ((#tag1, (c, #"StPre"))%V) ((#tag1, (c, #"StLin"))%V) tag1 c t');
           try done; rewrite /is_lin_event /is_pre_event; left; by exists tag1, c.
       }
       iSplitR; first by iPureIntro.
@@ -1064,7 +1064,7 @@ Section trace_proof.
           + intros trans op Hin_t Hin_op.
             specialize (Hex2 trans op Hin_t Hin_op).
             set_solver.
-          + split. 
+          + split.
             * intros trans op1 op2 Htrans_in Hrel.
               specialize (Hex3 trans op1 op2 Htrans_in Hrel).
               destruct Hex3 as (i & j & Hle & Hlookup_i & Hlookup_j).
@@ -1149,7 +1149,7 @@ Section trace_proof.
         iDestruct ("IH" with "[$Hkeys_conn][$Hkeys_conn_res1]") as "Hkeys_conn".
         rewrite big_sepS_union; last set_solver.
         iFrame.
-        iDestruct (big_sepS_sep with "[$Hkeys_conn_key $Hkeys_conn_res1_key]") 
+        iDestruct (big_sepS_sep with "[$Hkeys_conn_key $Hkeys_conn_res1_key]")
           as "Hkeys_conn_key".
         iApply (big_sepS_wand with "[$Hkeys_conn_key]").
         iApply big_sepS_intro.
@@ -1183,9 +1183,9 @@ Section trace_proof.
     rewrite /start_post_emit_event.
     wp_pures.
     iInv "HinvExt" as ">[%T'' [%exec'' [%t'' [%lt''
-      (Htr_is'' & HOwnLin'' & %HlinOf'' & %Hno_empty'' & %Hex'' & %Hvalid_trans'' & 
+      (Htr_is'' & HOwnLin'' & %HlinOf'' & %Hno_empty'' & %Hex'' & %Hvalid_trans'' &
       %Hbased'' & %Hvalid_exec'' & %Hvalid_seq'' & HstateRes'' & Hlin_res'' & Hpost_res'' & %Hopen_later'')]]]]" "Hclose''".
-    iDestruct (own_lin_prefix with "[$HOwnLin'' $HOwnLinHist']") 
+    iDestruct (own_lin_prefix with "[$HOwnLin'' $HOwnLinHist']")
       as "(HOwnLin'' & HOwnLinHist & %Hprefix')".
     assert ((#tag1, (c, #"StLin"))%V ∈ lt'') as HstLinIn.
     {
@@ -1198,7 +1198,7 @@ Section trace_proof.
       solve_ndisj.
     }
     {
-      eapply valid_trace_post; 
+      eapply valid_trace_post;
         rewrite /is_post_event /is_st_post_event;
         set_solver.
     }
@@ -1227,8 +1227,8 @@ Section trace_proof.
     set_solver.
   Qed.
 
-  Lemma commit_implication γmstate γmlin γmpost γmname γl clients (res : RU_resources Mdl Σ) 
-  (lib : KVS_transaction_api) : 
+  Lemma commit_implication γmstate γmlin γmpost γmname γl clients (res : RU_resources Mdl Σ)
+  (lib : KVS_transaction_api) :
     ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
     trace_inv trace_inv_name valid_trace_ru -∗
     inv KVS_InvName (∃ T exec, GlobalInvExt commit_test_ru T extract γmstate γmlin γmpost γmname γl clients exec) -∗
@@ -1238,13 +1238,13 @@ Section trace_proof.
     iIntros "%Hkvs_inv_name #Htr_inv #HinvExt #Hcommit".
     rewrite /commit_spec.
     iModIntro.
-    iIntros (c sa E) "%Hsub (#Hconn & %Hsa_in_clients & %Hsa_extract & (%γ & #Hsa'_pointer)) !# %Φ Hshift".
+    iIntros (c sa) "(#Hconn & %Hsa_in_clients & %Hsa_extract & (%γ & #Hsa'_pointer)) !# %Φ %E %HE Hshift".
     rewrite /TC_commit /KVS_wrapped_api /wrap_commit.
     wp_pures.
     wp_bind (ast.Fresh _).
     rewrite /commit_pre_emit_event.
     wp_pures.
-    iInv "HinvExt" as ">[%T [%exec [%t [%lt 
+    iInv "HinvExt" as ">[%T [%exec [%t [%lt
       (Htr_is & HOwnLin & %HlinOf & %Hno_empty & %Hex & %Hvalid_trans & %Hvalid_seq &
       %Hbased & %Hvalid_exec & Hstate_res & Hlin_res & Hpost_res & %Hopen_later)]]]]" "Hclose".
     wp_apply (aneris_wp_fresh with "[$Htr_inv $Htr_is]").
@@ -1259,26 +1259,26 @@ Section trace_proof.
     }
     iIntros (tag1) "(Htr_is & %Htag1_nin)".
     iDestruct (alloc_trace_hist with "[$Htr_is]") as "(Htr_is & #Htr_hist)".
-    iMod (lin_tag_create lt t γmlin (#tag1, (c, #"CmPre"))%V with "[$Hlin_res]") 
+    iMod (lin_tag_create lt t γmlin (#tag1, (c, #"CmPre"))%V with "[$Hlin_res]")
       as "(Hlin_res & Hlin_tag_res)".
     {
       iPureIntro.
       simpl.
       do 2 (split; first done).
       intros Hfalse.
-      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]]; 
-        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse; 
+      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]];
+        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse;
         set_solver.
     }
-    iMod (post_tag_create t γmpost (#tag1, (c, #"CmPre"))%V with "[$Hpost_res]") 
+    iMod (post_tag_create t γmpost (#tag1, (c, #"CmPre"))%V with "[$Hpost_res]")
       as "(Hpost_res & Hpost_tag_res)".
     {
       iPureIntro.
       simpl.
       do 2 (split; first done).
       intros Hfalse.
-      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]]; 
-        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse; 
+      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]];
+        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse;
         set_solver.
     }
     iMod ("Hclose" with "[Htr_is HOwnLin Hstate_res Hlin_res Hpost_res]").
@@ -1296,14 +1296,14 @@ Section trace_proof.
     wp_pures.
     wp_apply "Hcommit"; try done.
     iClear "Hcommit".
-    iMod "Hshift" as "(%s & %mc & %m & ((Hstate & Hstate_pr) & %Hdom1 & %Hdom2 & Hkeys_conn & Hkeys) & Hshift)".
-    iModIntro.
+    iMod "Hshift"; do 2 iModIntro;
+      iDestruct "Hshift" as "(%s & %mc & %m & ((Hstate & Hstate_pr) & %Hdom1 & %Hdom2 & Hkeys_conn & Hkeys) & Hshift)".
     iExists s, mc, m.
     rewrite big_sepM_sep.
     iDestruct "Hkeys_conn" as "(Hkeys_conn1 & Hkeys_conn2)".
     simpl.
-    iAssert (([∗ map] k↦V ∈ m, k ↦ₖ V) ∗ ([∗ map] k↦V ∈ m, (∀ v, ⌜v ∈ V⌝ → 
-        ∃ lh (tag : string) c, OwnLinHist γl lh ∗ ⌜(#tag, (c, (#"WrLin", (#(LitString k), v))))%V ∈ lh⌝)))%I 
+    iAssert (([∗ map] k↦V ∈ m, k ↦ₖ V) ∗ ([∗ map] k↦V ∈ m, (∀ v, ⌜v ∈ V⌝ →
+        ∃ lh (tag : string) c, OwnLinHist γl lh ∗ ⌜(#tag, (c, (#"WrLin", (#(LitString k), v))))%V ∈ lh⌝)))%I
         with "[Hkeys]" as "(Hkeys1 & Hkeys2)".
     {
       iApply big_sepM_sep.
@@ -1315,8 +1315,8 @@ Section trace_proof.
       iSplit; by iPureIntro.
     }
     iIntros (b) "(Hstate & Hkeys1)".
-    iInv "HinvExt" as ">[%T' [%exec' [%t' [%lt' 
-      (Htr_is' & HOwnLin' & %HlinOf' & %Hno_empty' & %Hex' & %Hvalid_trans' & 
+    iInv "HinvExt" as ">[%T' [%exec' [%t' [%lt'
+      (Htr_is' & HOwnLin' & %HlinOf' & %Hno_empty' & %Hex' & %Hvalid_trans' &
       %Hbased' & %Hvalid_exec' & %Hvalid_seq' & HstateRes' & Hlin_res' & Hpost_res' & %Hopen_later')]]]]" "Hclose'".
     iMod (own_lin_add _ _ (#tag1, (c, (#"CmLin", #b)))%V with "[$HOwnLin']") as "HOwnLin'".
     iMod (own_lin_hist with "[$HOwnLin']") as "(HOwnLin' & #HOwnLinHist')".
@@ -1328,7 +1328,7 @@ Section trace_proof.
     }
     iPoseProof (lin_tag_not_in lt' t' γmlin with "[$Hlin_res' $Hlin_tag_res]") as "%Hnot_lin_in".
     iPoseProof (post_tag_not_in t' γmpost with "[$Hpost_res' $Hpost_tag_res]") as "%Hnot_post_in".
-    iDestruct (lin_tag_add lt' t' γmlin (#tag1, (c, (#"CmLin", #b)))%V tag1 with "[$Hlin_res' $Hlin_tag_res]") 
+    iDestruct (lin_tag_add lt' t' γmlin (#tag1, (c, (#"CmLin", #b)))%V tag1 with "[$Hlin_res' $Hlin_tag_res]")
       as "Hlin_res'".
     {
       iPureIntro.
@@ -1361,21 +1361,21 @@ Section trace_proof.
       - iSplit; set_solver.
     }
     iDestruct "Htrace_res" as "(%Hinit & [(%Hfalse & _ & _)|Htrace_res])"; first done.
-    iMod (ghost_map_update (CanStart, Some c) with "[$Hmap_mstate] [$Hstate_pr]") 
+    iMod (ghost_map_update (CanStart, Some c) with "[$Hmap_mstate] [$Hstate_pr]")
       as "(Hmap_mstate & Hstate_pr)".
     iMod ("Hclose'" with "[Htr_is' HOwnLin' Hpost_res' Hlin_res' Htrace_res Hkeys_conn2 Hmap_mname
       Hmap_m Hdisj_trace_res Hmap_mstate]").
     {
       iModIntro.
-      assert (Decision (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation), 
-        op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans)) 
+      assert (Decision (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation),
+        op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans))
         as Hdecision.
       {
         do 2 (apply list_exist_dec; intros).
         apply _.
       }
-      destruct (decide (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation), 
-        op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans)) 
+      destruct (decide (∃ (trans : transaction), trans ∈ T' ∧ (λ trans, ∃ (op : operation),
+        op ∈ trans ∧ (λ op, last trans = Some op ∧ connOfOp op = c ∧ isCmOp op = false) op) trans))
           as [(trans & Htrans_in & Hop)|Hdec].
       - destruct (elem_of_list_split _ _ Htrans_in) as (T1 & T2 & ->).
         assert (valid_transactions (T1 ++ (trans ++ [Cm (tag1, c) b]) :: T2)) as Hvalid_trans_add.
@@ -1389,7 +1389,7 @@ Section trace_proof.
             intros (s' & b' & ->).
             set_solver.
         }
-        destruct (exists_execution (T1 ++ (trans ++ [Cm (tag1, c) b]) :: T2)) 
+        destruct (exists_execution (T1 ++ (trans ++ [Cm (tag1, c) b]) :: T2))
           as (exec'' & Hbased'' & Hvalid_exec''); try done.
         {
           intros trans' Hin.
@@ -1402,12 +1402,12 @@ Section trace_proof.
           apply app_eq_nil in Hfalse.
           set_solver.
         }
-        iExists (T1 ++ (trans ++ [Cm (tag1, c) b]) :: T2), exec'', t', 
+        iExists (T1 ++ (trans ++ [Cm (tag1, c) b]) :: T2), exec'', t',
           (lt' ++ [(#tag1, (c, (#"CmLin", #b)))%V]).
         iFrame.
         iSplit.
         + iPureIntro.
-          apply (lin_trace_lin lt' (#tag1, (c, #"CmPre"))%V 
+          apply (lin_trace_lin lt' (#tag1, (c, #"CmPre"))%V
             (#tag1, (c, (#"CmLin", #b)))%V tag1 c t'); try done;
             rewrite /is_lin_event /is_cm_lin_event /is_pre_event /is_cm_pre_event;
             set_solver.
@@ -1416,14 +1416,14 @@ Section trace_proof.
             by apply trans_add_non_empty.
           * iSplit.
             -- iPureIntro.
-               assert (∀ op, op ∈ trans → ¬ is_cm_op op) as Hno_cm; 
+               assert (∀ op, op ∈ trans → ¬ is_cm_op op) as Hno_cm;
                 first by eapply last_not_cm_impl_no_cm.
                apply (extraction_of_add2 tag1); try done.
                intros op' c'.
                apply (Hopen_later' trans op' c'); set_solver.
             -- iSplit; first by iPureIntro.
                iSplit.
-               ++ iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & Hact_eq & -> & 
+               ++ iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & Hact_eq & -> &
                     %Hopen_start & Hrest)".
                   iPureIntro.
                   apply (valid_sequence_wr_rd_cm_lin _ _ tag1 c tail); try done.
@@ -1438,8 +1438,8 @@ Section trace_proof.
                     eapply open_trans_no_later_imp4; try done.
                     rewrite /is_cm_lin_event; eauto.
                   }
-                  iApply (trace_state_resources_commit_lin2 clients c tag1 lt' T1 T2 trans sa 
-                    s γ γmstate γmname extract b mc mstate mname m' with 
+                  iApply (trace_state_resources_commit_lin2 clients c tag1 lt' T1 T2 trans sa
+                    s γ γmstate γmname extract b mc mstate mname m' with
                     "[//][//][//][//][//][//][//][//][][$Hkeys_conn2][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
                     [$Hmap_m][$Hdisj_trace_res][$Htrace_res]").
                   iPureIntro.
@@ -1469,10 +1469,10 @@ Section trace_proof.
         iFrame.
         iSplit.
         + iPureIntro.
-          apply (lin_trace_lin lt' (#tag1, (c, #"CmPre"))%V 
+          apply (lin_trace_lin lt' (#tag1, (c, #"CmPre"))%V
             (#tag1, (c, (#"CmLin", #b)))%V tag1 c t'); try done;
             rewrite /is_lin_event /is_cm_lin_event /is_pre_event /is_cm_pre_event;
-            set_solver. 
+            set_solver.
         + iSplit.
           * iPureIntro.
             intros t'' Ht''_in.
@@ -1483,7 +1483,7 @@ Section trace_proof.
                by apply (extraction_of_add1 _ _ _ _ tag1).
             -- iSplit; first by iPureIntro.
                iSplit.
-               ++ iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & Hact_eq & -> & 
+               ++ iDestruct "Htrace_res" as "(%domain & %sub_domain & %tail & Hact_eq & -> &
                     %Hopen_start & Hrest)".
                   iPureIntro.
                   apply (valid_sequence_wr_rd_cm_lin _ _ tag1 c tail); try done.
@@ -1496,9 +1496,9 @@ Section trace_proof.
                   {
                     iPureIntro.
                     by eapply open_trans_no_later_imp3.
-                  } 
-                  iApply (trace_state_resources_commit_lin1 clients c tag1 lt' T' sa 
-                    s γ γmstate γmname extract b mc mstate mname m' with 
+                  }
+                  iApply (trace_state_resources_commit_lin1 clients c tag1 lt' T' sa
+                    s γ γmstate γmname extract b mc mstate mname m' with
                     "[//][//][//][//][//][//][//][][$Hkeys_conn2][$Hsa_pointer][$Hmap_mstate][$Hmap_mname]
                     [$Hmap_m][$Hdisj_trace_res][$Htrace_res]").
                   iPureIntro.
@@ -1517,10 +1517,10 @@ Section trace_proof.
     rewrite /commit_post_emit_event.
     wp_pures.
     wp_bind (Emit _).
-    iInv "HinvExt" as ">[%T'' [%exec'' [%t'' [%lt'' 
-      (Htr_is'' & HOwnLin'' & %HlinOf'' & %Hno_empty'' & %Hex'' & %Hvalid_trans'' & 
+    iInv "HinvExt" as ">[%T'' [%exec'' [%t'' [%lt''
+      (Htr_is'' & HOwnLin'' & %HlinOf'' & %Hno_empty'' & %Hex'' & %Hvalid_trans'' &
       %Hbased'' & %Hvalid_exec'' & %Hvalid_seq'' & HstateRes'' & Hlin_res'' & Hpost_res'' & %Hopen_later'')]]]]" "Hclose''".
-    iDestruct (own_lin_prefix with "[$HOwnLin'' $HOwnLinHist']") 
+    iDestruct (own_lin_prefix with "[$HOwnLin'' $HOwnLinHist']")
       as "(HOwnLin'' & HOwnLinHist & %Hprefix')".
     assert ((#tag1, (c, (#"CmLin", #b)))%V ∈ lt'') as HstLinIn.
     {
@@ -1533,7 +1533,7 @@ Section trace_proof.
       solve_ndisj.
     }
     {
-      eapply valid_trace_post; 
+      eapply valid_trace_post;
       rewrite /is_post_event /is_cm_post_event;
       set_solver.
     }
@@ -1563,8 +1563,8 @@ Section trace_proof.
     by wp_pures.
   Qed.
 
-  Lemma init_client_implication γmstate γmlin γmpost γmname γl clients (res : RU_resources Mdl Σ) 
-  (lib : KVS_transaction_api) : 
+  Lemma init_client_implication γmstate γmlin γmpost γmname γl clients (res : RU_resources Mdl Σ)
+  (lib : KVS_transaction_api) :
     ⌜KVS_InvName = nroot .@ "kvs_inv"⌝ -∗
     trace_inv trace_inv_name valid_trace_ru -∗
     inv KVS_InvName (∃ T exec, GlobalInvExt commit_test_ru T extract γmstate γmlin γmpost γmname γl clients exec) -∗
@@ -1577,7 +1577,7 @@ Section trace_proof.
     rewrite /TC_init_client_proxy /KVS_wrapped_api /wrap_init_client_proxy.
     wp_pures.
     wp_bind (ast.Fresh _).
-    iInv "HinvExt" as ">[%T [%exec [%t [%lt (Htr_is & HOwnLin & %HlinOf & %Hno_empty & %Hex 
+    iInv "HinvExt" as ">[%T [%exec [%t [%lt (Htr_is & HOwnLin & %HlinOf & %Hno_empty & %Hex
       & %Hvalid_trans & %Hvalid_seq & %Hbased & %Hvalid_exec & Hstate_res & Hlin_res & Hpost_res & %Hopen_later)]]]]" "Hclose".
     wp_apply (aneris_wp_fresh with "[$Htr_inv $Htr_is]").
     {
@@ -1592,26 +1592,26 @@ Section trace_proof.
     iIntros (tag1) "(Htr_is & %Htag1_nin)".
     rewrite /init_pre_emit_event.
     iDestruct (alloc_trace_hist with "[$Htr_is]") as "(Htr_is & #Htr_hist)".
-    iMod (lin_tag_create lt t γmlin (#tag1, init_pre_emit_event)%V with "[$Hlin_res]") 
+    iMod (lin_tag_create lt t γmlin (#tag1, init_pre_emit_event)%V with "[$Hlin_res]")
       as "(Hlin_res & Hlin_tag_res)".
     {
       iPureIntro.
       simpl.
       do 2 (split; first done).
       intros Hfalse.
-      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]]; 
-        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse; 
+      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]];
+        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse;
         set_solver.
     }
-    iMod (post_tag_create t γmpost (#tag1, init_pre_emit_event)%V with "[$Hpost_res]") 
+    iMod (post_tag_create t γmpost (#tag1, init_pre_emit_event)%V with "[$Hpost_res]")
       as "(Hpost_res & Hpost_tag_res)".
     {
       iPureIntro.
       simpl.
       do 2 (split; first done).
       intros Hfalse.
-      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]]; 
-        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse; 
+      destruct Hfalse as [Hfalse | [[Hfalse | Hfalse] | [Hfalse | [Hfalse | Hfalse]]]];
+        rewrite /is_st_post_event /is_wr_post_event /is_cm_post_event /is_in_post_event in Hfalse;
         set_solver.
     }
     iMod ("Hclose" with "[Htr_is HOwnLin Hlin_res Hpost_res Hstate_res]").
@@ -1633,7 +1633,7 @@ Section trace_proof.
     wp_bind (ast.Emit _).
     rewrite /init_post_emit_event.
     wp_pures.
-    iInv "HinvExt" as ">[%T' [%exec' [%t' [%lt' (Htr_is' & HOwnLin' & %HlinOf' & %Hno_empty' & %Hex' 
+    iInv "HinvExt" as ">[%T' [%exec' [%t' [%lt' (Htr_is' & HOwnLin' & %HlinOf' & %Hno_empty' & %Hex'
       & %Hvalid_trans' & %Hvalid_seq' & %Hbased' & %Hvalid_exec' & Hstate_res' & Hlin_res' & Hpost_res' & %Hopen_later')]]]]" "Hclose'".
     iMod (own_lin_add _ _ (#tag1, (c, #"InLin"))%V with "[$HOwnLin']") as "HOwnLin'".
     iPoseProof (trace_hist_trace_is_prefix with "[$Htr_is'][$Htr_hist]") as "%Hprefix".
@@ -1644,7 +1644,7 @@ Section trace_proof.
     }
     iPoseProof (lin_tag_not_in lt' t' γmlin with "[$Hlin_res' $Hlin_tag_res]") as "%Hnot_lin_in".
     iPoseProof (post_tag_not_in t' γmpost with "[$Hpost_res' $Hpost_tag_res]") as "%Hnot_post_in".
-    iDestruct (lin_tag_add lt' t' γmlin (#tag1, (c, #"InLin"))%V tag1 with "[$Hlin_res' $Hlin_tag_res]") 
+    iDestruct (lin_tag_add lt' t' γmlin (#tag1, (c, #"InLin"))%V tag1 with "[$Hlin_res' $Hlin_tag_res]")
       as "Hlin_res'".
     {
       iPureIntro.
@@ -1664,14 +1664,14 @@ Section trace_proof.
     iAssert ((⌜mname !! sa = None⌝ ∧ ⌜no_emit_with_address sa lt' extract⌝)%I) as "(%Hlookup_none & %Hno_emit)".
     {
       iDestruct ("Hext_rest1_sa") as "[(_ & %Hnot_lookup & %Hno_emit)|[%s [%c' [%γ [%m (%Hfalse & asd)]]]]]".
-      - iPureIntro. 
+      - iPureIntro.
         destruct (mname !! sa) as [γ|] eqn:Hfalse; last done.
         exfalso.
         apply Hnot_lookup.
         by exists γ.
       - set_solver.
     }
-    iDestruct (res.(read_uncommitted.specs.resources.Extraction_of_address) 
+    iDestruct (res.(read_uncommitted.specs.resources.Extraction_of_address)
           with "[$His_conn]") as "%Hextract".
     assert (lin_trace_of (lt' ++ [(#tag1, (c, #"InLin"))%V])
       (t' ++ [(#tag1, (c, #"InPost"))%V])) as Hlin_trace'.
@@ -1679,11 +1679,11 @@ Section trace_proof.
       apply (lin_trace_valid tag1); try done.
       - right.
         split.
-        + do 4 right. 
+        + do 4 right.
           rewrite /is_in_post_event; eauto.
         + exists (#tag1, (c, #"InLin"))%V.
           set_solver.
-      - apply (lin_trace_lin lt' (#tag1, #"InPre")%V 
+      - apply (lin_trace_lin lt' (#tag1, #"InPre")%V
           (#tag1, (c, #"InLin"))%V tag1 c t'); try done;
           rewrite /is_lin_event /is_in_lin_event /is_pre_event /is_in_pre_event;
           set_solver.
@@ -1709,7 +1709,7 @@ Section trace_proof.
         set_solver.
     }
     iIntros "Htr_is".
-    iDestruct (lin_tag_add_post (lt' ++ [(#tag1, (c, #"InLin"))%V]) t' γmlin (#tag1, (c, #"InPost"))%V 
+    iDestruct (lin_tag_add_post (lt' ++ [(#tag1, (c, #"InLin"))%V]) t' γmlin (#tag1, (c, #"InPost"))%V
       with "[$Hlin_res']") as "Hlin_res'".
     iDestruct (post_tag_add t' γmpost (#tag1, (c, #"InPost"))%V tag1 with "[$Hpost_res' $Hpost_tag_res]")
       as "Hpost_res'".
@@ -1723,15 +1723,15 @@ Section trace_proof.
     }
     iMod (ghost_map_alloc ((gset_to_gmap None KVS_keys : gmap Key (option val))))
       as "[%γ (Hghost_map_m & Hghost_elems_m)]".
-    iMod (ghost_map_update (CanStart, Some c) with "[$Hghost_map_mstate] [$Hsa_pointer]") 
+    iMod (ghost_map_update (CanStart, Some c) with "[$Hghost_map_mstate] [$Hsa_pointer]")
       as "(Hghost_map_mstate & Hsa_pointer)".
-    iMod (ghost_map_insert_persist sa (γ, c) Hlookup_none with "[$Hghost_map_mname]") 
+    iMod (ghost_map_insert_persist sa (γ, c) Hlookup_none with "[$Hghost_map_mname]")
       as "(Hghost_map_mname & #Hkey_pers_mname)".
-    iMod ("Hclose'" with "[Htr_is HOwnLin' Hghost_map_mname Hext_rest1 Hext_rest1_sa 
+    iMod ("Hclose'" with "[Htr_is HOwnLin' Hghost_map_mname Hext_rest1 Hext_rest1_sa
       Hghost_map_mstate Hghost_map_m Hghost_elems_m Hlin_res' Hpost_res']").
     {
       iNext.
-      iExists T', exec', (t' ++ [(#tag1, (c, #"InPost"))%V]), 
+      iExists T', exec', (t' ++ [(#tag1, (c, #"InPost"))%V]),
         (lt' ++ [(#tag1, (c, #"InLin"))%V]).
       iFrame.
       do 2 (iSplit; first by iPureIntro).
@@ -1786,8 +1786,8 @@ Section trace_proof.
           destruct Hin as [Hin|Hin]; first done.
           rewrite /is_st_lin_event in Hstart.
           set_solver.
-        * iSplit. 
-          -- iPureIntro. 
+        * iSplit.
+          -- iPureIntro.
              intros (trans & (op & Ht'_in & Hlast & Hconn_last & _)).
              destruct Hex' as (_ & Hex' & _).
              apply last_Some_elem_of in Hlast.
@@ -1795,8 +1795,8 @@ Section trace_proof.
              apply Hno_emit.
              exists (toLinEvent op), c.
              split_and!; try done.
-             destruct op; destruct s; 
-              simpl in Hconn_last; subst; 
+             destruct op; destruct s;
+              simpl in Hconn_last; subst;
               simpl; try done.
               by destruct ov.
           -- rewrite big_sepM_gset_to_gmap.
@@ -1827,24 +1827,24 @@ Section trace_proof.
   (** Main theorem  *)
 
   Theorem library_implication  (clients : gset socket_address) (lib : KVS_transaction_api) :
-    ((RU_spec clients lib) ∗ trace_is [] ∗ 
-      trace_inv trace_inv_name valid_trace_ru ∗ ⌜KVS_InvName = nroot .@ "kvs_inv"⌝) ={⊤}=∗ 
+    ((RU_spec clients lib) ∗ trace_is [] ∗
+      trace_inv trace_inv_name valid_trace_ru ∗ ⌜KVS_InvName = nroot .@ "kvs_inv"⌝) ={⊤}=∗
     RU_spec clients (KVS_wrapped_api lib).
   Proof.
-    iIntros "([%res (Hkeys & Hkvs_init & #Hglob_inv & Hcan_conn & 
-      (#Hinit_kvs & #Hinit_cli & #Hread & #Hwrite & #Hstart & #Hcom))] & Htr & #Htr_inv & %Hkvs_inv_name)".    
-    iMod (ghost_map_alloc ((gset_to_gmap (CanStart, None) clients : 
+    iIntros "([%res (Hkeys & Hkvs_init & #Hglob_inv & Hcan_conn &
+      (#Hinit_kvs & #Hinit_cli & #Hread & #Hwrite & #Hstart & #Hcom))] & Htr & #Htr_inv & %Hkvs_inv_name)".
+    iMod (ghost_map_alloc ((gset_to_gmap (CanStart, None) clients :
       gmap socket_address (local_state * option val))))
       as "[%γmstate (Hghost_map_mstate & Hghost_elems_mstate)]".
     iMod (ghost_map_alloc_empty (K:=string) (V:=bool)) as "[%γmlin Hghost_map_mlin]".
     iMod (ghost_map_alloc_empty (K:=string) (V:=bool)) as "[%γmpost Hghost_map_mpost]".
     iMod (ghost_map_alloc_empty (K:=socket_address) (V:=(gname * val))) as "[%γmname Hghost_map_mname]".
     iMod (own_alloc (●ML ([] : list val) ⋅ ◯ML ([] : list val))) as (γl) "[Hltrace _]".
-    { 
+    {
       apply mono_list_both_dfrac_valid.
-      by split; [done|exists []; done]. 
+      by split; [done|exists []; done].
     }
-    iMod (inv_alloc KVS_InvName ⊤ (∃ T exec, GlobalInvExt commit_test_ru T extract γmstate γmlin γmpost γmname γl clients exec) with 
+    iMod (inv_alloc KVS_InvName ⊤ (∃ T exec, GlobalInvExt commit_test_ru T extract γmstate γmlin γmpost γmname γl clients exec) with
       "[Htr Hghost_map_mstate Hghost_map_mlin Hghost_map_mpost Hghost_map_mname Hltrace]") as "#HinvExt".
     {
       iNext.
@@ -1915,13 +1915,13 @@ Section trace_proof.
           * iPureIntro.
             rewrite /no_emit_with_address.
             set_solver.
-      - iSplitL "Hghost_map_mlin". 
+      - iSplitL "Hghost_map_mlin".
         + iExists ∅.
           iFrame.
           iSplitL; first set_solver.
-          iIntros (tag Hexists). 
+          iIntros (tag Hexists).
           set_solver.
-        + iSplit. 
+        + iSplit.
           * iExists ∅.
             iFrame.
             iSplitL; first set_solver.
@@ -1938,7 +1938,7 @@ Section trace_proof.
     {
       simpl.
       iApply (big_sepS_mono with "[$Hkeys]").
-      iIntros (k Hin) "Hkey". 
+      iIntros (k Hin) "Hkey".
       iFrame.
       by iIntros (v) "%Hfalse".
     }
@@ -1962,27 +1962,27 @@ Section trace_proof.
     {
       iClear "Hinit_kvs Hinit_cli Hwrite Hstart Hcom".
       iApply (read_implication with "[//][$Htr_inv][$HinvExt][]").
-      iIntros (c sa E k) "!# #Hsub #Hin #Hconn %Φ !# Hshift".
-      iApply ("Hread" $! c sa E k with "[$][$][$][$Hshift]").
+      iIntros (c sa k) "!# #Hin #Hconn %Φ %E %HE !# Hshift".
+      iApply ("Hread" $! c sa k with "[$][$][%//][$Hshift]").
     }
     iSplitR.
     {
       iClear "Hinit_kvs Hinit_cli Hread Hstart Hcom".
       iApply (write_implication with "[//][$Htr_inv][$HinvExt][]").
-      iIntros (c sa E k v) "!# #Hsub #Hin #Hconn %Φ !# Hshift".
-      iApply ("Hwrite" $! c sa E k v with "[$][$][$][$Hshift]").
+      iIntros (c sa k v) "!# #Hin #Hconn %Φ %E %HE !# Hshift".
+      iApply ("Hwrite" $! c sa k v with "[$][$][%//][$Hshift]").
     }
     iSplitR.
     {
       iClear "Hinit_kvs Hinit_cli Hwrite Hread Hcom".
       iApply (start_implication with "[//][$Htr_inv][$HinvExt][]").
-      iIntros (c sa E) "!# #Hsub #Hconn %Φ !# Hshift".
-      iApply ("Hstart" $! c sa E with "[$][$][$Hshift]").
+      iIntros (c sa) "!# #Hconn %Φ %E %HE !# Hshift".
+      iApply ("Hstart" $! c sa with "[$][%//][$Hshift]").
     }
     iClear "Hinit_kvs Hinit_cli Hwrite Hread Hstart".
     iApply (commit_implication with "[//][$Htr_inv][$HinvExt][]").
-    iIntros (c sa E) "!# #Hsub #Hconn %Φ !# Hshift".
-    iApply ("Hcom" $! c sa E with "[$][$][$Hshift]").
+    iIntros (c sa) "!# #Hconn %Φ %E %HE !# Hshift".
+    iApply ("Hcom" $! c sa with "[$][%//][$Hshift]").
   Qed.
 
 End trace_proof.
