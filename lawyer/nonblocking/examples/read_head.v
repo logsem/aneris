@@ -210,17 +210,21 @@ Section ReadHead.
     iFrame "#∗ %".
   Qed.
 
-  Lemma finish_read_op t br pt i hist h fl od:
-  read_head_resources t br pt (Some i) -∗ read_hist_interp hist (Some i) h br fl od -∗
-  br_lb br
+  Lemma finish_read_op t br pt i hist h fl od rp
+    (FIN: rs_fin rp):
+    read_head_resources t br pt (Some i) -∗
+    read_hist_interp hist (Some i) h br fl od -∗
+    br_lb br -∗
+    ith_rp i rp
  ==∗
   ∃ hist', read_head_resources t br pt None ∗ read_hist_interp hist' None h br fl od.
   Proof using.
-    iIntros "RH ROP #BR".
+    iIntros "RH ROP #BR RP".
     rewrite {1}/read_hist_interp {1}/read_head_resources.
     iDestruct "ROP" as "(ROPA & ROP & RHIST & %RH_WF & #OLDS)".
     iDestruct "RH" as "(TLA & BRA & TAIL & ROPF)".
-    rewrite /rop_interp. iDestruct ("ROP" with "[//]") as "(%r & %rp & READ_ & RP & ROP)". 
+    rewrite /rop_interp. iDestruct ("ROP" with "[//]") as "(%r & %rp_ & READ_ & RP' & ROP)".
+    iDestruct (ith_rp_le with "RP' RP") as %CM.
 
     iMod (rop_update _ _ None with "[$] [$]") as "(ROPA & ROPF)".
     iAssert (read_head_resources t br pt None)%I with "[ROPF TAIL TLA BRA]" as "$".
@@ -261,43 +265,112 @@ Section ReadHead.
          inversion RS_LE; subst. iFrame "#∗".
          iPureIntro. red. tauto. }
          
-    (* iDestruct "FROM_HEAD" as "(-> & [-> | (<- & ->)])". *)
-    (* 2: {  *)
-    
-    (* iEval (rewrite bi.or_assoc) in "SAFE".  *)
+    iDestruct "FROM_HEAD" as "(-> & [-> | (<- & -> & ?)])".
+    { inversion CM. }
+    inversion RS_LE. subst. 
+    inversion CM; subst.
+    - clear -FIN. red in FIN. set_solver.
+    - inversion RSP.
+  Qed.    
 
-    
+  Definition disj_range (h t: nat): iProp Σ :=
+    let range := set_seq h (t - h): gset nat in
+    (* ([∗ set] i ∈ range, ∃ nd, ith_node i nd) ∗ *)
+    (∀ i j ndi ndj, ⌜ i ≠ j /\ i ∈ range /\ j ∈ range ⌝ -∗
+                      □ (ith_node i ndi -∗ ith_node j ndj -∗ ⌜ ndi.1 ≠ ndj.1 ⌝)).
 
-    (* iDestruct  *)
+  Goal forall h t, Persistent (disj_range h t).
+    apply _.
+  Abort. 
 
-    (* iMod (read_hist_alloc with "[$]") as "(AUTH & #READ & %RH_WF' & RP)"; [done| ]. *)
-    (* red in RH_WF. *)
-    (* destruct RH_WF as (n & DOM & ROP & SEQ & BB). *)
-    (* assert (set_fold Init.Nat.max 0 (dom hist) + 1 = S n) as EQ.  *)
-    (* { rewrite DOM dom_max_set_fold. lia. } *)
-    (* rewrite EQ. rewrite EQ in RH_WF'. *)
+  Lemma phys_queue_interp_disj_impl' (pq: HistQueue) i j p
+    (LT : i < j)
+    (ITH : exists nd, pq !! i = Some (p, nd))
+    (JTH : exists nd, pq !! j = Some (p, nd)):
+  ([∗ list] nd ∈ pq, hn_interp nd) -∗ False.
+  Proof using.
+    destruct ITH as [? ITH], JTH as [? JTH].
+    (* pose proof ITH as II%mk_is_Some%lookup_lt_is_Some.  *)
+    pose proof JTH as JJ%mk_is_Some%lookup_lt_is_Some.
+    (* apply Nat.lt_exists_pred in JJ as (k & -> & LE).  *)
+    apply Nat.lt_exists_pred in LT as (k & -> & LE).
+    apply Nat.lt_exists_pred in JJ as (t & EQ & LE').
+    erewrite <- (take_drop_middle _ (S k)); eauto.  
+    erewrite <- (take_drop_middle (take _ _) i).
+    2: { rewrite lookup_take; [| lia]. eauto. }
+    repeat rewrite big_sepL_app. simpl.
+    iIntros "((?&X&?) & Y & ?)".
+    by iDestruct (hn_interp_ptr_excl with "X Y") as %?.
+  Qed.
 
-    (* iFrame "#∗". *)
-    (* iModIntro. iSplitL. *)
-    (* 2: { iSplit; [done| ]. *)
-    (*      iApply old_rps_olds. rewrite delete_insert; [done| ]. *)
-    (*      apply not_elem_of_dom. rewrite DOM. rewrite elem_of_set_seq. lia. } *)
-    (* rewrite /rop_interp. iIntros (? [=<-]). *)
-    (* iFrame "RP". iExists _. iSplit. *)
-    (* { iApply (ith_included with "READ"). lia. } *)
-    (* iLeft. rewrite /safe_read. iLeft. iSplit; try done. *)
-    (* by iLeft. *)
-  Abort.
-    
+  Lemma ith_node_agree i nd1 nd2:
+    ith_node i nd1 -∗ ith_node i nd2 -∗ ⌜ nd2 = nd1 ⌝.
+  Proof using.
+    rewrite bi.wand_curry -!own_op.
+    iIntros "X". iDestruct (own_valid with "[$]") as %V.
+    rewrite -auth_frag_op singleton_op in V.
+    rewrite auth_frag_valid in V. apply singleton_valid in V.
+    by apply to_agree_op_inv_L in V.
+  Qed.
+
+  Lemma phys_queue_interp_disj_impl (pq: HistQueue):
+    phys_queue_interp pq -∗
+    ⌜ forall i j ndi ndj, i ≠ j -> pq !! i = Some ndi -> pq !! j = Some ndj -> ndi.1 ≠ ndj.1 ⌝.
+  Proof using.
+    rewrite /phys_queue_interp. iIntros "(Q & (%pt & TAIL & DUMMY & %LL & HEAD))".
+    iIntros (i j [??] [??] NEQ ITH JTH EQ).
+    simpl in EQ. subst.
+    apply not_eq in NEQ as [?|?].
+    - iApply (phys_queue_interp_disj_impl' pq i j); eauto.
+    - iApply (phys_queue_interp_disj_impl' pq j i); eauto.
+  Qed.
+
+  Lemma phys_queue_interp_disj (hq: HistQueue) h:
+    phys_queue_interp (drop h hq) -∗ hq_auth hq  -∗ disj_range h (length hq).
+  Proof using.
+    iIntros "PQI AUTH". 
+    iDestruct (phys_queue_interp_disj_impl with "PQI") as %DISJ. 
+    rewrite /phys_queue_interp. iDestruct "PQI" as "(Q & (%pt & TAIL & DUMMY & %LL & HEAD))".
+    (* iAssert ([∗ set] i ∈ set_seq h (length hq - h), ∃ nd, ith_node i nd)%I *)
+    (*   with "[AUTH]" as "#FRAGS".  *)
+    (* { iApply big_sepS_forall. iIntros (i IN). *)
+    (*   apply elem_of_set_seq in IN as [HH TT]. *)
+    (*   destruct (decide (h <= length hq)); [| lia]. *)
+    (*   rewrite -Nat.le_add_sub in TT; [| done]. *)
+    (*   pose proof TT as [nd ITH]%lookup_lt_is_Some.  *)
+    (*   iDestruct (hq_auth_get_ith with "AUTH") as "#ITH"; [done| ]. *)
+    (*   iFrame "ITH". } *)
+    (* iSplit; [done| ]. *)
+    iIntros (i j [??] [??] (NEQ & II & JJ)).
+    simpl.
+    apply elem_of_set_seq in II, JJ.
+    destruct (decide (h <= length hq)); [| lia].
+    pose proof II as ?. pose proof JJ as ?. 
+    rewrite -Nat.le_add_sub in II, JJ; try done.
+    destruct II as [HI ITH], JJ as [HJ JTH].
+    apply lookup_lt_is_Some in ITH as [? ITH], JTH as [? JTH].
+    iDestruct (hq_auth_get_ith with "AUTH") as "#ITH"; [apply ITH| ].
+    iDestruct (hq_auth_get_ith with "AUTH") as "#JTH"; [apply JTH| ].
+    iModIntro. iIntros "ITH' JTH'".
+    iDestruct (ith_node_agree with "ITH' ITH") as %->. 
+    iDestruct (ith_node_agree with "JTH' JTH") as %->.
+    iIntros (<-).
+    apply Nat.le_sum in HI as [u ->], HJ as [v ->].
+    assert (u ≠ v) as NEQ' by lia. 
+    eapply DISJ in NEQ'.
+    2, 3: rewrite lookup_drop; eauto.
+    done.
+  Qed.  
 
   Lemma start_read l (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ queue_inv l ∗ read_head_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d 1 }}}
        !#(Head q_sq) @ τ
-    {{{ (ph: loc), RET #ph; th_phase_frag τ π q ∗
+    {{{ (ph: loc), RET #ph; th_phase_frag τ π q ∗ rop_token ∗ 
           ∃ t br pt rop, read_head_resources t br pt rop ∗
            (⌜ pt = ph /\ rop = None ⌝ ∨ 
-            ⌜ pt ≠ ph /\ is_Some rop ⌝ ∗ rop_token ∗ ∃ i h ndh, ith_node h (ph, ndh) ∗ ith_read i h 0 ∗ ⌜ br <= h ⌝) }}}.
+            ∃ i h ndh, ⌜ pt ≠ ph /\ rop = Some i ⌝ ∗ ith_node h (ph, ndh) ∗
+                        ith_read i h 0 ∗ ⌜ br <= h ⌝ ∗ disj_range h t) }}}.
   Proof using. 
     simpl. iIntros (Φ) "([#QAT #INV] & TOK & PH & CPS) POST".
 
@@ -325,14 +398,19 @@ Section ReadHead.
       set_solver.
     - iMod (start_rop with "RHI RH") as "(%i & %hist' & RHI & RH & #ITH)". 
       iFrame.
-      iMod ("CLOS" with "[-RTOK]") as "_".
+      iAssert (disj_range h t) with "[QI HQ]" as "#DISJ".
+      { rewrite /queue_interp. iDestruct "QI" as "(%T_LEN & PQI & BR & FL)".
+        subst. iApply (phys_queue_interp_disj with "[$] [$]"). }
+      iFrame "DISJ". 
+      iMod ("CLOS" with "[-]") as "_".
       { by iFrame. }
       iRight. iFrame "#∗". iModIntro.
+      iExists _. 
       iSplit; [done| ]. 
-      iExists _. iSplit.
+      iSplit.
       2: { red in ORDER0. iPureIntro. lia. }
       iApply (ith_included with "ITH"). lia. 
-  Qed. 
+  Qed.
 
   Lemma read_tail_exact l (τ: locale heap_lang) (π: Phase) (q: Qp) t br pt rop:
     {{{ queue_inv l ∗ read_head_resources t br pt rop ∗
@@ -363,6 +441,14 @@ Section ReadHead.
     done.
   Qed.
 
+  Lemma rop_token_excl: rop_token -∗ rop_token -∗ False.
+  Proof using.
+    rewrite /rop_token.
+    rewrite bi.wand_curry -!own_op.
+    iIntros "X". iDestruct (own_valid with "[$]") as %V.
+    done.
+  Qed.
+
   Lemma bump_BR l (τ: locale heap_lang) (π: Phase) (q: Qp) t br pt h ndh i ph
     (BRH: br <= h):
     {{{ queue_inv l ∗ read_head_resources t br pt (Some i) ∗
@@ -385,7 +471,8 @@ Section ReadHead.
 
     rewrite /read_hist_interp. iDestruct "RHI" as "(ROPA & ROP & RHIST & %RH_WF & #OLDS)".
     rewrite /rop_interp. iDestruct ("ROP" with "[//]") as "(%r & %rp & READ_ & RP & ROP)".
-    iDestruct (ith_read_agree with "READ READ_") as %->. 
+    iDestruct (ith_read_agree with "READ READ_") as %->.
+    iDestruct (ith_read_hist_compat with "[$] [$]") as %(?&?&ITH&_).
 
     iAssert (|==> auths h' t h fl ∗ read_head_resources t h pt (Some i))%I with "[AUTHS RH]" as ">[AUTHS RH]".
     { iDestruct "AUTHS" as "($&$&BR&$)".
@@ -412,11 +499,11 @@ Section ReadHead.
       - iDestruct "FROM_HEAD" as "[-> [-> | (-> & -> & RTOK')]]".
         + iFrame. iIntros (? [=<-]). iFrame "#∗".
           iLeft. rewrite /safe_read. iLeft. iSplit; [done| ]. by iLeft.
-        + admit.
+        + by iDestruct (rop_token_excl with "[$] [$]") as "?". 
       - iDestruct "FROM_DANGLE" as "((-> & -> & %X) & ? & RTOK')".
-        admit. 
+        by iDestruct (rop_token_excl with "[$] [$]") as "?". 
       - iDestruct "FROM_BR" as "([-> ->] & -> & RTOK')".
-        admit. }
+        by iDestruct (rop_token_excl with "[$] [$]") as "?". }
 
     iAssert (read_hist_interp hist (Some i) h' h fl od)%I with "[ROPA ROP RHIST]" as "RHI".
     { iFrame "#∗". done. }
@@ -425,9 +512,127 @@ Section ReadHead.
     iMod ("CLOS" with "[-]") as "_"; [| done].  
     iFrame. iPureIntro.
     red. split; [| apply ORDER0].
-    foobar.  
+    red in RH_WF. destruct RH_WF as (n & DOM & ROP & SEQ & BB).
+    eapply BB in ITH. simpl in ITH. lia.
+  Qed.
+
+  Definition small_fuel := 10.
+
+  Lemma check_head_change l (τ: locale heap_lang) (π: Phase) (q: Qp)
+    t pt h ndh i ph
+    (PTR_NEQ: pt ≠ ph):
+    {{{ queue_inv l ∗ read_head_resources t h pt (Some i) ∗
+        rop_token ∗ ith_node h (ph, ndh) ∗
+        ith_read i h 0 ∗ disj_range h t ∗ 
+        cp_mul π d 1 ∗ th_phase_frag τ π q }}}
+      ! #(Head q_sq) @τ
+    {{{ (ph': loc), RET #ph'; 
+        th_phase_frag τ π q ∗ ∃ rp, read_head_resources t h pt (Some i) ∗
+          ith_rp i rp ∗ (⌜ ph' = ph /\ rp = rs_proc None ⌝ ∨ ⌜ ph' ≠ ph /\ rp = rs_canceled ⌝ ∗ rop_token ) }}}.
+  Proof using. 
+    simpl. iIntros (Φ) "([#QAT #INV] & RH & TOK & #ITH & #READ & #DISJ & CPS & PH) POST".
+
+    iInv "INV" as "(%hq & %h' & %t_ & %br_ & %fl & %rop_ & %od & %hist & inv)" "CLOS".
+    iEval (rewrite /queue_inv_inner) in "inv".
+    iDestruct "inv" as ">(HQ & AUTHS & %ORDER0 & QI & DANGLE & OHV & RHI & RH' & DQ)".
+    iDestruct "RH'" as "[(% & RH' & RTOK') | TOK']".
+    { by iDestruct (read_head_resources_excl with "RH RH'") as "?". }
+    iDestruct (read_head_resources_auth_agree with "[$] [$]") as %[<- <-].
+    iDestruct (read_head_resources_rop_interp_agree with "[$] [$]") as %<-.
+
+    iDestruct (access_queue_ends with "[$] [$]") as "(%ph' & %pt_ & HEAD & TAIL & #HT & CLOS')".
+    iDestruct (read_head_res_Tail_agree with "RH [$]") as %EQ.
+    inversion EQ. subst pt_. clear EQ. 
+    iApply sswp_MU_wp; [done| ].
+    iApply (wp_load with "HEAD"). iIntros "!> HEAD".
+    MU_by_burn_cp. iApply wp_value.
+
+    iDestruct ("CLOS'" with "[$] [$]") as "(HQ & QI)".
+
+    iApply "POST". iFrame "PH RH".
+    iClear "INV QAT CPS".
+
+    rewrite /read_hist_interp. iDestruct "RHI" as "(ROPA & ROP & RHIST & %RH_WF & #OLDS)".
+    rewrite /rop_interp. iDestruct ("ROP" with "[//]") as "(%r & %rp & READ_ & RP & ROP)".
+    iDestruct (ith_read_agree with "READ READ_") as %->. iClear "READ_".
+
+    iDestruct "ROP" as "[SAFE | [-> #CW]]".
+    2: { iDestruct (bi.persistent_sep_dup with "RP") as "[$ #RP]". 
+         iFrame. iRight. iFrame.
+         rewrite /cancel_witness.
+         iDestruct "CW" as "(% & %GT & #LB)".
+         iAssert (⌜ r' <= h' ⌝)%I as %?.
+         { iDestruct (me_auth_lb with "[AUTHS] LB") as %?; [| done]. 
+           by iDestruct "AUTHS" as "(?&_)". }
+         iApply fupd_trans_frame. iSplitL.
+         2: { iModIntro. iApply bi.True_sep'. iSplit; [| done].
+              iIntros (->). 
+              iDestruct "HT" as "[[? ->] | ((%LT & NEQ') & (%nd' & ITH'))]"; [done| ].
+              rewrite /disj_range. 
+              iDestruct ("DISJ" with "[] ITH ITH'") as %DISJ.
+              { iPureIntro. rewrite !elem_of_set_seq. lia. }
+              done. }
+         iIntros "_".
+
+         iAssert (rop_interp (Some i) h' h fl od)%I as "ROP".
+         { rewrite /rop_interp. iIntros (? [=<-]).
+           do 2 iExists _. iFrame "RP". iSplit. 
+           { iApply (ith_included with "READ"). lia. }
+           iRight. iSplit; [done| ].
+           iExists _. by iFrame "LB". }
+         iAssert (read_hist_interp hist (Some i) h' h fl od) with "[ROPA ROP RHIST]" as "RHI".
+         { by iFrame "#∗". }
+
+         iMod ("CLOS" with "[-]") as "_"; [| done].
+         by iFrame. }
+    rewrite /safe_read.
+    iDestruct "SAFE" as "[FROM_HEAD | PROT]".
+    2: { iAssert (rop_token)%I with "[PROT]" as "RTOK'".
+         { iDestruct "PROT" as "[((% & % & %X) & ? & RTOK') | ([% %] & % & RTOK')]"; iFrame. }
+         by iDestruct (rop_token_excl with "[$] [$]") as "?". } 
+    iDestruct "FROM_HEAD" as "[<- [-> | (% & -> & RTOK')]]".
+    2: { by iDestruct (rop_token_excl with "[$] [$]") as "?". }
+        + iFrame. iIntros (? [=<-]). iFrame "#∗".
+          iLeft. rewrite /safe_read. iLeft. iSplit; [done| ]. by iLeft.
+        + by iDestruct (rop_token_excl with "[$] [$]") as "?". 
+      - iDestruct "FROM_DANGLE" as "((-> & -> & %X) & ? & RTOK')".
+        by iDestruct (rop_token_excl with "[$] [$]") as "?". 
+      - iDestruct "FROM_BR" as "([-> ->] & -> & RTOK')".
+        by iDestruct (rop_token_excl with "[$] [$]") as "?". 
+
+
+ 
+
     
     
+
+    
+               
+
+  Lemma get_head_val_spec l (τ: locale heap_lang) (π: Phase) (q: Qp)
+    t pt h ndh i ph:
+    {{{ queue_inv l ∗ read_head_resources t h pt (Some i) ∗
+        rop_token ∗ ith_node h (ph, ndh) ∗
+        ith_read i h 0 ∗ 
+        cp_mul π d small_fuel ∗ th_phase_frag τ π q }}}
+      get_head_val #ph @τ
+    {{{ v, RET v; th_phase_frag τ π q ∗ read_head_resources t h pt (Some i) ∗
+                  read_head_token }}}.
+  Proof using. 
+    simpl. iIntros (Φ) "([#QAT #INV] & RH & TOK & #ITH & #READ & CPS & PH) POST".
+    rewrite /get_head_val. 
+    pure_steps.
+
+    wp_bind (! _)%E.    
+
+  Proof using. 
+    simpl. iIntros (Φ) "([#QAT #INV] & RH & TOK & #ITH & #READ & CPS & PH) POST".
+    rewrite /get_head_val. 
+    pure_steps.
+
+    wp_bind (! _)%E.    
+
+
 
   Lemma read_head_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ queue_inv l ∗ read_head_token ∗ 
@@ -443,7 +648,7 @@ Section ReadHead.
     split_cps "CPS" 1.
     replace Head with (simple_queue.Head q_sq) by (by rewrite Q_SQ).
     iApply (start_read with "[$QAT $INV $CPS' $PH $TOK]").
-    iIntros "!> %ph (PH & (%t & %br & %pt & %rop & RH & %CASES))". 
+    iIntros "!> %ph (PH & RTOK & (%t & %br & %pt & %rop & RH & CASES))".
 
     wp_bind (Rec _ _ _)%E. pure_steps.
     wp_bind (! _)%E.
@@ -459,7 +664,7 @@ Section ReadHead.
     { set_solver. }
     MU_by_burn_cp. iApply wp_value.
 
-    destruct CASES as [[-> ->] | [NEQ [i ->]]].
+    iDestruct "CASES" as "[[-> ->] | (%i & %h & %ndh & [%NEQ ->] & #ITH & #READ & %BR_H)]". 
     { rewrite bool_decide_true; [| done].
       iApply sswp_MU_wp_fupd; [done| ].
 
@@ -470,81 +675,28 @@ Section ReadHead.
       iApply sswp_pure_step.
       { set_solver. }
       MU_by_burn_cp.
-      iDestruct "RH'" as "[(% & RH') | TOK']".
+      iDestruct "RH'" as "[(% & RH' & RTOK') | TOK']".
       { by iDestruct (read_head_resources_excl with "RH RH'") as "?". }
       iDestruct (read_head_resources_auth_agree with "[$] [$]") as %[<- <-].
       iMod ("CLOS" with "[-PH CPS POST TOK']") as "_".
-      { by iFrame. }
+      { iFrame. iNext. iSplit; [done| ]. iLeft. iFrame. }
       iModIntro.
       pure_steps. iApply "POST". iFrame. }
 
     rewrite bool_decide_false; [| set_solver].
     pure_steps. 
-      
 
-
-    
-    
-    iInv "INV" as "(%hq & %h1 & %t_ & %br_ & %fl1 & %rop_ & %od & %hist & inv)" "CLOS".
-    iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as ">(HQ & AUTHS & %ORDER1 & QI & DANGLE & OHV & RHI & RH' & DQ)".
-    (* iDestruct (h_lb_bound with "[$] [$]") as %H01.  *)
-    iApply sswp_MU_wp; [done| ].
-    iDestruct (access_queue_ends with "[$] [$]") as "(%ph' & %pt_ & HEAD & TAIL & _ & CLOS')".
-    iDestruct (read_head_res_Tail_agree with "RH [$]") as %EQ.
-    inversion EQ. subst pt_. clear EQ.
-    replace Tail with (simple_queue.Tail q_sq) by (by rewrite Q_SQ).
-    iApply (wp_load with "TAIL"). iIntros "!> TAIL".
-    iDestruct "RH'" as "[(% & RH') | TOK]".
-    { by iDestruct (read_head_resources_excl with "RH RH'") as "?". }
-    iDestruct ("CLOS'" with "[$] [$]") as "(HQ & QI)".
-    MU_by_burn_cp. iApply wp_value.
-    iMod ("CLOS" with "[-POST CPS PH RH]") as "_".
-    { by iFrame. }
-    iModIntro. clear hist hq rop_ ph' od br_ ORDER1 h1 t_ fl1.
+    wp_bind (_ <- _)%E.
+    split_cps "CPS" 1.
+    replace BeingRead with (simple_queue.BeingRead q_sq) by (by rewrite Q_SQ). 
+    iApply (bump_BR with "[-CPS POST]").
+    { apply BR_H. }
+    { iFrame "#∗". }
+    iIntros "!> (PH & RH & RTOK)".
 
     wp_bind (Rec _ _ _)%E. pure_steps.
-
-    wp_bind (_ = _)%E.
-    iApply sswp_MU_wp; [done| ].
-    iApply sswp_pure_step.
-    { set_solver. }
-    MU_by_burn_cp. iApply wp_value.
-
-    iDestruct "HT" as "[[%EMPTY ->] | ([%NEMPTY %NEQ] & (%ndh0 & #HTH0))]".
-    { rewrite bool_decide_true; [| done].
-
-      iApply sswp_MU_wp_fupd; [done| ].
-      iClear "H_LB ITH". clear dependent h0.
-
-      iInv "INV" as "(%hq & %h1 & %t_ & %br_ & %fl1 & %rop_ & %od & %hist & inv)" "CLOS".
-      iEval (rewrite /queue_inv_inner) in "inv".
-      iDestruct "inv" as ">(HQ & AUTHS & %ORDER1 & QI & DANGLE & OHV & RHI & RH' & DQ)".
-      iModIntro. 
  
-      iApply sswp_pure_step.
-      { set_solver. }
-      MU_by_burn_cp.
-      iDestruct "RH'" as "[(% & RH') | TOK]".
-      { by iDestruct (read_head_resources_excl with "RH RH'") as "?". }
-      iDestruct (read_head_resources_rop_interp_agree with "[$] [$]") as %<-. 
-      iDestruct (read_head_resources_auth_agree with "[$] [$]") as %[<- <-].
-
-      
-      iMod ("CLOS" with "[-POST CPS PH TOK]") as "_".
-      { 
-        
-        iFrame. iNext. iSplit; [done| ].
-        by iLeft. 
-      }
-
-
-      
-      
-      pure_steps. iApply "POST". iFrame. }
-
-    rewrite PTR_EQ. 
-
+    
   
 
 End ReadHead. 
