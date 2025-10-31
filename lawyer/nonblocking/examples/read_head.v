@@ -518,6 +518,16 @@ Section ReadHead.
 
   Definition small_fuel := 10.
 
+  Lemma ith_rp_get_rs_p0 i rs
+    (LE: rs_le (rs_proc None) rs):
+    ith_rp i rs -∗ ith_rp i (rs_proc None).
+  Proof using.
+    rewrite /ith_rp. iApply own_mono.
+    apply auth_frag_mono. apply singleton_included_mono.
+    apply pair_included. split; [done| ].
+    by apply rs_le_incl.
+  Qed. 
+
   Lemma check_head_change l (τ: locale heap_lang) (π: Phase) (q: Qp)
     t pt h ndh i ph
     (PTR_NEQ: pt ≠ ph):
@@ -556,6 +566,11 @@ Section ReadHead.
     rewrite /rop_interp. iDestruct ("ROP" with "[//]") as "(%r & %rp & READ_ & RP & ROP)".
     iDestruct (ith_read_agree with "READ READ_") as %->. iClear "READ_".
 
+    (* iDestruct "HT" as "[[%GE ->] | ((%LT & NEQ') & (%nd' & ITH'))]". *)
+    (* { red in ORDER0. assert (h' = t) as -> by lia. *)
+      
+    (*   iDestruct (hq_auth_lookup with lia.  *)
+
     iDestruct "ROP" as "[SAFE | [-> #CW]]".
     2: { iDestruct (bi.persistent_sep_dup with "RP") as "[$ #RP]". 
          iFrame. iRight. iFrame.
@@ -585,6 +600,7 @@ Section ReadHead.
 
          iMod ("CLOS" with "[-]") as "_"; [| done].
          by iFrame. }
+
     rewrite /safe_read.
     iDestruct "SAFE" as "[FROM_HEAD | PROT]".
     2: { iAssert (rop_token)%I with "[PROT]" as "RTOK'".
@@ -592,21 +608,64 @@ Section ReadHead.
          by iDestruct (rop_token_excl with "[$] [$]") as "?". } 
     iDestruct "FROM_HEAD" as "[<- [-> | (% & -> & RTOK')]]".
     2: { by iDestruct (rop_token_excl with "[$] [$]") as "?". }
-        + iFrame. iIntros (? [=<-]). iFrame "#∗".
-          iLeft. rewrite /safe_read. iLeft. iSplit; [done| ]. by iLeft.
-        + by iDestruct (rop_token_excl with "[$] [$]") as "?". 
-      - iDestruct "FROM_DANGLE" as "((-> & -> & %X) & ? & RTOK')".
-        by iDestruct (rop_token_excl with "[$] [$]") as "?". 
-      - iDestruct "FROM_BR" as "([-> ->] & -> & RTOK')".
-        by iDestruct (rop_token_excl with "[$] [$]") as "?". 
-
-
- 
-
     
-    
+    destruct RH_WF as (n & DOM & ROP & SEQ & BB).
+    iDestruct (ith_read_hist_compat with "[$] [$]") as %(?&rpa&NTH&_). 
+    iDestruct (ith_rp_hist_compat with "[$] [$]") as %(xx&NTH_&RS_LE).
+    rewrite NTH in NTH_. inversion NTH_. subst xx. clear NTH_.
+    inversion RS_LE. subst.
 
+    iDestruct (read_hist_update' with "RHIST RP") as "X".
+    { apply rs_init_going. }
+    { apply NTH. }
+    erewrite Nat.max_id. rewrite decide_False; [| done].
+    iMod "X" as "(RHIST & #READ' & RP)". 
     
+    iDestruct "HT" as "[[%GE ->] | ((%LT & NEQ') & (%nd' & ITH'))]".
+    { red in ORDER0. assert (h = t) as -> by lia.
+      iDestruct (hq_auth_lookup with "[$] [$]") as %TTH.
+      rewrite /queue_interp. iDestruct "QI" as "(-> & _)".
+      apply mk_is_Some, lookup_lt_is_Some in TTH. lia. }
+    iDestruct (ith_node_agree with "ITH' ITH") as %EQ.
+    inversion EQ. subst ph' nd'. clear EQ.
+    iDestruct (ith_rp_get_rs_p0 with "RP") as "#RP0".
+    { constructor. }
+    (* TODO: make/find a lemma *)
+    iApply fupd_trans_frame. iSplitL.
+    2: { iModIntro. iApply bi.True_sep'. iFrame "RP0". set_solver. }
+    iIntros "_".
+
+    iAssert (rop_interp (Some i) h h fl od)%I with "[TOK RP]" as "ROP".
+    { rewrite /rop_interp. iIntros (? [=<-]).
+      do 2 iExists _. iFrame "RP". iSplit. 
+      { iApply (ith_included with "READ"). lia. }
+      iLeft. rewrite /safe_read. iLeft. iSplit; [done| ].
+      iRight. iFrame. done. }
+    set (hist' := <[i:=(h, x, rs_proc (Some rsp_going))]> hist). 
+    iAssert (read_hist_interp hist' (Some i) h h fl od) with "[ROPA ROP RHIST]" as "RHI".
+    { iFrame "#∗". iSplit.
+      2: { iApply old_rps_olds.
+           rewrite old_rps_olds.
+           replace (delete i hist') with (delete i hist); [done| ].
+           subst hist'. by rewrite delete_insert_delete. }
+      iPureIntro. red. 
+      exists n. split; [| split; [| split]]. 
+      - rewrite dom_insert_L. rewrite DOM.
+        apply mk_is_Some, elem_of_dom in NTH. set_solver. 
+      - tauto.
+      - intros ?????. rewrite !lookup_insert_Some.
+        intros [(? & ?) | (? & ITH) ] [(? & ?) | (? & JTH) ]; subst; simpl in *; try lia.
+        + eapply SEQ in H; eauto. done. 
+        + eapply BB; eauto. 
+        + eapply SEQ in H; eauto; try done.
+      - intros ??. rewrite lookup_insert_Some.         
+        intros [(? & ?) | (? & ITH) ]; subst; simpl; try lia.
+        + eapply BB in NTH; eauto.
+        + eapply BB in NTH; eauto. }
+
+    iMod ("CLOS" with "[-]") as "_"; [| done].
+    by iFrame.
+  Qed.
                
 
   Lemma get_head_val_spec l (τ: locale heap_lang) (π: Phase) (q: Qp)
