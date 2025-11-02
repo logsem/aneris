@@ -893,29 +893,45 @@ Section ReadHead.
     iDestruct "CASES" as "[(-> & ->) | ((%NEQ' & ->) & RTOK)]".
     2: { rewrite bool_decide_false; [| set_solver].
          pure_steps.
-         split_cps "CPS" 1. 
+         split_cps "CPS" 1.
+         iApply wp_fupd.
          iApply (read_ohv_spec with "[$QAT $INV $CPS' $PH]").
          iIntros "!> % PH".
-         (* iApply "POST". iFrame. *)
-         (* iPureIntro. red. tauto. *)
-         (* TODO: finish rop upon ohv read or even earlier *)
-         admit. }
+         iApply "POST". iFrame.
+
+         iInv "INV" as "(%hq & %h' & %t_ & %br_ & %fl & %rop_ & %od & %hist & inv)" "CLOS".
+         iEval (rewrite /queue_inv_inner) in "inv".
+         iDestruct "inv" as ">(HQ & AUTHS & %ORDER0 & QI & DANGLE & OHV & RHI & RH' & DQ)".
+         iDestruct "RH'" as "[(% & RH' & RTOK') | TOK']".
+         { by iDestruct (read_head_resources_excl with "RH RH'") as "?". }
+         iDestruct (read_head_resources_auth_agree with "[$] [$]") as %[<- <-].
+         iDestruct (read_head_resources_rop_interp_agree with "[$] [$]") as %<-.
+         
+         rewrite /read_hist_interp. iDestruct "RHI" as "(ROPA & ROP & RHIST & %RH_WF & #OLDS)".
+         rewrite /rop_interp. iDestruct ("ROP" with "[//]") as "(%r & %rp & READ_ & RP_ & ROP)".
+         iDestruct (ith_read_agree with "READ READ_") as %->. iClear "READ_".
+         iDestruct (ith_rp_le with "RP RP_") as %CM. inversion CM. subst rp.
+
+         iAssert (br_lb h)%I as "#BR_H".
+         { iDestruct (take_snapshot with "[$]") as "(_&_&$&_)". }
+
+         iDestruct (finish_read_op with "RH [ROPA RHIST RP ROP] [$] [$]") as "X".
+         { by left. }
+         { iFrame. iFrame "OLDS". iSplit; [| done].
+           iFrame. iIntros (? [=<-]). iFrame "RP READ ROP". }
+         iMod "X" as "(%hist' & RH & RHI & RTOK_)". iClear "RTOK_". 
+
+         iFrame "TOK'". 
+         iMod ("CLOS" with "[-]") as "_"; [| done]. 
+         iFrame. iNext. iSplit; [done| ]. iLeft. iFrame. }
     
     rewrite bool_decide_true; [| set_solver].
     pure_steps.
     split_cps "CPS" small_fuel; [cbv; lia| ]. 
     iApply (get_op_node_val with "[-POST CPS]").
     { iFrame. iFrame "#∗". }
-    done. 
-
-  Proof using. 
-    simpl. iIntros (Φ) "([#QAT #INV] & RH & TOK & #ITH & #READ & CPS & PH) POST".
-    rewrite /get_head_val. 
-    pure_steps.
-
-    wp_bind (! _)%E.    
-
-
+    done.
+  Qed.
 
   Lemma read_head_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ queue_inv l ∗ read_head_token ∗ 
