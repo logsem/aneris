@@ -868,7 +868,7 @@ Section ReadHead.
     {{{ queue_inv l ∗ read_head_resources t h pt (Some i) ∗
         rop_token ∗ ith_node h (ph, ndh) ∗
         ith_read i h 0 ∗ disj_range h t ∗ 
-        cp_mul π d small_fuel ∗ th_phase_frag τ π q }}}
+        cp_mul π d (2 * small_fuel) ∗ th_phase_frag τ π q }}}
       get_head_val #ph @τ
     {{{ v, RET v; th_phase_frag τ π q ∗ read_head_token }}}.
   Proof using. 
@@ -896,12 +896,17 @@ Section ReadHead.
          split_cps "CPS" 1. 
          iApply (read_ohv_spec with "[$QAT $INV $CPS' $PH]").
          iIntros "!> % PH".
-         iApply "POST". iFrame.
-         iPureIntro. red. tauto. }
+         (* iApply "POST". iFrame. *)
+         (* iPureIntro. red. tauto. *)
+         (* TODO: finish rop upon ohv read or even earlier *)
+         admit. }
     
     rewrite bool_decide_true; [| set_solver].
     pure_steps.
-    split_cps "CPS" 1.     
+    split_cps "CPS" small_fuel; [cbv; lia| ]. 
+    iApply (get_op_node_val with "[-POST CPS]").
+    { iFrame. iFrame "#∗". }
+    done. 
 
   Proof using. 
     simpl. iIntros (Φ) "([#QAT #INV] & RH & TOK & #ITH & #READ & CPS & PH) POST".
