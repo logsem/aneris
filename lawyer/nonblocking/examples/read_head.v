@@ -764,6 +764,12 @@ Section ReadHead.
 
     iDestruct "ROP" as "[SAFE | [-> #CW]]".
     2: { iDestruct (ith_rp_le with "RP RP0") as %CM. inversion CM. }
+
+    iAssert (br_lb h)%I as "#BR_H".
+    { iDestruct (take_snapshot with "[$]") as "(_&_&$&_)". }
+    iApply sswp_MU_wp; [done| ].
+
+
     rewrite /safe_read. 
     iDestruct "SAFE" as "[FROM_HEAD | PROT]".
     - iDestruct "FROM_HEAD" as "[<- [-> | (% & -> & RTOK')]]".
@@ -782,7 +788,6 @@ Section ReadHead.
       { rewrite lookup_drop. erewrite Nat.add_0_r. eauto. }
       simpl. destruct ndh. iDestruct "H" as "[H NXT]".
 
-      iApply sswp_MU_wp; [done| ].
       iApply (wp_load with "H"). iIntros "!> H".  
       MU_by_burn_cp. iApply wp_value.
 
@@ -793,9 +798,6 @@ Section ReadHead.
         by iFrame. }
       iAssert (queue_interp hq h t h fl) with "[PQI BR FL]" as "QI".
       { iFrame. iSplit; [done| ]. by rewrite HTH. }
-
-      iAssert (br_lb h)%I as "#BR_H".
-      { iDestruct (take_snapshot with "[$]") as "(_&_&$&_)". }
 
       iDestruct (finish_read_op with "RH [ROPA RHIST RP RTOK'] [$] [$]") as "X".
       { by right. }
@@ -810,14 +812,55 @@ Section ReadHead.
       iApply ("POST"). iFrame.
       iMod ("CLOS" with "[-]") as "_"; [| done]. 
       iFrame. iNext. iSplit; [done| ]. iLeft. iFrame.
-    - 
-      
+    -
+      (* TODO: rewrite the invariant into this form *)
+      iAssert (⌜ rp = rs_proc (Some rsp_protected)⌝ ∗ rop_token ∗ ⌜ h = h' - 1 /\ is_Some od \/ h = fl ⌝)%I with "[PROT]" as "(-> & RTOK & %CASES)".
+         { iDestruct "PROT" as "[((-> & ? & %) & -> & TOK) | ((? & ->) & -> & TOK)]"; iFrame.
+           all: iPureIntro; tauto. }
 
-  Abort. 
-    
+         iDestruct (hq_auth_lookup with "[$] ITH") as %HTH.
+         iAssert (sswp NotStuck (⊤ ∖ ↑queue_ns) ! #ph (fun e => ⌜ exists v, e = Val v ⌝ ∗ dangle_interp od h' hq ∗ queue_interp hq h' t h fl))%I
+           with "[DANGLE QI]" as "STEP".
+         { destruct CASES as [(-> & OD) | ->].
+           - inversion OD. subst.
+             rewrite /dangle_interp.
+             iDestruct "DANGLE" as "(DAUTH & x)".
+             iDestruct "x" as "[% | (% & HN_D)]"; [done| ].
+             inversion H. subst x.
+             rewrite HTH.
+             simpl. destruct ndh. iDestruct "HN_D" as "[H NXT]".             
+             iApply (wp_load with "H"). iIntros "!> H".
+             iFrame. iSplit; [by eauto| ]. 
+             iRight. by iFrame.
+           - rewrite /queue_interp. iDestruct "QI" as "(%T_LEN & PQI & BR & FL)".
+             iDestruct "FL" as "(% & %FLTH_ & FL & HNI_FL)". 
+             rewrite HTH in FLTH_. inversion FLTH_. subst. 
+             simpl. destruct ndh. iDestruct "HNI_FL" as "[H NXT]".
+             iApply (wp_load with "H"). iIntros "!> H".
+             iFrame. iSplit; [by eauto| ].
+             iSplit; [done| ]. iExists _.
+             rewrite HTH. iSplit; [done| ]. iFrame. }
 
-    
-    
+         iApply (sswp_wand with "[-STEP] [$]").
+         iIntros (?) "(%E & DANGLE & QI)". destruct E as [? ->].
+         MU_by_burn_cp. iApply wp_value.
+
+         iDestruct (finish_read_op with "RH [ROPA RHIST RP RTOK] [$] [$]") as "X".
+         { by right. }
+         { iFrame. iFrame "OLDS". iSplit; [| done].
+           iFrame. iIntros (? [=<-]). iFrame "RP READ".
+           iLeft. rewrite /safe_read. iRight.
+           destruct CASES as [(-> & OD) | ->].
+           - iLeft. iFrame. iPureIntro. done.
+           - iRight. iFrame. iPureIntro. done. }
+         iMod "X" as "(%hist' & RH & RHI & RTOK)".
+         iSpecialize ("RTOK" with "[]").
+         { iPureIntro. constructor. }
+         
+         iApply ("POST"). iFrame.
+         iMod ("CLOS" with "[-]") as "_"; [| done]. 
+         iFrame. iNext. iSplit; [done| ]. iLeft. iFrame.
+  Qed.
 
   Lemma get_head_val_spec l (τ: locale heap_lang) (π: Phase) (q: Qp)
     t pt h ndh i ph
