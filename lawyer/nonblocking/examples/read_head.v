@@ -963,7 +963,7 @@ Section ReadHead.
     { set_solver. }
     MU_by_burn_cp. iApply wp_value.
 
-    iDestruct "CASES" as "[[-> ->] | (%i & %h & %ndh & [%NEQ ->] & #ITH & #READ & %BR_H)]". 
+    iDestruct "CASES" as "[[-> ->] | (%i & %h & %ndh & [%NEQ ->] & #ITH & #READ & %BR_H & #DISJ)]". 
     { rewrite bool_decide_true; [| done].
       iApply sswp_MU_wp_fupd; [done| ].
 
@@ -994,8 +994,13 @@ Section ReadHead.
     iIntros "!> (PH & RH & RTOK)".
 
     wp_bind (Rec _ _ _)%E. pure_steps.
- 
-    
-  
+    split_cps "CPS" (2 * small_fuel); [cbv; lia| ].
+    iApply (get_head_val_spec with "[-CPS POST]").
+    { apply NEQ. }
+    { iFrame. iFrame "#∗". }
+    iIntros "!> % [PH TOK]".
+
+    pure_steps. iApply "POST". iFrame.
+  Qed.  
 
 End ReadHead. 
