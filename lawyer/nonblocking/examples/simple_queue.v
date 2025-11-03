@@ -53,7 +53,11 @@ Class QueueG Σ := {
 Definition get_val: val := λ: "nd", ! ("nd" +ₗ #0).
 Definition get_next: val := λ: "nd", ! ("nd" +ₗ #1).
 
-Definition free_el: val. Admitted.
+Definition free_el: val :=
+  λ: "nd",
+    Free ("nd" +ₗ #0) ;;
+    Free ("nd" +ₗ #1)
+. 
 
 Definition get_to_free '(SQ _ _ BR FL _): val :=
   λ: "ph",

@@ -771,11 +771,46 @@ Section Dequeue.
   Qed.
 
   Lemma free_el_spec τ π q ptr nd:
-    {{{ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel ∗ 
+    {{{ th_phase_frag τ π q ∗ cp_mul π d (2 * get_loc_fuel) ∗ 
         hn_interp (ptr, nd) }}}
       free_el #ptr @ τ
     {{{ v, RET v; th_phase_frag τ π q }}}.
-  Proof using. Admitted. 
+  Proof using.
+    simpl. iIntros (Φ) "(PH & CPS & HN) POST".
+    destruct nd. iDestruct "HN" as "[L0 L1]". 
+    rewrite /free_el.
+    pure_steps.
+
+    (* iApply sswp_MU_wp; [done| ]. *)
+    (* iApply sswp_pure_step; [done| ]. *)
+    (* MU_by_burn_cp. rewrite loc_add_0. iApply wp_value. *)
+    
+    (* wp_bind (Free _)%E. *)
+    (* replace Free with (AllocN #1) by admit.   *)
+    wp_bind (_ +ₗ _)%E.
+    iApply sswp_MU_wp; [done| ].
+    iApply sswp_pure_step; [done| ].
+    MU_by_burn_cp. rewrite loc_add_0. iApply wp_value.
+
+    wp_bind (Free _)%E.
+    iApply sswp_MU_wp; [done| ].
+    iApply (wp_free with "L0"). iIntros "!> FREE0". 
+    MU_by_burn_cp. iApply wp_value.
+ 
+    wp_bind (Rec _ _ _)%E. pure_steps. 
+
+    wp_bind (_ +ₗ _)%E.
+    iApply sswp_MU_wp; [done| ].
+    iApply sswp_pure_step; [done| ].
+    MU_by_burn_cp. iApply wp_value.
+
+    wp_bind (Free _)%E.
+    iApply sswp_MU_wp; [done| ].
+    iApply (wp_free with "[$]"). iIntros "!> FREE1". 
+    MU_by_burn_cp. iApply wp_value.
+
+    by iApply "POST". 
+  Qed. 
   
   Lemma dequeue_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ queue_inv l ∗ dequeue_token ∗ 
@@ -902,7 +937,7 @@ Section Dequeue.
     iIntros "!> %to_free (%hfr & %fl' & HNFR & PH & DR)".
     wp_bind (Rec _ _ _)%E. pure_steps.
     wp_bind (free_el _)%E.
-    split_cps "CPS" get_loc_fuel; [cbv; lia| ].
+    split_cps "CPS" (2 * get_loc_fuel); [cbv; lia| ].
     iApply (free_el_spec with "[CPS' PH HNFR]").
     { iFrame. }
     iIntros "!> %v PH".
@@ -929,6 +964,5 @@ Section Dequeue.
     iModIntro. pure_steps.
     iApply "POST". iFrame.
   Qed.
-
     
 End Dequeue.
