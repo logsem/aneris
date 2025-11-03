@@ -253,7 +253,7 @@ Section WaitFreePR.
              (t1 ++ @fill _ Ki x :: t2 ++ efs, σ')
              (trace_last mtr)
              ℓ δ'⌝ ∗
-          @gen_heap_interp loc loc_eq_decision loc_countable val Σ
+          @gen_heap_interp loc loc_eq_decision loc_countable (option val) Σ
             (@heap_gen_heapGS Σ (@iem_phys heap_lang _ HeapLangEM EM Σ Hinv))
             (heap σ') ∗
           @obls_asem_mti _ _ _ WF_SB OP

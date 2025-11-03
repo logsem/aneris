@@ -109,7 +109,7 @@ Qed.
 
 
 (* TODO: move? try to unify with sswp_MU_wp_fupd  *)
-Lemma sswp_pwp {Σ} {iG: invGS_gen HasNoLc Σ} {hG: heap1GS Σ}
+Lemma sswp_pwp_fupd {Σ} {iG: invGS_gen HasNoLc Σ} {hG: heap1GS Σ}
   s E E' τ e Φ
   (NVAL: language.to_val e = None):
   let iG := irisG_looping HeapLangEM (lG := hG) in 
@@ -138,3 +138,15 @@ Proof using.
   iMod "CLOS'" as "_". iMod "HMU". iModIntro.
   iExists tt, tt. by iFrame.
 Qed. 
+
+Lemma sswp_pwp {Σ} {iG: invGS_gen HasNoLc Σ} {hG: heap1GS Σ}
+  s E τ e Φ
+  (NVAL: language.to_val e = None):
+  let iG := irisG_looping HeapLangEM (lG := hG) in 
+  sswp s E e (λ e', ▷ pwp s E τ e' Φ)%I -∗
+  pwp s E τ e Φ.
+Proof using.
+  simpl. iIntros. iApply sswp_pwp_fupd; [done| ].
+  iModIntro. iApply (sswp_wand with "[] [$]").
+  iIntros. by do 2 iModIntro.
+Qed.

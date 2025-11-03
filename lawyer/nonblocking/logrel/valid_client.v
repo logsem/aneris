@@ -21,7 +21,7 @@ Fixpoint valid_client (e : expr) : Prop :=
   | Val v => valid_val v
   | Var _ | ChooseNat => True
   | Rec _ _  e | UnOp _ e | Fst e | Snd e |
-    InjL e | InjR e | Fork e | Load e
+    InjL e | InjR e | Fork e | Load e | Free e
     => valid_client e
   | App e1 e2 | Pair e1 e2 | 
     AllocN e1 e2 | Store e1 e2 | FAA e1 e2

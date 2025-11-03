@@ -56,7 +56,7 @@ Section logrel.
   Qed.
 
   Program Definition interp_ref_inv (l : loc) : D -n> iPropO Σ :=
-    λne ii, (∃ v, l ↦ (v: val heap_lang) ∗ ii v)%I.
+    λne ii, ((∃ v, l ↦ (v: val heap_lang) ∗ ii v) ∨ loc_freed l)%I.
   Solve Obligations with solve_proper.
 
   Program Definition interp_ref : D -n> D :=

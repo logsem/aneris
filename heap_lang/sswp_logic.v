@@ -118,7 +118,7 @@ Section SSWP.
   
   Lemma wp_free s E l v (Φ : expr → iProp Σ) :
     ▷ l ↦ v -∗
-    ▷ Φ (Val $ LitV $ LitUnit) -∗
+    ▷ (loc_freed l -∗ Φ (Val $ LitV $ LitUnit)) -∗
       sswp s E (Free (Val $ LitV $ LitLoc l)) Φ.
   Proof.
     iIntros ">Hl HΦ". simpl.
@@ -130,6 +130,7 @@ Section SSWP.
     iIntros (e2 σ2 efs Hstep). iIntros "!>!>!>".
     iMod "Hclose".
     iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]".
+    iSpecialize ("HΦ" with "Hl"). 
     iFrame.
     apply head_reducible_prim_step in Hstep; [|by eauto].
     inv_head_step. by iFrame.

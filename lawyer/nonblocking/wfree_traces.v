@@ -31,6 +31,7 @@ Section UnderCtx.
   | CaseCtx ec1 ec2, Case e e1 e2 => check (e1 = ec1 /\ e2 = ec2) e
   | AllocNLCtx vc2, AllocN e (Val v2) => check (v2 = vc2) e
   | AllocNRCtx ec1, AllocN e1 e => check (e1 = ec1) e
+  | FreeCtx, Free e => Some e
   | LoadCtx, Load e => Some e
   | StoreLCtx vc2, Store e (Val v2) => check (v2 = vc2) e
   | StoreRCtx ec1, Store e1 e => check (e1 = ec1) e
@@ -54,13 +55,10 @@ Section UnderCtx.
     all: try by apply not_eq_helper. 
     Local Ltac solve_iff := rewrite /check; destruct decide; try apply not_eq_helper; subst; set_solver.
     all: try by solve_iff.
-    all: try by set_solver. 
-    - destruct e2; by apply not_eq_helper || solve_iff.
-    - destruct e2; by apply not_eq_helper || solve_iff.
-    - destruct e2; by apply not_eq_helper || solve_iff.
+    all: try by set_solver.
+    all: try by (destruct e2; by apply not_eq_helper || solve_iff). 
     - destruct e2, e3; by apply not_eq_helper || solve_iff.
     - destruct e3; by apply not_eq_helper || solve_iff.
-    - destruct e2; by apply not_eq_helper || solve_iff.
   Qed. 
 
   Fixpoint under_ctx (K: ectx heap_lang) (e: expr): option expr :=

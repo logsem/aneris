@@ -169,9 +169,9 @@ Section typed_interp.
     iIntros "#IH #Henv".
     iLöb as "IHrec".
     iModIntro. iIntros (τ' v) "#ARG".
-    iApply sswp_pwp; [done| ]. iModIntro.
+    iApply sswp_pwp; [done| ].
     iApply sswp_pure_step; [done| ].
-    do 3 iModIntro. 
+    do 2 iModIntro. 
     simpl.
 
     destruct x; simpl.
@@ -210,11 +210,11 @@ Section typed_interp.
   Proof.
     iIntros "#IH !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
     rewrite subst_env_rec.
-    iApply sswp_pwp; [done| ]. iModIntro.
+    iApply sswp_pwp; [done| ]. 
     iApply sswp_pure_step; [done| ].
     iApply wp_value.
     rewrite {2}interp_unfold. simpl. 
-    do 3 iModIntro.
+    do 2 iModIntro.
 
     iApply (logrel_App_RecV_env with "[$]").
     - intros ? ->. simpl. set_solver.
@@ -281,7 +281,7 @@ Section typed_interp.
 
     destruct (un_op_eval op v) eqn:EVAL; [| solve_stuck_case].
     iApply sswp_pwp; [done| ].
-    iModIntro. iApply sswp_pure_step; [by apply EVAL| ].
+    iApply sswp_pure_step; [by apply EVAL| ].
     iIntros "!> !>".
     iApply wp_value.
 
@@ -307,7 +307,7 @@ Section typed_interp.
     destruct (bin_op_eval op v1 v2) eqn:EVAL; [| solve_stuck_case]. 
 
     iApply sswp_pwp; [done| ].
-    iModIntro. iApply sswp_pure_step; [by apply EVAL| ].
+    iApply sswp_pure_step; [by apply EVAL| ].
     iIntros "!> !>".
     iApply wp_value.
 
@@ -327,13 +327,13 @@ Section typed_interp.
     iApply wp_wand; [by iApply "IH1"| ].
     iIntros (v1) "#Hv1 /=".
 
-    iApply sswp_pwp; [done| ]. iModIntro.
+    iApply sswp_pwp; [done| ]. 
     iApply sswp_pure_step; [done| ].
     iIntros "!> !>".
     iApply wp_value.
     iClear "IH1 IH2".
     rewrite {3}interp_unfold. simpl.
-    iIntros "!> !>". do 2 iExists _. iSplitR; [done| ].
+    iIntros "!>". do 2 iExists _. iSplitR; [done| ].
     iFrame "#∗". 
   Qed.
 
@@ -351,14 +351,14 @@ Section typed_interp.
       all: right; set_solver. }
     2: solve_stuck_case. 
     
-    iApply sswp_pwp; [done| ]. iModIntro.
+    iApply sswp_pwp; [done| ]. 
     iApply sswp_pure_step; [done| ].
     iApply wp_value.
     iClear "IH".
     rewrite {1}interp_unfold. simpl.
     iNext. iDestruct "Hv" as (??) "(%EQ&?&?)".
     inversion EQ. subst.
-    iIntros "!> !>". iFrame "#∗".
+    iIntros "!>". iFrame "#∗".
   Qed.
 
   Lemma logrel_snd e : logrel e -∗ logrel (Snd e).
@@ -375,14 +375,14 @@ Section typed_interp.
       all: right; set_solver. }
     2: solve_stuck_case. 
     
-    iApply sswp_pwp; [done| ]. iModIntro.
+    iApply sswp_pwp; [done| ]. 
     iApply sswp_pure_step; [done| ].
     iApply wp_value.
     iClear "IH".
     rewrite {1}interp_unfold. simpl.
     iNext. iDestruct "Hv" as (??) "(%EQ&?&?)".
     inversion EQ. subst.
-    iIntros "!> !>". iFrame "#∗".
+    iIntros "!>". iFrame "#∗".
   Qed.
 
   Lemma logrel_injl e : logrel e -∗ logrel (InjL e).
@@ -393,12 +393,12 @@ Section typed_interp.
     iApply wp_wand; first by iApply "IH".
     iIntros (v) "#Hv /=".
     
-    iApply sswp_pwp; [done| ]. iModIntro.
+    iApply sswp_pwp; [done| ]. 
     iApply sswp_pure_step; [done| ].
     iApply wp_value.
     iClear "IH".
     rewrite {2}interp_unfold. simpl.
-    iIntros "!> !> !> !>". iFrame "#∗". by iLeft. 
+    iIntros "!> !> !>". iFrame "#∗". by iLeft. 
   Qed.
 
   Lemma logrel_injr e : logrel e -∗ logrel (InjR e).
@@ -409,12 +409,12 @@ Section typed_interp.
     iApply wp_wand; first by iApply "IH".
     iIntros (v) "#Hv /=".
     
-    iApply sswp_pwp; [done| ]. iModIntro.
+    iApply sswp_pwp; [done| ].
     iApply sswp_pure_step; [done| ].
     iApply wp_value.
     iClear "IH".
     rewrite {2}interp_unfold. simpl.
-    iIntros "!> !> !> !>". iFrame "#∗". by iRight. 
+    iIntros "!> !> !>". iFrame "#∗". by iRight. 
   Qed.
   Lemma logrel_case e0 e1 e2 : logrel e0 -∗ logrel e1 -∗ logrel e2 -∗ logrel (Case e0 e1 e2).
   Proof.
@@ -431,10 +431,10 @@ Section typed_interp.
     2: solve_stuck_case.
 
     destruct CASE as [(?&->) | (?&->)].
-    - iApply sswp_pwp; [done| ]. iModIntro.
+    - iApply sswp_pwp; [done| ].
       iApply sswp_pure_step; [done| ].
       rewrite {4}interp_unfold. simpl.
-      do 3 iModIntro.
+      do 2 iModIntro.
       iDestruct "Hv0" as "[(%&%&U1) | (%&%&?)]"; [| done].
       inversion H. subst. 
 
@@ -442,10 +442,10 @@ Section typed_interp.
       iApply wp_wand; [by iApply "IH1"| ].
       iIntros (v1) "#V1". simpl.
       by iApply wp_app_val_val.
-    - iApply sswp_pwp; [done| ]. iModIntro.
+    - iApply sswp_pwp; [done| ].
       iApply sswp_pure_step; [done| ].
       rewrite {4}interp_unfold. simpl.
-      do 3 iModIntro.
+      do 2 iModIntro.
       iDestruct "Hv0" as "[(%&%&?) | (%&%&U2)]"; [done| ].
       inversion H. subst. 
 
@@ -482,13 +482,13 @@ Section typed_interp.
     2: solve_stuck_case. 
     destruct BOOL as (b&->).
     destruct b.
-    - iApply sswp_pwp; [done| ]. iModIntro.
+    - iApply sswp_pwp; [done| ].
       iApply sswp_pure_step; [done| ].
-      do 3 iModIntro.
+      do 2 iModIntro.
       by iApply "IH1".
-    - iApply sswp_pwp; [done| ]. iModIntro.
+    - iApply sswp_pwp; [done| ].
       iApply sswp_pure_step; [done| ].
-      do 3 iModIntro.
+      do 2 iModIntro.
       by iApply "IH2".
   Qed.
 
@@ -527,7 +527,7 @@ Section typed_interp.
     destruct (decide (0 < x)) as [NZ | ].
     2: solve_stuck_case. 
 
-    iApply sswp_pwp; [done| ]. iModIntro.
+    iApply sswp_pwp_fupd; [done| ]. iModIntro.
     iApply wp_allocN_seq; [done| ].
     iIntros "!> %l L".
     iModIntro.
@@ -539,7 +539,47 @@ Section typed_interp.
     iApply wp_value. rewrite {5}interp_unfold. simpl.
     iExists _. iSplitR; [done| ].
 
-    iApply inv_alloc. by iFrame.
+    iApply inv_alloc. iNext. iLeft. by iFrame.
+  Qed.
+
+  Ltac solve_head_stuck_with_freed :=
+    rewrite ?heap_lang_defs.pointsto_unseal;
+    iIntros "* %VALID %LAST SI";
+    simpl; iDestruct (gen_heap_valid with "SI [$]") as %V;
+    iMod (fupd_mask_subseteq ∅) as "_"; [set_solver| ];
+    iModIntro; iPureIntro;
+    match goal with 
+    | LAST : trace_ends_in _ _, V : heap _ !! _ = Some _ |- _ =>
+        rewrite LAST /= in V end;
+    solve_head_stuck. 
+
+  Ltac solve_stuck_case_with_freed :=
+    iApply ectx_lifting.wp_lift_head_stuck;
+      [done | apply srav_helper; solve_no_fill_item | solve_head_stuck_with_freed]. 
+
+  Lemma logrel_free e : logrel e -∗ logrel (Free e).
+  Proof.
+    iIntros "#IH !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
+    rewrite subst_env_arg1; [| done]. 
+    iApply (wp_bind [FreeCtx]).
+    iApply wp_wand; first by iApply "IH".
+    iIntros (v) "#Hv /=".
+    destruct (is_loc_dec v) as [LOC| ]. 
+    2: solve_stuck_case.
+    destruct LOC as (l&->).
+    rewrite {2}interp_unfold /=. 
+    iDestruct "Hv" as "(% & %EQ & INVl)". inversion_clear EQ.
+    iApply wp_atomic. 
+    iInv "INVl" as "[(%v & >L & #IIv) | >FREE]" "CLOS"; iModIntro. 
+    2: solve_stuck_case_with_freed.
+
+    iApply sswp_pwp; [done| ]. 
+    iApply (wp_free with "L").
+    iIntros "!> FREE !>".
+    simpl. iApply wp_value.
+    iMod ("CLOS" with "[FREE]") as "_".
+    { by iRight. }
+    by rewrite {4}interp_unfold /=. 
   Qed.
 
   Lemma logrel_load e : logrel e -∗ logrel (Load e).
@@ -553,15 +593,18 @@ Section typed_interp.
     2: solve_stuck_case.
     destruct LOC as (l&->).
     rewrite {2}interp_unfold /=. 
-    iDestruct "Hv" as "(% & %EQ & INVl)". inversion_clear EQ. 
-    iApply sswp_pwp; [done| ]. iModIntro.
-    iApply sswp_fupd; [done| ].
-    iInv "INVl" as "(%v & >L & #IIv)" "CLOS".
-    iModIntro. 
+    iDestruct "Hv" as "(% & %EQ & INVl)". inversion_clear EQ.
+    iApply wp_atomic. 
+    iInv "INVl" as "[(%v & >L & #IIv) | >FREE]" "CLOS"; iModIntro. 
+    2: solve_stuck_case_with_freed.
+
+    iApply sswp_pwp; [done| ]. 
     iApply (wp_load with "L").
-    iIntros "!> L".
-    iMod ("CLOS" with "[$L $IIv]").
-    do 3 iModIntro. by iApply wp_value.
+    iIntros "!> L !>".
+    simpl. iApply wp_value.
+    iMod ("CLOS" with "[L IIv]") as "_".
+    { iLeft. by iFrame. } 
+    by iFrame. 
   Qed.
 
   Lemma logrel_store el ev : logrel el -∗ logrel ev -∗ logrel (Store el ev).
@@ -578,15 +621,17 @@ Section typed_interp.
     2: solve_stuck_case.
     destruct LOC as (l&->).
     rewrite {4}interp_unfold /=.
-    iDestruct "Hl" as "(% & %EQ & INVl)". inversion_clear EQ. 
-    iApply sswp_pwp; [done| ]. iModIntro.
-    iApply sswp_fupd; [done| ].
-    iInv "INVl" as "(%v0 & >L & #IIv)" "CLOS".
-    iModIntro.
+    iDestruct "Hl" as "(% & %EQ & INVl)". inversion_clear EQ.
+
+    iApply wp_atomic. 
+    iInv "INVl" as "[(%v_ & >L & #IIv) | >FREE]" "CLOS"; iModIntro. 
+    2: solve_stuck_case_with_freed.
+    
+    iApply sswp_pwp; [done| ].
     iApply (wp_store with "[$]").
-    iIntros "!> L".
-    iMod ("CLOS" with "[$L $Hv]").
-    do 3 iModIntro. iApply wp_value.
+    iIntros "!> L !>". simpl. iApply wp_value.
+    iMod ("CLOS" with "[L Hv]").
+    { iLeft. by iFrame. }
     by rewrite {6}interp_unfold.
   Qed.
 
@@ -621,33 +666,28 @@ Section typed_interp.
     
     rewrite {6}interp_unfold /=.
     iDestruct "Hl" as "(% & %EQ & INVl)". inversion_clear EQ.
-    iApply wp_atomic. 
-    iInv "INVl" as "(%v0 & >L & #IIv)" "CLOS".
-    iModIntro. 
+    iApply wp_atomic.
 
-    destruct (decide (vals_compare_safe v0 s)).
-    2: { iApply (ectx_lifting.wp_lift_head_stuck). 
-         - done.
-         - apply srav_helper; solve_no_fill_item.
-         - iIntros. simpl. rewrite H0 /=.
-           iDestruct (gen_heap_valid with "[$] [$]") as %L.
-           iApply fupd_mask_intro; [set_solver| ]. iIntros "CLOS'".
-           iPureIntro.
-           solve_head_stuck. }
+    iInv "INVl" as "[(%v & >L & #IIv) | >FREE]" "CLOS"; iModIntro. 
+    2: solve_stuck_case_with_freed.
+ 
+    destruct (decide (vals_compare_safe v s)).
+    2: solve_stuck_case_with_freed. 
     
-    iApply sswp_pwp; [done| ]. iModIntro.
-    destruct (decide (s = v0)) as [-> | ?]. 
+    iApply sswp_pwp; [done| ].
+    destruct (decide (s = v)) as [-> | ?]. 
     - iApply (wp_cmpxchg_suc with "[$L //]"); try done.
-      iIntros "!> L !> !>".
-      iApply wp_value. 
-      iMod ("CLOS" with "[$L $Hf]").
+      iIntros "!> L !>". iApply wp_value. simpl. 
+      iMod ("CLOS" with "[L Hf]").
+      { iLeft. by iFrame. } 
       rewrite {8}interp_unfold. simpl.
       iModIntro. do 2 iExists _. iSplit; [done| ].
       iFrame "#∗". by rewrite {8}interp_unfold. 
     - iApply (wp_cmpxchg_fail with "[$L //]"); try done.
-      iIntros "!> L !> !>".
-      iApply wp_value. 
-      iMod ("CLOS" with "[$L $IIv]").
+      iIntros "!> L !>".
+      iApply wp_value. simpl.  
+      iMod ("CLOS" with "[L IIv]").
+      { iLeft. by iFrame. }
       rewrite {8}interp_unfold. simpl.
       iModIntro. do 2 iExists _. iSplit; [done| ].
       iFrame "#∗". by rewrite {8}interp_unfold. 
@@ -676,28 +716,21 @@ Section typed_interp.
     iDestruct "Hl" as "(% & %EQ & INVl)". inversion_clear EQ.  
 
     iApply wp_atomic. 
-    iInv (logN .@ l0) as (w) "[>L IIl]" "CLOS".
-    iModIntro.
-
-    destruct (is_int_dec w) as [INT| ].
-    2: { iApply ectx_lifting.wp_lift_head_stuck. 
-         - done.
-         - apply srav_helper; solve_no_fill_item.
-         - iIntros. simpl. rewrite H0 /=.
-           iDestruct (gen_heap_valid with "[$] [$]") as %L.
-           iApply fupd_mask_intro; [set_solver| ]. iIntros "CLOS'".
-           iPureIntro.
-           solve_head_stuck. }
+    iInv "INVl" as "[(%v & >L & #IIv) | >FREE]" "CLOS"; iModIntro. 
+    2: solve_stuck_case_with_freed.
+ 
+    destruct (is_int_dec v) as [INT| ].
+    2: { solve_stuck_case_with_freed. }
     destruct INT as (?&->).
     
-    iApply sswp_pwp; [done| ]. iModIntro.
+    iApply sswp_pwp; [done| ].
     iApply (wp_faa with "[$]"). 
     iIntros "!> L".
-    do 2 iModIntro.
-    iApply wp_value.
-    iMod ("CLOS" with "[$L]").
-    { by iEval (rewrite interp_unfold). }
-    by iApply "IIl". 
+    do 1 iModIntro.
+    iApply wp_value. simpl. 
+    iMod ("CLOS" with "[L]").
+    { iLeft. iFrame. by rewrite {6}interp_unfold. }
+    by rewrite {6}interp_unfold.
   Qed.
 
   Lemma logrel_ChooseNat: ⊢ logrel ChooseNat.
@@ -705,9 +738,8 @@ Section typed_interp.
     iIntros "!#" (vs τ) "#Henv"; rewrite /interp_expr /=.
     rewrite (subst_env_arg1 (fun _ => ChooseNat) _ (Val $ LitV $ LitUnit)); [| done].
     iApply sswp_pwp; [done| ].
-    iModIntro.
     iApply wp_choose_nat.
-    iIntros "!> % !>!>".
+    iIntros "!> % !>".
     iApply wp_value.
     by rewrite interp_unfold.
   Qed.    
@@ -744,6 +776,7 @@ Section typed_interp.
     - iApply logrel_fork. by iApply H.
     - destruct H1 as (?&?).
       iApply logrel_alloc; [by iApply H | by iApply H0].
+    - iApply logrel_free. by iApply H.
     - iApply logrel_load. by iApply H.
     - destruct H1 as (?&?).
       iApply logrel_store; [by iApply H | by iApply H0].
