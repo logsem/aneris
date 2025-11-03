@@ -62,7 +62,7 @@ Section RTBAdequacy.
   Instance RTBΣ_pre: @IEMGpreS _ _ HeapLangEM EM RTBΣ.
   Proof.
     split; try by (apply _ || solve_inG).
-    - simpl. apply _.
+    - simpl. apply subG_heap1PreG. apply _. 
     - simpl. apply obls_Σ_pre. apply _.
   Qed.
 

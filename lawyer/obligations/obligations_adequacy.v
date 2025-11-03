@@ -511,6 +511,11 @@ Qed.
     rewrite /indexes. rewrite imap_seq_0. by rewrite list_fmap_id.
   Qed.
 
+  (* Lemma foo `{heapGS Σ M}: heap1GS Σ. *)
+  (*   clear -H2. *)
+  (*   apply H2. *)
+  (*   Show Proof. *)
+
   Lemma obls_match_impl_multiple Σ
     {HEAP: @heapGpreS Σ M EM}
     (extr : heap_lang_extrace) (es: list expr) (σ: state)
@@ -521,7 +526,9 @@ Qed.
     (LEN: length es ≥ 1)
     (OM_INIT: obls_is_init_st (es, σ) δ)
     (LIVE0: om_live_tids id locale_enabled (es, σ) δ)
-    (WPe: forall (HEAP: @heapGS Σ M EM), ⊢ (([∗ map] l↦v ∈ heap σ, l ↦ v) ∗
+    (WPe: forall (HEAP: @heapGS Σ M EM), ⊢ (
+                                        (* ([∗ map] l↦v ∈ heap σ, l ↦ v) ∗ *)
+                                        (let _: heap1GS Σ := (iem_phys HeapLangEM EM) in hl_phys_init_resource (trfirst extr)) ∗
                                      (@em_init_resource heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) δ tt))%I -∗
             let Φs := map (fun τ v => @em_thread_post heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) τ v) (seq 0 (length es)) in
               wptp NotStuck es Φs)
@@ -532,7 +539,8 @@ Qed.
     forward eapply om_simulation_adequacy_model_trace_multiple; eauto.
     - apply obls_sim_rel_FB. 
     - red. intros ?. iStartProof. iIntros "[HEAP INIT] !>".
-      set (hGS := {| heap_iemgs := Hinv |}). 
+      set (hGS := {| heap_iemgs := Hinv |}).
+      rewrite Hexfirst in WPe. 
       iPoseProof (WPe hGS with "[$HEAP $INIT]") as "foo".
       iSplitR; [| iSplitL]. 
       + by iApply hl_config_wp.
@@ -553,7 +561,7 @@ Qed.
     (cps_degs: gmultiset Degree) (eb: nat)
     (s1 := init_om_state (trfirst extr) cps_degs eb (OP := OP))
     (Hexfirst : trfirst extr = ([e], σ))
-    (WPe: forall (HEAP: @heapGS Σ M EM), ⊢ (([∗ map] l↦v ∈ heap σ, l ↦ v) ∗
+    (WPe: forall (HEAP: @heapGS Σ M EM), ⊢ ((let _: heap1GS Σ := (iem_phys HeapLangEM EM) in hl_phys_init_resource (trfirst extr)) ∗
                                      (@em_init_resource heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) s1 tt))%I -∗
             (WP e @locale_of [] e {{ v, @em_thread_post heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) 0 v}})%I)
     (VALID: extrace_valid extr)
@@ -578,7 +586,7 @@ Qed.
     (LEN: length es >= 1)
     (OM_INIT: obls_is_init_st (es, σ) δ)
     (LIVE0: om_live_tids id locale_enabled (es, σ) δ)
-    (WPe: forall (HEAP: @heapGS Σ M EM), ⊢ (([∗ map] l↦v ∈ heap σ, l ↦ v) ∗
+    (WPe: forall (HEAP: @heapGS Σ M EM), ⊢ ((let _: heap1GS Σ := (iem_phys HeapLangEM EM) in hl_phys_init_resource (trfirst extr)) ∗
                                      (@em_init_resource heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) δ tt))%I
             ={⊤}=∗
             let Φs := map (fun τ v => @em_thread_post heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) τ v) (seq 0 (length es)) in
@@ -593,7 +601,8 @@ Qed.
     
     apply FAIR_TERM; auto. 
     red. intros ?. iStartProof. iIntros "[HEAP INIT]".
-    set (hGS := {| heap_iemgs := Hinv |}). 
+    set (hGS := {| heap_iemgs := Hinv |}).
+    rewrite Hexfirst in WPe. 
     iPoseProof (WPe hGS with "[$HEAP $INIT]") as "foo".
     rewrite locales_of_list_indexes indexes_seq.
     iSplitR; [| iSplitL].
@@ -608,7 +617,7 @@ Qed.
     (cps_degs: gmultiset Degree) (eb: nat)    
     (s1 := init_om_state (trfirst extr) cps_degs eb (OP := OP))
     (Hexfirst : trfirst extr = ([e], σ))
-    (WPe: forall (HEAP: @heapGS Σ M EM), ⊢ (([∗ map] l↦v ∈ heap σ, l ↦ v) ∗
+    (WPe: forall (HEAP: @heapGS Σ M EM), ⊢ ((let _: heap1GS Σ := (iem_phys HeapLangEM EM) in hl_phys_init_resource (trfirst extr)) ∗
                                      (@em_init_resource heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) s1 tt))%I -∗
             (WP e @locale_of [] e {{ v, @em_thread_post heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) 0 v}})%I)
     :

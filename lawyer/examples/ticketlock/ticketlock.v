@@ -143,7 +143,7 @@ Section Ticketlock.
     iDestruct (own_valid with "X") as %V%mono_nat_both_valid. done.
   Qed.
 
-  Definition tl_LK `{TicketlockG Σ} `{gen_heapGS loc val Σ}
+  Definition tl_LK `{TicketlockG Σ} `{heap1GS Σ}
     (st: FL_st): iProp Σ :=
     let '(lk, r, b) := st in
     ∃ (l__ow l__tk: loc),

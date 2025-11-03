@@ -47,7 +47,7 @@ Section NondetAdequacy.
   Instance NDΣ_pre: @IEMGpreS _ _ HeapLangEM EM NDΣ.
   Proof.
     split; try by (apply _ || solve_inG).
-    - simpl. apply _.
+    - simpl. apply subG_heap1PreG. apply _. 
     - simpl. apply obls_Σ_pre. apply _.
   Qed.
 
@@ -85,7 +85,8 @@ Section NondetAdequacy.
     rewrite START. by iApply closed_pre_helper.
   Qed.
 
-  Definition conf_init_pre (cnt flag: loc) := ([stop_and_read #cnt #flag; incr_loop #cnt #flag], Build_state {[ cnt := #0; flag := #false ]} ∅). 
+  Definition conf_init_pre (cnt flag: loc) := 
+    ([stop_and_read #cnt #flag; incr_loop #cnt #flag], Build_state {[ cnt := Some #0; flag := Some #false ]} ∅).
 
   Definition δ_init_pre: ProgressState := 
       {| ps_cps := 30 *: {[+ (π0, d0) +]};
@@ -168,6 +169,7 @@ Section NondetAdequacy.
     { apply init_live_tids. }
 
     iIntros (?) "[HEAP INIT]". simpl.
+    rewrite START /hl_phys_init_resource /conf_init_pre. 
     rewrite big_sepM_insert.
     2: { rewrite lookup_insert_ne; done. }
     rewrite big_sepM_singleton.
@@ -185,7 +187,8 @@ Section NondetAdequacy.
     pose proof @alloc_nondet_inv_impl.
     specialize (H _ _ _ ND_OP_HL _ EM NDΣ (OHE HEAP) () 0 _ 0 cnt flag 0).
 
-    iApply fupd_mask_mono; [apply empty_subseteq| ]. 
+    iApply fupd_mask_mono; [apply empty_subseteq| ].
+    rewrite heap_lang_defs.pointsto_unseal in H. 
     iMod (H with "[$] [$] [$] [$] []") as "foo".
     { iApply (exc_lb_le with "[$]"). lia. }
     iDestruct "foo" as (ND) "(#INV & OB0 & #SGN' & TOK)".

@@ -25,6 +25,7 @@ Class OM_HL_Env `(OP: OP_HL DegO LvlO LIM_STEPS)
   `(EM: ExecutionModel heap_lang M) (Σ: gFunctors):= {
     ohe_oGS' : @asem_GS _ _ ObligationsASEM Σ;
     ohe_hGS :: @heapGS _ _ EM;
+    ohe_h1GS :: heap1GS Σ := iem_phys HeapLangEM EM;
 
     ohe_obls_AMU : @AMU_lift_MU _ _ _ ohe_oGS' _ EM ohe_hGS (↑ nroot);
     ohe_obls_AMU__f : forall τ, @AMU_lift_MU__f _ _ _ τ ohe_oGS' _ EM _ ⊤;
@@ -33,3 +34,4 @@ Class OM_HL_Env `(OP: OP_HL DegO LvlO LIM_STEPS)
 }.
 Global Existing Instance ohe_oGS.
 Global Existing Instance ohe_hGS.
+Global Existing Instance ohe_h1GS.
