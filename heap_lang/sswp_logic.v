@@ -103,7 +103,7 @@ Section SSWP.
     iSplit; [|done].
     iApply "HΦ".
     iApply big_sepL_sep. iSplitL "Hl".
-    + by iApply heap_array_to_seq_mapsto.
+    + by iApply heap_array_to_seq_pointsto. 
     + iApply (heap_array_to_seq_meta with "Hm"). by rewrite length_replicate.
   Qed.
   
@@ -114,6 +114,25 @@ Section SSWP.
     iIntros "HΦ". iApply wp_allocN_seq; [lia|].
     iIntros "!>" (l) "[[Hl Hm] _]". rewrite loc_add_0.
     iApply ("HΦ" with "Hl Hm").
+  Qed.
+  
+  Lemma wp_free s E l v (Φ : expr → iProp Σ) :
+    ▷ l ↦ v -∗
+    ▷ Φ (Val $ LitV $ LitUnit) -∗
+      sswp s E (Free (Val $ LitV $ LitLoc l)) Φ.
+  Proof.
+    iIntros ">Hl HΦ". simpl.
+    iIntros (σ1) "Hsi".
+    rewrite heap_lang_defs.pointsto_unseal. iDestruct (gen_heap_valid with "Hsi Hl") as %Hheap.
+    iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
+    iSplit.
+    { destruct s; [|done]. iPureIntro. apply head_prim_reducible. by eauto. }
+    iIntros (e2 σ2 efs Hstep). iIntros "!>!>!>".
+    iMod "Hclose".
+    iMod (@gen_heap_update with "Hsi Hl") as "[Hsi Hl]".
+    iFrame.
+    apply head_reducible_prim_step in Hstep; [|by eauto].
+    inv_head_step. by iFrame.
   Qed.
   
   Lemma wp_choose_nat s E (Φ : expr → iProp Σ) :
@@ -146,7 +165,7 @@ Section SSWP.
     rewrite /sswp. simpl.
     iIntros (σ) "Hσ".
     iMod fupd_mask_subseteq as "Hclose"; last iModIntro; first by set_solver.
-    iDestruct (@gen_heap_valid with "Hσ Hl") as %Hheap.
+    rewrite heap_lang_defs.pointsto_unseal. iDestruct (@gen_heap_valid with "Hσ Hl") as %Hheap.
     iSplit.
     { iPureIntro. destruct s; [|done]. apply head_prim_reducible. eauto. }
     iIntros (e2 σ2 efs Hstep). iIntros "!>!>!>".
@@ -166,7 +185,7 @@ Section SSWP.
   Proof.
     iIntros ">Hl HΦ". simpl.
     iIntros (σ1) "Hsi".
-    iDestruct (gen_heap_valid with "Hsi Hl") as %Hheap.
+    rewrite heap_lang_defs.pointsto_unseal. iDestruct (gen_heap_valid with "Hsi Hl") as %Hheap.
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
     iSplit.
     { destruct s; [|done]. iPureIntro. apply head_prim_reducible. by eauto. }
@@ -186,7 +205,7 @@ Section SSWP.
   Proof.
     iIntros (??) ">Hl HΦ". simpl.
     iIntros (σ1) "Hsi".
-    iDestruct (gen_heap_valid with "Hsi Hl") as %Hheap.
+    rewrite heap_lang_defs.pointsto_unseal. iDestruct (gen_heap_valid with "Hsi Hl") as %Hheap.
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
     iSplit.
     { destruct s; [|done]. iPureIntro. apply head_prim_reducible. by eauto. }
@@ -208,7 +227,7 @@ Section SSWP.
   Proof.
     iIntros (??) ">Hl HΦ". simpl.
     iIntros (σ1) "Hsi".
-    iDestruct (gen_heap_valid with "Hsi Hl") as %Hheap.
+    rewrite heap_lang_defs.pointsto_unseal. iDestruct (gen_heap_valid with "Hsi Hl") as %Hheap.
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
     iSplit.
     { destruct s; [|done]. iPureIntro. apply head_prim_reducible. by eauto. }
@@ -230,7 +249,7 @@ Section SSWP.
   Proof.
     iIntros ">Hl HΦ". simpl.
     iIntros (σ1) "Hsi".
-    iDestruct (gen_heap_valid with "Hsi Hl") as %Hheap.
+    rewrite heap_lang_defs.pointsto_unseal. iDestruct (gen_heap_valid with "Hsi Hl") as %Hheap.
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
     iSplit.
     { destruct s; [|done]. iPureIntro. apply head_prim_reducible. by eauto. }

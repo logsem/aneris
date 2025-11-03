@@ -1,5 +1,6 @@
 From iris.base_logic Require Export gen_heap. 
 From iris.proofmode Require Import tactics.
+From iris.bi.lib Require Import fractional.
 From trillium.program_logic Require Export weakestpre.
 From heap_lang Require Export lang.
 From trillium.program_logic Require Export execution_model iris_em.
@@ -9,7 +10,7 @@ From heap_lang Require Import tactics notation.
 
 Class heap1GpreS Σ := HeapPreG {
   (* heapGpreS_inv :: invGpreS Σ; *)
-  heapGpreS_gen_heap :: gen_heapGpreS loc val Σ;
+  heapGpreS_gen_heap :: gen_heapGpreS loc (option val) Σ;
   (* heapGpreS_em :: em_preGS Σ; *)
 }.
 
@@ -17,12 +18,12 @@ Class heap1GpreS Σ := HeapPreG {
 Class heap1GS Σ := HeapG {
   heap_inG :: heap1GpreS Σ;
   (* heap_invGS :: invGS_gen HasNoLc Σ; *)
-  heap_gen_heapGS :: gen_heapGS loc val Σ;
+  heap_gen_heapGS :: gen_heapGS loc (option val) Σ;
   (* heap_fairnessGS :: em_GS Σ; *)
 }.
 
 Definition heap1Σ : gFunctors :=
-  #[ (* invΣ;  *)gen_heapΣ loc val  (* em_Σ *) ].
+  #[ (* invΣ;  *)gen_heapΣ loc (option val)  (* em_Σ *) ].
 
 
 (* TODO: automatize *)
@@ -57,12 +58,12 @@ Class heapGS {Σ M} {EM: ExecutionModel heap_lang M} := {
 
 Global Instance heapPre_of_iemPre {Σ M} {EM: ExecutionModel heap_lang M}
   (hGS: @heapGpreS Σ _ EM):
-  gen_heapGpreS loc val Σ.
+  gen_heapGpreS loc (option val) Σ.
 Proof using. apply hGS. Defined.
 
 Global Instance heap_of_iem {Σ M} {EM: ExecutionModel heap_lang M}
   (hGS: @heapGS Σ _ EM):
-  gen_heapGS loc val Σ.
+  gen_heapGS loc (option val) Σ.
 Proof using. apply hGS. Defined.
 
 
@@ -129,11 +130,25 @@ Section GeneralProperties.
   
 End GeneralProperties.
 
+Definition loc_freed `{heap1GS Σ} (l: loc) := pointsto l (DfracOwn 1) None.
+
+(** see the comment in primitive_laws.v of Iris' heap_lang
+    that explains this new definition *)
+Local Definition pointsto_def `{heap1GS Σ}
+    (l : loc) (dq : dfrac) (v : val) : iProp Σ :=
+  pointsto l dq (Some v).
+Local Definition pointsto_aux : seal (@pointsto_def). Proof. by eexists. Qed.
+Definition pointsto := pointsto_aux.(unseal).
+Local Definition pointsto_unseal :
+  @pointsto = @pointsto_def := pointsto_aux.(seal_eq).
+Global Arguments pointsto {Σ _}.
+
 (** Override the notations so that scopes and coercions work out *)
-Notation "l ↦{ q } v" := (pointsto (L:=loc) (V:=val) l (DfracOwn q) v%V)
+Notation "l ↦{ q } v" :=
+  (pointsto l (DfracOwn q) v)
   (at level 20, q at level 50, format "l  ↦{ q }  v") : bi_scope.
 Notation "l ↦ v" :=
-  (pointsto (L:=loc) (V:=val) l (DfracOwn 1) v%V) (at level 20) : bi_scope.
+  (pointsto l (DfracOwn 1) v) (at level 20) : bi_scope.
 Notation "l ↦{ q } -" := (∃ v, l ↦{q} v)%I
   (at level 20, q at level 50, format "l  ↦{ q }  -") : bi_scope.
 Notation "l ↦ -" := (l ↦{1} -)%I (at level 20) : bi_scope.
@@ -200,6 +215,9 @@ Proof. solve_atomic. Qed.
 
 #[global] Instance alloc_atomic s v w : Atomic s (AllocN (Val v) (Val w)).
 Proof. solve_atomic. Qed.
+#[global] Instance free_atomic s v : Atomic s (Free (Val v)).
+Proof. solve_atomic. Qed.
+
 #[global] Instance load_atomic s v : Atomic s (Load (Val v)).
 Proof. solve_atomic. Qed.
 #[global] Instance store_atomic s v1 v2 : Atomic s (Store (Val v1) (Val v2)).
@@ -294,6 +312,76 @@ Proof. solve_pure_exec. Qed.
   PureExec True 1 (Case (Val $ InjRV v) e1 e2) (App e2 (Val v)).
 Proof. solve_pure_exec. Qed.
 
+Section Pointsto.
+Context `{!heap1GS Σ}.
+Implicit Types P Q : iProp Σ.
+Implicit Types Φ Ψ : val → iProp Σ.
+Implicit Types efs : list expr.
+Implicit Types σ : state.
+Implicit Types v : val.
+Implicit Types l : loc.
+
+Global Instance pointsto_timeless l dq v : Timeless (l ↦{dq} v).
+Proof. rewrite pointsto_unseal. apply _. Qed.
+Global Instance pointsto_fractional l v : Fractional (λ q, l ↦{q} v)%I.
+Proof. rewrite pointsto_unseal. apply _. Qed.
+Global Instance pointsto_as_fractional l q v :
+  AsFractional (l ↦{q} v) (λ q, l ↦{q} v)%I q.
+Proof. rewrite pointsto_unseal. apply _. Qed.
+(* Global Instance pointsto_persistent l v : Persistent (l ↦□ v). *)
+(* Proof. rewrite pointsto_unseal. apply _. Qed. *)
+
+Global Instance pointsto_combine_sep_gives l dq1 dq2 v1 v2 : 
+  CombineSepGives (l ↦{dq1} v1) (l ↦{dq2} v2) ⌜✓ (dq1 ⋅ dq2) ∧ v1 = v2⌝.
+Proof.
+  rewrite pointsto_unseal /CombineSepGives. iIntros "[H1 H2]".
+  iCombine "H1 H2" gives %[? [=->]]. eauto.
+Qed.
+
+Lemma pointsto_combine l dq1 dq2 v1 v2 :
+  l ↦{dq1} v1 -∗ l ↦{dq2} v2 -∗ l ↦{dq1 ⋅ dq2} v1 ∗ ⌜v1 = v2⌝.
+Proof.
+  rewrite pointsto_unseal.
+  iIntros "Hl1 Hl2". by iCombine "Hl1 Hl2" as "$" gives %[_ [= ->]].
+Qed.
+
+Global Instance pointsto_combine_as l dq1 dq2 v1 v2 :
+  CombineSepAs (l ↦{dq1} v1) (l ↦{dq2} v2) (l ↦{dq1 ⋅ dq2} v1) | 60.
+  (* higher cost than the Fractional instance, which kicks in for #qs *)
+Proof.
+  rewrite /CombineSepAs. iIntros "[H1 H2]".
+  iDestruct (pointsto_combine with "H1 H2") as "[$ _]".
+Qed.
+
+Lemma pointsto_valid l dq v : l ↦{dq} v -∗ ⌜✓ dq⌝.
+Proof. rewrite pointsto_unseal. apply pointsto_valid. Qed.
+Lemma pointsto_valid_2 l dq1 dq2 v1 v2 :
+  l ↦{dq1} v1 -∗ l ↦{dq2} v2 -∗ ⌜✓ (dq1 ⋅ dq2) ∧ v1 = v2⌝.
+Proof. iIntros "H1 H2". iCombine "H1 H2" gives %[? [= ?]]. done. Qed.
+Lemma pointsto_agree l dq1 dq2 v1 v2 : l ↦{dq1} v1 -∗ l ↦{dq2} v2 -∗ ⌜v1 = v2⌝.
+Proof. iIntros "H1 H2". iCombine "H1 H2" gives %[_ [= ?]]. done. Qed.
+
+Lemma pointsto_frac_ne l1 l2 dq1 dq2 v1 v2 :
+  ¬ ✓(dq1 ⋅ dq2) → l1 ↦{dq1} v1 -∗ l2 ↦{dq2} v2 -∗ ⌜l1 ≠ l2⌝.
+Proof. 
+  rewrite pointsto_unseal /pointsto_def. 
+  apply (pointsto_frac_ne l1 l2 (DfracOwn dq1) (DfracOwn dq2)).
+Qed. 
+       
+Lemma pointsto_ne l1 l2 dq2 v1 v2 : l1 ↦ v1 -∗ l2 ↦{dq2} v2 -∗ ⌜l1 ≠ l2⌝.
+Proof. rewrite pointsto_unseal. apply pointsto_ne. Qed.
+
+(* Lemma pointsto_persist l dq v : l ↦{dq} v ==∗ l ↦□ v. *)
+(* Proof. rewrite pointsto_unseal. apply pointsto_persist. Qed. *)
+(* Lemma pointsto_unpersist l v : l ↦□ v ==∗ ∃ q, l ↦{#q} v. *)
+(* Proof. rewrite pointsto_unseal. apply pointsto_unpersist. Qed. *)
+
+Global Instance frame_pointsto p l v q1 q2 q :
+  FrameFractionalQp q1 q2 q →
+  Frame p (l ↦{q1} v) (l ↦{q2} v) (l ↦{q} v) | 5.
+Proof. apply: frame_fractional. Qed.
+
+End Pointsto. 
 
 Section Heap.
   Context `{HGS: @heap1GS Σ}.
@@ -309,28 +397,45 @@ are   derived in te file [array]. *)
     iIntros (<-) "Hvs". iInduction vs as [|v vs] "IH" forall (l)=> //=.
     rewrite big_opM_union; last first.
     { apply map_disjoint_spec=> l' v1 v2 /lookup_singleton_Some [-> _].
-    intros (j&?&Hjl&_)%heap_array_lookup.
-    rewrite loc_add_assoc -{1}[l']loc_add_0 in Hjl. simplify_eq; lia. }
-    rewrite loc_add_0 -fmap_S_seq big_sepL_fmap.
-    setoid_rewrite Nat2Z.inj_succ. setoid_rewrite <-Z.add_1_l.
-    setoid_rewrite <-loc_add_assoc.
-    rewrite big_opM_singleton; iDestruct "Hvs" as "[$ Hvs]". by iApply "IH".
-  Qed.
-
-  Lemma heap_array_to_seq_mapsto l v (n : nat) :
-    ([∗ map] l' ↦ v ∈ heap_array l (replicate n v), l' ↦ v) -∗
-  [∗ list] i ∈ seq 0 n, (l +ₗ (i : nat)) ↦ v.
-  Proof.
-    iIntros "Hvs". iInduction n as [|n] "IH" forall (l); simpl.
-    { done. }
-    rewrite big_opM_union; last first.
-    { apply map_disjoint_spec=> l' v1 v2 /lookup_singleton_Some [-> _].
-      intros (j&?&Hjl&_)%heap_array_lookup.
+      intros (j&w&?&Hjl&?&?)%heap_array_lookup.
       rewrite loc_add_assoc -{1}[l']loc_add_0 in Hjl. simplify_eq; lia. }
     rewrite loc_add_0 -fmap_S_seq big_sepL_fmap.
     setoid_rewrite Nat2Z.inj_succ. setoid_rewrite <-Z.add_1_l.
     setoid_rewrite <-loc_add_assoc.
     rewrite big_opM_singleton; iDestruct "Hvs" as "[$ Hvs]". by iApply "IH".
   Qed.
+
+  (* Lemma heap_array_to_seq_mapsto l v (n : nat) : *)
+  (*   ([∗ map] l' ↦ v ∈ heap_array l (replicate n v), l' ↦ v) -∗ *)
+  (* [∗ list] i ∈ seq 0 n, (l +ₗ (i : nat)) ↦ v. *)
+  (* Proof. *)
+  (*   iIntros "Hvs". iInduction n as [|n] "IH" forall (l); simpl. *)
+  (*   { done. } *)
+  (*   rewrite big_opM_union; last first. *)
+  (*   { apply map_disjoint_spec=> l' v1 v2 /lookup_singleton_Some [-> _]. *)
+  (*     intros (j&?&Hjl&_)%heap_array_lookup. *)
+  (*     rewrite loc_add_assoc -{1}[l']loc_add_0 in Hjl. simplify_eq; lia. } *)
+  (*   rewrite loc_add_0 -fmap_S_seq big_sepL_fmap. *)
+  (*   setoid_rewrite Nat2Z.inj_succ. setoid_rewrite <-Z.add_1_l. *)
+  (*   setoid_rewrite <-loc_add_assoc. *)
+  (*   rewrite big_opM_singleton; iDestruct "Hvs" as "[$ Hvs]". by iApply "IH". *)
+  (* Qed. *)
+
+Lemma heap_array_to_seq_pointsto l (v: val) (n : nat) :
+  ([∗ map] l' ↦ ov ∈ heap_array l (replicate n v), gen_heap.pointsto l' (DfracOwn 1) ov) -∗
+  [∗ list] i ∈ seq 0 n, (l +ₗ (i : nat)) ↦ v.
+Proof.
+  iIntros "Hvs". iInduction n as [|n IH] forall (l); simpl.
+  { done. }
+  rewrite big_opM_union; last first.
+  { apply map_disjoint_spec=> l' v1 v2 /lookup_singleton_Some [-> _].
+    intros (j&w&?&Hjl&_)%heap_array_lookup.
+    rewrite loc_add_assoc -{1}[l']loc_add_0 in Hjl. simplify_eq; lia. }
+  rewrite loc_add_0 -fmap_S_seq big_sepL_fmap.
+  setoid_rewrite Nat2Z.inj_succ. setoid_rewrite <-Z.add_1_l.
+  setoid_rewrite <-loc_add_assoc.
+  rewrite big_opM_singleton pointsto_unseal.
+  iDestruct "Hvs" as "[$ Hvs]". by iApply "IH".
+Qed.
 
 End Heap.
