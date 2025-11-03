@@ -21,7 +21,7 @@ Section Counter.
     inv counter_inv_ns (∃ (n: nat), l ↦ #n).
 
   Definition counter_is_init_st (c: cfg heap_lang) :=
-    (heap c.2) !! l = Some #(0: nat).
+    (heap c.2) !! l = Some $ Some #(0: nat).
 
   Lemma counter_init_inv {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ}
     (c: cfg heap_lang) (INIT: counter_is_init_st c):
@@ -35,7 +35,8 @@ Section Counter.
     rewrite insert_empty big_sepM_singleton.
     iMod (inv_alloc counter_inv_ns _ with "[-]") as "#INV".
     2: iModIntro; by iApply "INV".
-    iNext. iExists _. iFrame.
+    iNext. iExists _.
+    rewrite heap_lang_defs.pointsto_unseal. iFrame.
   Qed.
 
   Context {Σ: gFunctors}. 
@@ -119,13 +120,13 @@ Proof using.
   iModIntro. iIntros (τ v) "IIv".
 
   iApply sswp_pwp; [done| ].
-  iModIntro.
   iApply sswp_pure_step; [done| ].
-  do 3 iModIntro.
+  do 2 iModIntro.
   simpl. 
 
-  iApply sswp_pwp; [done| ..].
-  iInv "INV" as "(%n & >L)" "CLOS". iModIntro.
+  iApply sswp_pwp_fupd; [done| ..].
+  iInv "INV" as "(%n & >L)" "CLOS".
+  iModIntro. 
   iApply (wp_faa with "[$]"). iIntros "!> L".
   iNext. 
   iMod ("CLOS" with "[L]") as "_".

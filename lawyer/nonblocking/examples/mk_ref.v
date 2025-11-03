@@ -94,37 +94,35 @@ Proof using.
   iModIntro. iIntros (τ v) "IIv".
 
   iApply sswp_pwp; [done| ].
-  iModIntro.
   iApply sswp_pure_step; [done| ].
-  do 3 iModIntro.
+  do 2 iModIntro.
   simpl. 
 
   (* Set Printing Coercions. *)
   (* Unset Printing Notations. *)
   iApply (wp_bind [AppRCtx _]). 
   iApply sswp_pwp; [done| ].
-  iModIntro.
   iApply wp_alloc. iIntros "!>" (l) "L _".
-  do 2 iModIntro. simpl.
+  do 1 iModIntro. simpl.
 
   iApply wp_value.
 
   iApply (wp_bind [AppLCtx _]). 
   iApply sswp_pwp; [done| ].
   iApply sswp_pure_step; [done| ].
-  do 3 iModIntro. simpl.
+  do 2 iModIntro. simpl.
 
   iApply wp_value.
   
-  iApply sswp_pwp; [done| ].
+  iApply sswp_pwp_fupd; [done| ]. iModIntro. 
   iApply sswp_pure_step; [done| ].
-  do 4 iModIntro. simpl.
+  do 2 iModIntro. simpl.
 
   iApply wp_value.
 
   rewrite {2}interp_unfold. simpl.
   iExists _. iSplitR; [done| ].  
-  iApply inv_alloc. iExists _. iFrame.
+  iApply inv_alloc. iLeft. iExists _. iFrame.
 Qed.
   
 
