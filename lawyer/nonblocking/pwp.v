@@ -150,3 +150,16 @@ Proof using.
   iModIntro. iApply (sswp_wand with "[] [$]").
   iIntros. by do 2 iModIntro.
 Qed.
+
+(* TODO: ? generalize *)
+Lemma pre_step_looping_wfree_elim {Σ M} {EM: ExecutionModel heap_lang M}
+  {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
+  (P: iProp Σ):
+  (let _ := iris_OM_into_Looping (EM := EM) in |~~| P) -∗ (|~~| P).
+Proof using.
+  simpl. iIntros "P".
+  rewrite !weakestpre.pre_step_unseal. rewrite /pre_step_def. simpl. 
+  iIntros (etr atr) "(%EVOL & PHYS & MSI)". simpl.
+  iMod ("P" $! etr looping_trace with "PHYS") as "(PHYS & P)".
+  iModIntro. by iFrame.
+Qed.

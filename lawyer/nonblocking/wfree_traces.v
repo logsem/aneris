@@ -262,13 +262,17 @@ Section CallInTrace.
   Definition has_return_at (tr: extrace heap_lang) '(TraceCtx i tpc as tc) j :=
     exists r cj, i <= j /\ tr S!! j = Some cj /\ return_at tpc cj r.
 
-  Definition has_return tr tc := exists j, has_return_at tr tc j. 
+  Definition has_return tr tc := exists j, has_return_at tr tc j.
+
+  Definition no_return_before tr tpc i k :=
+    ¬ (exists j, j <= k /\ has_return_at tr (TraceCtx i tpc) j). 
 
   Definition fair_call tr '(TpoolCtx K τ as tpc) i :=
     forall k ck, i <= k -> 
             tr S!! k = Some ck ->
             locale_enabled τ ck ->
-            ¬ (exists j, j <= k /\ has_return_at tr (TraceCtx i tpc) j) ->
+            (* ¬ (exists j, j <= k /\ has_return_at tr (TraceCtx i tpc) j) -> *)
+            no_return_before tr tpc i k ->
     exists d cd, tr S!! (k + d) = Some cd /\
             fairness_sat locale_enabled tid_match τ cd (tr L!! (k + d)). 
 

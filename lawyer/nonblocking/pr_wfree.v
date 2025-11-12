@@ -737,18 +737,6 @@ Section WaitFreePR.
     apply elem_of_lookup_imap. eauto.
   Qed.
 
-  (* TODO: move, ? generalize *)
-  Lemma pre_step_looping_wfree_elim {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
-    (P: iProp Σ):
-    (let _ := iris_OM_into_Looping (EM := EM) in |~~| P) -∗ (|~~| P).
-  Proof using.
-    simpl. iIntros "P".
-    rewrite !weakestpre.pre_step_unseal. rewrite /pre_step_def. simpl. 
-    iIntros (etr atr) "(%EVOL & PHYS & MSI)". simpl.
-    iMod ("P" $! etr looping_trace with "PHYS") as "(PHYS & P)".
-    iModIntro. by iFrame.
-  Qed.
-
   Lemma wptp_wfree_posts {Σ: gFunctors} (Hinv : IEMGS HeapLangEM EM Σ)
     (s : stuckness) (etr: execution_trace heap_lang) (Φs : list (val → iProp Σ))
     (FIT: fits_inf_call ic m ai etr):
@@ -874,61 +862,138 @@ Section WaitFreePR.
     by rewrite !fmap_app.
   Qed.
 
-  (* TODO: move, get rid of duplicates *)
-  Lemma locales_of_list_from_app (tp0 tp1 tp2: list expr):
-    locales_of_list_from tp0 (tp1 ++ tp2) =
-    locales_of_list_from tp0 tp1 ++
-    locales_of_list_from (tp0 ++ tp1) tp2.
-  Proof using.
-    rewrite /locales_of_list_from.
-    rewrite !prefixes_from_app.
-    by rewrite !fmap_app.
-  Qed.
-
   Local Lemma ic_helper:
     tctx_tpctx ic = {| tpctx_ctx := Ki; tpctx_tid := τi |}.
   Proof using. by destruct ic as [? []]. Qed.
 
-  Lemma wptp_wfree_take_step {Σ} (Hinv : IEMGS HeapLangEM EM Σ) (s : stuckness) 
-    (etr : execution_trace heap_lang) (Φs : list (val → iProp Σ)) 
-    (c : cfg heap_lang) (oτ : olocale heap_lang) (c' : cfg heap_lang) 
-    (mtr : auxiliary_trace M)
+  Section TakeStep.
+  Context {Σ} (Hinv : IEMGS HeapLangEM EM Σ).
+  Context (s : stuckness).
+  Context (etr : execution_trace heap_lang) (Φs : list (val → iProp Σ)) 
+    (c : cfg heap_lang) (oτ : olocale heap_lang) (c' : cfg heap_lang).
+  Context (mtr : auxiliary_trace M).
+  Context 
     (VALID: valid_exec etr)
     (FIN: trace_ends_in etr c)
+    (* (STEP: locale_step c oτ c') *)
+    (* (FIT: fits_inf_call ic m ai (etr :tr[ oτ ]: c')) *)
+  .
+
+  Lemma locale_tp_split
+    (e e' : expr) (σ' : state) (efs t1 t2 : list expr)
+    (Heqc': (t1 ++ e' :: t2 ++ efs, σ') = c')
+    (τ := locale_of t1 e):
+    (locale_of t1 e ∉ locales_of_list t1) ∧
+    (locale_of t1 e ∉ locales_of_list_from (t1 ++ [e']) t2) ∧
+    locale_of t1 e ∉ locales_of_list_from (t1 ++ [e'] ++ t2) efs.
+  Proof using.
+    clear FIN VALID. 
+    pose proof (thread_pool_split c'.1 τ) as SPLIT.
+    rewrite -Heqc' /= in SPLIT. destruct SPLIT as (tp1 & tp2 & tp' & EQ & TP' & NO1 & NO2).
+    destruct TP' as [-> | (e_ & -> & LOC)].
+    { simpl in EQ.
+      assert (τ ∈ locales_of_list c'.1) as IN. 
+      { rewrite -Heqc' /=.
+        rewrite locales_of_list_from_app /=. rewrite locales_of_list_from_cons.
+        set_solver. }
+      rewrite -Heqc' /= EQ in IN.
+      rewrite locales_of_list_from_app /= in IN.
+      rewrite app_nil_r in NO2.
+      exfalso. 
+      apply elem_of_app in IN as [?|?]; eauto. }
+    rewrite -/τ /locale_of in LOC.
+    apply app_inj_1 in EQ as [EQ1 EQ2]; eauto.
+    simpl in EQ2. inversion EQ2. subst.
+    split; eauto.
+    apply Decidable.not_or. intros IN. destruct NO2.
+    rewrite locales_of_list_from_app. apply elem_of_app.
+    by rewrite -app_assoc.
+  Qed.
+
+  (* Lemma get_MU_impl *)
+  (* (e : expr) *)
+  (* (σ : state) *)
+  (* (e' : expr) *)
+  (* (σ' : state) *)
+  (* (efs t1 t2 : list expr) *)
+  (* (FIN : trace_last etr = (t1 ++ e :: t2, σ)) *)
+  (* (H : (t1 ++ e :: t2, σ) = c) *)
+  (* (τ : nat) *)
+  (* (H1 : (t1 ++ e' :: t2 ++ efs, σ') = c') *)
+  (* (STEP : locale_step (t1 ++ e :: t2, σ) (Some τ) (t1 ++ e' :: t2 ++ efs, σ')) *)
+  (* (π : Phase) *)
+  (* (sf : olocale heap_lang) *)
+  (* (Heqsf : sf = step_fork (trace_last etr) (t1 ++ e' :: t2 ++ efs, σ')) *)
+  (* (upd := fun (R1 R2: gset SignalId) => let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in *)
+  (*                       (⌜ R1 = ∅ ⌝ ∗  *)
+  (*                       if (decide (sf = Some τi)) *)
+  (*                       then (∃ s, ⌜ R2 = {[ s ]} ⌝ ∗ sgn s l0 (Some false) ∗ ep s π0 d0)%I *)
+  (*                       else (⌜ R2 = ∅ ⌝ ∗ obls_τi' (t1 ++ e' :: t2 ++ efs, σ')))%I) *)
+  (* (* "INV" : wfree_trace_inv etr mtr *) *)
+  (* (* cp π0 d0 -∗ th_phase_eq τ π -∗ obls τ ∅ -∗ obls_τi' (trace_last etr) -∗  *) *)
+
+  (* : *)
+  
+  (* ⊢ *)
+  (*   (* MU_impl *) *)
+  (*   let hGS: @heapGS Σ M EM := {| heap_iemgs := Hinv |} in *)
+  (*   @MU_impl _ EM Σ hGS sf ⊤ τ *)
+  (*   (∃ R1 R2 : gset SignalId, cp π0 d0 ∗ th_phase_eq τ π0 ∗  *)
+  (*      obls τ (R1 ∪ R2) ∗ upd R1 R2 ∗ ⌜R1 ## R2⌝).  *)
+  (* Proof using. *)
+  (*   iIntros "CP PH OB OBτi". *)
+
+  Lemma τi_not_in e σ e' σ'
+  (efs t1 t2 : list expr)
+  (FIN' : trace_last etr = (t1 ++ e :: t2, σ))
+  (τ := locale_of t1 e : nat)
+  (STEP : locale_step (t1 ++ e :: t2, σ) (Some τ) (t1 ++ e' :: t2 ++ efs, σ'))
+  (NO : step_fork (trace_last etr) (t1 ++ e' :: t2 ++ efs, σ') ≠ Some τi)
+  (FIT : from_locale (t1 ++ e' :: t2 ++ efs) τi = Some (fill Ki (m ai)))
+  (sf := step_fork (trace_last etr) (t1 ++ e' :: t2 ++ efs, σ')):
+  τi ∉ locales_of_list_from (t1 ++ e' :: t2) efs.
+  Proof using.
+    clear WFS F. 
+    rewrite locales_of_list_from_locales.
+    intros [[??] IN]%elem_of_list_In%in_map_iff.
+    destruct IN as (LOC & IN).
+    apply elem_of_list_In, elem_of_list_lookup in IN as [i IN].
+    pose proof IN as X.
+    apply prefixes_from_ith_length in IN. 
+    rewrite !length_app /= in IN. rewrite /locale_of in LOC.
+    
+    apply from_locale_lookup in FIT.
+    apply lookup_lt_Some in FIT. simpl in FIT.
+    rewrite /τi in LOC.
+    rewrite /τi -LOC IN in FIT. 
+    repeat rewrite !length_app /= in FIT.
+    simpl in FIT.
+    
+    apply step_fork_hl in STEP as [[? ->] | (?&->&?)].
+    { simpl. simpl in FIT. lia. }
+    simpl in FIT. destruct i; [| lia].
+    simpl in X. inversion X.
+    subst. simpl in e0.
+    rewrite app_comm_cons app_assoc in NO.
+    rewrite FIN' in NO.
+    rewrite step_fork_fork in NO.
+    { rewrite /τi in NO. 
+      rewrite -LOC in NO. 
+      rewrite /locale_of !length_app in NO. done. }
+    apply locales_equiv_middle. done.
+  Qed.    
+
+  Lemma wptp_wfree_take_step'
     (STEP: locale_step c oτ c')
     (FIT: fits_inf_call ic m ai (etr :tr[ oτ ]: c')):
     state_interp etr mtr -∗ wfree_trace_inv etr mtr -∗
     pr_pr_wfree s etr Φs 
     ={⊤,∅}=∗ |={∅}▷=>^(S (trace_length etr)) |={∅,⊤}=>
-    ⌜∀ e2: expr, s = NotStuck → e2 ∈ c'.1 → not_stuck e2 c'.2⌝ ∗
     ∃ (δ' : M) (ℓ : mlabel M),
       state_interp (etr :tr[ oτ ]: c') (mtr :tr[ ℓ ]: δ') ∗
-      wfree_trace_inv (etr :tr[ oτ ]: c') (mtr :tr[ ℓ ]: δ') ∗
       pr_pr_wfree s (etr :tr[ oτ ]: c') (Φs ++ newposts c.1 c'.1).
-  Proof using.
+  Proof using VALID FIN.
     iIntros "TI #INV PR".
-
-    (* our PR instance in fact implies this not-stuck property *)
-    (* TODO: ? move this property to definition of PR? *)
-    iAssert (|={⊤,∅}=>
-               |={∅}▷=>^(S (trace_length etr))
-                 |={∅,⊤}=>
-                 ∃ (δ' : M) (ℓ : mlabel M),
-               state_interp (etr :tr[ oτ ]: c') (mtr :tr[ ℓ ]: δ') ∗
-               pr_pr_wfree s (etr :tr[ oτ ]: c') (Φs ++ newposts c.1 c'.1))%I
-        with "[-]" as "X".
-    2: { iMod "X". iModIntro.
-         iApply (step_fupdN_wand with "X").
-         iIntros "X". iMod "X" as (??) "(TI & PR)".
-         rewrite /pr_pr_wfree. iDestruct "PR" as "(WPS & ? & ? & OBS)".
-         iMod (wptp_wfre_not_stuck with "TI WPS") as "(TI & WPS & %NSTUCK')"; eauto.
-         { econstructor; eauto. }
-         { erewrite app_nil_r. red. simpl. apply surjective_pairing. }
-         iDestruct (reestablish_wfree_inv with "[] [$] [$]") as "#INV'".
-         2: { iDestruct "INV" as "[??]". done. }
-         { done. }
-         iModIntro. iFrame. iSplit; [| done].
-         iPureIntro. intros. by apply NSTUCK'. }
 
     simpl.
 
@@ -940,26 +1005,7 @@ Section WaitFreePR.
     rewrite H3 in STEP, FIT. rewrite H3.
 
     assert (τ ∉ locales_of_list_from [] t1 /\ τ ∉ locales_of_list_from (t1 ++ [e']) t2 /\ τ ∉ locales_of_list_from (t1 ++ [e'] ++ t2) efs) as (NO1 & NO2 & NO').
-    { pose proof (thread_pool_split c'.1 τ) as SPLIT.
-      rewrite -H1 /= in SPLIT. destruct SPLIT as (tp1 & tp2 & tp' & EQ & TP' & NO1 & NO2).
-      destruct TP' as [-> | (e_ & -> & LOC)].
-      { simpl in EQ.
-        assert (τ ∈ locales_of_list c'.1) as IN. 
-        { rewrite -H1 /=.
-          rewrite locales_of_list_from_app /=. rewrite locales_of_list_from_cons.
-          set_solver. }
-        rewrite -H1 /= EQ in IN.
-        rewrite locales_of_list_from_app /= in IN.
-        rewrite app_nil_r in NO2.
-        exfalso. 
-        apply elem_of_app in IN as [?|?]; eauto. }
-      rewrite -H3 /locale_of in LOC.
-      apply app_inj_1 in EQ as [EQ1 EQ2]; eauto.
-      simpl in EQ2. inversion EQ2. subst.
-      split; eauto.
-      apply Decidable.not_or. intros IN. destruct NO2.
-      rewrite locales_of_list_from_app. apply elem_of_app.
-      by rewrite -app_assoc. }    
+     { subst τ. eapply locale_tp_split; eauto. }
 
     rewrite /pr_pr_wfree. iDestruct "PR" as "(WPS & CPS & PH & OB)".
 
@@ -1110,14 +1156,19 @@ Section WaitFreePR.
         * iClear "He2".
           iDestruct (th_phase_frag_halve with "PH") as "[PH PH']". 
           iSpecialize ("WPS" with "[CPP PH']").
-          { rewrite /wp_tc. rewrite leb_correct_conv.
-            2: { simpl. lia. }
-            iPoseProof (get_call_wp with "[] [$] [$]") as "WP".
+          { iPoseProof (get_call_wp with "[] [$] [$]") as "WP".
             { iDestruct "INV" as "[??]". done. }
+            (* TODO: extract lemma *)
+            clear LEN_ LEN2 PH CORR.
+            clear STEP PSTEP VALID FIN.
+            clear H H1 NO' NO2 NO1.
+            clear dependent Φs1 Φs'.
+            Unshelve. 2: exact ai. 
+            rewrite /wp_tc. rewrite leb_correct_conv.
+            2: { simpl. lia. }
             red in FIT. apply proj1 in FIT.
             rewrite trace_lookup_extend in FIT; [| done].
             simpl in FIT. do 2 red in FIT. rewrite ic_helper /= in FIT.
-            (* destruct FIT as (e_ & CUR_ & CTX & ?). *)
             rewrite e0 /= in FIT.
             replace (locale_of t1 e) with (locale_of t1 e') in FIT.
             2: { done. }
@@ -1181,7 +1232,7 @@ Section WaitFreePR.
         { rewrite leb_correct_conv; [| lia]. eauto. }
 
         iAssert (wptp_wfree s (etr :tr[ Some τi ]: (t1 ++ fill Ki x :: t2, σ')) Φs)%I with "[WPS1 WPS2 He2]" as "WPS". 
-        {
+        { 
           rewrite /wptp_wfree. 
           rewrite -EQ. iApply wptp_from_gen_app. iSplitL "WPS1".
           { simpl. iApply (wptp_wfree_upd_other with "[$]").
@@ -1246,7 +1297,13 @@ Section WaitFreePR.
         1-2: by eauto.
         { red. rewrite FIN. erewrite ectx_fill_emp. reflexivity. }
         { done. }
-        { rewrite -Heqsf. 
+        { clear FIT NO1 NO2 NO'.
+          clear LEN VALID PSTEP.
+          clear Φs1 Φs' EQ LEN1 LEN' EQ'.
+          clear dependent Φ Φs2 n.
+          clear H3.
+          (* TODO: extract a lemma *)
+          rewrite -Heqsf. 
           rewrite (cp_weaken _ π); [| by apply phase_le_init].
           rewrite /obls_τi' /obls_τi. 
 
@@ -1481,34 +1538,7 @@ Section WaitFreePR.
              red in FIT. rewrite ic_helper /= in FIT. 
 
              assert (τi ∉ locales_of_list_from (t1 ++ e' :: t2) efs) as NONEW.
-             { rewrite locales_of_list_from_locales.
-               intros [[??] IN]%elem_of_list_In%in_map_iff.
-               destruct IN as (LOC & IN).
-               apply elem_of_list_In, elem_of_list_lookup in IN as [i IN].
-               pose proof IN as X.
-               apply prefixes_from_ith_length in IN. 
-               rewrite !length_app /= in IN. rewrite /locale_of in LOC.
-
-               apply from_locale_lookup in FIT.
-               apply lookup_lt_Some in FIT. simpl in FIT.
-               rewrite /τi in LOC.
-               rewrite /τi -LOC IN in FIT. 
-               repeat rewrite !length_app /= in FIT.
-               simpl in FIT.
-
-               subst τ. 
-               apply step_fork_hl in STEP as [[? ->] | (?&->&?)].
-               { simpl. simpl in FIT. lia. }
-               simpl in FIT. destruct i; [| lia].
-               simpl in X. inversion X.
-               subst. simpl in e0.
-               rewrite app_comm_cons app_assoc in NO.
-               rewrite FIN in NO.
-               rewrite step_fork_fork in NO.
-               { rewrite /τi in NO. 
-                 rewrite -LOC in NO. 
-                 rewrite /locale_of !length_app in NO. done. }
-               apply locales_equiv_middle. done. }
+             { subst τ. eapply τi_not_in; eauto. by rewrite -Heqsf. }
 
              assert (from_locale (t1 ++ e' :: t2) τi = Some (fill Ki (m ai))) as CUR.
              { apply from_locale_from_lookup. split; [| simpl; lia].
@@ -1651,7 +1681,7 @@ Section WaitFreePR.
              rewrite /τi e0 in EXPR. 
              apply from_locale_lookup in EXPR. 
              apply lookup_lt_Some in EXPR.
-             rewrite /locale_of !length_app /= in EXPR. lia. } 
+             rewrite /locale_of !length_app /= in EXPR. lia. }
 
         simpl.
         iAssert (wptp_from_gen (thread_pr s (trace_length etr)) [] (t1 ++ e' :: t2) Φs)%I with "[-]" as "WPS".
@@ -1675,6 +1705,38 @@ Section WaitFreePR.
         simpl in *. lia. 
   Qed.
   
+  (* our PR instance in fact implies the not-stuck property *)
+  (* TODO: ? move this property to definition of PR? *)
+  Lemma wptp_wfree_take_step 
+    (STEP: locale_step c oτ c')
+    (FIT: fits_inf_call ic m ai (etr :tr[ oτ ]: c')):
+    state_interp etr mtr -∗ wfree_trace_inv etr mtr -∗
+    pr_pr_wfree s etr Φs 
+    ={⊤,∅}=∗ |={∅}▷=>^(S (trace_length etr)) |={∅,⊤}=>
+    ⌜∀ e2: expr, s = NotStuck → e2 ∈ c'.1 → not_stuck e2 c'.2⌝ ∗
+    ∃ (δ' : M) (ℓ : mlabel M),
+      state_interp (etr :tr[ oτ ]: c') (mtr :tr[ ℓ ]: δ') ∗
+      wfree_trace_inv (etr :tr[ oτ ]: c') (mtr :tr[ ℓ ]: δ') ∗
+      pr_pr_wfree s (etr :tr[ oτ ]: c') (Φs ++ newposts c.1 c'.1).
+  Proof using VALID FIN.
+    iIntros "? #INV ?".
+    iPoseProof (wptp_wfree_take_step' with "[$] [$] [$]") as "X"; eauto. 
+    iMod "X". iModIntro.
+    iApply (step_fupdN_wand with "X").
+    iIntros "X". iMod "X" as (??) "(TI & PR)".
+    rewrite /pr_pr_wfree. iDestruct "PR" as "(WPS & ? & ? & OBS)".
+    iMod (wptp_wfre_not_stuck with "TI WPS") as "(TI & WPS & %NSTUCK')"; eauto.
+    { econstructor; eauto. }
+    { erewrite app_nil_r. red. simpl. apply surjective_pairing. }
+    iDestruct (reestablish_wfree_inv with "[] [$] [$]") as "#INV'".
+    2: { iDestruct "INV" as "[??]". done. }
+    { done. }
+    iModIntro. iFrame. iSplit; [| done].
+    iPureIntro. intros. by apply NSTUCK'.
+  Qed.
+
+  End TakeStep.
+
   Program Definition PR_wfree {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}:
     @ProgressResource heap_lang M Σ (@iem_invGS _ _ _ _ _ Hinv)
       state_interp wfree_trace_inv

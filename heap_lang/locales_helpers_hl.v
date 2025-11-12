@@ -61,6 +61,16 @@ Lemma locales_of_list_indexes (es : list expr) :
   locales_of_list es = indexes es.
 Proof. apply locales_of_list_from_indexes. Qed.
 
+Lemma locales_of_list_from_app (tp0 tp1 tp2: list expr):
+  locales_of_list_from tp0 (tp1 ++ tp2) =
+  locales_of_list_from tp0 tp1 ++
+  locales_of_list_from (tp0 ++ tp1) tp2.
+Proof using.
+  rewrite /locales_of_list_from.
+  rewrite !prefixes_from_app.
+  by rewrite !fmap_app.
+Qed.
+
 Lemma locales_of_cfg_simpl l σ:
   locales_of_cfg (l, σ) = set_seq 0 (length l).
 Proof. 
@@ -494,3 +504,4 @@ Proof using.
   { by apply extrace_valid_alt. }
   erewrite <- surjective_pairing, <-JTH. f_equal. lia.
 Qed.
+
