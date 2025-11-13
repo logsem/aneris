@@ -59,7 +59,144 @@ Section UnderCtx.
     all: try by (destruct e2; by apply not_eq_helper || solve_iff). 
     - destruct e2, e3; by apply not_eq_helper || solve_iff.
     - destruct e3; by apply not_eq_helper || solve_iff.
-  Qed. 
+  Qed.
+
+  (* TODO: move *)
+  Lemma fill_item_nval_strong e1 e2 i1 i2
+    (NVAL1: to_val e1 = None) (NVAL2: to_val e2 = None)
+    (EQ: fill_item i1 e1 = fill_item i2 e2):
+    i1 = i2 /\ e1 = e2. 
+  Proof using.
+    Set Printing Coercions.
+    destruct i1, i2; simpl in EQ.
+    all: try congruence.
+    all: try by (inversion EQ; subst; done).
+  Qed.
+
+  (* TODO: find existing / duplicates? *)
+  Lemma fill_item_not_val i e
+    (NVAL: to_val e = None):
+    to_val (fill_item i e) = None.
+  Proof using.
+    destruct (to_val (fill_item _ _)) eqn:V; [| done].
+    apply mk_is_Some, fill_item_val in V.
+    destruct V. set_solver.
+  Qed.
+
+  (* (* TODO: move, find existing? *) *)
+  (* Lemma fill_item_not_eq i e: *)
+  (*   fill_item i e ≠ e. *)
+  (* Proof using. *)
+
+  Fixpoint expr_depth (e: expr) :=
+    match e with
+    | Val _ | Var _ | ChooseNat => 0
+    | Rec _ _ e | UnOp _ e | Fst e | Snd e | InjL e
+    | InjR e | Fork e | Free e | Load e
+                                 => S $ expr_depth e
+    | App e1 e2 | BinOp _ e1 e2 | Pair e1 e2
+    | AllocN e1 e2 | Store e1 e2 | FAA e1 e2
+                                   => S $ max (expr_depth e1) (expr_depth e2)
+    | If e0 e1 e2 | Case e0 e1 e2 | CmpXchg e0 e1 e2
+                                    => S $ max_list [expr_depth e0; expr_depth e1; expr_depth e2]
+      end.
+
+  Lemma fill_item_depth i e:
+    expr_depth e < expr_depth (fill_item i e). 
+  Proof using.
+    destruct i; simpl; lia.
+  Qed.
+
+  From lawyer.nonblocking.logrel Require Import substitutions.
+
+  (* TODO: move, find existing? *)
+  Lemma fill_app K1 K2 (e: expr):
+    fill K1 (fill K2 e) = fill (K2 ++ K1) e. 
+  Proof using.
+    rewrite /fill. by rewrite foldl_app.
+  Qed.
+
+  (* TODO: move, find existing? *)
+  Lemma fill_item_fill_1 i (e: expr):
+    fill_item i e = fill [i] e. 
+  Proof using. done. Qed.
+
+  Lemma fill_item_fill K i e:
+    let K' := take (length K) (i :: K) in
+    fill K (fill_item i e) = fill_item (default i (last K)) (fill K' e).
+  Proof using.
+    simpl. 
+    rewrite !fill_item_fill_1.
+    rewrite !fill_app.
+    f_equal.
+    simpl. 
+
+    generalize dependent i. clear e. pattern K. apply rev_ind; clear K. 
+    { done. }
+    intros. simpl. 
+    (* we really only need the tail element, IH doesn't matter *)
+    clear H. 
+    rewrite length_app. simpl.
+    rewrite app_comm_cons.
+    rewrite take_app_length'.
+    2: simpl; lia.
+    rewrite last_snoc. done.
+  Qed.
+
+  Lemma fill_depth' K e
+    (NEMP: K ≠ ectx_emp):
+    expr_depth e < expr_depth (fill K e).
+  Proof using.
+    generalize dependent e.
+    revert NEMP. pattern K. apply rev_ind; clear K. 
+    { done. }
+    simpl. intros.
+    destruct l.
+    { simpl. apply fill_item_depth. }
+    etrans; [apply H; done| ]. 
+    rewrite -fill_app. rewrite -fill_item_fill_1. 
+    apply fill_item_depth.
+  Qed.   
+
+  Lemma fill_depth K e:
+    expr_depth e <= expr_depth (fill K e).
+  Proof using.
+    destruct K.
+    { done. }
+    apply Nat.lt_le_incl.
+    by apply fill_depth'. 
+  Qed.
+
+  Lemma fill_eq_inv (e: expr) K
+    (EQ: fill K e = e):
+    K = [].
+  Proof using. 
+    destruct K; [done| ].
+    symmetry in EQ. 
+    apply (@f_equal _ _ expr_depth) in EQ.
+    apply Nat.lt_neq in EQ; [done| ].
+    by apply fill_depth'.
+  Qed.
+
+  (* TODO: move *)
+  Lemma ectx_fill_ctx_nval e
+    (NVAL: to_val e = None):
+    Inj eq eq (flip fill e).
+  Proof using.
+    red. simpl. intros x. generalize dependent e.
+    pattern x. apply rev_ind; clear x; simpl. 
+    { intros. symmetry. by eapply fill_eq_inv. } 
+    intros a x IH e NVAL y EQ.
+
+    revert EQ. pattern y. apply rev_ind; clear y. 
+    { intros EQ. simpl in EQ. by eapply fill_eq_inv. } 
+
+    intros y' b _ EQ.
+    rewrite -!fill_app -!fill_item_fill_1 in EQ.
+    apply fill_item_nval_strong in EQ as [??].
+    2, 3: by apply fill_not_val. 
+    subst. f_equal. eauto.
+  Qed.
 
   Fixpoint under_ctx (K: ectx heap_lang) (e: expr): option expr :=
     match K with
