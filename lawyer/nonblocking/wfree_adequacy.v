@@ -51,12 +51,35 @@ Section WFAdequacy.
         (extr : extrace heap_lang)
         (Hvex : extrace_valid extr)
         (Hexfirst : trfirst extr = (es, σ1))
-        (LEN: length es ≥ 1):
+    :
     PR_premise_multiple obls_sim_rel_wfree (fits_inf_call ic m ai) Σ s es σ1 s1 (p: @em_init_param _ _ EM) ->
     (∃ omtr, obls_om_traces_match_wfree extr omtr ∧ trfirst omtr = s1) \/
     (exists k, ¬ (fits_inf_call ic m ai) (trace_take_fwd k extr)).
   Proof using.
     intros PREM.
+
+    destruct (decide (1 <= length es)).
+    2: { (* TODO: make a lemma *)
+         assert (length es = 0) by lia.
+         assert (es = []) as -> by (destruct es; simpl in H; lia || done).
+         assert (extr = tr_singl ([], σ1)) as ->.
+         { destruct extr; simpl in Hexfirst; subst. 
+           { done. }
+           apply extrace_valid_alt, trace_valid_cons_inv, proj2 in Hvex.
+           inversion Hvex; subst; try done.
+           inversion H0. clear -H4.
+           apply (@f_equal _ _ length) in H4.
+           rewrite !length_app /= in H4. lia. }
+         left. exists (tr_singl s1). split; [| done].
+         red. red. apply trace_match_singl.
+         red. 
+         rewrite /obls_st_rel /no_extra_obls.
+         rewrite /obls_fairness_preservation.om_live_tids /has_obls.
+         simpl in INIT. red in INIT.
+         rewrite /locales_of_cfg in INIT. rewrite list_to_set_nil in INIT.
+         apply proj1, eq_sym, dom_empty_inv_L in INIT.
+         rewrite INIT. set_solver. } 
+           
 
     unshelve epose proof (@PR_strong_simulation_adequacy_traces_multiple _ _ EM 
                             HeapLangEM obls_sim_rel_wfree (fits_inf_call ic m ai)
@@ -585,64 +608,99 @@ Section WFAdequacy.
     locale_of tp e = locale_of tp e'.
   Proof using. done. Qed. 
 
-  Theorem simple_om_simulation_adequacy_terminate_multiple_waitfree extr
-        (ETR0: valid_init_tpool m (trfirst extr).1)
-        (MOD_INIT: wfs_is_init_st m SPEC (trfirst extr))
-    :
-    extrace_valid extr -> 
-    (* fair_ex τi extr -> *)
-    fair_call extr tpc ii ->
-    terminating_trace extr \/ 
-    exists k, ¬ fits_inf_call ic m ai (trace_take_fwd k extr).
-  Proof.
-    intros VALID FAIR.
-    destruct ETR0 as (e0 & ETR0 & VALID0). 
+  Lemma om_trace_fair 
+    (extr: extrace heap_lang)
+    (VALID : extrace_valid extr)
+    (FAIR : fair_call extr tpc ii)
+    (omtr : obls_trace)
+    (MATCH'' : exec_OM_traces_match extr omtr)
+  (SR: traces_match (λ (_ : olocale heap_lang) (_ : mlabel ObligationsModel), True)
+      obls_st_rel_wfree
+      (λ (_ : cfg heap_lang) (_ : olocale heap_lang) (_ : cfg heap_lang), True)
+      (λ (_ : AM2M ObligationsAM) (_ : mlabel ObligationsModel) 
+         (_ : AM2M ObligationsAM), True)
+      extr omtr)
+  (NORET : ¬ ∃ j : nat, has_return_at extr ic j)
+  (IITH : is_Some (extr S!! ii)):
+  ∀ τ, obls_trace_fair τ omtr.
+  Proof using.
+    clear m SPEC F fic. 
+    intros. destruct (decide (τ = τi)) as [-> | NEQ].
+    2: { red. apply fair_by_equiv. red. intros n OB.
+         destruct (omtr S!! n) eqn:NTH; rewrite NTH in OB; [| done].
+         simpl in OB.
+         eapply traces_match_state_lookup_2 in NTH; eauto.
+         destruct NTH as (?&NTH'& NOOBS).
+         red in NOOBS. destruct NOOBS as [_ NOOBS].
+         red in NOOBS. ospecialize (NOOBS τ _).
+         { red in OB. by destruct lookup. }
+         subst. tauto. }
+    
+    red. apply fair_by_equiv. red. intros n OB.
+    destruct (omtr S!! n) eqn:NTH; rewrite NTH in OB; [| done].
+    simpl in OB.
+    eapply traces_match_state_lookup_2 in NTH; eauto.
+    destruct NTH as (?&NTH'& NOOBS).
+    red in NOOBS. apply proj1 in NOOBS. do 2 red in NOOBS.
+    specialize (NOOBS _ OB). simpl in NOOBS. 
+    
+    red in FAIR. move FAIR at bottom. 
+    rewrite /tpc tc_helper in FAIR.
+    
+    rewrite /no_return_before in FAIR. 
+    rewrite -tc_helper -ic_helper in FAIR.
+    
+    assert (exists cm: cfg heap_lang, extr S!! (max n ii) = Some cm) as [cm MTH].
+    { edestruct (Nat.max_spec_le n ii) as [[? ->] | [? ->]]; eauto. }
+    destruct (decide (locale_enabled τi cm)) as [ENm | DISm].
+    2: { (* there must've been a step between n and m*)
+      opose proof * (enabled_disabled_step_between extr n) as STEP; eauto.
+      { lia. }
+      destruct STEP as (k & [LE BOUND] & STEP).
+      apply Nat.le_sum in LE as [d ->].
+      pose proof STEP as [[??] _]%mk_is_Some%label_lookup_states. 
+      eapply obls_fairness_preservation.fairness_sat_ex_om_helper; eauto.
+      { apply _. }
+      rewrite STEP. simpl. red. right. eauto. } 
+    
+    ospecialize (FAIR _ _ _ MTH ENm _).
+    { lia. }
+    { intros (?&?&?). eauto. }
+    
+    destruct FAIR as (d & FAIR).
+    destruct (max_plus_consume n ii d) as [? EQ]. rewrite EQ in FAIR. 
+    destruct FAIR as (c' & DTH & STEP).
+    eapply obls_fairness_preservation.fairness_sat_ex_om_helper; eauto; try congruence.
+    simpl.
+    
+    red. red in STEP. simpl. rewrite /tid_match in STEP. set_solver.
+  Qed.
 
-    destruct (@decide (ii = 0 → ∃ e,
-                    from_locale (trfirst extr).1 τi = Some e ∧ under_ctx Ki e = Some (m ai))) as [II0| ].
-    { apply impl_dec; [apply _| ].
-      (* TODO: make a lemma + definition *)
-      apply ex_fin_dec with
-             (l := from_option (flip cons nil) [] (from_locale (trfirst extr).1 τi)).
-      { solve_decision. }
-      intros ? (RUNS & ?).
-      simpl. rewrite RUNS. simpl. tauto. }
-    2: { apply Classical_Prop.imply_to_and in n as (II & NO0).
-         right. exists 0. intros FITS. apply NO0.
-         red in FITS. apply proj1 in FITS.
-         fold ii in FITS.
-         rewrite trace_take_fwd_0_first in FITS.
-         rewrite II /= in FITS.
-         red in FITS. simpl in FITS. eauto.
-         red in FITS. rewrite tc_helper in FITS.
-         eexists. split; eauto. by rewrite under_ctx_fill. }
+  (* TODO: ? move, generalize *)
+  Instance under_ctx_ex_dec (extr: extrace heap_lang):
+    Decision (∃ e, from_locale (trfirst extr).1 τi = Some e ∧ under_ctx Ki e = Some (m ai)).
+  Proof using.
+    apply ex_fin_dec with
+      (l := from_option (flip cons nil) [] (from_locale (trfirst extr).1 τi)).
+    { solve_decision. }
+    intros ? (RUNS & ?).
+    simpl. rewrite RUNS. simpl. tauto.
+  Qed.
 
-    destruct (@decide (∀ e, from_locale (trfirst extr).1 τi = Some e → to_val e = None)) as [E0| ].
-    { destruct (from_locale (trfirst extr).1 τi) eqn:E.
-      2: { left. set_solver. }
-      destruct (to_val e) eqn:V.
-      { right. set_solver. }
-      left. set_solver. }
-    2: { apply not_forall_exists_not in n as [e VAL].
-         apply Classical_Prop.imply_to_and in VAL as [E VAL].
-         right. exists 0. intros FITS. apply VAL.
-         red in FITS. do 2 apply proj2 in FITS.
-         specialize (FITS 0). rewrite trace_take_fwd_0_first /= in FITS.
-         rewrite E in FITS. done. }
-
+  (* TODO: rename *)
+  Lemma simple_om_simulation_adequacy_terminate_multiple_waitfree_impl extr
+    (MOD_INIT : wfs_is_init_st m SPEC (trfirst extr))
+    (VALID : extrace_valid extr)
+    (FAIR : fair_call extr tpc ii)
+    (INIT_TP : tpool_init_restr (trfirst extr).1):
+    terminating_trace extr ∨ ∃ k, ¬ fits_inf_call ic m ai (trace_take_fwd k extr).
+  Proof using. 
     opose proof (om_simulation_adequacy_model_trace_multiple_waitfree
-                wfreeΣ _ (trfirst extr).1 _ _ _ _ _ VALID _ _ _) as ADEQ.
+                wfreeΣ _ (trfirst extr).1 _ _ _ _ _ VALID _ _) as ADEQ.
     { apply init_om_wfree_is_init. }
-    { apply surjective_pairing. }
-    { rewrite ETR0. simpl. lia. } 
+    { apply surjective_pairing. }     
     { rewrite -surjective_pairing. 
-      eapply PR_premise_wfree; eauto.
-
-      split; [| split].
-      - (* TODO: can generalize to more than 1 initial thread *)
-        rewrite ETR0. constructor; [| done]. eauto.
-      - eauto.
-      - eauto. }
+      eapply PR_premise_wfree; eauto. }
     
     destruct ADEQ as [(mtr & MATCH & OM0) | RET]. 
     2: { right. done. } 
@@ -652,9 +710,7 @@ Section WFAdequacy.
     { eapply obls_init_wf. rewrite OM0. apply init_om_wfree_is_init. }
 
     destruct (Classical_Prop.classic (∃ j, has_return_at extr ic j)) as [[j RET]| NORET].
-    {
-      red in RET. rewrite ic_helper in RET. destruct RET as (r & cj & ? & JTH & RET).
-
+    { red in RET. rewrite ic_helper in RET. destruct RET as (r & cj & ? & JTH & RET).
       right. exists j. rewrite /fits_inf_call.
       apply Classical_Prop.or_not_and. right. 
       apply Classical_Prop.or_not_and. left.
@@ -670,61 +726,10 @@ Section WFAdequacy.
          eapply state_lookup_dom_neg in IITH; eauto.
          eapply terminating_trace_equiv; eauto.
          destruct x; try done. eauto. } 
- 
-    assert (forall τ, obls_trace_fair τ omtr) as OM_FAIR.
-    { intros.
-      destruct (decide (τ = τi)) as [-> | NEQ].
-      (* { eapply exec_om_fairness_preserved; eauto. } *)
-      2: { red. apply fair_by_equiv. red. intros n OB.
-           destruct (omtr S!! n) eqn:NTH; rewrite NTH in OB; [| done].
-           simpl in OB.
-           eapply traces_match_state_lookup_2 in NTH; eauto.
-           destruct NTH as (?&NTH'& NOOBS).
-           red in NOOBS. destruct NOOBS as [_ NOOBS].
-           red in NOOBS. ospecialize (NOOBS τ _).
-           { red in OB. by destruct lookup. }
-           subst. tauto. }
 
-      red. apply fair_by_equiv. red. intros n OB.
-      destruct (omtr S!! n) eqn:NTH; rewrite NTH in OB; [| done].
-      simpl in OB.
-      eapply traces_match_state_lookup_2 in NTH; eauto.
-      destruct NTH as (?&NTH'& NOOBS).
-      red in NOOBS. apply proj1 in NOOBS. do 2 red in NOOBS.
-      specialize (NOOBS _ OB). simpl in NOOBS. 
-
-      red in FAIR. move FAIR at bottom. 
-      rewrite /tpc tc_helper in FAIR.
-
-      rewrite -tc_helper -ic_helper in FAIR.
-
-      assert (exists cm: cfg heap_lang, extr S!! (max n ii) = Some cm) as [cm MTH].
-      { edestruct (Nat.max_spec_le n ii) as [[? ->] | [? ->]]; eauto. }
-      destruct (decide (locale_enabled τi cm)) as [ENm | DISm].
-      2: { (* there must've been a step between n and m*)
-        opose proof * (enabled_disabled_step_between extr n) as STEP; eauto.
-        { lia. }
-        destruct STEP as (k & [LE BOUND] & STEP).
-        apply Nat.le_sum in LE as [d ->].
-        pose proof STEP as [[??] _]%mk_is_Some%label_lookup_states. 
-        eapply obls_fairness_preservation.fairness_sat_ex_om_helper; eauto.
-        { apply _. }
-        rewrite STEP. simpl. red. right. eauto. } 
-      
-      ospecialize (FAIR _ _ _ MTH ENm _).
-      { lia. }
-      { intros (?&?&?). eauto. }
-
-      destruct FAIR as (d & FAIR).
-      destruct (max_plus_consume n ii d) as [? EQ]. rewrite EQ in FAIR. 
-      destruct FAIR as (c' & DTH & STEP).
-      eapply obls_fairness_preservation.fairness_sat_ex_om_helper; eauto; try congruence.
-      simpl.
-
-      red. red in STEP. simpl. rewrite /tid_match in STEP. set_solver. }
+    assert (forall τ, obls_trace_fair τ omtr) as OM_FAIR by (eapply om_trace_fair; eauto).
 
     left.
-
     pose proof (traces_match_valid2 _ _ _ _ _ _ MATCH'') as OM_VALID.
     pose proof (obls_fair_trace_terminate _ OM_VALID OM_FAIR) as OM_TERM.
 
@@ -732,6 +737,56 @@ Section WFAdequacy.
     apply OM_TERM; eauto.
     + apply unit_WF.
     + apply fin_wf.
+  Qed.
+
+  Theorem simple_om_simulation_adequacy_terminate_multiple_waitfree extr
+        (ETR0: valid_init_tpool m (trfirst extr).1)
+        (MOD_INIT: wfs_is_init_st m SPEC (trfirst extr))
+    :
+    extrace_valid extr -> 
+    fair_call extr tpc ii ->
+    terminating_trace extr \/ 
+    exists k, ¬ fits_inf_call ic m ai (trace_take_fwd k extr).
+  Proof.
+    intros VALID FAIR.
+    destruct ETR0 as (e0 & ETR0 & VALID0). 
+
+    destruct (decide (ii = 0 → ∃ e,
+                    from_locale (trfirst extr).1 τi = Some e ∧ under_ctx Ki e = Some (m ai))) as [II0| ].
+    2: { pose proof tc_helper. 
+         clear -n H.
+         right. 
+         apply Classical_Prop.imply_to_and in n as (II & NO0).
+         exists 0. intros FITS. apply NO0.
+         red in FITS. apply proj1 in FITS.
+         fold ii in FITS.
+         rewrite trace_take_fwd_0_first in FITS.
+         rewrite II /= in FITS.
+         red in FITS. simpl in FITS. eauto.
+         red in FITS. rewrite H in FITS.
+         eexists. split; eauto. by rewrite under_ctx_fill. }
+
+    destruct (@decide (∀ e, from_locale (trfirst extr).1 τi = Some e → to_val e = None)) as [E0| ].
+    { destruct (from_locale (trfirst extr).1 τi) eqn:E.
+      2: { left. set_solver. }
+      destruct (to_val e) eqn:V.
+      { right. set_solver. }
+      left. set_solver. }
+    2: { apply not_forall_exists_not in n as [e VAL].
+         apply Classical_Prop.imply_to_and in VAL as [E VAL].
+         right. exists 0. intros FITS. apply VAL.
+         red in FITS. do 2 apply proj2 in FITS.
+         specialize (FITS 0). rewrite trace_take_fwd_0_first /= in FITS.
+         rewrite E in FITS. done. }
+
+    assert (tpool_init_restr (trfirst extr).1) as INIT_TP.
+    { split; [| split].
+      - (* TODO: can generalize to more than 1 initial thread *)
+        rewrite ETR0. constructor; [| done]. eauto.
+      - eauto.
+      - eauto. }
+
+    by apply simple_om_simulation_adequacy_terminate_multiple_waitfree_impl.
   Qed.
 
   Lemma call_continues_or_returns tpc_ c1 c2 oτ
@@ -891,7 +946,7 @@ Proof using.
     eapply mk_is_Some, state_lookup_dom in DOM; eauto. simpl in DOM.
     lia. }
 
-  edestruct @Classical_Prop.classic as [RET | NORET]; [by apply RET| ].   
+  edestruct @Classical_Prop.classic as [RET | NORET]; [by apply RET| ].
   
   
   pose proof DOM as EE. eapply from_locale_trace in EE; eauto.
