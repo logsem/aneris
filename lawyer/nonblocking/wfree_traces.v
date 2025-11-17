@@ -7,6 +7,97 @@ From trillium.traces Require Import exec_traces trace_lookup inftraces.
 
 Close Scope Z.
 
+Section CallInTrace.
+  Context (m: val).
+  
+  Definition has_return_at (tr: extrace heap_lang) '(TraceCtx i tpc as tc) j :=
+    exists r cj, i <= j /\ tr S!! j = Some cj /\ return_at tpc cj r.
+
+  Definition has_return tr tc := exists j, has_return_at tr tc j.
+
+  Definition no_return_before tr tpc i k :=
+    ¬ (exists j, j <= k /\ has_return_at tr (TraceCtx i tpc) j). 
+
+  Definition fair_call tr '(TpoolCtx K τ as tpc) i :=
+    forall k ck, i <= k -> 
+            tr S!! k = Some ck ->
+            locale_enabled τ ck ->
+            (* ¬ (exists j, j <= k /\ has_return_at tr (TraceCtx i tpc) j) -> *)
+            no_return_before tr tpc i k ->
+    exists d cd, tr S!! (k + d) = Some cd /\
+            fairness_sat locale_enabled tid_match τ cd (tr L!! (k + d)). 
+
+  Definition always_returns tr :=    
+    forall tc a ci, let '(TraceCtx i tpc) := tc in
+      (* fair_ex (tpctx_tid tpc) tr -> *)
+      fair_call tr tpc i ->
+      tr S!! i = Some ci ->
+      call_at tpc ci m a (APP := App) ->
+      has_return tr tc.
+
+  (* TODO: generalize to multiple threads *)
+  Definition valid_init_tpool (tp: list expr) :=
+    (exists e0, tp = [subst "m" m e0] /\ valid_client e0). 
+  
+  Definition wait_free (is_init_st: cfg heap_lang -> Prop) := forall etr,
+      valid_init_tpool (trfirst etr).1 ->
+      is_init_st (trfirst etr) ->
+      extrace_valid etr ->
+      always_returns etr.
+
+  Lemma no_return_before_equiv_nvals tr tpc c i k
+    (VALID: extrace_valid tr)
+    (ITH: tr S!! i = Some c)
+    (NVAL: nval_at tpc c)                                     
+    :
+    no_return_before tr tpc i k <->
+    forall j, i <= j <= k -> from_option (nval_at tpc) True (tr S!! j). 
+  Proof using.
+    rewrite /no_return_before.
+    split.
+    - intros NORET j DOM.
+      destruct (tr S!! j) as [c'| ] eqn:JTH; [| done]. simpl.
+      destruct (decide (nval_at tpc c')); [done| ]. exfalso.
+      eapply (call_returns_if_not_continues _ i j) in n; eauto.
+      2: lia.
+      destruct NORET. destruct n as (r&?&?&?&?&?).
+      exists r. split; [lia| ].
+      red. do 2 eexists. split; eauto. lia.
+    - rewrite /has_return_at. 
+      intros CONT (j & LE & (r & c' & GE & JTH & RET)).
+      specialize (CONT j ltac:(lia)). rewrite JTH /= in CONT.
+      edestruct not_return_nval; eauto.
+  Qed.
+
+  Lemma no_return_before_neg_equiv_ret tr tpc c i k
+    (VALID: extrace_valid tr)
+    (ITH: tr S!! i = Some c)
+    (NVAL: nval_at tpc c)                                     
+    :
+    ¬ no_return_before tr tpc i k <->
+    exists j, i <= j <= k /\ from_option (fun c => exists a, return_at tpc c a) False (tr S!! j). 
+  Proof using.
+    rewrite no_return_before_equiv_nvals; eauto.
+    split.
+    - intros NORET. apply not_forall_exists_not in NORET as (j & [XX YY]%Classical_Prop.imply_to_and).
+      destruct (tr S!! j) eqn:JTH; [| done]; simpl in *.
+      eapply (call_returns_if_not_continues _ i j) in YY; eauto.
+      2: lia.
+      destruct YY as (r&?&?&?&?&?).
+      exists r. split; [lia| ].
+      rewrite H0 /=. eauto.
+    - intros (j & DOM & RET).
+      destruct (tr S!! j) eqn:JTH; [| done].
+      simpl in RET.
+      intros CONT. specialize (CONT j ltac:(lia)).
+      rewrite JTH /= in CONT.
+      destruct RET.
+      eapply not_return_nval; eauto.
+  Qed.      
+
+End CallInTrace.
+
+
 Section FitsInfCall.
 
   Context (ic: @trace_ctx heap_lang).
@@ -136,67 +227,3 @@ Section FitsInfCall.
   Qed.
 
 End FitsInfCall. 
-
-Section CallInTrace.
-  Context (m: val).
-  
-  Definition has_return_at (tr: extrace heap_lang) '(TraceCtx i tpc as tc) j :=
-    exists r cj, i <= j /\ tr S!! j = Some cj /\ return_at tpc cj r.
-
-  Definition has_return tr tc := exists j, has_return_at tr tc j.
-
-  Definition no_return_before tr tpc i k :=
-    ¬ (exists j, j <= k /\ has_return_at tr (TraceCtx i tpc) j). 
-
-  Definition fair_call tr '(TpoolCtx K τ as tpc) i :=
-    forall k ck, i <= k -> 
-            tr S!! k = Some ck ->
-            locale_enabled τ ck ->
-            (* ¬ (exists j, j <= k /\ has_return_at tr (TraceCtx i tpc) j) -> *)
-            no_return_before tr tpc i k ->
-    exists d cd, tr S!! (k + d) = Some cd /\
-            fairness_sat locale_enabled tid_match τ cd (tr L!! (k + d)). 
-
-  Definition always_returns tr :=    
-    forall tc a ci, let '(TraceCtx i tpc) := tc in
-      (* fair_ex (tpctx_tid tpc) tr -> *)
-      fair_call tr tpc i ->
-      tr S!! i = Some ci ->
-      call_at tpc ci m a (APP := App) ->
-      has_return tr tc.
-
-  (* TODO: generalize to multiple threads *)
-  Definition valid_init_tpool (tp: list expr) :=
-    (exists e0, tp = [subst "m" m e0] /\ valid_client e0). 
-  
-  Definition wait_free (is_init_st: cfg heap_lang -> Prop) := forall etr,
-      valid_init_tpool (trfirst etr).1 ->
-      is_init_st (trfirst etr) ->
-      extrace_valid etr ->
-      always_returns etr.
-
-  Lemma no_return_before_equiv_nvals tr tpc c i k
-    (VALID: extrace_valid tr)
-    (ITH: tr S!! i = Some c)
-    (NVAL: nval_at tpc c)                                     
-    :
-    no_return_before tr tpc i k <->
-    forall j, i <= j <= k -> from_option (nval_at tpc) True (tr S!! j). 
-  Proof using.
-    rewrite /no_return_before.
-    split.
-    - intros NORET j DOM.
-      destruct (tr S!! j) as [c'| ] eqn:JTH; [| done]. simpl.
-      destruct (decide (nval_at tpc c')); [done| ]. exfalso.
-      eapply (call_returns_if_not_continues _ i j) in n; eauto.
-      2: lia.
-      destruct NORET. destruct n as (r&?&?&?&?&?).
-      exists r. split; [lia| ].
-      red. do 2 eexists. split; eauto. lia.
-    - rewrite /has_return_at. 
-      intros CONT (j & LE & (r & c' & GE & JTH & RET)).
-      specialize (CONT j ltac:(lia)). rewrite JTH /= in CONT.
-      edestruct not_return_nval; eauto.
-  Qed.
-
-End CallInTrace.
