@@ -1008,7 +1008,7 @@ Proof using.
     clear VALID.
     clear ETR0 SPEC.
 
-    clear DOM. 
+    (* clear DOM.  *)
     
     red in FAIR. destruct tpc as [K τ]. 
     ospecialize (FAIR (len - 1)).
