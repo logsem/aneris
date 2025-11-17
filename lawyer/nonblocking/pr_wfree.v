@@ -2,7 +2,7 @@ From iris.proofmode Require Import tactics.
 From trillium.traces Require Import inftraces trace_lookup exec_traces trace_len. 
 From fairness Require Import fairness locales_helpers.
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am obls_termination obligations_wf.
-From lawyer.nonblocking Require Import trace_context om_wfree_inst wptp_gen pwp wfree_traces.
+From lawyer.nonblocking Require Import trace_context om_wfree_inst wptp_gen pwp wfree_traces calls.
 From trillium.program_logic Require Import execution_model weakestpre adequacy_utils adequacy_cond simulation_adequacy_em_cond. 
 From lawyer Require Import action_model sub_action_em.
 From heap_lang Require Import lang.

@@ -1,267 +1,11 @@
 From iris.proofmode Require Import tactics.
 From fairness Require Import locales_helpers utils fairness.
-From lawyer.nonblocking Require Import trace_context.
+From lawyer.nonblocking Require Import trace_context calls.
 From lawyer.nonblocking.logrel Require Import valid_client.
 From heap_lang Require Import lang notation.
 From trillium.traces Require Import exec_traces trace_lookup inftraces.
 
-
-Close Scope Z. 
-
-
-Section UnderCtx.
-
-  Local Definition check P `{Decision P} (e: expr) :=
-    if (decide P) then Some e else None. 
-
-  Definition under_ctx_item (Ki: ectx_item) (e: expr): option expr :=
-    match Ki, e with 
-  | AppLCtx vc2, App e e2 => check (e2 = of_val vc2) e
-  | AppRCtx ec1, App e1 e => check (e1 = ec1) e
-  | UnOpCtx opc, UnOp op e => check (op = opc) e
-  | BinOpLCtx opc vc, BinOp op e1 v2 => check (op = opc /\ v2 = vc) e1
-  | BinOpRCtx opc ec, BinOp op e1 e2 => check (op = opc /\ e1 = ec) e2
-  | IfCtx ec1 ec2, If e e1 e2 => check (e1 = ec1 /\ e2 = ec2) e
-  | PairLCtx vc2, Pair e (Val v2) => check (v2 = vc2) e
-  | PairRCtx ec1, Pair e1 e => check (e1 = ec1) e
-  | FstCtx, Fst e => Some e
-  | SndCtx, Snd e => Some e
-  | InjLCtx, InjL e => Some e
-  | InjRCtx, InjR e => Some e
-  | CaseCtx ec1 ec2, Case e e1 e2 => check (e1 = ec1 /\ e2 = ec2) e
-  | AllocNLCtx vc2, AllocN e (Val v2) => check (v2 = vc2) e
-  | AllocNRCtx ec1, AllocN e1 e => check (e1 = ec1) e
-  | FreeCtx, Free e => Some e
-  | LoadCtx, Load e => Some e
-  | StoreLCtx vc2, Store e (Val v2) => check (v2 = vc2) e
-  | StoreRCtx ec1, Store e1 e => check (e1 = ec1) e
-  | CmpXchgLCtx vc1 vc2, CmpXchg e (Val v1) (Val v2) => check (v1 = vc1 /\ v2 = vc2) e
-  | CmpXchgMCtx ec0 vc2, CmpXchg e0 e (Val v2) => check (e0 = ec0 /\ v2 = vc2) e
-  | CmpXchgRCtx ec0 ec1, CmpXchg e0 e1 e => check (e0 = ec0 /\ e1 = ec1) e
-  | FaaLCtx vc2, FAA e (Val v2) => check (v2 = vc2) e
-  | FaaRCtx ec1, FAA e1 e => check (e1 = ec1) e
-  | _, _ => None
-    end.
-
-  Local Lemma not_eq_helper (x e1 e2: expr)
-    (NEQ: e1 ≠ e2):
-    None = Some x <-> e1 = e2.
-  Proof using. trans False; done. Qed.
-    
-  Lemma under_ctx_item_spec Ki e e':
-    under_ctx_item Ki e = Some e' <-> fill_item Ki e' = e.
-  Proof using.
-    destruct Ki, e; simpl.
-    all: try by apply not_eq_helper. 
-    Local Ltac solve_iff := rewrite /check; destruct decide; try apply not_eq_helper; subst; set_solver.
-    all: try by solve_iff.
-    all: try by set_solver.
-    all: try by (destruct e2; by apply not_eq_helper || solve_iff). 
-    - destruct e2, e3; by apply not_eq_helper || solve_iff.
-    - destruct e3; by apply not_eq_helper || solve_iff.
-  Qed.
-
-  (* TODO: move *)
-  Lemma fill_item_nval_strong e1 e2 i1 i2
-    (NVAL1: to_val e1 = None) (NVAL2: to_val e2 = None)
-    (EQ: fill_item i1 e1 = fill_item i2 e2):
-    i1 = i2 /\ e1 = e2. 
-  Proof using.
-    Set Printing Coercions.
-    destruct i1, i2; simpl in EQ.
-    all: try congruence.
-    all: try by (inversion EQ; subst; done).
-  Qed.
-
-  (* TODO: find existing / duplicates? *)
-  Lemma fill_item_not_val i e
-    (NVAL: to_val e = None):
-    to_val (fill_item i e) = None.
-  Proof using.
-    destruct (to_val (fill_item _ _)) eqn:V; [| done].
-    apply mk_is_Some, fill_item_val in V.
-    destruct V. set_solver.
-  Qed.
-
-  (* (* TODO: move, find existing? *) *)
-  (* Lemma fill_item_not_eq i e: *)
-  (*   fill_item i e ≠ e. *)
-  (* Proof using. *)
-
-  Fixpoint expr_depth (e: expr) :=
-    match e with
-    | Val _ | Var _ | ChooseNat => 0
-    | Rec _ _ e | UnOp _ e | Fst e | Snd e | InjL e
-    | InjR e | Fork e | Free e | Load e
-                                 => S $ expr_depth e
-    | App e1 e2 | BinOp _ e1 e2 | Pair e1 e2
-    | AllocN e1 e2 | Store e1 e2 | FAA e1 e2
-                                   => S $ max (expr_depth e1) (expr_depth e2)
-    | If e0 e1 e2 | Case e0 e1 e2 | CmpXchg e0 e1 e2
-                                    => S $ max_list [expr_depth e0; expr_depth e1; expr_depth e2]
-      end.
-
-  Lemma fill_item_depth i e:
-    expr_depth e < expr_depth (fill_item i e). 
-  Proof using.
-    destruct i; simpl; lia.
-  Qed.
-
-  From lawyer.nonblocking.logrel Require Import substitutions.
-
-  (* TODO: move, find existing? *)
-  Lemma fill_app K1 K2 (e: expr):
-    fill K1 (fill K2 e) = fill (K2 ++ K1) e. 
-  Proof using.
-    rewrite /fill. by rewrite foldl_app.
-  Qed.
-
-  (* TODO: move, find existing? *)
-  Lemma fill_item_fill_1 i (e: expr):
-    fill_item i e = fill [i] e. 
-  Proof using. done. Qed.
-
-  Lemma fill_item_fill K i e:
-    let K' := take (length K) (i :: K) in
-    fill K (fill_item i e) = fill_item (default i (last K)) (fill K' e).
-  Proof using.
-    simpl. 
-    rewrite !fill_item_fill_1.
-    rewrite !fill_app.
-    f_equal.
-    simpl. 
-
-    generalize dependent i. clear e. pattern K. apply rev_ind; clear K. 
-    { done. }
-    intros. simpl. 
-    (* we really only need the tail element, IH doesn't matter *)
-    clear H. 
-    rewrite length_app. simpl.
-    rewrite app_comm_cons.
-    rewrite take_app_length'.
-    2: simpl; lia.
-    rewrite last_snoc. done.
-  Qed.
-
-  Lemma fill_depth' K e
-    (NEMP: K ≠ ectx_emp):
-    expr_depth e < expr_depth (fill K e).
-  Proof using.
-    generalize dependent e.
-    revert NEMP. pattern K. apply rev_ind; clear K. 
-    { done. }
-    simpl. intros.
-    destruct l.
-    { simpl. apply fill_item_depth. }
-    etrans; [apply H; done| ]. 
-    rewrite -fill_app. rewrite -fill_item_fill_1. 
-    apply fill_item_depth.
-  Qed.   
-
-  Lemma fill_depth K e:
-    expr_depth e <= expr_depth (fill K e).
-  Proof using.
-    destruct K.
-    { done. }
-    apply Nat.lt_le_incl.
-    by apply fill_depth'. 
-  Qed.
-
-  Lemma fill_eq_inv (e: expr) K
-    (EQ: fill K e = e):
-    K = [].
-  Proof using. 
-    destruct K; [done| ].
-    symmetry in EQ. 
-    apply (@f_equal _ _ expr_depth) in EQ.
-    apply Nat.lt_neq in EQ; [done| ].
-    by apply fill_depth'.
-  Qed.
-
-  (* TODO: move *)
-  Lemma ectx_fill_ctx_nval e
-    (NVAL: to_val e = None):
-    Inj eq eq (flip fill e).
-  Proof using.
-    red. simpl. intros x. generalize dependent e.
-    pattern x. apply rev_ind; clear x; simpl. 
-    { intros. symmetry. by eapply fill_eq_inv. } 
-    intros a x IH e NVAL y EQ.
-
-    revert EQ. pattern y. apply rev_ind; clear y. 
-    { intros EQ. simpl in EQ. by eapply fill_eq_inv. } 
-
-    intros y' b _ EQ.
-    rewrite -!fill_app -!fill_item_fill_1 in EQ.
-    apply fill_item_nval_strong in EQ as [??].
-    2, 3: by apply fill_not_val. 
-    subst. f_equal. eauto.
-  Qed.
-
-  Fixpoint under_ctx (K: ectx heap_lang) (e: expr): option expr :=
-    match K with
-    | [] => Some e
-    | Ki :: K' => from_option (under_ctx_item Ki) None (under_ctx K' e)
-    end. 
-
-  Lemma under_ctx_spec K e e':
-    under_ctx K e = Some e' <-> fill K e' = e.
-  Proof using.
-    generalize dependent e. generalize dependent e'.
-    induction K.
-    { simpl. set_solver. }
-    intros. simpl. destruct under_ctx eqn:ITEM.
-    2: { apply not_eq_helper.
-         intros EQ. rewrite -IHK in EQ. congruence. }
-    rewrite under_ctx_item_spec.
-    apply IHK in ITEM. simpl in *.
-    rewrite -ITEM. split.
-    + by intros <-.
-    + by intros ?%ectx_fill_inj.
-  Qed.
-
-  Lemma under_ctx_spec_neg K e:
-    under_ctx K e = None <-> forall e', fill K e' ≠ e.
-  Proof using.
-    simpl. split; intros. 
-    - intros EQ%under_ctx_spec. congruence.
-    - destruct under_ctx eqn:UC; [| done].
-      apply under_ctx_spec in UC.
-      edestruct H; eauto.
-  Qed.
-
-  Lemma under_ctx_fill K e:
-    under_ctx K (fill K e) = Some e.
-  Proof using. by apply under_ctx_spec. Qed.
-
-  Lemma under_ctx_val_Some_inv (e ec: expr) K
-    (CTX: under_ctx K e = Some ec)
-    (VAL: is_Some (language.to_val e)):
-    K = ectx_emp /\ ec = e.
-  Proof using.
-    apply under_ctx_spec in CTX. simpl in *.
-    destruct K; simpl in CTX; subst; try done.
-    simpl in VAL.
-    rewrite fill_not_val in VAL.
-    { by destruct VAL. }
-    by destruct e0. 
-  Qed.
-
-  (** specific to heap_lang, as it requires under_ctx *)
-  Global Instance nval_at_dec:
-    forall tc c, Decision (nval_at tc c).
-  Proof using.
-    intros [K τ] ?. rewrite /nval_at /expr_at.
-    apply ex_fin_dec with
-             (l := from_option
-                     (fun e => from_option (flip cons nil) [] (under_ctx K e))
-                     [] (from_locale c.1 τ)); [apply _| ].
-    intros ec (IN & NVAL).
-    rewrite IN. simpl. rewrite under_ctx_fill. simpl. tauto.  
-  Qed.
-
-End UnderCtx.
-
+Close Scope Z.
 
 Section FitsInfCall.
 
@@ -430,5 +174,29 @@ Section CallInTrace.
       is_init_st (trfirst etr) ->
       extrace_valid etr ->
       always_returns etr.
+
+  Lemma no_return_before_equiv_nvals tr tpc c i k
+    (VALID: extrace_valid tr)
+    (ITH: tr S!! i = Some c)
+    (NVAL: nval_at tpc c)                                     
+    :
+    no_return_before tr tpc i k <->
+    forall j, i <= j <= k -> from_option (nval_at tpc) True (tr S!! j). 
+  Proof using.
+    rewrite /no_return_before.
+    split.
+    - intros NORET j DOM.
+      destruct (tr S!! j) as [c'| ] eqn:JTH; [| done]. simpl.
+      destruct (decide (nval_at tpc c')); [done| ]. exfalso.
+      eapply (call_returns_if_not_continues _ i j) in n; eauto.
+      2: lia.
+      destruct NORET. destruct n as (r&?&?&?&?&?).
+      exists r. split; [lia| ].
+      red. do 2 eexists. split; eauto. lia.
+    - rewrite /has_return_at. 
+      intros CONT (j & LE & (r & c' & GE & JTH & RET)).
+      specialize (CONT j ltac:(lia)). rewrite JTH /= in CONT.
+      edestruct not_return_nval; eauto.
+  Qed.
 
 End CallInTrace.

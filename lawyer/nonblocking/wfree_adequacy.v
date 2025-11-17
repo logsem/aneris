@@ -5,7 +5,7 @@ From trillium.prelude Require Import classical.
 From fairness Require Import fairness locales_helpers utils.
 From lawyer Require Import program_logic sub_action_em action_model.
 From lawyer.examples Require Import orders_lib obls_tactics.
-From lawyer.nonblocking Require Import trace_context om_wfree_inst pr_wfree wfree_traces wptp_gen pwp.
+From lawyer.nonblocking Require Import trace_context om_wfree_inst pr_wfree wfree_traces wptp_gen pwp calls.
 From lawyer.nonblocking.logrel Require Import fundamental. 
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am obls_termination.
 From heap_lang Require Import lang simulation_adequacy.
@@ -603,11 +603,6 @@ Section WFAdequacy.
     eapply IHi; eauto. lia. 
   Qed.
 
-  (* TODO: move  *)
-  Lemma locale_of_hl_expr_irrel tp e e':
-    locale_of tp e = locale_of tp e'.
-  Proof using. done. Qed. 
-
   Lemma om_trace_fair 
     (extr: extrace heap_lang)
     (VALID : extrace_valid extr)
@@ -925,16 +920,69 @@ Section WFAdequacy.
 End WFAdequacy.
 
 
+(* Definition no_return_before_alt tr tpc i k := *)
+(*   forall j c a K, j < i -> etr S!! j = Some c -> *)
+(*              call_at tpc c m a (APP := App) -> *)
+(*              exists has_return_at tr *)
+
+(* (* TODO: move *) *)
+(* Lemma no_return_before_equiv tr tpc i k: *)
+(*   no_return_before tr tpc i k <-> *)
+
+Definition all_previous_calls_return etr i τ m :=
+  forall j c a K, j < i -> etr S!! j = Some c ->
+             call_at (TpoolCtx K τ) c m a (APP := App) ->
+             ¬ no_return_before etr (TpoolCtx K τ) j i. 
+
+Lemma find_main_call etr i K τ m a ci
+  (tpc := TpoolCtx K τ)
+  (VALID : extrace_valid etr)
+  (FAIR : fair_call etr tpc i)
+  (ITH : etr S!! i = Some ci)
+  (CALL : call_at tpc ci m a (APP := App)):
+  exists i' K' a' ci',
+    let tpc' := TpoolCtx K' τ in
+    fair_call etr tpc' i' /\ etr S!! i' = Some ci' /\ call_at tpc' ci' m a' (APP := App) /\
+    all_previous_calls_return etr i' τ m /\
+    i' <= i /\ nval_at tpc' ci.
+Proof using.
+Admitted.
+
+
+Definition always_returns_main m tr :=    
+  forall tc a ci, let '(TraceCtx i tpc) := tc in
+      fair_call tr tpc i ->
+      tr S!! i = Some ci ->
+      all_previous_calls_return tr i (tpctx_tid tpc) m ->
+      call_at tpc ci m a (APP := App) ->
+      has_return tr tc.
+
+Lemma main_returns_reduction m etr
+  (VALID: extrace_valid etr):
+  always_returns_main m etr -> always_returns m etr.
+Proof using.
+  rewrite /always_returns_main /always_returns. 
+  intros MAIN_RET. intros [i [K τ]] a ci FAIR ITH CALL.
+  opose proof * find_main_call as X; eauto.
+  destruct X as (i0 & K0 & a0 & c0 & ?&?&?&?&PREV&NVALi0).
+  ospecialize * (MAIN_RET (TraceCtx i0 (TpoolCtx K0 τ))).
+  1-4: by eauto. 
+Abort. 
+
+
 Theorem wfree_is_wait_free m
   (SPEC: WaitFreeSpec m):
   wait_free m (wfs_is_init_st _ SPEC). 
 Proof using.
   red. intros etr ETR0 MOD_INIT VALID.
-  red. intros [i tpc] a ci FAIR ITH CALL. 
+  red. intros [i tpc] a ci FAIR ITH CALL.
+
+  (* opose proof * find_top_call as C; eauto. *)
+  (* clear i. *)
 
   opose proof * (obls_terminates_impl_multiple_waitfree (TraceCtx i tpc)) as ADEQ; eauto.
   { simpl. by rewrite ITH. }
-  destruct ADEQ as [TERM| ?]; [| done]. 
+  destruct ADEQ as [TERM| ?]; [| done].
 
   pose proof (trace_has_len etr) as [? LEN].
   eapply terminating_trace_equiv in TERM as [len EQ]; eauto. subst.
@@ -948,14 +996,20 @@ Proof using.
 
   edestruct @Classical_Prop.classic as [RET | NORET]; [by apply RET| ].
   
-  
   pose proof DOM as EE. eapply from_locale_trace in EE; eauto.
   2: { eapply locales_of_cfg_Some. eapply expr_at_in_locales.
        erewrite <- surjective_pairing. eauto. }
   rewrite LAST /= in EE. destruct EE as [e EE].
   
   destruct (decide (nval_at tpc c)) as [NVAL | VAL]. 
-  + 
+  + clear ITH.
+    clear CALL.
+    clear MOD_INIT.
+    clear VALID.
+    clear ETR0 SPEC.
+
+    clear DOM. 
+    
     red in FAIR. destruct tpc as [K τ]. 
     ospecialize (FAIR (len - 1)).
     
