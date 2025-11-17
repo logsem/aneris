@@ -706,10 +706,7 @@ Section WFAdequacy.
 
     destruct (Classical_Prop.classic (∃ j, has_return_at extr ic j)) as [[j RET]| NORET].
     { red in RET. rewrite ic_helper in RET. destruct RET as (r & cj & ? & JTH & RET).
-      right. exists j. rewrite /fits_inf_call.
-      apply Classical_Prop.or_not_and. right. 
-      apply Classical_Prop.or_not_and. left.
-      intros NVALS.
+      right. exists j. intros [_ NVALS _]. 
       specialize (NVALS _ H).
       erewrite trace_take_fwd_lookup_Some' in NVALS; eauto.
       simpl in NVALS.
@@ -753,12 +750,12 @@ Section WFAdequacy.
          right. 
          apply Classical_Prop.imply_to_and in n as (II & NO0).
          exists 0. intros FITS. apply NO0.
-         red in FITS. apply proj1 in FITS.
-         fold ii in FITS.
-         rewrite trace_take_fwd_0_first in FITS.
-         rewrite II /= in FITS.
-         red in FITS. simpl in FITS. eauto.
-         red in FITS. rewrite H in FITS.
+         destruct FITS.
+         fold ii in fic_call.
+         rewrite trace_take_fwd_0_first in fic_call.
+         rewrite II /= in fic_call.
+         red in fic_call. simpl in fic_call. eauto.
+         red in fic_call. rewrite H in fic_call.
          eexists. split; eauto. by rewrite under_ctx_fill. }
 
     destruct (@decide (∀ e, from_locale (trfirst extr).1 τi = Some e → to_val e = None)) as [E0| ].
@@ -770,9 +767,9 @@ Section WFAdequacy.
     2: { apply not_forall_exists_not in n as [e VAL].
          apply Classical_Prop.imply_to_and in VAL as [E VAL].
          right. exists 0. intros FITS. apply VAL.
-         red in FITS. do 2 apply proj2 in FITS.
-         specialize (FITS 0). rewrite trace_take_fwd_0_first /= in FITS.
-         rewrite E in FITS. done. }
+         destruct FITS. 
+         specialize (fic_never_val 0). rewrite trace_take_fwd_0_first /= in fic_never_val.
+         rewrite E in fic_never_val. done. }
 
     assert (tpool_init_restr (trfirst extr).1) as INIT_TP.
     { split; [| split].
@@ -866,10 +863,13 @@ Section WFAdequacy.
 
     destruct ADEQ as [| [n NFIT]]; [tauto| ].
     right. red. simpl in *.
-    rewrite /fits_inf_call in NFIT.
-    destruct (extr S!! ii) as [ci | ] eqn:ITH; rewrite ITH /= in CALL; [| done]. 
-    apply Classical_Prop.not_and_or in NFIT as [NFIT | X].
-    2: apply Classical_Prop.not_and_or in X as [NFIT | NFIT].
+    (* rewrite /fits_inf_call in NFIT. *)
+    destruct (extr S!! ii) as [ci | ] eqn:ITH; rewrite ITH /= in CALL; [| done].
+    pose proof (FIC ic m ai (trace_take_fwd n extr)) as X.
+    rewrite !curry_uncurry_prop in X. apply Classical_Prop.imply_to_or in X.
+    destruct X as [NFIT' | ?]; [| done]. clear NFIT. rename NFIT' into NFIT.
+    apply Classical_Prop.not_and_or in NFIT as [X | NFIT].
+    1: apply Classical_Prop.not_and_or in X as [NFIT | NFIT].
     - destruct (trace_take_fwd n extr !! tctx_index ic) eqn:II; rewrite II /= // in NFIT.
       destruct NFIT.
       apply trace_take_fwd_lookup_Some in II.

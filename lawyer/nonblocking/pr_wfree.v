@@ -347,9 +347,9 @@ Section WaitFreePR.
       iDestruct (obls_msi_exact with "[$] [$]") as %NOOBS.
       by rewrite NOOBS in OBS.
     - iPureIntro.
-      red in FIT. do 2 (apply proj2 in FIT).
-      ospecialize (FIT (trace_length etr - 1)).
-      erewrite (trace_lookup_last etr) in FIT.
+      destruct FIT. 
+      ospecialize (fic_never_val (trace_length etr - 1)).
+      erewrite (trace_lookup_last etr) in fic_never_val. 
       2: { simpl. rewrite -Nat.sub_succ_l; [lia| ].
            destruct etr; simpl; lia. }
       done. 
@@ -580,7 +580,8 @@ Section WaitFreePR.
   (* TODO: refactor *)
   Lemma cur_phases_other_step `{!ObligationsGS Σ} etr c' τ
     (STEP: locale_step (trace_last etr) (Some τ) c')
-    (etr' := etr :tr[ Some τi ]: c')
+    (* (etr' := etr :tr[ Some τi ]: c') *)
+    (etr' := etr :tr[ Some τ ]: c')
     (FITS: fits_inf_call ic m ai etr')
     (OTHER: τ ≠ τi):
     cur_phases etr -∗
@@ -610,12 +611,12 @@ Section WaitFreePR.
          { rewrite subseteq_empty_difference_L; [| done]. set_solver. }
          rewrite union_empty_r_L. 
          destruct (decide (trace_length etr = ii)).
-         - apply proj1 in FITS. subst etr'.
-           rewrite trace_lookup_last in FITS.
+         - destruct FITS. 
+           rewrite trace_lookup_last in fic_call .
            2: { simpl in *. lia. }
-           simpl in FITS.
+           simpl in fic_call. 
            iSpecialize ("PHτi" with "[]").
-           { iPureIntro. red in FITS. 
+           { iPureIntro. red in fic_call. 
              pose proof STEP as EQ%locale_step_step_fork_exact.
              rewrite SF /= union_empty_r_L in EQ. rewrite -EQ.
              eapply expr_at_in_locales; eauto. }
@@ -664,16 +665,16 @@ Section WaitFreePR.
     rewrite big_opS_singleton. iFrame "PH'".
 
     destruct (decide (trace_length etr = ii)).
-    - apply proj1 in FITS. subst etr'.
-      rewrite trace_lookup_last in FITS.
+    - destruct FITS. subst etr'.
+      rewrite trace_lookup_last in fic_call.
       2: { simpl in *. lia. }
-      simpl in FITS.
+      simpl in fic_call.
       iSpecialize ("PHτi" with "[]").
-      { iPureIntro. red in FITS. 
+      { iPureIntro. red in fic_call. 
         pose proof STEP as EQ%locale_step_step_fork_exact.
         rewrite SF /= in EQ.
-        apply expr_at_in_locales in FITS. rewrite EQ in FITS.
-        apply elem_of_union in FITS as [|]; eauto.
+        apply expr_at_in_locales in fic_call. rewrite EQ in fic_call.
+        apply elem_of_union in fic_call as [|]; eauto.
         set_solver. }
       iDestruct "PHτi" as (?) "PH".
       rewrite leb_correct; [| simpl in *; lia].
@@ -1166,14 +1167,14 @@ Section WaitFreePR.
             Unshelve. 2: exact ai. 
             rewrite /wp_tc. rewrite leb_correct_conv.
             2: { simpl. lia. }
-            red in FIT. apply proj1 in FIT.
-            rewrite trace_lookup_extend in FIT; [| done].
-            simpl in FIT. do 2 red in FIT. rewrite ic_helper /= in FIT.
-            rewrite e0 /= in FIT.
-            replace (locale_of t1 e) with (locale_of t1 e') in FIT.
+            destruct FIT. 
+            rewrite trace_lookup_extend in fic_call; [| done].
+            simpl in fic_call. do 2 red in fic_call. rewrite ic_helper /= in fic_call.
+            rewrite e0 /= in fic_call.
+            replace (locale_of t1 e) with (locale_of t1 e') in fic_call.
             2: { done. }
-            rewrite /from_locale from_locale_from_locale_of in FIT.
-            inversion FIT. subst e'. 
+            rewrite /from_locale from_locale_from_locale_of in fic_call.
+            inversion fic_call. subst e'. 
             erewrite (proj2 (under_ctx_spec _ _ _)). 
             { simpl. iApply (wp_stuck_mono with "[$]"). done. }
             reflexivity. }
@@ -1287,8 +1288,10 @@ Section WaitFreePR.
         iDestruct (cur_obls_sigs_other_step with "[$]") as "(OB & OBτi & OBLS)".
         { by rewrite FIN. }
         { congruence. }
-        iDestruct (cur_phases_other_step with "[$]") as "(PH & PHS)"; eauto.
+        iDestruct (cur_phases_other_step _ _ τ with "[$]") as "(PH & PHS)".
         { rewrite FIN. subst τ. eauto. }
+        { eauto. }
+        { congruence. }
         iDestruct "PH" as (π) "PH". rewrite H3. 
 
         remember (step_fork (trace_last etr) (t1 ++ e' :: t2 ++ efs, σ')) as sf.
@@ -1439,10 +1442,10 @@ Section WaitFreePR.
              iPoseProof (get_call_wp ai with "[] [$] [$]") as "WP".
              { iDestruct "INV" as "[??]". done. }
 
-             red in FIT. apply proj1 in FIT.
-             rewrite trace_lookup_last in FIT.
+             destruct FIT.
+             rewrite trace_lookup_last in fic_call. 
              2: { simpl in *. lia. }
-             simpl in FIT. red in FIT.
+             simpl in fic_call. red in fic_call.
 
              subst τ. apply step_fork_hl in STEP as [[? ->] | (?&->&?)].
              { simpl. by rewrite FIN H2 in Heqsf. }
@@ -1470,15 +1473,15 @@ Section WaitFreePR.
              2: { simpl in *. lia. }
              simpl.
 
-             red in FIT. rewrite ic_helper /= in FIT.
+             red in fic_call. rewrite ic_helper /= in fic_call.
              rewrite /τi /= in H4. 
-             rewrite /τi -H4 /= in FIT. 
-             rewrite app_comm_cons app_assoc in FIT. 
+             rewrite /τi -H4 /= in fic_call. 
+             rewrite app_comm_cons app_assoc in fic_call. 
              assert (locale_of (t1 ++ e :: t2) x = locale_of (t1 ++ e' :: t2) x) as RR. 
              { rewrite /locale_of !length_app. done. }
-             rewrite /= RR in FIT. 
-             rewrite /from_locale from_locale_from_locale_of in FIT.
-             inversion FIT. subst x. clear FIT.
+             rewrite /= RR in fic_call. 
+             rewrite /from_locale from_locale_from_locale_of in fic_call.
+             inversion fic_call. subst x. clear fic_call.
              rewrite under_ctx_fill. simpl. rewrite H4. 
              iApply (wp_stuck_mono with "[$]"). done.
 
@@ -1531,11 +1534,11 @@ Section WaitFreePR.
              iDestruct (wptp_from_gen_app' with "[$]") as "[WPS WPS']".
              { rewrite -EQ -EQ'. rewrite !length_app. simpl. lia. }
 
-             red in FIT. apply proj1 in FIT.
-             rewrite trace_lookup_last in FIT.
+             destruct FIT. 
+             rewrite trace_lookup_last in fic_call.
              2: { simpl in *. lia. }
-             simpl in FIT. red in FIT.
-             red in FIT. rewrite ic_helper /= in FIT. 
+             simpl in fic_call. red in fic_call.
+             red in fic_call. rewrite ic_helper /= in fic_call. 
 
              assert (τi ∉ locales_of_list_from (t1 ++ e' :: t2) efs) as NONEW.
              { subst τ. eapply τi_not_in; eauto. by rewrite -Heqsf. }
@@ -1543,15 +1546,15 @@ Section WaitFreePR.
              assert (from_locale (t1 ++ e' :: t2) τi = Some (fill Ki (m ai))) as CUR.
              { apply from_locale_from_lookup. split; [| simpl; lia].
                simpl. rewrite Nat.sub_0_r.
-               simpl in FIT. apply from_locale_from_lookup, proj1 in FIT.
-               rewrite /= Nat.sub_0_r in FIT.
-               rewrite app_comm_cons app_assoc in FIT.
-               apply lookup_app_Some in FIT. destruct FIT as [? | [OVER ?]].
+               simpl in fic_call. apply from_locale_from_lookup, proj1 in fic_call.
+               rewrite /= Nat.sub_0_r in fic_call.
+               rewrite app_comm_cons app_assoc in fic_call.
+               apply lookup_app_Some in fic_call. destruct fic_call as [? | [OVER ?]].
                { done. }
                destruct NONEW. rewrite locales_of_list_from_indexes.
                apply elem_of_lookup_imap.
               eexists (τi - length (t1 ++ e' :: t2)), _. split; [lia| done]. }
-             clear FIT.
+             clear fic_call.
 
              iApply wptp_from_gen_app. iSplitR "WPS'".
              2: { simpl.
@@ -1599,6 +1602,7 @@ Section WaitFreePR.
         { congruence. }
         iDestruct (cur_phases_other_step with "[$]") as "(PH & PHS)"; eauto.
         { rewrite FIN. subst τ. eauto. }
+        { congruence. }
         iDestruct "PH" as (π) "PH". rewrite H3.
 
         rewrite {1}/obls_τi'.

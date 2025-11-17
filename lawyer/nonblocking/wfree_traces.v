@@ -108,23 +108,24 @@ Section FitsInfCall.
 
   Context (m: val) (ai: val). 
 
-  Definition fits_inf_call (etr: execution_trace heap_lang): Prop :=
-    from_option (fun c => call_at tc c m ai (APP := App)) True (etr !! ii) /\
-    (forall j, ii <= j -> from_option (nval_at tc) True (etr !! j)) /\
-    (forall i, from_option (fun e => to_val e = None) True
-            (from_option (fun c => from_locale c.1 τi) None (etr !! i))).
+  Record fits_inf_call (etr: execution_trace heap_lang): Prop := FIC {
+    fic_call: from_option (fun c => call_at tc c m ai (APP := App)) True (etr !! ii);
+    fic_cont: forall j, ii <= j -> from_option (nval_at tc) True (etr !! j);
+    fic_never_val: forall i, from_option (fun e => to_val e = None) True
+            (from_option (fun c => from_locale c.1 τi) None (etr !! i));
+  }.
 
   Lemma fits_inf_call_last_or_short etr
     (FITS: fits_inf_call etr):
     (nval_at tc (trace_last etr)) \/ trace_length etr <= ii. 
   Proof using.
     edestruct Nat.lt_ge_cases as [LT| ]; [| by eauto].
-    red in FITS. apply proj2, proj1 in FITS. red in LT.
-    ospecialize * (FITS (trace_length etr - 1)).
+    destruct FITS. 
+    ospecialize * (fic_cont0 (trace_length etr - 1)).
     { lia. }
-    rewrite trace_lookup_last in FITS.
+    rewrite trace_lookup_last in fic_cont0. 
     2: { lia. }
-    simpl in FITS. by left.
+    simpl in fic_cont0. by left.
   Qed.
 
   (* TODO: move *)
@@ -140,7 +141,7 @@ Section FitsInfCall.
   Proof using.
     red. intros etr τ c FITS. 
     pose proof (ft_lookup_old etr c τ) as LOOKUP.  
-    destruct FITS as (II & FITS & NVAL). split; [| split]. 
+    destruct FITS as [II FITS NVAL]. split. 
     - destruct (etr !! ii) eqn:ITH; [| done].
       simpl. 
       eapply LOOKUP in ITH.
@@ -176,8 +177,7 @@ Section FitsInfCall.
     (LEN: ii < trace_length etr):
     τi ∈ locales_of_cfg (trace_last etr).
   Proof using.
-    red in FITS. 
-    destruct FITS as (_ & NEXT & _).
+    destruct FITS as [_ NEXT _].
     ospecialize (NEXT (trace_length etr - 1) _).
     { lia. }
     rewrite trace_lookup_last in NEXT.
@@ -191,11 +191,32 @@ Section FitsInfCall.
 
   Global Instance fic_dec: ∀ etr, Decision (fits_inf_call etr).
   Proof using.
-    intros. rewrite /fits_inf_call.
-    apply and_dec.
+    intros. pose proof (FIC etr).
+
+    Ltac step_dec_proof := match goal with
+    | H : ?P -> ?Q |- _ => destruct (@decide P) as [Y | N]; 
+                        [try by solve_decision |
+                         specialize (H Y); clear Y |
+                         right; intros [???]; tauto] end
+      .
+    step_dec_proof.
     { destruct (etr !! ii); solve_decision. }
-    apply and_dec; cycle 1. 
-    - apply Decision_iff_impl with
+    step_dec_proof.
+    { apply Decision_iff_impl with (P := Forall (fun j => from_option (nval_at tc) True (etr !! j)) (seq ii (trace_length etr - tctx_index ic))).
+      2: { apply Forall_dec. intros. destruct lookup; solve_decision. }
+      rewrite List.Forall_forall. simpl.
+      apply forall_proper. intros i.
+      rewrite in_seq.
+      split; intros X II.
+      2: { apply X. lia. }
+      destruct (etr !! i) eqn:ITH; try done. apply X.
+      split; auto.
+      apply trace_lookup_lt_Some_1 in ITH. 
+      rewrite -Nat.le_add_sub; [done| ]. 
+      edestruct Nat.le_gt_cases as [LE | GT]; [by apply LE| ].
+      simpl in *. lia. }
+    step_dec_proof.
+    { apply Decision_iff_impl with
         (P := Forall (fun i => from_option (fun e => to_val e = None) True
                         (from_option (fun c => from_locale c.1 τi) None (etr !! i)))
                 (seq 0 (trace_length etr))).
@@ -209,21 +230,9 @@ Section FitsInfCall.
       fold τi. split; auto.
       intros.
       destruct lookup eqn:ITH; try done. simpl in *.
-      apply H. split; [lia| ].
-      eapply trace_lookup_lt_Some_1; eauto. 
-    - apply Decision_iff_impl with (P := Forall (fun j => from_option (nval_at tc) True (etr !! j)) (seq ii (trace_length etr - tctx_index ic))).
-      2: { apply Forall_dec. intros. destruct lookup; solve_decision. }
-      rewrite List.Forall_forall. simpl.
-      apply forall_proper. intros i.
-      rewrite in_seq.
-      split; intros X II.
-      2: { apply X. lia. }
-      destruct (etr !! i) eqn:ITH; try done. apply X.
-      split; auto.
-      apply trace_lookup_lt_Some_1 in ITH. 
-      rewrite -Nat.le_add_sub; [done| ]. 
-      edestruct Nat.le_gt_cases as [LE | GT]; [by apply LE| ].
-      simpl in *. lia. 
-  Qed.
+      apply H0. split; [lia| ].
+      eapply trace_lookup_lt_Some_1; eauto. }
+    by left.
+  Qed. 
 
 End FitsInfCall. 
