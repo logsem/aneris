@@ -1042,7 +1042,7 @@ Section WaitFreePR.
   (* Φs2 : list (val → iPropI Σ) *)
   (* EQ' : [Φ] ++ Φs2 = Φs' *)
 
-  Lemma wptp_wfree_take_τi_step
+  Lemma wptp_wfree_take_step_τi
     (EQ_TID: oτ = Some τi)
     (STEP: locale_step c oτ c')
     (FIT: fits_inf_call ic m ai (etr :tr[ oτ ]: c')):
@@ -1320,9 +1320,9 @@ Section WaitFreePR.
       by iFrame.
   Qed.
 
-
-  Lemma wptp_wfree_take_step'
+  Lemma wptp_wfree_take_step'_other
     (STEP: locale_step c oτ c')
+    (OTHER: oτ ≠ Some τi)
     (FIT: fits_inf_call ic m ai (etr :tr[ oτ ]: c')):
     state_interp etr mtr -∗ wfree_trace_inv etr mtr -∗
     pr_pr_wfree s etr Φs 
@@ -1342,618 +1342,221 @@ Section WaitFreePR.
     set (τ := locale_of t1 e). 
 
     iEval (rewrite /thread_pr) in "WP".
-    destruct decide.
-    - subst τ.
-      rewrite /wp_tc.
+    assert (τi ≠ locale_of t1 e) as OTHER'.
+    { by intros ->. }
+    clear OTHER. 
+    
+    rewrite decide_False; [| done]. 
+    destruct (trace_length etr <=? ii) eqn:LEN.
+    + apply Nat.leb_le in LEN.
+      simpl.
 
-      iDestruct (cur_phases_τi_step with "[$]") as "(PH & PHS)".
-      { by rewrite e0 FIN. }
-      iDestruct "PH" as "(%π & PH)". 
+      iDestruct (split_trace_fuel with "[$]") as "(CP & CPP & CPS)"; [done| ].
+      iDestruct (cur_obls_sigs_other_step with "[$]") as "(OB & OBτi & OBLS)".
+      { by rewrite FIN. }
+      { congruence. }
+      iDestruct (cur_phases_other_step _ _ τ with "[$]") as "(PH & PHS)".
+      { rewrite FIN. subst τ. eauto. }
+      { eauto. }
+      { subst τ. congruence. }
+      iDestruct "PH" as (π) "PH". 
 
-      iAssert (⌜ ps_phases (trace_last mtr) !! τi = Some π ⌝)%I as "%PH".
-      { iApply (th_phase_msi_frag with "[-PH] [$]").
-        by iDestruct "TI" as "(?&?&(?&?&?))". }
-      iAssert (⌜ obls_cfg_corr (trace_last etr) (trace_last mtr) ⌝)%I as "%CORR".
-      { iDestruct "TI" as "(_&_&CORR)".
-        rewrite /obls_asem_mti /obls_si.
-        iDestruct "CORR" as "(_&%CORR)". done. }
+      remember (step_fork (trace_last etr) (t1 ++ e' :: t2 ++ efs, σ')) as sf.
 
-      destruct Nat.leb eqn:LEN.
-      + apply Nat.leb_le in LEN.
-        simpl. 
+      iDestruct (@pwp_MU_ctx_take_step _ _ _ Hinv with "TI [CP PH OB OBτi] WP") as "STEP".
+      1-2: by eauto.
+      { red. rewrite FIN. erewrite ectx_fill_emp. reflexivity. }
+      { done. }
+      { clear FIT NO1 NO2 NO'.
+        clear LEN VALID PSTEP.
+        clear Φs1  LEN1 EQ_Φs.
+        clear dependent Φ Φs2.
 
-        iDestruct (split_trace_fuel with "[$]") as "(CP & CPP & CPS)"; [done| ].
-        iDestruct (cur_obls_sigs_τi_step with "[$]" ) as "(OB & OBLS)".
-        { by rewrite e0 FIN. }
+        (* TODO: extract a lemma *)
+        rewrite -Heqsf. 
+        rewrite (cp_weaken _ π); [| by apply phase_le_init].
+        rewrite /obls_τi' /obls_τi. 
 
-        rewrite {1}/obls_τi. iDestruct "OB" as "(%si & OB & SGN & EP)".
+        set (upd := fun (R1 R2: gset SignalId) => let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
+                      (⌜ R1 = ∅ ⌝ ∗ 
+                      if (decide (sf = Some τi))
+                      then (∃ s, ⌜ R2 = {[ s ]} ⌝ ∗ sgn s l0 (Some false) ∗ ep s π0 d0)%I
+                      else (⌜ R2 = ∅ ⌝ ∗ obls_τi' (t1 ++ e' :: t2 ++ efs, σ')))%I). 
+        iApply (MU_burn_cp _ _ _ _ upd with "[-]").
+        iFrame "CP PH". subst upd. simpl.
+        rewrite -FIN in STEP.
+        destruct sf; simpl. 
+        2: { iModIntro. do 2 iExists _.
+             iSplitL "OB".
+             { erewrite union_empty_r_L. iFrame. }
+             repeat (iSplit; try done). 
+             iApply obls_τi'_next; [| done].
+             apply locale_step_step_fork_exact in STEP.
+             rewrite -Heqsf in STEP. set_solver. }
+        destruct (decide (l = τi)) as [-> | NEQ].
+        - rewrite decide_False.
+          2: { eapply locale_step_fork_Some in STEP; eauto. tauto. }
+          iMod (OU_create_sig with "[$]") as "(%sg & SGN & OB & _)".
+          { rewrite /WF_SB. lia. }
+          iDestruct (sgn_get_ex with "[$]") as "(SGN & #SGN0)". 
+          iMod (create_ep_upd with "[OBτi] SGN0") as "(#EP & _)".
+          { apply (orders_lib.ith_bn_lt 2 0 1). lia. }
+          { iFrame. }
+          iModIntro. do 2 iExists _. rewrite decide_True; [| done].
+          iFrame. iFrame "#∗". iPureIntro. set_solver. 
+        - iModIntro. iFrame.
+          setoid_rewrite (@decide_False _ (Some l = _)); [| congruence].
+          do 2 iExists _. erewrite union_empty_r_L. iFrame. 
+          repeat iSplit; try done. 
+          (* TODO: refactor *)
+          rewrite /obls_τi'.
+          apply locale_step_step_fork_exact in STEP. rewrite STEP.
+          erewrite decide_ext; [by iFrame| ].
+          rewrite -Heqsf. simpl. set_solver. }
 
-        iDestruct (@pwp_MU_ctx_take_step _ _ _ Hinv with "TI [CP PH OB] WP") as "STEP".
-        1-2: by eauto. 
-        { red. rewrite FIN. erewrite ectx_fill_emp. reflexivity. }
-        { done. }
-        { rewrite (cp_weaken _ π); [| by apply phase_le_init].
-          iApply (MU_burn_cp _ _ _ _ (fun R1 R2 => (⌜ R1 = {[ si ]} /\ R2 = ∅ ⌝)%I) with "[$CP $PH OB]").
-          iModIntro. do 2 iExists _. iSplit.
-          2: { iPureIntro. split; [split| ]; try reflexivity. done. }
-          by rewrite union_empty_r_L. }
+      iMod "STEP". iModIntro.
+      iMod "STEP". iModIntro. iNext. 
+      iMod "STEP". iModIntro.
+      iApply (step_fupdN_wand with "[STEP]"); first by iApply "STEP".
+      iIntros "STEP".
+      iMod "STEP" as (δ' ℓ) "(HSI & He2 & WPS' & MOD) /=".
+
+      iDestruct "MOD" as (π' R1 R2) "(PH & (-> & MOD) & %DISJ12 & MOD')".        
+      rewrite union_empty_l_L. 
+        
+      iAssert (@state_interp _ M _ _ (etr :tr[ Some τ ]: (t1 ++ e' :: t2 ++ efs, σ')) _)%I with "[HSI]" as "TI".
+      { simpl. iDestruct "HSI" as "(?&?&?)". iFrame. }
+
+      iSpecialize ("PHS" with "[$PH]"). 
+      (* iSpecialize ("OBLS" with "[$]"). *)
+
+      iModIntro.
+      do 2 iExists _.
+      iFrame "TI".
+
+      (** first close the wptp for the _current_ trace length *)
+      iAssert (wptp_gen (thread_pr s (trace_length etr)) (t1 ++ e' :: t2 ++ efs) (Φs ++ newposts (t1 ++ e :: t2) (t1 ++ e' :: t2 ++ efs)))%I with "[WPS1 WPS2 WPS' He2]" as "WPS_PRE". 
+      { rewrite app_comm_cons app_assoc.
+        iApply wptp_from_gen_app. iSplitR "WPS'".
+        2: { simpl. rewrite /newposts.
+             rewrite newelems_app_drop.
+             2: { rewrite !length_app. simpl. lia. }
+
+             subst τ.
+             apply step_fork_hl in STEP as [[? ->] | (?&->&?)].
+             - simpl. set_solver.
+             - rewrite wptp_gen_singleton. rewrite /thread_pr.
+               rewrite /wp_tc. rewrite leb_correct; [| done].
+               rewrite big_sepL_singleton. simpl. rewrite app_nil_r.
+               replace (locale_of (t1 ++ e' :: t2) x) with (locale_of (t1 ++ e :: t2) x).
+               2: { rewrite /locale_of. rewrite !length_app. simpl. lia. } 
+               destruct decide as [-> | ?]; done. }
           
-        iMod "STEP". iModIntro.
-        iMod "STEP". iModIntro. iNext. 
-        iMod "STEP". iModIntro.
-        iApply (step_fupdN_wand with "[STEP]"); first by iApply "STEP".
-        iIntros "STEP".
-        iMod "STEP" as (δ' ℓ) "(HSI & He2 & WPS' & MOD) /=".
+        rewrite EQ_Φs. iApply wptp_from_gen_app. iFrame "WPS1". 
 
-        iDestruct "MOD" as (π' ??) "(PH & [->->] & _ & MOD')".
-        rewrite union_empty_r_L. 
-
-        iAssert (@state_interp _ M _ _ (etr :tr[ Some τi ]: (t1 ++ e' :: t2 ++ efs, σ')) _)%I with "[HSI]" as "TI".
-        { simpl. iDestruct "HSI" as "(?&?&?)". iFrame. }
-
-        iModIntro.
-        do 2 iExists _.
-        iSplitL "TI".
-        { simpl. rewrite e0. iFrame. }
-
-        iAssert (wp_tc s e' (S (trace_length etr) <=? ii) Φ -∗
-                 wptp_wfree s
-                 (etr :tr[ Some (locale_of t1 e) ]: (t1 ++ e' :: t2 ++ efs, σ'))
-                 (Φs ++ newposts (t1 ++ e :: t2) (t1 ++ e' :: t2 ++ efs) (irisG0 := {|
-      iris_invGS :=
-        @iem_invGS heap_lang
-          (AM2M
-             (@ObligationsAM (@sigO natO (λ i : nat, i < 2)) unitO
-                (locale heap_lang) WF_SB OP Nat.inhabited))
-          HeapLangEM EM Σ Hinv;
-      state_interp :=
-        @state_interp heap_lang M Σ (@IEM_irisG heap_lang M HeapLangEM EM Σ Hinv);
-      fork_post := λ (_ : locale heap_lang) (_ : val), True        
-    |})))%I with "[WPS1 WPS2 WPS']" as "WPS". 
-        { iIntros "WP".
-          rewrite app_comm_cons app_assoc.
-          iApply wptp_from_gen_app. iSplitR "WPS'".
-          2: { simpl. rewrite /newposts.
-               rewrite newelems_app_drop.
-               2: { rewrite !length_app. simpl. lia. }
-
-               apply step_fork_hl in STEP as [[? ->] | (?&->&?)].
-               - simpl. set_solver.
-               - rewrite wptp_gen_singleton. rewrite /thread_pr.
-                 rewrite decide_False.
-                 2: { intros ->. rewrite /locale_of in e0.
-                      rewrite !length_app in e0. simpl in e0. lia. }
-                 rewrite big_sepL_singleton. simpl.
-                 rewrite app_nil_r.
-                 replace (locale_of (t1 ++ e' :: t2) x) with (locale_of (t1 ++ e :: t2) x); [done| ].
-                 rewrite /locale_of. rewrite !length_app. simpl. lia. } 
-          
-          rewrite EQ_Φs. iApply wptp_from_gen_app. iSplitL "WPS1".
-          { iApply (wptp_wfree_upd_other with "[$]").
-            by rewrite e0. }
-
-          simpl. iApply wptp_from_gen_cons.
-          iSplitL "WP".
-          2: { erewrite wptp_from_gen_locales_equiv_1 with (t0' := (t1 ++ [e'])).
-               2: { rewrite !prefixes_from_app.
-                    eapply Forall2_app; [apply adequacy_utils.locales_equiv_refl| ].
-                    simpl. by constructor. }
-               iApply (wptp_wfree_upd_other with "[$]").
-               by rewrite e0. }
+        simpl. iApply wptp_from_gen_cons.          
+        iSplitL "He2".
+        2: { erewrite wptp_from_gen_locales_equiv_1 with (t0' := (t1 ++ [e'])).
+             { done. }
+             rewrite !prefixes_from_app.
+             eapply Forall2_app; [apply adequacy_utils.locales_equiv_refl| ].
+             simpl. by constructor. }
                
-          rewrite /thread_pr. rewrite decide_True; [done| ]. 
-          rewrite e0. done. }
+        rewrite /thread_pr.
+        rewrite /wp_tc. rewrite leb_correct; [| done].
+        subst τ. 
+        destruct decide as [-> | ?]; done. }
 
+      destruct (decide (sf = Some τi)) as [-> | NO].
+      * simpl. symmetry in Heqsf.
+        rewrite decide_True //.
+        iDestruct "MOD" as "(% & -> & SGN & #EP)".
+        iDestruct "MOD'" as "(% & PHτi & OB & OBτi)". 
+
+        iSpecialize ("OBLS" with "[$] [SGN OBτi] []").
+        { rewrite /obls_τi'. rewrite decide_True.
+          { iFrame "#∗". }
+          apply locale_step_step_fork_exact in STEP. rewrite STEP.
+          rewrite -FIN Heqsf. set_solver. }
+        { iIntros (? (?&?)). set_solver. }
+        iFrame "OBLS".          
+
+        rewrite Heqsf. 
+        iDestruct ("PHS" with "[$PHτi]") as "[PHS PHτi]".
+        iFrame "PHS". 
+          
         (* pr is reestablished differently depending on whether we reach ii.
            TODO: try to unify it *)
         apply Nat.le_lteq in LEN as [LT | <-].
-        * iSpecialize ("CPS" with "[$CPP]"); [done| ]. 
-          iSpecialize ("WPS" with "[He2]").
-          { rewrite /wp_tc. rewrite leb_correct.
-            2: { simpl in *. lia. }
-            done. }
-          
-          iFrame "CPS WPS".
-          rewrite leb_correct; [| simpl in *; lia].
-          iSpecialize ("PHS" with "[PH]"); [by eauto| ].
-                    
-          iAssert (cur_phases (etr :tr[ Some (locale_of t1 e) ]: (t1 ++ e' :: t2 ++ efs, σ')) ∗
-                     cur_obls_sigs (etr :tr[ Some (locale_of t1 e) ]: (t1 ++ e' :: t2 ++ efs, σ')))%I with "[-]" as "[PHS OBS]".
-          { destruct step_fork eqn:SF; simpl. 
-            - iDestruct "MOD'" as (?) "(PH' & OB & OB')".
-              rewrite e0. iSplitL "PH' PHS".
-              + iApply "PHS". eauto.
-              + iApply ("OBLS" with "[-OB'] [$]"). iFrame.
-                by rewrite e0.
-            - iSplitL "PHS".
-              + by iApply "PHS".
-              + iApply ("OBLS" with "[-] [//]"). by iFrame. }
-          iFrame.
-        * iClear "He2".
-          iDestruct (th_phase_frag_halve with "PH") as "[PH PH']". 
-          iSpecialize ("WPS" with "[CPP PH']").
-          { iPoseProof (get_call_wp with "[] [$] [$]") as "WP".
-            { iDestruct "INV" as "[??]". done. }
-            (* TODO: extract lemma *)
-            clear LEN2 PH CORR.
-            clear STEP VALID FIN.
-            clear (* H H1 *) NO' NO2 NO1.
-            clear dependent Φs1.
-            Unshelve. 2: exact ai. 
-            rewrite /wp_tc. rewrite leb_correct_conv.
-            2: { simpl. lia. }
-            destruct FIT. 
-            rewrite trace_lookup_extend in fic_call; [| done].
-            simpl in fic_call. do 2 red in fic_call. rewrite ic_helper /= in fic_call.
-            rewrite e0 /= in fic_call.
-            replace (locale_of t1 e) with (locale_of t1 e') in fic_call.
-            2: { done. }
-            rewrite /from_locale from_locale_from_locale_of in fic_call.
-            inversion fic_call. subst e'. 
-            erewrite (proj2 (under_ctx_spec _ _ _)). 
-            { simpl. iApply (wp_stuck_mono with "[$]"). done. }
-            reflexivity. }
+        ** iClear "PHτi". 
+           iSpecialize ("CPS" with "[$CPP]"); [done| ].
+           iFrame "CPS".
 
-          iFrame "WPS".
-          iSpecialize ("CPS" with "[]").
-          { iIntros (?). simpl in H0. lia. }
-          iFrame "CPS".
-          rewrite leb_correct_conv; [| simpl in *; lia].
-          iSpecialize ("PHS" with "[PH]").
-          { rewrite half_inv2. iFrame. }
+           rewrite /wptp_wfree /wptp_gen /wptp_from_gen.
+           simpl. iApply (big_sepL2_impl with "[$]").
+           iModIntro. 
+           iIntros (k0 [tp0 e0] Φ0 KTH KTH'). simpl.
+           rewrite /thread_pr.
+           rewrite !leb_correct.
+           2, 3: simpl in *; lia.
+           by iIntros "$".
+        ** iSpecialize ("CPS" with "[]").
+           { iIntros (?). simpl in *. lia. }
+           iFrame "CPS".
+           iDestruct ("PHτi" with "[//]") as (π_) "PHτi".
+           rewrite half_inv2.
 
-          iAssert (cur_phases (etr :tr[ Some (locale_of t1 e) ]: (t1 ++ e' :: t2 ++ efs, σ')) ∗
-                     cur_obls_sigs (etr :tr[ Some (locale_of t1 e) ]: (t1 ++ e' :: t2 ++ efs, σ')))%I with "[-]" as "[PHS OBS]".
-          { destruct step_fork eqn:SF; simpl. 
-            - iDestruct "MOD'" as (?) "(PH' & OB & OB')".
-              rewrite e0. iSplitL "PH' PHS".
-              + iApply "PHS". eauto.
-              + iApply ("OBLS" with "[-OB'] [$]"). iFrame. by rewrite e0. 
-            - iSplitL "PHS".
-              + by iApply "PHS".
-              + iApply ("OBLS" with "[-] [//]"). iFrame. }
-          iFrame.            
-      + apply Nat.leb_gt in LEN. 
-        apply fits_inf_call_prev in FIT.
-        apply fits_inf_call_last_or_short in FIT as [NVAL | SHORT].
-        2: { simpl in *. lia. }
-        rewrite FIN in NVAL. apply runs_call_helper in NVAL; eauto.
-        destruct NVAL as (e_ & CUR & NVAL).
+           iPoseProof (get_call_wp ai with "[] [$] [$]") as "WP".
+           { iDestruct "INV" as "[??]". done. }
 
-        rewrite CUR. simpl.
-        apply under_ctx_spec in CUR.
+           destruct FIT.
+           rewrite trace_lookup_last in fic_call. 
+           2: { simpl in *. lia. }
+           simpl in fic_call. red in fic_call.
 
-        rewrite -CUR in PSTEP. eapply fill_step_inv in PSTEP as (?&?&?).
-        2: done. 
+           subst τ. apply step_fork_hl in STEP as [[? ->] | (?&->&?)].
+           { simpl. by rewrite FIN H0 in Heqsf. }
+           rewrite FIN H0 in Heqsf. inversion Heqsf. clear Heqsf. 
 
-        iDestruct (wp_ctx_take_step with "[TI] WP") as "He".
-        1, 2: by eauto. 
-        { red. rewrite FIN. rewrite -CUR. eauto. }
-        { subst. done. }
-        { iFrame. }
+           rewrite app_comm_cons app_assoc. 
+           iApply wptp_from_gen_app. iSplitL "WPS_PRE".
+           { (** just drop the pwp for the newly forked τi *)
+             iDestruct (wptp_from_gen_app' with "[$]") as "[WPS _]".
+             { rewrite EQ_Φs. rewrite !length_app. simpl in *.
+               (* lia.  - ??? *)
+               f_equal.
+               { by symmetry. }
+               f_equal. by symmetry. }
+             simpl. iApply (wptp_wfree_upd_other with "[$]").
+             rewrite locales_of_list_from_indexes.
+             intros (?&?&->&?)%elem_of_lookup_imap.
+             rewrite /locale_of /= in H2. rewrite -H2 in H1.
+             apply lookup_lt_Some in H1.
+             rewrite !length_app /= in H1. lia. }
 
-        iMod "He" as "He". iModIntro.
-        iMod "He" as "He". iModIntro. iNext.
-        iMod "He" as "He". iModIntro.
-        iApply (step_fupdN_wand with "[He]"); first by iApply "He".
-        iIntros "He".
-        iMod "He" as (δ' ℓ) "(HSI & He2 & Hefs) /=".
+           rewrite /newposts.
+           rewrite newelems_app_drop.
+           2: { rewrite !length_app. simpl. lia. }
+           simpl. iApply wptp_gen_singleton. rewrite /thread_pr.
+           rewrite decide_True.
+           2: { rewrite -H2. rewrite /locale_of !length_app. done. }
+           rewrite leb_correct_conv.
+           2: { simpl in *. lia. }
+           simpl.
 
-        iDestruct (same_phase_no_fork with "[$] [$]") as %(-> & EQ_CFG); eauto.
+           red in fic_call. rewrite ic_helper /= in fic_call.
+           rewrite /τi /= in H2. 
+           rewrite /τi -H2 /= in fic_call. 
+           rewrite app_comm_cons app_assoc in fic_call. 
+           assert (locale_of (t1 ++ e :: t2) x = locale_of (t1 ++ e' :: t2) x) as RR. 
+           { rewrite /locale_of !length_app. done. }
+           rewrite /= RR in fic_call. 
+           rewrite /from_locale from_locale_from_locale_of in fic_call.
+           inversion fic_call. subst x. clear fic_call.
+           rewrite under_ctx_fill. simpl. rewrite H2.
+           iApply (wp_stuck_mono with "[$]"). done.
 
-        simpl. rewrite !app_nil_r.
-        iDestruct "HSI" as "(%MSTEP & HEAP & MSI)".
-
-        iSpecialize ("PHS" with "[PH]").
-        { rewrite leb_correct_conv; [| simpl in *; lia]. eauto. }
-
-        iAssert (wptp_wfree s (etr :tr[ Some τi ]: (t1 ++ fill Ki x :: t2, σ')) Φs)%I with "[WPS1 WPS2 He2]" as "WPS". 
-        { 
-          rewrite /wptp_wfree. simpl.
-          rewrite EQ_Φs. 
-          iApply wptp_from_gen_app. iSplitL "WPS1".
-          { simpl. iApply (wptp_wfree_upd_other with "[$]").
-            by rewrite e0. }
-          simpl. 
-          iApply (wptp_from_gen_app _ _ [_] [_]).
-          iSplitL "He2".
-          { simpl. iApply wptp_gen_singleton.
-            rewrite /thread_pr. rewrite decide_True; [| done].
-            rewrite /wp_tc. rewrite leb_correct_conv.
-            2: { simpl in *; lia. }
-            rewrite under_ctx_fill. rewrite e0. done. }
-
-          erewrite wptp_from_gen_locales_equiv_1 with (t0' := (t1 ++ [fill Ki x])).
-          2: { rewrite !prefixes_from_app.
-               eapply Forall2_app; [apply adequacy_utils.locales_equiv_refl| ].
-               simpl. by constructor. }
-          simpl. iApply (wptp_wfree_upd_other with "[$]").
-          erewrite (proj1 (locales_equiv_from_of_list_from _ _ _ _)).
-          { rewrite e0. apply NO'. }
-          apply adequacy_utils.locales_equiv_from_refl.
-          apply locales_equiv_from_middle with (t2 := []). done. }
-        
-        iAssert (@state_interp _ M _ _ (etr :tr[ Some τi ]: (t1 ++ fill Ki x :: t2, σ')) _)%I with "[HEAP MSI]" as "TI".
-        { simpl. by iFrame. }
-
-        rewrite -{6}(app_nil_r (t1 ++ e' :: t2)).
-        rewrite /newposts. rewrite newelems_app_drop.
-        2: { rewrite !length_app. simpl. lia. }
-        simpl. rewrite app_nil_r. 
-
-        iDestruct (reestablish_obls_sigs with "[$]") as "OBS".
-        { by rewrite EQ_CFG app_nil_r. }
-        
-        iDestruct (reestablish_fuel with "[$]") as "CPS". 
-        iSpecialize ("PHS" with "[]"). 
-        { destruct step_fork eqn:SF; [| done]. simpl.
-          rewrite app_nil_r in EQ_CFG. 
-          rewrite /step_fork EQ_CFG in SF.
-          subst e'. simpl in SF. rewrite difference_diag_L in SF.
-          set_solver. }
-
-        subst e'.
-        rewrite e0. do 2 iExists _.
-        by iFrame.
-    - (* other threads' steps *)
-      destruct (trace_length etr <=? ii) eqn:LEN.
-      + apply Nat.leb_le in LEN.
-        simpl.
-
-        iDestruct (split_trace_fuel with "[$]") as "(CP & CPP & CPS)"; [done| ].
-        iDestruct (cur_obls_sigs_other_step with "[$]") as "(OB & OBτi & OBLS)".
-        { by rewrite FIN. }
-        { congruence. }
-        iDestruct (cur_phases_other_step _ _ τ with "[$]") as "(PH & PHS)".
-        { rewrite FIN. subst τ. eauto. }
-        { eauto. }
-        { congruence. }
-        iDestruct "PH" as (π) "PH". rewrite H3. 
-
-        remember (step_fork (trace_last etr) (t1 ++ e' :: t2 ++ efs, σ')) as sf.
-
-        iDestruct (@pwp_MU_ctx_take_step _ _ _ Hinv with "TI [CP PH OB OBτi] WP") as "STEP".
-        1-2: by eauto.
-        { red. rewrite FIN. erewrite ectx_fill_emp. reflexivity. }
-        { done. }
-        { clear FIT NO1 NO2 NO'.
-          clear LEN VALID PSTEP.
-          clear Φs1 Φs' EQ LEN1 LEN' EQ'.
-          clear dependent Φ Φs2 n.
-          clear H3.
-          (* TODO: extract a lemma *)
-          rewrite -Heqsf. 
-          rewrite (cp_weaken _ π); [| by apply phase_le_init].
-          rewrite /obls_τi' /obls_τi. 
-
-          set (upd := fun (R1 R2: gset SignalId) => let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
-                        (⌜ R1 = ∅ ⌝ ∗ 
-                        if (decide (sf = Some τi))
-                        then (∃ s, ⌜ R2 = {[ s ]} ⌝ ∗ sgn s l0 (Some false) ∗ ep s π0 d0)%I
-                        else (⌜ R2 = ∅ ⌝ ∗ obls_τi' (t1 ++ e' :: t2 ++ efs, σ')))%I). 
-          iApply (MU_burn_cp _ _ _ _ upd with "[-]").
-          iFrame "CP PH". subst upd. simpl.
-          rewrite -FIN in STEP.
-          destruct sf; simpl. 
-          2: { iModIntro. do 2 iExists _.
-               iSplitL "OB".
-               { erewrite union_empty_r_L. iFrame. }
-               repeat (iSplit; try done). 
-               iApply obls_τi'_next; [| done].
-               apply locale_step_step_fork_exact in STEP.
-               rewrite -Heqsf in STEP. set_solver. }
-          destruct (decide (l = τi)) as [-> | NEQ].
-          - rewrite decide_False.
-            2: { eapply locale_step_fork_Some in STEP; eauto. tauto. }
-            iMod (OU_create_sig with "[$]") as "(%sg & SGN & OB & _)".
-            { rewrite /WF_SB. lia. }
-            iDestruct (sgn_get_ex with "[$]") as "(SGN & #SGN0)". 
-            iMod (create_ep_upd with "[OBτi] SGN0") as "(#EP & _)".
-            { apply (orders_lib.ith_bn_lt 2 0 1). lia. }
-            { iFrame. }
-            iModIntro. do 2 iExists _. rewrite decide_True; [| done].
-            iFrame. iFrame "#∗". iPureIntro. set_solver. 
-          - iModIntro. iFrame.
-            setoid_rewrite (@decide_False _ (Some l = _)); [| congruence].
-            do 2 iExists _. erewrite union_empty_r_L. iFrame. 
-            repeat iSplit; try done. 
-            (* TODO: refactor *)
-            rewrite /obls_τi'.
-            apply locale_step_step_fork_exact in STEP. rewrite STEP.
-            erewrite decide_ext; [by iFrame| ].
-            rewrite -Heqsf. simpl. set_solver. }
-
-        iMod "STEP". iModIntro.
-        iMod "STEP". iModIntro. iNext. 
-        iMod "STEP". iModIntro.
-        iApply (step_fupdN_wand with "[STEP]"); first by iApply "STEP".
-        iIntros "STEP".
-        iMod "STEP" as (δ' ℓ) "(HSI & He2 & WPS' & MOD) /=".
-
-        iDestruct "MOD" as (π' R1 R2) "(PH & (-> & MOD) & %DISJ12 & MOD')".        
-        rewrite union_empty_l_L. 
-        
-        iAssert (@state_interp _ M _ _ (etr :tr[ Some τ ]: (t1 ++ e' :: t2 ++ efs, σ')) _)%I with "[HSI]" as "TI".
-        { simpl. iDestruct "HSI" as "(?&?&?)". iFrame. }
-
-        iSpecialize ("PHS" with "[$PH]"). 
-        (* iSpecialize ("OBLS" with "[$]"). *)
-
-        iModIntro.
-        do 2 iExists _.
-        iFrame "TI".
-
-        (** first close the wptp for the _current_ trace length *)
-        iAssert (wptp_gen (thread_pr s (trace_length etr)) (t1 ++ e' :: t2 ++ efs) (Φs ++ newposts (t1 ++ e :: t2) (t1 ++ e' :: t2 ++ efs)))%I with "[WPS1 WPS2 WPS' He2]" as "WPS_PRE". 
-        { 
-          rewrite app_comm_cons app_assoc.
-          iApply wptp_from_gen_app. iSplitR "WPS'".
-          2: { simpl. rewrite /newposts.
-               rewrite newelems_app_drop.
-               2: { rewrite !length_app. simpl. lia. }
-
-               subst τ.
-               apply step_fork_hl in STEP as [[? ->] | (?&->&?)].
-               - simpl. set_solver.
-               - rewrite wptp_gen_singleton. rewrite /thread_pr.
-                 rewrite /wp_tc. rewrite leb_correct; [| done].
-                 rewrite big_sepL_singleton. simpl. rewrite app_nil_r.
-                 replace (locale_of (t1 ++ e' :: t2) x) with (locale_of (t1 ++ e :: t2) x).
-                 2: { rewrite /locale_of. rewrite !length_app. simpl. lia. } 
-                 destruct decide as [-> | ?]; done. }
-          
-          rewrite -EQ. iApply wptp_from_gen_app. iFrame "WPS1". 
-
-          simpl. rewrite -EQ'. iApply wptp_from_gen_cons.          
-          iSplitL "He2".
-          2: { erewrite wptp_from_gen_locales_equiv_1 with (t0' := (t1 ++ [e'])).
-               { done. }
-               rewrite !prefixes_from_app.
-               eapply Forall2_app; [apply adequacy_utils.locales_equiv_refl| ].
-               simpl. by constructor. }
-               
-          rewrite /thread_pr.
-          rewrite /wp_tc. rewrite leb_correct; [| done].
-          subst τ. 
-          destruct decide as [-> | ?]; done. }
-
-        destruct (decide (sf = Some τi)) as [-> | NO].
-        * simpl. symmetry in Heqsf.
-          rewrite decide_True //.
-          iDestruct "MOD" as "(% & -> & SGN & #EP)".
-          iDestruct "MOD'" as "(% & PHτi & OB & OBτi)". 
-
-          iSpecialize ("OBLS" with "[$] [SGN OBτi] []").
-          { rewrite /obls_τi'. rewrite decide_True.
-            { iFrame "#∗". }
-            apply locale_step_step_fork_exact in STEP. rewrite STEP.
-            rewrite -FIN Heqsf. set_solver. }
-          { iIntros (? (?&?)). congruence. }
-          iFrame "OBLS".
-
-          iDestruct ("PHS" with "[$PHτi]") as "[PHS PHτi]".
-          iFrame "PHS". 
-          
-          (* pr is reestablished differently depending on whether we reach ii.
-             TODO: try to unify it *)
-          apply Nat.le_lteq in LEN as [LT | <-].
-          ** iClear "PHτi". 
-             iSpecialize ("CPS" with "[$CPP]"); [done| ].
-             iFrame "CPS".
-
-             rewrite /wptp_wfree /wptp_gen /wptp_from_gen.
-             simpl. iApply (big_sepL2_impl with "[$]").
-             iModIntro. 
-             iIntros (k0 [tp0 e0] Φ0 KTH KTH'). simpl.
-             rewrite /thread_pr.
-             rewrite !leb_correct.
-             2, 3: simpl in *; lia.
-             by iIntros "$".
-          ** iSpecialize ("CPS" with "[]").
-             { iIntros (?). simpl in *. lia. }
-             iFrame "CPS".
-             iDestruct ("PHτi" with "[//]") as (π_) "PHτi".
-             rewrite half_inv2.
-
-             iPoseProof (get_call_wp ai with "[] [$] [$]") as "WP".
-             { iDestruct "INV" as "[??]". done. }
-
-             destruct FIT.
-             rewrite trace_lookup_last in fic_call. 
-             2: { simpl in *. lia. }
-             simpl in fic_call. red in fic_call.
-
-             subst τ. apply step_fork_hl in STEP as [[? ->] | (?&->&?)].
-             { simpl. by rewrite FIN H2 in Heqsf. }
-             rewrite FIN H2 in Heqsf. inversion Heqsf. clear Heqsf. 
-
-             rewrite app_comm_cons app_assoc. 
-             iApply wptp_from_gen_app. iSplitL "WPS_PRE".
-             { (** just drop the pwp for the newly forked τi *)
-               iDestruct (wptp_from_gen_app' with "[$]") as "[WPS _]".
-               { rewrite -EQ -EQ'. rewrite !length_app. simpl. lia. }
-               simpl. iApply (wptp_wfree_upd_other with "[$]").
-               rewrite locales_of_list_from_indexes.
-               intros (?&?&->&?)%elem_of_lookup_imap.
-               rewrite /locale_of /= in H4. rewrite -H4 in H3.
-               apply lookup_lt_Some in H3.
-               rewrite !length_app /= in H3. lia. }
-
-             rewrite /newposts.
-             rewrite newelems_app_drop.
-             2: { rewrite !length_app. simpl. lia. }
-             simpl. iApply wptp_gen_singleton. rewrite /thread_pr.
-             rewrite decide_True.
-             2: { rewrite -H4. rewrite /locale_of !length_app. done. }
-             rewrite leb_correct_conv.
-             2: { simpl in *. lia. }
-             simpl.
-
-             red in fic_call. rewrite ic_helper /= in fic_call.
-             rewrite /τi /= in H4. 
-             rewrite /τi -H4 /= in fic_call. 
-             rewrite app_comm_cons app_assoc in fic_call. 
-             assert (locale_of (t1 ++ e :: t2) x = locale_of (t1 ++ e' :: t2) x) as RR. 
-             { rewrite /locale_of !length_app. done. }
-             rewrite /= RR in fic_call. 
-             rewrite /from_locale from_locale_from_locale_of in fic_call.
-             inversion fic_call. subst x. clear fic_call.
-             rewrite under_ctx_fill. simpl. rewrite H4. 
-             iApply (wp_stuck_mono with "[$]"). done.
-
-        * rewrite decide_False; [| done]. iDestruct "MOD" as "(-> & OBτi)".
-
-          iAssert (let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
-                   obls τ ∅ ∗
-                   from_option (λ τ', obls τ' ∅) ⌜ True ⌝ sf ∗
-                   from_option (λ τ', ∃ π'0, th_phase_eq τ' π'0) ⌜ True ⌝ sf)%I with "[MOD']" as "(OB & OB' & PH')".
-          { destruct sf; simpl. 
-            - iDestruct "MOD'" as (?) "(?&?&?)". iFrame.
-            - by iFrame. } 
-             
-          iSpecialize ("OBLS" with "OB OBτi [OB']").
-          { by iIntros (? [-> ?]). }
-          iFrame "OBLS".
-
-          iDestruct ("PHS" with "[$]") as "[PHS PHτi]". iFrame "PHS". 
-
-          (* pr is reestablished differently depending on whether we reach ii.
-             TODO: try to unify it *)
-          (* TODO: the case analysis above is very similar to this one *)
-          apply Nat.le_lteq in LEN as [LT | <-].
-          ** iClear "PHτi". 
-             iSpecialize ("CPS" with "[$CPP]"); [done| ].
-             iFrame "CPS".
-
-             rewrite /wptp_wfree /wptp_gen /wptp_from_gen.
-             simpl. iApply (big_sepL2_impl with "[$]").
-             iModIntro. 
-             iIntros (k0 [tp0 e0] Φ0 KTH KTH'). simpl.
-             rewrite /thread_pr.
-             rewrite !leb_correct.
-             2, 3: simpl in *; lia.
-             by iIntros "$".
-          ** iSpecialize ("CPS" with "[]").
-             { iIntros (?). simpl in *. lia. }
-             iFrame "CPS".
-             iDestruct ("PHτi" with "[//]") as (π_) "PHτi".
-             rewrite half_inv2.
-
-             iPoseProof (get_call_wp ai with "[] [$] [$]") as "WP".
-             { iDestruct "INV" as "[??]". done. }
-
-             rewrite /newposts. 
-             rewrite app_comm_cons app_assoc.  
-             rewrite newelems_app_drop.
-             2: { rewrite !length_app. simpl. lia. }
-
-             iDestruct (wptp_from_gen_app' with "[$]") as "[WPS WPS']".
-             { rewrite -EQ -EQ'. rewrite !length_app. simpl. lia. }
-
-             destruct FIT. 
-             rewrite trace_lookup_last in fic_call.
-             2: { simpl in *. lia. }
-             simpl in fic_call. red in fic_call.
-             red in fic_call. rewrite ic_helper /= in fic_call. 
-
-             assert (τi ∉ locales_of_list_from (t1 ++ e' :: t2) efs) as NONEW.
-             { subst τ. eapply τi_not_in; eauto. by rewrite -Heqsf. }
-
-             assert (from_locale (t1 ++ e' :: t2) τi = Some (fill Ki (m ai))) as CUR.
-             { apply from_locale_from_lookup. split; [| simpl; lia].
-               simpl. rewrite Nat.sub_0_r.
-               simpl in fic_call. apply from_locale_from_lookup, proj1 in fic_call.
-               rewrite /= Nat.sub_0_r in fic_call.
-               rewrite app_comm_cons app_assoc in fic_call.
-               apply lookup_app_Some in fic_call. destruct fic_call as [? | [OVER ?]].
-               { done. }
-               destruct NONEW. rewrite locales_of_list_from_indexes.
-               apply elem_of_lookup_imap.
-              eexists (τi - length (t1 ++ e' :: t2)), _. split; [lia| done]. }
-             clear fic_call.
-
-             iApply wptp_from_gen_app. iSplitR "WPS'".
-             2: { simpl.
-                  iApply (wptp_wfree_upd_other with "[$]"). done. }
-
-             (*****)
-             remember (t1 ++ e' :: t2) as tp'.
-             clear dependent Φs1 Φs2 Φs' t1 t2 e.
-             pose proof CUR as X%from_locale_lookup%elem_of_list_split_length.
-             destruct X as (t1 & t2 & -> & ->).
-             iDestruct (wptp_gen_split_1 with "[$]") as %X.
-             destruct X as (Φs1 & Φs2 & <- & LEN1 & LEN2).
-             iDestruct (wptp_from_gen_app' with "[$]") as "[WPS1 WPS]"; [done| ].
-             iApply wptp_from_gen_app. iSplitL "WPS1".
-             { iApply (wptp_wfree_upd_other with "[$]").
-               rewrite H. 
-               rewrite locales_of_list_from_indexes.
-               intros (?&?&?&?)%elem_of_lookup_imap.
-               apply lookup_lt_Some in H2. simpl in *. lia. }
-             simpl. destruct Φs2; [done| ].
-             (* drop the existing pwp for τi *)
-             rewrite wptp_from_gen_cons. iDestruct "WPS"  as "[_ WPS2]". 
-             iApply wptp_from_gen_cons. iSplitR "WPS2".
-             2: { iApply (wptp_wfree_upd_other with "[$]").
-                  rewrite H. 
-                  rewrite locales_of_list_from_indexes.
-                  intros (?&?&?&?)%elem_of_lookup_imap.
-                  apply lookup_lt_Some in H2.
-                  rewrite length_app /= in H1. 
-                  lia. }
-                  
-             rewrite /thread_pr. rewrite !decide_True; try done.
-             rewrite /wp_tc. rewrite leb_correct_conv; [| simpl in *; lia].
-             rewrite under_ctx_fill /= -H. 
-             iApply (wp_stuck_mono with "[$]"). done.
-      + apply leb_complete_conv in LEN. simpl in LEN. 
-
-        iClear "CPS".
-        iAssert (extra_fuel (etr :tr[ Some τ ]: (t1 ++ e' :: t2 ++ efs, σ'))) as "CPS'".
-        { rewrite /extra_fuel. rewrite leb_correct_conv; [done| ].
-          simpl. lia. }
-        
-        iDestruct (cur_obls_sigs_other_step with "[$]") as "(OB & OBτi & OBLS)".
-        { by rewrite FIN. }
-        { congruence. }
-        iDestruct (cur_phases_other_step with "[$]") as "(PH & PHS)"; eauto.
-        { rewrite FIN. subst τ. eauto. }
-        { congruence. }
-        iDestruct "PH" as (π) "PH". rewrite H3.
-
-        rewrite {1}/obls_τi'.
-        rewrite decide_True.
-        2: { eapply fic_has_τi; eauto. eapply fits_inf_call_prev; eauto. }
-
-        remember (step_fork (trace_last etr) (t1 ++ e' :: t2 ++ efs, σ')) as sf.
-        (* rewrite -Heqsf. *)
-
-        iDestruct (@pwp_MU_ctx_take_step _ _ _ Hinv with "TI [OB PH OBτi] WP") as "STEP".
-        1-2: by eauto.
-        { red. rewrite FIN. erewrite ectx_fill_emp. reflexivity. }
-        { done. }
-        { rewrite -Heqsf. 
-          iApply (MU_burn_cp _ _ _ _ (fun (R1 R2: gset SignalId) => (⌜ R1 = ∅ /\ R2 = ∅⌝ ∗ obls_τi)%I) with "[-]").
-          iMod (BOU_wait_τi with "[$] [$] [$]") as "(?&?&OB&?)".
-          iModIntro. do 2 iExists _. iFrame.  
-          iSplitL "OB".
-          { by erewrite union_empty_l_L. }
-          iFrame. iPureIntro. set_solver. }          
-          
-        iMod "STEP". iModIntro.
-        iMod "STEP". iModIntro. iNext. 
-        iMod "STEP". iModIntro.
-        iApply (step_fupdN_wand with "[STEP]"); first by iApply "STEP".
-        iIntros "STEP".
-        iMod "STEP" as (δ' ℓ) "(HSI & He2 & WPS' & MOD) /=".
-
-        iDestruct "MOD" as (π' R1 R2) "(PH & ((-> & ->) & OBτi) & %DISJ12 & MOD')".
-        rewrite union_empty_l_L. 
-
-        iAssert (@state_interp _ M _ _ (etr :tr[ Some τ ]: (t1 ++ e' :: t2 ++ efs, σ')) _)%I with "[HSI]" as "TI".
-        { simpl. iDestruct "HSI" as "(?&?&?)". iFrame. }
-
-        iFrame "TI". iFrame "CPS'". iClear "CPS'".
+      * rewrite decide_False; [| done]. iDestruct "MOD" as "(-> & OBτi)".
 
         iAssert (let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
                  obls τ ∅ ∗
@@ -1961,68 +1564,225 @@ Section WaitFreePR.
                  from_option (λ τ', ∃ π'0, th_phase_eq τ' π'0) ⌜ True ⌝ sf)%I with "[MOD']" as "(OB & OB' & PH')".
         { destruct sf; simpl. 
           - iDestruct "MOD'" as (?) "(?&?&?)". iFrame.
-          - by iFrame. }
-
-        iSpecialize ("OBLS" with "[$] [OBτi] [OB']").
-        { rewrite /obls_τi'. rewrite decide_True; [done| ].
-          apply fic_has_τi in FIT; [done| ].
-          simpl. lia. }
-        { by iIntros (? [-> ?]). }
+          - by iFrame. } 
+             
+        iSpecialize ("OBLS" with "OB OBτi [OB']").
+        { iIntros (? [EQ ?]). rewrite -Heqsf in EQ. subst.
+          simpl. by rewrite EQ. }
+            
         iFrame "OBLS".
 
-        iDestruct ("PHS" with "[$PH] [$]") as "[PHS _]". iFrame "PHS".
-        iModIntro.
-        rewrite app_comm_cons app_assoc. 
-        iApply wptp_from_gen_app. iSplitR "WPS'".
-        2: { simpl.
-             replace (newposts (t1 ++ e :: t2) ((t1 ++ e' :: t2) ++ efs)) with
-               (newposts (t1 ++ e' :: t2) ((t1 ++ e' :: t2) ++ efs)).
-             2: { apply adequacy_utils.newposts_locales_equiv.
-                  apply locales_equiv_middle. done. }
-             rewrite -new_threads_wptp_from_gen.
-             iApply (big_sepL_impl with "[$]").
-             iModIntro. 
-             iIntros (i x ITH).
-             rewrite /thread_pr.
-             destruct decide.
-             2: { simpl. list_simplifier.
-                  rewrite /locale_of. rewrite !length_app /=.
-                  by iIntros "$". }
+        rewrite -Heqsf.
+        iDestruct ("PHS" with "[$]") as "[PHS PHτi]". iFrame "PHS". 
 
-             apply fits_inf_call_prev, fits_inf_call_last_or_short in FIT.
-             destruct FIT as [NVAL | SHORT].
-             2: { simpl in SHORT. lia. }
-             (* red in FIT. destruct FIT as (?& IN & ?&?). *)
-             move NVAL at bottom.
-             rewrite /τi in e0.
-             red in NVAL. destruct NVAL as (?&EXPR&NVAL).
-             red in EXPR. rewrite ic_helper in EXPR. 
-             rewrite FIN /= in EXPR.
-             rewrite /τi e0 in EXPR. 
-             apply from_locale_lookup in EXPR. 
-             apply lookup_lt_Some in EXPR.
-             rewrite /locale_of !length_app /= in EXPR. lia. }
+        (* pr is reestablished differently depending on whether we reach ii.
+           TODO: try to unify it *)
+        (* TODO: the case analysis above is very similar to this one *)
+        apply Nat.le_lteq in LEN as [LT | <-].
+        ** iClear "PHτi". 
+           iSpecialize ("CPS" with "[$CPP]"); [done| ].
+           iFrame "CPS".
 
-        simpl.
-        iAssert (wptp_from_gen (thread_pr s (trace_length etr)) [] (t1 ++ e' :: t2) Φs)%I with "[-]" as "WPS".
-        { rewrite -EQ. iApply wptp_from_gen_app. iSplitL "WPS1"; [done| ].
-          simpl. rewrite -EQ'. iApply wptp_from_gen_cons. iSplitR "WPS2".
-          { rewrite /thread_pr. rewrite decide_False; [| done].
-            rewrite -H3. done. }
-          iApply (wptp_from_gen_locales_equiv_1 with "[$]").
-          (* TODO: make a lemma and use it above *)
-          rewrite !prefixes_from_app.
-          eapply Forall2_app; [apply adequacy_utils.locales_equiv_refl| ].
-          simpl. by constructor. }
+           rewrite /wptp_wfree /wptp_gen /wptp_from_gen.
+           simpl. iApply (big_sepL2_impl with "[$]").
+           iModIntro. 
+           iIntros (k0 [tp0 e0] Φ0 KTH KTH'). simpl.
+           rewrite /thread_pr.
+           rewrite !leb_correct.
+           2, 3: simpl in *; lia.
+           by iIntros "$".
+        ** iSpecialize ("CPS" with "[]").
+           { iIntros (?). simpl in *. lia. }
+           iFrame "CPS".
+           iDestruct ("PHτi" with "[//]") as (π_) "PHτi".
+           rewrite half_inv2.
+
+           iPoseProof (get_call_wp ai with "[] [$] [$]") as "WP".
+           { iDestruct "INV" as "[??]". done. }
+
+           rewrite /newposts. 
+           rewrite app_comm_cons app_assoc.  
+           rewrite newelems_app_drop.
+           2: { rewrite !length_app. simpl. lia. }
+
+           iDestruct (wptp_from_gen_app' with "[$]") as "[WPS WPS']".
+           { rewrite EQ_Φs. rewrite !length_app. simpl.
+             symmetry in LEN1, LEN2. simpl in *.
+             rewrite LEN1 LEN2.
+             reflexivity. }
+
+           destruct FIT. 
+           rewrite trace_lookup_last in fic_call.
+           2: { simpl in *. lia. }
+           simpl in fic_call. red in fic_call.
+           red in fic_call. rewrite ic_helper /= in fic_call. 
+
+           assert (τi ∉ locales_of_list_from (t1 ++ e' :: t2) efs) as NONEW.
+           { subst τ. eapply τi_not_in; eauto. by rewrite -Heqsf. }
+
+           assert (from_locale (t1 ++ e' :: t2) τi = Some (fill Ki (m ai))) as CUR.
+           { apply from_locale_from_lookup. split; [| simpl; lia].
+             simpl. rewrite Nat.sub_0_r.
+             simpl in fic_call. apply from_locale_from_lookup, proj1 in fic_call.
+             rewrite /= Nat.sub_0_r in fic_call.
+             rewrite app_comm_cons app_assoc in fic_call.
+             apply lookup_app_Some in fic_call. destruct fic_call as [? | [OVER ?]].
+             { done. }
+             destruct NONEW. rewrite locales_of_list_from_indexes.
+             apply elem_of_lookup_imap.
+            eexists (τi - length (t1 ++ e' :: t2)), _. split; [lia| done]. }
+           clear fic_call.
+
+           iApply wptp_from_gen_app. iSplitR "WPS'".
+           2: { simpl. iApply (wptp_wfree_upd_other with "[$]"). done. }
+
+           (*****)
+           (* TODO: extract a lemma *)
+           remember (t1 ++ e' :: t2) as tp'.
+           generalize τ. clear τ. intros τ. 
+           clear dependent Φs1 Φs2  t1 t2 e.
+           pose proof CUR as X%from_locale_lookup%elem_of_list_split_length.
+           destruct X as (t1 & t2 & -> & ->).
+           iDestruct (wptp_gen_split_1 with "[$]") as %X.
+           destruct X as (Φs1 & Φs2 & <- & LEN1 & LEN2).
+           iDestruct (wptp_from_gen_app' with "[$]") as "[WPS1 WPS]"; [done| ].
+           iApply wptp_from_gen_app. iSplitL "WPS1".
+           { iApply (wptp_wfree_upd_other with "[$]").
+             rewrite H0. 
+             rewrite locales_of_list_from_indexes.
+             intros (?&?&?&?)%elem_of_lookup_imap.
+             apply lookup_lt_Some in H2. simpl in *. lia. }
+           simpl. destruct Φs2; [done| ].
+           (* drop the existing pwp for τi *)
+           rewrite wptp_from_gen_cons. iDestruct "WPS"  as "[_ WPS2]". 
+           iApply wptp_from_gen_cons. iSplitR "WPS2".
+           2: { iApply (wptp_wfree_upd_other with "[$]").
+                rewrite H0. 
+                rewrite locales_of_list_from_indexes.
+                intros (?&?&?&?)%elem_of_lookup_imap.
+                apply lookup_lt_Some in H2.
+                rewrite length_app /= in H1. 
+                lia. }
+                  
+           rewrite /thread_pr. rewrite !decide_True; try done.
+           rewrite /wp_tc. rewrite leb_correct_conv; [| simpl in *; lia].
+           rewrite under_ctx_fill /= -H0. 
+           iApply (wp_stuck_mono with "[$]"). done.
+    + apply leb_complete_conv in LEN. simpl in LEN.
+
+      iClear "CPS".
+      iAssert (extra_fuel (etr :tr[ Some τ ]: (t1 ++ e' :: t2 ++ efs, σ'))) as "CPS'".
+      { rewrite /extra_fuel. rewrite leb_correct_conv; [done| ].
+        simpl. lia. }
+        
+      iDestruct (cur_obls_sigs_other_step with "[$]") as "(OB & OBτi & OBLS)".
+      { by rewrite FIN. }
+      { congruence. }
+      iDestruct (cur_phases_other_step with "[$]") as "(PH & PHS)"; eauto.
+      { rewrite FIN. subst τ. eauto. }
+      iDestruct "PH" as (π) "PH". 
+
+      rewrite {1}/obls_τi'.
+      rewrite decide_True.
+      2: { eapply fic_has_τi; eauto. eapply fits_inf_call_prev; eauto. }
+
+      remember (step_fork (trace_last etr) (t1 ++ e' :: t2 ++ efs, σ')) as sf.
+
+      iDestruct (@pwp_MU_ctx_take_step _ _ _ Hinv with "TI [OB PH OBτi] WP") as "STEP".
+      1-2: by eauto.
+      { red. rewrite FIN. erewrite ectx_fill_emp. reflexivity. }
+      { done. }
+      { rewrite -Heqsf. 
+        iApply (MU_burn_cp _ _ _ _ (fun (R1 R2: gset SignalId) => (⌜ R1 = ∅ /\ R2 = ∅⌝ ∗ obls_τi)%I) with "[-]").
+        iMod (BOU_wait_τi with "[$] [$] [$]") as "(?&?&OB&?)".
+        iModIntro. do 2 iExists _. iFrame.  
+        iSplitL "OB".
+        { by erewrite union_empty_l_L. }
+        iFrame. iPureIntro. set_solver. }          
           
-        (* TODO: Make a lemma *)
-        iApply (big_sepL2_impl with "[$]").
-        iModIntro. 
-        iIntros (i pfi Φi PFith Φith).
-        rewrite /thread_pr.
-        erewrite (proj2 (leb_eq_equiv _ _ _ _)).
-        { by iIntros "$". }
-        simpl in *. lia. 
+      iMod "STEP". iModIntro.
+      iMod "STEP". iModIntro. iNext. 
+      iMod "STEP". iModIntro.
+      iApply (step_fupdN_wand with "[STEP]"); first by iApply "STEP".
+      iIntros "STEP".
+      iMod "STEP" as (δ' ℓ) "(HSI & He2 & WPS' & MOD) /=".
+
+      iDestruct "MOD" as (π' R1 R2) "(PH & ((-> & ->) & OBτi) & %DISJ12 & MOD')".
+      rewrite union_empty_l_L. 
+
+      iAssert (@state_interp _ M _ _ (etr :tr[ Some τ ]: (t1 ++ e' :: t2 ++ efs, σ')) _)%I with "[HSI]" as "TI".
+      { simpl. iDestruct "HSI" as "(?&?&?)". iFrame. }
+
+      iFrame "TI". iFrame "CPS'". iClear "CPS'".
+
+      iAssert (let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
+               obls τ ∅ ∗
+               from_option (λ τ', obls τ' ∅) ⌜ True ⌝ sf ∗
+               from_option (λ τ', ∃ π'0, th_phase_eq τ' π'0) ⌜ True ⌝ sf)%I with "[MOD']" as "(OB & OB' & PH')".
+      { destruct sf; simpl. 
+        - iDestruct "MOD'" as (?) "(?&?&?)". iFrame.
+        - by iFrame. }
+
+      iSpecialize ("OBLS" with "[$] [OBτi] [OB']").
+      { rewrite /obls_τi'. rewrite decide_True; [done| ].
+        apply fic_has_τi in FIT; [done| ].
+        simpl. lia. }
+      { rewrite -Heqsf. by iIntros (? [-> ?]). }
+      iFrame "OBLS".
+
+      rewrite -Heqsf. 
+      iDestruct ("PHS" with "[$PH] [$]") as "[PHS _]". iFrame "PHS".
+      iModIntro.
+      rewrite app_comm_cons app_assoc. 
+      iApply wptp_from_gen_app. iSplitR "WPS'".
+      2: { simpl.
+           replace (newposts (t1 ++ e :: t2) ((t1 ++ e' :: t2) ++ efs)) with
+             (newposts (t1 ++ e' :: t2) ((t1 ++ e' :: t2) ++ efs)).
+           2: { apply adequacy_utils.newposts_locales_equiv.
+                apply locales_equiv_middle. done. }
+           rewrite -new_threads_wptp_from_gen.
+           iApply (big_sepL_impl with "[$]").
+           iModIntro. 
+           iIntros (i x ITH).
+           rewrite /thread_pr.
+           destruct decide.
+           2: { simpl. list_simplifier.
+                rewrite /locale_of. rewrite !length_app /=.
+                by iIntros "$". }
+
+           apply fits_inf_call_prev, fits_inf_call_last_or_short in FIT.
+           destruct FIT as [NVAL | SHORT].
+           2: { simpl in SHORT. lia. }
+           (* red in FIT. destruct FIT as (?& IN & ?&?). *)
+           move NVAL at bottom.
+           rewrite /τi in e0.
+           red in NVAL. destruct NVAL as (?&EXPR&NVAL).
+           red in EXPR. rewrite ic_helper in EXPR. 
+           rewrite FIN /= in EXPR.
+           rewrite /τi e0 in EXPR. 
+           apply from_locale_lookup in EXPR. 
+           apply lookup_lt_Some in EXPR.
+           rewrite /locale_of !length_app /= in EXPR. lia. }
+
+      simpl.
+      iAssert (wptp_from_gen (thread_pr s (trace_length etr)) [] (t1 ++ e' :: t2) Φs)%I with "[-]" as "WPS".
+      { rewrite EQ_Φs. iApply wptp_from_gen_app. iSplitL "WPS1"; [done| ].
+        simpl. iApply wptp_from_gen_cons. iSplitR "WPS2".
+        { rewrite /thread_pr. rewrite decide_False; done. }
+        iApply (wptp_from_gen_locales_equiv_1 with "[$]").
+        (* TODO: make a lemma and use it above *)
+        rewrite !prefixes_from_app.
+        eapply Forall2_app; [apply adequacy_utils.locales_equiv_refl| ].
+        simpl. by constructor. }
+          
+      (* TODO: Make a lemma *)
+      iApply (big_sepL2_impl with "[$]").
+      iModIntro. 
+      iIntros (i pfi Φi PFith Φith).
+      rewrite /thread_pr.
+      erewrite (proj2 (leb_eq_equiv _ _ _ _)).
+      { by iIntros "$". }
+      simpl in *. lia. 
   Qed.
   
   (* our PR instance in fact implies the not-stuck property *)
@@ -2040,7 +1800,15 @@ Section WaitFreePR.
       pr_pr_wfree s (etr :tr[ oτ ]: c') (Φs ++ newposts c.1 c'.1).
   Proof using VALID FIN.
     iIntros "? #INV ?".
-    iPoseProof (wptp_wfree_take_step' with "[$] [$] [$]") as "X"; eauto. 
+    
+    iAssert (|={⊤,∅}=> |={∅}▷=>^(S (trace_length etr)) |={∅,⊤}=> 
+    ∃ (δ' : M) (ℓ : mlabel M),
+      state_interp (etr :tr[ oτ ]: c') (mtr :tr[ ℓ ]: δ') ∗
+      pr_pr_wfree s (etr :tr[ oτ ]: c') (Φs ++ newposts c.1 c'.1))%I with "[-]" as "X".
+    { destruct (decide (oτ = Some τi)).
+      - by iApply (wptp_wfree_take_step_τi with "[$] [$] [$]"). 
+      - by iApply (wptp_wfree_take_step'_other with "[$] [$] [$]"). } 
+
     iMod "X". iModIntro.
     iApply (step_fupdN_wand with "X").
     iIntros "X". iMod "X" as (??) "(TI & PR)".
