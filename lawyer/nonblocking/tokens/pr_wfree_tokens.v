@@ -3,6 +3,7 @@ From trillium.traces Require Import inftraces trace_lookup exec_traces trace_len
 From fairness Require Import fairness locales_helpers.
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am obls_termination obligations_wf.
 From lawyer.nonblocking Require Import trace_context om_wfree_inst wptp_gen pwp wfree_traces calls.
+From lawyer.nonblocking.tokens Require Import pwp_ext om_wfree_inst_tokens.
 From trillium.program_logic Require Import execution_model weakestpre adequacy_utils adequacy_cond simulation_adequacy_em_cond. 
 From lawyer Require Import action_model sub_action_em.
 From heap_lang Require Import lang.
@@ -27,8 +28,8 @@ Section WaitFreePR.
   Let Ki := tpctx_ctx tc.
   Let τi := tpctx_tid tc. 
 
-  Context `(WFS: WaitFreeSpec m).
-  Let F := wfs_F _ WFS. 
+  Context `(WFST: WaitFreeSpecToken m).
+  Let F := wfst_F _ WFST. 
   
   Open Scope WFR_scope. 
 
@@ -43,15 +44,15 @@ Section WaitFreePR.
   exact {| heap_iemgs := Hinv |}.
   Defined.
 
-  Lemma get_call_wp {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
+  Lemma get_call_wp {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} {UT: UnitToken Σ}
     (a: val) π:
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
-    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ WFS) -∗
-    cp_mul π0 d0 F -∗ th_phase_frag τi π (1 / 2)%Qp -∗
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ WFST) -∗
+    cp_mul π0 d0 F -∗ th_phase_frag τi π (1 / 2)%Qp -∗ unit_tok -∗
     WP m a @ τi {{ _, ⌜ True ⌝ }}.
   Proof using.
-    simpl. iIntros "#INV CPS PH".
-    pose proof (@wfs_spec _ WFS _ EM Σ OHE) as SPEC. 
+    simpl. iIntros "#INV CPS PH TOK".
+    pose proof (@wfst_spec _ WFST _ EM Σ OHE) as SPEC. 
     iApply (SPEC with "[-]").
     2: { by iIntros "!> **". } 
     iSplitL "CPS"; [| by iFrame].
@@ -69,25 +70,33 @@ Section WaitFreePR.
     (extr: execution_trace heap_lang) (omtr: auxiliary_trace M): iProp Σ :=
     ⌜ no_extra_obls (trace_last extr) (trace_last omtr) /\
       from_option (fun e => to_val e = None) True (from_locale (trace_last extr).1 τi) ⌝ ∗
-    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ WFS). 
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ WFST). 
   
-  Context (ai: val). 
+  Context (ai: val).
 
-  Definition wp_tc {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
+  Class PrWfreeTok Σ := {
+      pwt_Hinv :: @IEMGS _ _ HeapLangEM EM Σ;
+      pwt_CT :: CallTracker Σ;
+      pwt_UT :: UnitToken Σ;
+  }.
+
+  Definition wp_tc {Σ} {PWT: PrWfreeTok Σ}                   
     (s: stuckness) (e: expr) (b: bool) Φ :=
     if b then
-      let _ := iris_OM_into_Looping (EM := EM) in
+      (* let _ := iris_OM_into_Looping (EM := EM) in *)
+      (* pwp s ⊤ τi e Φ *)
+      let _ := iris_OM_into_phys_cti _ _ m τi unit_tok (EM := EM) in
       pwp s ⊤ τi e Φ
     else
       let e' := default (Val #false) (under_ctx Ki e) in
       (* from now on, we forget about the original postcondition *)
       wp s ⊤ τi e' (fun _ => ⌜ True ⌝%I).
 
-  Definition thread_pr {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} s N :=
+  Definition thread_pr {Σ} {PWT: PrWfreeTok Σ} s N :=
     (fun e τ Φ => if decide (τi = τ) then wp_tc s e (N <=? ii) Φ
                  else let _ := iris_OM_into_Looping (EM := EM) in pwp s ⊤ τ e Φ).
 
-  Definition wptp_wfree {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
+  Definition wptp_wfree {Σ} {PWT: PrWfreeTok Σ}
     (s: stuckness) (etr: execution_trace heap_lang) (Φs : list (val → iPropI Σ)):
     iProp Σ :=
     wptp_gen (thread_pr s (trace_length etr)) (trace_last etr).1 Φs.
@@ -103,19 +112,23 @@ Section WaitFreePR.
     red. right. eapply reducible_fill; eauto.
   Qed.
 
-  Lemma wptp_wfre_not_stuck {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
+  Definition cti_cond `{PWT: PrWfreeTok Σ} (etr: execution_trace heap_lang): iProp Σ
+    :=
+    ⌜ trace_length etr <= ii ⌝ -∗ ct_interp m τi unit_tok etr. 
+
+  Lemma wptp_wfre_not_stuck {Σ} {PWT: PrWfreeTok Σ}
     ex atr σ tp trest s Φs :
     valid_exec ex →
     trace_ends_in ex (tp ++ trest, σ) →
     fits_inf_call ic m ai ex ->
-    state_interp ex atr -∗ wptp_wfree s ex Φs ={⊤}=∗
-    state_interp ex atr ∗ wptp_wfree s ex Φs ∗
+    state_interp ex atr -∗ wptp_wfree s ex Φs -∗ cti_cond ex ={⊤}=∗
+    state_interp ex atr ∗ wptp_wfree s ex Φs ∗ cti_cond ex ∗
     ⌜∀ e, e ∈ tp → s = NotStuck → not_stuck e (trace_last ex).2⌝.
   Proof.
-    iIntros (Hexvalid Hex FIT) "HSI Ht".
-    rewrite assoc.
+    iIntros (Hexvalid Hex FIT) "HSI Ht CTI".
+    do 2 rewrite assoc.
     iApply fupd_plain_keep_r; iFrame.
-    iIntros "[HSI Ht]".
+    iIntros "((HSI & Ht) & CTI)".
     iIntros (e He).
     rewrite /wptp_wfree.
     rewrite Hex. iEval (simpl) in "Ht".
@@ -129,10 +142,13 @@ Section WaitFreePR.
     apply elem_of_list_split in He as (?&?&->).
     rewrite -app_assoc -app_comm_cons in Hex. 
     destruct decide; [rewrite /wp_tc; destruct Nat.leb eqn:LEN| ].
-    - iMod (wp_not_stuck _ _ ectx_emp with "[HSI] W") as "(_ & _ & ?)";
+    - iMod (wp_not_stuck _ _ ectx_emp with "[HSI CTI] W") as "(_ & _ & ?)";
       [done| rewrite ectx_fill_emp // | .. ].
       { done. }
       { simpl. rewrite /phys_SI. simpl.
+        rewrite /cti_cond. iSpecialize ("CTI" with "[]").
+        { iPureIntro. by apply leb_complete. }
+        iFrame. 
         by iDestruct "HSI" as "(?&?&?)". }
       simpl. by rewrite Hex.
     - apply fits_inf_call_last_or_short in FIT as [NVAL | SHORT].
@@ -190,10 +206,11 @@ Section WaitFreePR.
     ([∗ set] τ ∈ locales_of_cfg c ∖ {[ τi ]}, obls τ ∅) ∗
     obls_τi' c. 
 
-  Definition pr_pr_wfree {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
+  Definition pr_pr_wfree {Σ} {PWT: PrWfreeTok Σ}
     (s: stuckness) (etr: execution_trace heap_lang) (Φs: list (val → iProp Σ)): iProp Σ :=
-    let oGS: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
-    wptp_wfree s etr Φs ∗ extra_fuel etr ∗ cur_phases etr ∗ cur_obls_sigs etr. 
+    let oGS: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ (@pwt_Hinv _ PWT) in
+    wptp_wfree s etr Φs ∗ extra_fuel etr ∗ cur_phases etr ∗
+    cur_obls_sigs etr ∗ cti_cond etr. 
 
   (* TODO: remove? *)
   Lemma cur_phases_take `{!ObligationsGS Σ} etr τ
@@ -263,7 +280,7 @@ Section WaitFreePR.
             (mtr :tr[ ℓ ]: δ') -∗
   ⌜efs = [] /\ locales_of_cfg (trace_last etr) = locales_of_cfg (t1 ++ @fill _ Ki x :: t2 ++ efs, σ')⌝.
   Proof using.
-    clear m WFS F.
+    clear m WFST F.
     iIntros "PH HSI".
     iAssert (⌜ ps_phases δ'  !! τi = Some π ⌝)%I as "%PH'".
     { iApply (th_phase_msi_frag with "[-PH] [$]").
@@ -323,7 +340,7 @@ Section WaitFreePR.
     (FIT: fits_inf_call ic m ai etr)
     :
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
-    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ WFS) -∗
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ WFST) -∗
     cur_obls_sigs etr -∗ state_interp etr mtr -∗
     wfree_trace_inv etr mtr.
   Proof using.
@@ -396,7 +413,7 @@ Section WaitFreePR.
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
     cur_phases etr -∗ cur_phases (etr :tr[ Some τ ]: c').
   Proof using.
-    clear m WFS F.
+    clear m WFST F.
     simpl. iIntros "PHS".
     rewrite /cur_phases.
     rewrite -EQ_CFG.    
@@ -591,7 +608,7 @@ Section WaitFreePR.
           cur_phases etr' ∗
           (⌜ trace_length etr = ii ⌝ → ∃ π, th_phase_frag τi π (/2)%Qp)).
   Proof using.
-    clear WFS F.
+    clear WFST F.
     rewrite /cur_phases. simpl. iIntros "(PHS & PHτi)".
     iDestruct (big_sepS_elem_of_acc with "[$]") as "(PH & PHS)".
     { apply elem_of_difference. split; [| apply not_elem_of_singleton]; eauto.
@@ -707,7 +724,7 @@ Section WaitFreePR.
     obls τ ∅ -∗ th_phase_eq τ π -∗ obls_τi -∗
       BOU ∅ WF_SB (cp π d0 ∗ th_phase_eq τ π ∗ obls τ ∅ ∗ obls_τi). 
   Proof using.
-    clear m WFS F. 
+    clear m WFST F. 
     iIntros "OB PH OBτi".
     rewrite /obls_τi. iDestruct "OBτi" as "(%s & OBτi & SGN & #EP)".    
     iMod (expect_sig_upd with "[] [$] OB [] [$]") as "(?&?&?&?)".
@@ -720,7 +737,7 @@ Section WaitFreePR.
     iModIntro. iFrame "#∗".
   Qed.
 
-  Lemma wptp_wfree_other_simpl {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
+  Lemma wptp_wfree_other_simpl {Σ} {PWT: PrWfreeTok Σ}
     s (etr: execution_trace heap_lang) tp0 tp Φs
     (OTHER: τi ∉ locales_of_list_from tp0 tp):
     wptp_from_gen (thread_pr s (trace_length etr)) tp0 tp Φs ⊣⊢
@@ -738,86 +755,86 @@ Section WaitFreePR.
     apply elem_of_lookup_imap. eauto.
   Qed.
 
-  Lemma wptp_wfree_posts {Σ: gFunctors} (Hinv : IEMGS HeapLangEM EM Σ)
-    (s : stuckness) (etr: execution_trace heap_lang) (Φs : list (val → iProp Σ))
-    (FIT: fits_inf_call ic m ai etr):
-    let Ps := adequacy_utils.posts_of (trace_last etr).1 Φs in
-    pr_pr_wfree s etr Φs -∗ |~~| Ps ∗ (Ps -∗ pr_pr_wfree s etr Φs).
-  Proof using. 
-    simpl. 
-    set (Ps := adequacy_utils.posts_of (trace_last etr).1 Φs). simpl. 
-    iUnfold pr_pr_wfree.
-    iIntros "(WPS & CPS & PH & OB)".
+  (* Lemma wptp_wfree_posts {Σ: gFunctors} {PWT: PrWfreeTok Σ} *)
+  (*   (s : stuckness) (etr: execution_trace heap_lang) (Φs : list (val → iProp Σ)) *)
+  (*   (FIT: fits_inf_call ic m ai etr): *)
+  (*   let Ps := adequacy_utils.posts_of (trace_last etr).1 Φs in *)
+  (*   pr_pr_wfree s etr Φs -∗ |~~| Ps ∗ (Ps -∗ pr_pr_wfree s etr Φs). *)
+  (* Proof using.  *)
+  (*   simpl.  *)
+  (*   set (Ps := adequacy_utils.posts_of (trace_last etr).1 Φs). simpl.  *)
+  (*   iUnfold pr_pr_wfree. *)
+  (*   iIntros "(WPS & CPS & PH & OB & CTI)". *)
 
-    iAssert (pre_step top top (Ps ∗ (Ps -∗ wptp_wfree s etr Φs)) (irisG0 := {|
-      iris_invGS :=
-        @iem_invGS heap_lang (AM2M _) HeapLangEM EM Σ Hinv;
-      state_interp :=
-        @state_interp heap_lang M Σ _;
-      fork_post := λ (_ : locale heap_lang) (_ : val), True        
-    |}))%I with "[WPS]" as "CLOS".
-    2: { iMod "CLOS". iModIntro. by iFrame. }
-    rewrite /wptp_wfree.
-    iDestruct (big_sepL2_length with "[$]") as "%LENS".
-    rewrite adequacy_utils.prefixes_from_length in LENS.
+  (*   iAssert (pre_step top top (cti_cond etr ∗ Ps ∗ (Ps -∗ wptp_wfree s etr Φs)) (irisG0 := {| *)
+  (*     iris_invGS := *)
+  (*       @iem_invGS heap_lang (AM2M _) HeapLangEM EM Σ (@pwt_Hinv _ PWT); *)
+  (*     state_interp := *)
+  (*       @state_interp heap_lang M Σ _; *)
+  (*     fork_post := λ (_ : locale heap_lang) (_ : val), True         *)
+  (*   |}))%I with "[WPS CTI]" as "CLOS". *)
+  (*   2: { iMod "CLOS" as "(?&?&?)". iModIntro. by iFrame. } *)
+  (*   rewrite /wptp_wfree. *)
+  (*   iDestruct (big_sepL2_length with "[$]") as "%LENS". *)
+  (*   rewrite adequacy_utils.prefixes_from_length in LENS. *)
 
-    destruct (trace_last etr) as [tp σ] eqn:LAST. simpl. 
+  (*   destruct (trace_last etr) as [tp σ] eqn:LAST. simpl.  *)
 
-    pose proof (thread_pool_split tp τi) as (tp1 & tp2 & tp' & -> & TP' & NO1 & NO2).
+  (*   pose proof (thread_pool_split tp τi) as (tp1 & tp2 & tp' & -> & TP' & NO1 & NO2). *)
 
-    iDestruct (wptp_gen_split_1 with "WPS") as %X.
-    destruct X as (Φs1 & Φs' & <- & LEN1 & LEN').
-    iDestruct (wptp_from_gen_app' with "[$]") as "[WPS1 WPS'] /="; [done| ].
+  (*   iDestruct (wptp_gen_split_1 with "WPS") as %X. *)
+  (*   destruct X as (Φs1 & Φs' & <- & LEN1 & LEN'). *)
+  (*   iDestruct (wptp_from_gen_app' with "[$]") as "[WPS1 WPS'] /="; [done| ]. *)
 
-    rewrite wptp_wfree_other_simpl; [| done]. simpl. 
-    iPoseProof (wptp_of_val_post with "WPS1") as "foo".
+  (*   rewrite wptp_wfree_other_simpl; [| done]. simpl.  *)
+  (*   iPoseProof (wptp_of_val_post with "WPS1") as "foo". *)
 
-    iDestruct (wptp_gen_split_1 with "WPS'") as %X.
-    destruct X as (Φs_ & Φs2 & <- & LEN2 & LEN'').
-    iDestruct (wptp_from_gen_app' with "WPS'") as "[WPS' WPS2]"; [done| ].
+  (*   iDestruct (wptp_gen_split_1 with "WPS'") as %X. *)
+  (*   destruct X as (Φs_ & Φs2 & <- & LEN2 & LEN''). *)
+  (*   iDestruct (wptp_from_gen_app' with "WPS'") as "[WPS' WPS2]"; [done| ]. *)
     
-    erewrite wptp_wfree_other_simpl with (tp0 := tp1 ++ tp'); [| done].
-    iPoseProof (wptp_of_val_post with "WPS2") as "bar".
+  (*   erewrite wptp_wfree_other_simpl with (tp0 := tp1 ++ tp'); [| done]. *)
+  (*   iPoseProof (wptp_of_val_post with "WPS2") as "bar". *)
 
-    iAssert (|~~| adequacy_utils.posts_of tp' Φs_ ∗ (adequacy_utils.posts_of tp' Φs_ -∗ wptp_from_gen (thread_pr s (trace_length etr)) tp1 tp' Φs_))%I with "[WPS']" as "WPS'".
-    { destruct TP' as [-> | (e & -> & EQ)].
-      { iModIntro. rewrite /adequacy_utils.posts_of. simpl. set_solver. }
-      destruct Φs_ as [ | ? [|] ].
-      1, 3: simpl in LEN2; lia.
-      rewrite wptp_gen_singleton.
-      rewrite /adequacy_utils.posts_of. simpl.
-      destruct (to_val e) eqn:VAL; simpl.
-      2: { iFrame. iModIntro. set_solver. }
-      rewrite /thread_pr. rewrite decide_True; [| done].
-      pose proof (of_to_val e _ VAL) as EV. rewrite -EV.        
-      rewrite /wp_tc. destruct leb eqn:LEN.
-      - iPoseProof (wp_value_inv' with "WPS'") as "foo".
-        iMod (pre_step_looping_wfree_elim with "foo") as "foo".
-        iModIntro. iFrame. iIntros "(? & _)".
-        by iApply @wp_value'.
-      - apply fits_inf_call_last_or_short in FIT. destruct FIT as [RUNS | SHORT].
-        2: { apply leb_complete_conv in LEN. simpl in SHORT. lia. }
+  (*   iAssert (|~~| adequacy_utils.posts_of tp' Φs_ ∗ (adequacy_utils.posts_of tp' Φs_ -∗ wptp_from_gen (thread_pr s (trace_length etr)) tp1 tp' Φs_))%I with "[WPS']" as "WPS'". *)
+  (*   { destruct TP' as [-> | (e & -> & EQ)]. *)
+  (*     { iModIntro. rewrite /adequacy_utils.posts_of. simpl. set_solver. } *)
+  (*     destruct Φs_ as [ | ? [|] ]. *)
+  (*     1, 3: simpl in LEN2; lia. *)
+  (*     rewrite wptp_gen_singleton. *)
+  (*     rewrite /adequacy_utils.posts_of. simpl. *)
+  (*     destruct (to_val e) eqn:VAL; simpl. *)
+  (*     2: { iFrame. iModIntro. set_solver. } *)
+  (*     rewrite /thread_pr. rewrite decide_True; [| done]. *)
+  (*     pose proof (of_to_val e _ VAL) as EV. rewrite -EV.         *)
+  (*     rewrite /wp_tc. destruct leb eqn:LEN. *)
+  (*     - iPoseProof (wp_value_inv' with "WPS'") as "foo". *)
+  (*       iMod (pre_step_looping_wfree_elim with "foo") as "foo". *)
+  (*       iModIntro. iFrame. iIntros "(? & _)". *)
+  (*       by iApply @wp_value'. *)
+  (*     - apply fits_inf_call_last_or_short in FIT. destruct FIT as [RUNS | SHORT]. *)
+  (*       2: { apply leb_complete_conv in LEN. simpl in SHORT. lia. } *)
 
-        rewrite LAST /= in RUNS. apply runs_call_helper in RUNS; eauto.  
-        destruct RUNS as (e_ & CTX & NVAL).
-        apply under_ctx_val_Some_inv in CTX as [? ->]; eauto.
-        congruence. }
+  (*       rewrite LAST /= in RUNS. apply runs_call_helper in RUNS; eauto.   *)
+  (*       destruct RUNS as (e_ & CTX & NVAL). *)
+  (*       apply under_ctx_val_Some_inv in CTX as [? ->]; eauto. *)
+  (*       congruence. } *)
       
-    iMod (pre_step_looping_wfree_elim with "foo") as "[P1 WPS1]". 
-    iMod (pre_step_looping_wfree_elim with "bar") as "[P2 WPS2]".
-    iMod "WPS'" as "[P' WPS']".  
+  (*   iMod (pre_step_looping_wfree_elim with "foo") as "[P1 WPS1]".  *)
+  (*   iMod (pre_step_looping_wfree_elim with "bar") as "[P2 WPS2]". *)
+  (*   iMod "WPS'" as "[P' WPS']".   *)
 
-    iModIntro. subst Ps. iSimpl.
-    rewrite -!posts_of_app; try done. iFrame "P1 P2 P'".
-    iIntros "(P1 & P' & P2)".
-    iSpecialize ("WPS1" with "P1"). iSpecialize ("WPS2" with "P2"). iSpecialize ("WPS'" with "P'").
-    iApply wptp_from_gen_app. iSplitL "WPS1".
-    { by rewrite wptp_wfree_other_simpl. }
-    simpl. iApply wptp_from_gen_app. iFrame.
-    by rewrite wptp_wfree_other_simpl.
-  Qed.    
+  (*   iModIntro. subst Ps. iSimpl. *)
+  (*   rewrite -!posts_of_app; try done. iFrame "P1 P2 P'". *)
+  (*   iIntros "(P1 & P' & P2)". *)
+  (*   iSpecialize ("WPS1" with "P1"). iSpecialize ("WPS2" with "P2"). iSpecialize ("WPS'" with "P'"). *)
+  (*   iApply wptp_from_gen_app. iSplitL "WPS1". *)
+  (*   { by rewrite wptp_wfree_other_simpl. } *)
+  (*   simpl. iApply wptp_from_gen_app. iFrame. *)
+  (*   by rewrite wptp_wfree_other_simpl. *)
+  (* Qed.     *)
 
-  Lemma wptp_wfree_not_stuck {Σ : gFunctors} (Hinv : IEMGS HeapLangEM EM Σ) 
+  Lemma wptp_wfree_not_stuck {Σ : gFunctors} {PWT: PrWfreeTok Σ}
     (s : stuckness) (ex : execution_trace heap_lang) 
     (Φs : list (val → iProp Σ)) 
     (σ : state) (atr : auxiliary_trace M) 
@@ -830,12 +847,13 @@ Section WaitFreePR.
     ⌜∀ e: expr, e ∈ tp → s = NotStuck → not_stuck e (trace_last ex).2⌝ .
   Proof using.
     iIntros "SI PR".
-    rewrite /pr_pr_wfree. iDestruct "PR" as "(WPS &X&Y&Z)".
+    rewrite /pr_pr_wfree. iDestruct "PR" as "(WPS &X&Y&Z&CTI)".
     iFrame "X Y Z".
-    iApply (wptp_wfre_not_stuck with "[$] [$]"); eauto.
+    rewrite -bi.sep_assoc. 
+    iApply (wptp_wfre_not_stuck with "[$] [$] [$]"); eauto.
   Qed.
 
-  Lemma wptp_wfree_upd_other `{Hinv : @IEMGS _ _ HeapLangEM EM Σ} s N tp0 tp Φs
+  Lemma wptp_wfree_upd_other `{PWT: PrWfreeTok Σ} s N tp0 tp Φs
     (OTHER: τi ∉ locales_of_list_from tp0 tp):
     wptp_from_gen (thread_pr s N) tp0 tp Φs -∗
     wptp_from_gen (thread_pr s (S N)) tp0 tp Φs.
@@ -868,7 +886,10 @@ Section WaitFreePR.
   Proof using. by destruct ic as [? []]. Qed.
 
   Section TakeStep.
-  Context {Σ} (Hinv : IEMGS HeapLangEM EM Σ).
+  Context {Σ} {PWT: PrWfreeTok Σ}.
+
+  Let Hinv: IEMGS HeapLangEM EM Σ := @pwt_Hinv _ PWT.
+  
   Context (s : stuckness).
   Context (etr : execution_trace heap_lang) (Φs : list (val → iProp Σ)) 
     (c : cfg heap_lang) (oτ : olocale heap_lang) (c' : cfg heap_lang).
@@ -954,7 +975,7 @@ Section WaitFreePR.
   (sf := step_fork (trace_last etr) (t1 ++ e' :: t2 ++ efs, σ')):
   τi ∉ locales_of_list_from (t1 ++ e' :: t2) efs.
   Proof using.
-    clear WFS F. 
+    clear WFST F. 
     rewrite locales_of_list_from_locales.
     intros [[??] IN]%elem_of_list_In%in_map_iff.
     destruct IN as (LOC & IN).
@@ -997,7 +1018,7 @@ Section WaitFreePR.
   thread_pr s (trace_length etr) e (locale_of t1 e) Φ ∗ 
   wptp_from_gen (thread_pr s (trace_length etr)) (t1 ++ [e]) t2 Φs2.
   Proof using FIN.
-    clear mtr m WFS VALID F. 
+    clear mtr WFST VALID F. 
     iIntros "WPS".
     simpl.
     inversion STEP as
@@ -1055,7 +1076,7 @@ Section WaitFreePR.
   Proof using VALID FIN.
     iIntros "TI #INV PR".
     rewrite /pr_pr_wfree. 
-    iDestruct "PR" as "(WPS & CPS & PH & OB)".
+    iDestruct "PR" as "(WPS & CPS & PH & OB & CTI)".
 
     iDestruct (unfold_helper with "[$]") as "(%&%&%&%&%&%&%&% & %PROPS & WPS1 & WP & WPS2)"; eauto.
     subst oτ. 
@@ -1084,7 +1105,11 @@ Section WaitFreePR.
       iDestruct "CORR" as "(_&%CORR)". done. }
 
     destruct Nat.leb eqn:LEN.
-    + apply Nat.leb_le in LEN.
+    +
+      rewrite /cti_cond. iSpecialize ("CTI" with "[]").
+      { iPureIntro. by apply leb_complete. }
+  
+      apply Nat.leb_le in LEN.
       simpl. 
 
       iDestruct (split_trace_fuel with "[$]") as "(CP & CPP & CPS)"; [done| ].
