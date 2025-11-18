@@ -847,6 +847,68 @@ Section WFAdequacy.
     do 3 eexists. split; eauto. lia.
   Qed.
 
+  (* TODO: try to remove duplication between this and previous_calls_return *)
+  Definition previous_calls_return_tr (tr: extrace heap_lang) i τ m :=
+    forall j K, let tpc := TpoolCtx K τ in
+           j < i ->
+           from_option (fun c => exists a, call_at tpc c m a (APP := App)) False (tr S!! j) ->
+           exists r, r <= i /\ from_option (fun c => exists v, return_at tpc c v) False (tr S!! r).
+
+  (* TODO: move *)
+  Lemma trace_infinite_cons {St L : Type} (tr: trace St L) s l:
+    trace_len_is tr my_omega.NOinfinity <-> trace_len_is (tr_cons s l tr) my_omega.NOinfinity.
+  Proof using.
+    split; intros LEN. 
+    - eapply trace_len_cons in LEN; eauto.
+    - eapply trace_len_tail in LEN; eauto.
+  Qed. 
+
+  (* TODO: move *)
+  Lemma trace_take_fwd_length {St L : Type} n (tr: trace St L) len
+    (LEN: trace_len_is tr len):
+    trace_length (trace_take_fwd n tr) = 
+    match len with | my_omega.NOnum l => min l (S n) | my_omega.NOinfinity => S n end.
+  Proof using.
+    clear dependent ic. clear dependent m. 
+    destruct len; simpl.
+    { generalize dependent tr. 
+      induction n.
+      { simpl. destruct tr; simpl; lia. }
+      intros tr INF. 
+      simpl.
+      destruct tr.
+      { pose proof (@trace_len_singleton _ L s).
+        eapply trace_len_uniq in INF; eauto. done. }
+      simpl. rewrite ft_prepend_length.
+      f_equal. apply IHn.
+      eapply trace_infinite_cons; eauto. }
+    generalize dependent n0. generalize dependent tr.
+    induction n.
+    { intros. simpl.
+      apply trace_len_gt_0 in LEN. simpl in LEN.
+      destruct tr; simpl; lia. }
+    intros tr l LEN.
+    pose proof LEN as NZ%trace_len_gt_0. simpl in NZ. destruct l; [lia| ].  
+    destruct tr.
+    2: { simpl. rewrite ft_prepend_length.
+         f_equal. apply IHn.
+         apply trace_len_tail in LEN. eauto. }
+    simpl.
+    pose proof (@trace_len_singleton _ L s) as LEN'. 
+    eapply trace_len_uniq in LEN; eauto.
+    inversion LEN. subst. lia.
+  Qed.
+
+  (* TODO: move *)
+  Lemma trace_take_fwd_length_bound {St L : Type} n (tr: trace St L):
+    trace_length (trace_take_fwd n tr) <= S n. 
+  Proof using.
+    clear dependent ic. clear dependent m. 
+    pose proof (trace_has_len tr) as [??].
+    erewrite trace_take_fwd_length; eauto.
+    destruct x; lia.
+  Qed.
+
   (* TODO: rename *)
   Lemma obls_terminates_impl_multiple_waitfree
     (extr : extrace heap_lang)
@@ -855,6 +917,7 @@ Section WFAdequacy.
     (VALID: extrace_valid extr)
     (* (FAIR: fair_ex τi extr) *)
     (FAIR: fair_call extr tpc ii)
+    (MAIN: previous_calls_return_tr extr ii τi m)
     (CALL: from_option (fun c => call_at tpc c m ai (APP := App)) False (extr S!! ii))
     :
     terminating_trace extr \/ has_return extr ic. 
@@ -869,6 +932,7 @@ Section WFAdequacy.
     rewrite !curry_uncurry_prop in X. apply Classical_Prop.imply_to_or in X.
     destruct X as [NFIT' | ?]; [| done]. clear NFIT. rename NFIT' into NFIT.
     apply Classical_Prop.not_and_or in NFIT as [X | NFIT].
+    1: apply Classical_Prop.not_and_or in X as [X | NFIT].
     1: apply Classical_Prop.not_and_or in X as [NFIT | NFIT].
     - destruct (trace_take_fwd n extr !! tctx_index ic) eqn:II; rewrite II /= // in NFIT.
       destruct NFIT.
@@ -885,7 +949,7 @@ Section WFAdequacy.
       rename r into b. 
       destruct NFIT as (k & r & ck & RANGE & KTH & RETk).
       rewrite ic_helper.
-      exists k, r, ck. split; eauto. lia.  
+      exists k, r, ck. split; eauto. lia.
     - apply not_forall_exists_not in NFIT. destruct NFIT as [j NFIT].
       destruct (trace_take_fwd n extr !! j) eqn:JJ; rewrite JJ /= // in NFIT.
       destruct (from_locale c.1 τi) eqn:EE; rewrite EE /= // in NFIT.
@@ -915,6 +979,21 @@ Section WFAdequacy.
         destruct GT as (k & r & ck & RANGE & KTH & RETk).
         rewrite ic_helper.
         exists k, r, ck. split; eauto. lia.
+    - apply Classical_Prop.imply_to_and in NFIT as [LONG NORET].
+      destruct NORET. red.
+      clear CALL. 
+      intros j K PREV CALL.
+      destruct (trace_take_fwd n extr !! j) eqn:JJ; rewrite JJ /= // in CALL.
+      pose proof (trace_take_fwd_length_bound n extr). 
+      (* apply trace_take_fwd_lookup_Some in JJ. *)
+      red in MAIN. eapply MAIN in PREV.
+      2: { apply trace_take_fwd_lookup_Some in JJ. rewrite JJ. eauto. }
+      destruct PREV as (r&PREV'&RET).
+      exists r. split; [done| ].
+      destruct (extr S!! r) eqn:RTH; [| done]. 
+      eapply (trace_take_fwd_lookup_Some' _ n) in RTH; eauto.
+      2: { lia. }
+      by rewrite RTH.       
   Qed.
      
 End WFAdequacy.
@@ -929,11 +1008,6 @@ End WFAdequacy.
 (* Lemma no_return_before_equiv tr tpc i k: *)
 (*   no_return_before tr tpc i k <-> *)
 
-Definition all_previous_calls_return etr i τ m :=
-  forall j c a K, j < i -> etr S!! j = Some c ->
-             call_at (TpoolCtx K τ) c m a (APP := App) ->
-             ¬ no_return_before etr (TpoolCtx K τ) j i. 
-
 Lemma find_main_call etr i K τ m a ci
   (tpc := TpoolCtx K τ)
   (VALID : extrace_valid etr)
@@ -943,7 +1017,7 @@ Lemma find_main_call etr i K τ m a ci
   exists i' K' a' ci',
     let tpc' := TpoolCtx K' τ in
     fair_call etr tpc' i' /\ etr S!! i' = Some ci' /\ call_at tpc' ci' m a' (APP := App) /\
-    all_previous_calls_return etr i' τ m /\
+    previous_calls_return_tr etr i' τ m /\
     i' <= i /\ nval_at tpc' ci.
 Proof using.
 Admitted.
@@ -953,7 +1027,7 @@ Definition always_returns_main m tr :=
   forall tc a ci, let '(TraceCtx i tpc) := tc in
       fair_call tr tpc i ->
       tr S!! i = Some ci ->
-      all_previous_calls_return tr i (tpctx_tid tpc) m ->
+      previous_calls_return_tr tr i (tpctx_tid tpc) m ->
       call_at tpc ci m a (APP := App) ->
       has_return tr tc.
 
@@ -967,7 +1041,7 @@ Proof using.
   destruct X as (i0 & K0 & a0 & c0 & ?&?&?&?&PREV&NVALi0).
   ospecialize * (MAIN_RET (TraceCtx i0 (TpoolCtx K0 τ))).
   1-4: by eauto. 
-Abort. 
+Admitted.
 
 
 Theorem wfree_is_wait_free m
@@ -975,10 +1049,8 @@ Theorem wfree_is_wait_free m
   wait_free m (wfs_is_init_st _ SPEC). 
 Proof using.
   red. intros etr ETR0 MOD_INIT VALID.
-  red. intros [i tpc] a ci FAIR ITH CALL.
-
-  (* opose proof * find_top_call as C; eauto. *)
-  (* clear i. *)
+  apply main_returns_reduction; [done| ].  
+  red. intros [i tpc] a ci FAIR ITH MAIN CALL.
 
   opose proof * (obls_terminates_impl_multiple_waitfree (TraceCtx i tpc)) as ADEQ; eauto.
   { simpl. by rewrite ITH. }

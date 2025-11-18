@@ -100,19 +100,30 @@ End CallInTrace.
 
 Section FitsInfCall.
 
+  (* TODO: do we need a similar def for infinite traces? *)
+  Definition previous_calls_return (etr: execution_trace heap_lang) i τ m :=
+    forall j K, let tpc := TpoolCtx K τ in
+           j < i ->
+           from_option (fun c => exists a, call_at tpc c m a (APP := App)) False (etr !! j) ->
+           exists r, r <= i /\ from_option (fun c => exists v, return_at tpc c v) False (etr !! r).
+
+  Global Instance pcr_dec etr i τ m: Decision (previous_calls_return etr i τ m).
+  Proof using. Admitted.
+    
   Context (ic: @trace_ctx heap_lang).
   Let ii := tctx_index ic.
   Let tc := tctx_tpctx ic. 
   Let Ki := tpctx_ctx tc.
   Let τi := tpctx_tid tc. 
 
-  Context (m: val) (ai: val). 
+  Context (m: val) (ai: val).
 
   Record fits_inf_call (etr: execution_trace heap_lang): Prop := FIC {
     fic_call: from_option (fun c => call_at tc c m ai (APP := App)) True (etr !! ii);
     fic_cont: forall j, ii <= j -> from_option (nval_at tc) True (etr !! j);
     fic_never_val: forall i, from_option (fun e => to_val e = None) True
             (from_option (fun c => from_locale c.1 τi) None (etr !! i));
+    fic_main: ii < trace_length etr -> previous_calls_return etr ii τi m;
   }.
 
   Lemma fits_inf_call_last_or_short etr
@@ -141,7 +152,7 @@ Section FitsInfCall.
   Proof using.
     red. intros etr τ c FITS. 
     pose proof (ft_lookup_old etr c τ) as LOOKUP.  
-    destruct FITS as [II FITS NVAL]. split. 
+    destruct FITS as [II FITS NVAL MAIN]. split. 
     - destruct (etr !! ii) eqn:ITH; [| done].
       simpl. 
       eapply LOOKUP in ITH.
@@ -156,6 +167,17 @@ Section FitsInfCall.
       destruct (from_locale c0.1 τi) eqn:TT; simpl.
       2: { by rewrite TT. }  
       specialize (NVAL i). erewrite LOOKUP in NVAL; eauto.
+    - intros LEN j K' ? PREV CALL. 
+      destruct (etr !! j) as [c0| ] eqn:JTH; [| done]. simpl in CALL.
+      (* destruct CALL as (a & CALL). *)
+      ospecialize (MAIN _ j K' _ _).
+      1, 2: simpl in *; lia.
+      { erewrite LOOKUP; eauto. }
+      destruct MAIN as (r&?&RET).
+      opose proof * (trace_lookup_lt_Some_2 etr r) as [? RTH]. 
+      { lia. }
+      exists r. split; auto. rewrite RTH /=.
+      erewrite LOOKUP in RET; eauto.  
   Qed.
 
   Lemma runs_call_helper t1 t2 e σ
@@ -232,6 +254,7 @@ Section FitsInfCall.
       destruct lookup eqn:ITH; try done. simpl in *.
       apply H0. split; [lia| ].
       eapply trace_lookup_lt_Some_1; eauto. }
+    step_dec_proof.
     by left.
   Qed. 
 
