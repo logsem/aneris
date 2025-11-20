@@ -36,9 +36,9 @@ Section CallInTrace.
       call_at tpc ci m a (APP := App) ->
       has_return tr tc.
 
-  (* TODO: generalize to multiple threads *)
-  Definition valid_init_tpool (tp: list expr) :=
-    (exists e0, tp = [subst "m" m e0] /\ valid_client e0). 
+  Definition valid_op_client e := exists e0, e = subst "m" m e0 /\ valid_client e0. 
+
+  Definition valid_init_tpool (tp: list expr) := Forall valid_op_client tp. 
   
   Definition wait_free (is_init_st: cfg heap_lang -> Prop) := forall etr,
       valid_init_tpool (trfirst etr).1 ->

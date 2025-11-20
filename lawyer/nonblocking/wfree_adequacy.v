@@ -741,7 +741,6 @@ Section WFAdequacy.
     exists k, ¬ fits_inf_call ic m ai (trace_take_fwd k extr).
   Proof.
     intros VALID FAIR.
-    destruct ETR0 as (e0 & ETR0 & VALID0). 
 
     destruct (decide (ii = 0 → ∃ e,
                     from_locale (trfirst extr).1 τi = Some e ∧ under_ctx Ki e = Some (m ai))) as [II0| ].
@@ -772,11 +771,7 @@ Section WFAdequacy.
          rewrite E in fic_never_val. done. }
 
     assert (tpool_init_restr (trfirst extr).1) as INIT_TP.
-    { split; [| split].
-      - (* TODO: can generalize to more than 1 initial thread *)
-        rewrite ETR0. constructor; [| done]. eauto.
-      - eauto.
-      - eauto. }
+    { repeat split; eauto. }
 
     by apply simple_om_simulation_adequacy_terminate_multiple_waitfree_impl.
   Qed.
