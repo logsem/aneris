@@ -96,35 +96,81 @@ Section CallInTrace.
       eapply not_return_nval; eauto.
   Qed.
 
+  (* TODO: move, use in other places *)
+  Lemma nval_enabled K τ c
+    (NVAL: nval_at (TpoolCtx K τ) c):
+  locale_enabled τ c.
+  Proof using. 
+    red. red in NVAL. simpl in NVAL. destruct NVAL as (?&?&?).
+    eexists. split; eauto.
+    eapply fill_not_val; eauto.
+  Qed.
+
   (** definition used in paper *)
   Definition fair_call_strong tr '(TpoolCtx K τ as tpc) i :=
-    forall k ck, i <= k -> 
-            tr S!! k = Some ck ->
-            locale_enabled τ ck ->
-            no_return_before tr tpc i k ->
+    forall k, i <= k -> is_Some (tr S!! k) -> no_return_before tr tpc i k ->
     exists d, tr L!! (k + d) = Some $ Some τ.
 
   (** τ is enabled at j and cannot get disabled without taking steps *)
-  Lemma fair_call_strenghten tr tpc i
-    (VALID: extrace_valid tr):
-    fair_call tr tpc i <-> fair_call_strong tr tpc i.
+  Lemma fair_call_strenghten tr K τ i
+    (tpc := TpoolCtx K τ)
+    (VALID: extrace_valid tr)
+    (CALLi: from_option (fun c => exists a, call_at tpc c m a (APP := App)) False (tr S!! i)): 
+    fair_call tr (TpoolCtx K τ) i <-> fair_call_strong tr (TpoolCtx K τ) i.
   Proof using.
     rewrite /fair_call /fair_call_strong.
-    destruct tpc as [τ K].
-    apply forall_proper. intros j. repeat (apply forall_proper; intros).
+    apply forall_proper. intros k. 
     split.
-    2: { intros (d & STEP).
+    2: { intros FAIR ? LE KTH EN NORET.
+         ospecialize * FAIR; eauto.
+         destruct FAIR as [? STEP]. 
          pose proof STEP as [[??] _]%mk_is_Some%label_lookup_states.
          do 2 eexists. split; eauto.
          red. eauto. right. eexists. by split; eauto. }
-    intros (d & ? & ? & FAIR).
-    rewrite /fairness_sat in FAIR. destruct FAIR as [DIS | (?&?&STEP)].
+    intros FAIR LE [? KTH] NORET.
+    destruct (tr S!! i) eqn:ITH; [| done]. simpl in CALLi. destruct CALLi.
+    ospecialize * FAIR; eauto.
+    { odestruct (decide (locale_enabled _ _ )) as [EN | DIS]; [by apply EN| ].
+      eapply call_returns_if_not_continues in LE; eauto.
+      { destruct LE as (?&?&?&?&?&RET).
+        edestruct NORET. eexists. split; [apply H0| ].
+        red. do 2 eexists. split; eauto. lia. }
+      { eapply (@call_nval_at _ _ App); eauto. }
+      intros NVAL. apply DIS. eapply nval_enabled; eauto. }
+    rewrite /fairness_sat in FAIR. destruct FAIR as (d&?&?&[DIS | (?&?&STEP)]).
     2: { red in STEP. subst. eauto. }
-    eapply (enabled_disabled_step_between _ j (j + d)) in DIS; eauto.
+    eapply (enabled_disabled_step_between _ k (k + d)) in DIS; eauto.
     2: lia.
-    destruct DIS as (?&?&?).
-    apply proj1, Nat.le_sum in H0 as [? ->].
+    2: { eapply no_return_before_equiv_nvals in NORET; eauto.
+         2: { eapply (@call_nval_at _ _ App); eauto. }
+         rewrite KTH /= in NORET. eapply nval_enabled; eauto. } 
+    destruct DIS as (?&GE&?).
+    apply proj1, Nat.le_sum in GE as [? ->].
     eauto.
+  Qed.
+
+  Definition always_returns_strong tr :=    
+    forall tc a ci, let '(TraceCtx i tpc) := tc in
+      fair_call_strong tr tpc i ->
+      tr S!! i = Some ci ->
+      call_at tpc ci m a (APP := App) ->
+      has_return tr tc.
+
+  Definition wait_free_strong (is_init_st: cfg heap_lang -> Prop) := forall etr,
+      valid_init_tpool (trfirst etr).1 ->
+      is_init_st (trfirst etr) ->
+      extrace_valid etr ->
+      always_returns_strong etr.
+
+  Lemma wait_free_equiv C:
+    wait_free C <-> wait_free_strong C. 
+  Proof using.
+    rewrite /wait_free /wait_free_strong.
+    repeat (apply forall_proper; intros).
+    destruct x3 as [? [??]]. 
+    split; intros RET **; apply RET; auto.
+    all: eapply fair_call_strenghten; eauto;
+      rewrite H0; simpl; exists x4; eauto.
   Qed.
 
 End CallInTrace.
