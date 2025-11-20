@@ -2,7 +2,7 @@ From iris.proofmode Require Import tactics.
 From fairness Require Import locales_helpers utils fairness.
 From lawyer.nonblocking Require Import trace_context calls.
 From lawyer.nonblocking.logrel Require Import valid_client.
-From heap_lang Require Import lang notation.
+From heap_lang Require Import lang notation locales_helpers_hl.
 From trillium.traces Require Import exec_traces trace_lookup inftraces.
 
 Close Scope Z.
@@ -18,6 +18,7 @@ Section CallInTrace.
   Definition no_return_before tr tpc i k :=
     ¬ (exists j, j <= k /\ has_return_at tr (TraceCtx i tpc) j). 
 
+  (** see fair_call_strenghten for an equivalent definition used in paper *)
   Definition fair_call tr '(TpoolCtx K τ as tpc) i :=
     forall k ck, i <= k -> 
             tr S!! k = Some ck ->
@@ -93,7 +94,38 @@ Section CallInTrace.
       rewrite JTH /= in CONT.
       destruct RET.
       eapply not_return_nval; eauto.
-  Qed.      
+  Qed.
+
+  (** definition used in paper *)
+  Definition fair_call_strong tr '(TpoolCtx K τ as tpc) i :=
+    forall k ck, i <= k -> 
+            tr S!! k = Some ck ->
+            locale_enabled τ ck ->
+            no_return_before tr tpc i k ->
+    exists d, tr L!! (k + d) = Some $ Some τ.
+
+  (** τ is enabled at j and cannot get disabled without taking steps *)
+  Lemma fair_call_strenghten tr tpc i
+    (VALID: extrace_valid tr):
+    fair_call tr tpc i <-> fair_call_strong tr tpc i.
+  Proof using.
+    rewrite /fair_call /fair_call_strong.
+    destruct tpc as [τ K].
+    apply forall_proper. intros j. repeat (apply forall_proper; intros).
+    split.
+    2: { intros (d & STEP).
+         pose proof STEP as [[??] _]%mk_is_Some%label_lookup_states.
+         do 2 eexists. split; eauto.
+         red. eauto. right. eexists. by split; eauto. }
+    intros (d & ? & ? & FAIR).
+    rewrite /fairness_sat in FAIR. destruct FAIR as [DIS | (?&?&STEP)].
+    2: { red in STEP. subst. eauto. }
+    eapply (enabled_disabled_step_between _ j (j + d)) in DIS; eauto.
+    2: lia.
+    destruct DIS as (?&?&?).
+    apply proj1, Nat.le_sum in H0 as [? ->].
+    eauto.
+  Qed.
 
 End CallInTrace.
 
