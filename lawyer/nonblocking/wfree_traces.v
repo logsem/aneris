@@ -36,7 +36,7 @@ Section CallInTrace.
       call_at tpc ci m a (APP := App) ->
       has_return tr tc.
 
-  Definition valid_op_client e := exists e0, e = subst "m" m e0 /\ valid_client e0. 
+  Definition valid_op_client e := exists e0, e = subst "m" m e0 /\ valid_client e0.
 
   Definition valid_init_tpool (tp: list expr) := Forall valid_op_client tp. 
   

@@ -16,7 +16,7 @@ Section typed_interp.
     {invG: invGS_gen HasNoLc Σ}
   .
 
-  Let iG := irisG_looping HeapLangEM (lG := hG).
+  Let iG := irisG_looping HeapLangEM si_add_none (lG := hG).
   Existing Instance iG. 
   
   Notation D := (persistent_predO val (iPropI Σ)).
@@ -55,7 +55,7 @@ Section typed_interp.
 
   Ltac solve_stuck_case :=
     iApply ectx_lifting.wp_lift_pure_head_stuck;
-      [done | apply srav_helper; solve_no_fill_item | solve_head_stuck]. 
+      [done | apply srav_helper; solve_no_fill_item | solve_head_stuck ..].
 
   Lemma bin_op_eval_inv op a b r
     (EVAL: bin_op_eval op a b = Some r):
@@ -123,7 +123,7 @@ Section typed_interp.
     destruct (vs !! x) eqn:XTH; rewrite XTH; simpl. 
     - iApply wp_value.
       iApply interp_env_Some_l; done.
-    - solve_stuck_case. 
+    - solve_stuck_case.
   Qed. 
 
   Lemma wp_app_val_val f a τ:
@@ -543,8 +543,8 @@ Section typed_interp.
   Qed.
 
   Ltac solve_head_stuck_with_freed :=
-    rewrite ?heap_lang_defs.pointsto_unseal;
-    iIntros "* %VALID %LAST SI";
+    rewrite heap_lang_defs.pointsto_unseal;
+    iIntros "* %VALID %LAST (SI & ADD)";
     simpl; iDestruct (gen_heap_valid with "SI [$]") as %V;
     iMod (fupd_mask_subseteq ∅) as "_"; [set_solver| ];
     iModIntro; iPureIntro;
@@ -571,8 +571,7 @@ Section typed_interp.
     iDestruct "Hv" as "(% & %EQ & INVl)". inversion_clear EQ.
     iApply wp_atomic. 
     iInv "INVl" as "[(%v & >L & #IIv) | >FREE]" "CLOS"; iModIntro. 
-    2: solve_stuck_case_with_freed.
-
+    2: solve_stuck_case_with_freed.             
     iApply sswp_pwp; [done| ]. 
     iApply (wp_free with "L").
     iIntros "!> FREE !>".
