@@ -10,6 +10,9 @@ From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From heap_lang Require Import sswp_logic lang.
 
 
+Close Scope Z. 
+
+
 Section CallTracker.
 
   Class CallTrackerPre Σ := {
@@ -37,11 +40,13 @@ Section PwpExtra.
 
   Definition inside_call (K: ectx heap_lang) (i: nat) (etr: execution_trace heap_lang) (e: expr) :=
     let κ := TpoolCtx K τ in
-    exists (a: val),
+    let last_ind := trace_length etr - 1 in
+    exists (a: val),      
       (exists s, etr !! i = Some s /\ call_at κ s m a (APP := App)) /\
-      i < trace_length etr /\
-      no_return_before (finite_trace_to_trace etr) κ i (trace_length etr) /\
-      (* nval_at κ (trace_last etr) /\ *)
+      i < last_ind /\ 
+      (** finite_trace_to_trace reverses the trace; use alt def of no_return_before instead *)
+      (* no_return_before (finite_trace_to_trace etr) κ i (trace_length etr - 1) /\ *)
+      (forall j, i <= j <= last_ind -> from_option (nval_at κ) False (etr !! j)) /\
       from_option (fun eτ => under_ctx K eτ = Some e) False ((trace_last etr).1 !! τ)
   . 
 
@@ -54,19 +59,19 @@ Section PwpExtra.
     (tok ∗ ⌜ oe = None ⌝ ∨ ∃ e K s, ⌜ oe = Some e /\ inside_call K s etr e⌝)
   .
 
-  Definition irisG_phys_cti (LG: LangEM heap_lang) `{invGS_gen HasNoLc Σ} {lG: lgem_GS Σ}:
-    irisG heap_lang LoopingModel Σ := {|
-      state_interp etr mtr := (phys_SI LG etr mtr (lG := lG) ∗ ct_interp etr)%I;
-      fork_post := fun _ _ => (⌜ True ⌝)%I;
-  |}.
+  (* Definition irisG_phys_cti (LG: LangEM heap_lang) `{invGS_gen HasNoLc Σ} {lG: lgem_GS Σ}: *)
+  (*   irisG heap_lang LoopingModel Σ := {| *)
+  (*     state_interp etr mtr := (phys_SI LG etr mtr (lG := lG) ∗ ct_interp etr)%I; *)
+  (*     fork_post := fun _ _ => (⌜ True ⌝)%I; *)
+  (* |}. *)
   
 End PwpExtra.
 
-(* TODO: rename *)
-Definition iris_OM_into_phys_cti {Σ} `(Hinv : @IEMGS heap_lang M LG EM Σ) (CT: CallTracker Σ)
-  (m: val) (τ: locale heap_lang) (tok: iProp Σ)
-  :
-  irisG heap_lang LoopingModel Σ.
-Proof using.
-  eapply (irisG_phys_cti m τ tok); apply Hinv.
-Defined.
+(* (* TODO: rename *) *)
+(* Definition iris_OM_into_phys_cti {Σ} `(Hinv : @IEMGS heap_lang M LG EM Σ) (CT: CallTracker Σ) *)
+(*   (m: val) (τ: locale heap_lang) (tok: iProp Σ) *)
+(*   : *)
+(*   irisG heap_lang LoopingModel Σ. *)
+(* Proof using. *)
+(*   eapply (irisG_phys_cti m τ tok); apply Hinv. *)
+(* Defined. *)

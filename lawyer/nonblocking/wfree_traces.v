@@ -183,7 +183,7 @@ Section FitsInfCall.
     forall j K, let tpc := TpoolCtx K τ in
            j < i ->
            from_option (fun c => exists a, call_at tpc c m a (APP := App)) False (etr !! j) ->
-           exists r, r <= i /\ from_option (fun c => exists v, return_at tpc c v) False (etr !! r).
+           exists r, j < r <= i /\ from_option (fun c => exists v, return_at tpc c v) False (etr !! r).
 
   Global Instance pcr_dec etr i τ m: Decision (previous_calls_return etr i τ m).
   Proof using. Admitted.

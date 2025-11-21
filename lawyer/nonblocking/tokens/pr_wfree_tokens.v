@@ -1,5 +1,5 @@
 From iris.proofmode Require Import tactics.
-From trillium.traces Require Import inftraces trace_lookup exec_traces trace_len. 
+From trillium.traces Require Import inftraces trace_lookup exec_traces trace_len trace_utils. 
 From fairness Require Import fairness locales_helpers.
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am obls_termination obligations_wf.
 From lawyer.nonblocking Require Import trace_context om_wfree_inst wptp_gen pwp wfree_traces calls.
@@ -80,13 +80,22 @@ Section WaitFreePR.
       pwt_UT :: UnitToken Σ;
   }.
 
+  Definition ct_interp_tok `{PWT: PrWfreeTok Σ} (etr: execution_trace heap_lang): iProp Σ
+    := ct_interp m τi unit_tok etr.
+
+  Definition cti_cond `{PWT: PrWfreeTok Σ} (etr: execution_trace heap_lang): iProp Σ
+    :=
+    ⌜ trace_length etr <= ii ⌝ -∗ ct_interp_tok etr.
+
+  Definition pwp0 `{PWT: PrWfreeTok Σ} :=
+    let _ := IEMGS_into_Looping (@pwt_Hinv _ PWT) si_add_none in pwp. 
+
+  Definition pwp_ext `{PWT: PrWfreeTok Σ} :=
+    let _ := IEMGS_into_Looping (@pwt_Hinv _ PWT) ct_interp_tok in pwp.
+
   Definition wp_tc {Σ} {PWT: PrWfreeTok Σ}                   
     (s: stuckness) (e: expr) (b: bool) Φ :=
-    if b then
-      (* let _ := iris_OM_into_Looping (EM := EM) in *)
-      (* pwp s ⊤ τi e Φ *)
-      let _ := iris_OM_into_phys_cti _ _ m τi unit_tok (EM := EM) in
-      pwp s ⊤ τi e Φ
+    if b then pwp_ext s ⊤ τi e Φ
     else
       let e' := default (Val #false) (under_ctx Ki e) in
       (* from now on, we forget about the original postcondition *)
@@ -94,7 +103,7 @@ Section WaitFreePR.
 
   Definition thread_pr {Σ} {PWT: PrWfreeTok Σ} s N :=
     (fun e τ Φ => if decide (τi = τ) then wp_tc s e (N <=? ii) Φ
-                 else let _ := iris_OM_into_Looping (EM := EM) in pwp s ⊤ τ e Φ).
+                 else pwp0 s ⊤ τ e Φ).
 
   Definition wptp_wfree {Σ} {PWT: PrWfreeTok Σ}
     (s: stuckness) (etr: execution_trace heap_lang) (Φs : list (val → iPropI Σ)):
@@ -111,10 +120,6 @@ Section WaitFreePR.
     { simpl in VAL. rewrite NV in VAL. red in VAL. set_solver. }
     red. right. eapply reducible_fill; eauto.
   Qed.
-
-  Definition cti_cond `{PWT: PrWfreeTok Σ} (etr: execution_trace heap_lang): iProp Σ
-    :=
-    ⌜ trace_length etr <= ii ⌝ -∗ ct_interp m τi unit_tok etr. 
 
   Lemma wptp_wfre_not_stuck {Σ} {PWT: PrWfreeTok Σ}
     ex atr σ tp trest s Φs :
@@ -148,8 +153,7 @@ Section WaitFreePR.
       { simpl. rewrite /phys_SI. simpl.
         rewrite /cti_cond. iSpecialize ("CTI" with "[]").
         { iPureIntro. by apply leb_complete. }
-        iFrame. 
-        by iDestruct "HSI" as "(?&?&?)". }
+        iDestruct "HSI" as "(?&?&?)". by iFrame. }
       simpl. by rewrite Hex.
     - apply fits_inf_call_last_or_short in FIT as [NVAL | SHORT].
       2: { apply Nat.leb_gt in LEN. 
@@ -174,11 +178,11 @@ Section WaitFreePR.
       rewrite Hex in NS. simpl in NS.
       eapply not_stuck_fill; eauto.
     - 
-      iMod (wp_not_stuck _ _ ectx_emp with "[HSI] W") as "(_ & _ & %NS)";
+      iMod (wp_not_stuck _ _ ectx_emp with "[HSI CTI] W") as "(_ & _ & %NS)";
       [done| rewrite ectx_fill_emp // | .. ].
       { done. }
       { simpl. rewrite /phys_SI. simpl.
-        by iDestruct "HSI" as "(?&?&?)". }
+        iDestruct "HSI" as "(?&?&?)". iFrame. }
       simpl. by rewrite Hex in NS.
     (* TODO: get rid of this? *)
     Unshelve. all: by apply trace_singleton. 
@@ -731,8 +735,7 @@ Section WaitFreePR.
     { iApply (ep_weaken with "[$]"). apply (phase_le_init π). } 
     { (* TODO: Make a lemma *)
       rewrite /sgns_level_gt. rewrite /sgns_levels_gt'.
-      iApply empty_sgns_levels_rel. 
-}
+      iApply empty_sgns_levels_rel. }
     { rewrite /WF_SB. lia. }
     iModIntro. iFrame "#∗".
   Qed.
@@ -741,13 +744,13 @@ Section WaitFreePR.
     s (etr: execution_trace heap_lang) tp0 tp Φs
     (OTHER: τi ∉ locales_of_list_from tp0 tp):
     wptp_from_gen (thread_pr s (trace_length etr)) tp0 tp Φs ⊣⊢
-    let _ := iris_OM_into_Looping (EM := EM) in
+    let _ := IEMGS_into_Looping (@pwt_Hinv _ PWT) si_add_none in 
     wptp_from tp0 s tp Φs.
   Proof using.
     rewrite /wptp_from_gen.
     iApply big_sepL2_proper; try done.
     intros ? [??] ? IN IN'. rewrite /thread_pr. simpl.
-    rewrite decide_False; [done| ].
+    rewrite decide_False; [done| ]. 
     intros ->. apply OTHER.
     rewrite /locale_of. rewrite locales_of_list_from_indexes.
     pose proof IN as ITH%prefixes_lookup_orig. 
@@ -1089,7 +1092,7 @@ Section WaitFreePR.
     rewrite decide_True.
     2: congruence. 
 
-    rewrite EQ_TID'. 
+    (* rewrite EQ_TID'.  *)
     rewrite /wp_tc.
 
     iDestruct (cur_phases_τi_step with "[$]") as "(PH & PHS)".
@@ -1118,22 +1121,30 @@ Section WaitFreePR.
 
       rewrite {1}/obls_τi. iDestruct "OB" as "(%si & OB & SGN & EP)".
 
-      iDestruct (@pwp_MU_ctx_take_step _ _ _ Hinv with "TI [CP PH OB] WP") as "STEP".
+      assert (τi = length Φs1) as EQ_TID''. 
+      { rewrite /locale_of in EQ_TID'. by rewrite LEN1 -EQ_TID'. } 
+
+      iDestruct (@pwp_MU_ctx_take_step _ _ _ (@pwt_Hinv _ PWT) ct_interp_tok with "TI [CTI] [CP PH OB] [WP]") as "STEP".
       1-2: by eauto. 
       { red. rewrite FIN. erewrite ectx_fill_emp. reflexivity. }
       { done. }
-      { rewrite (cp_weaken _ π); [| by apply phase_le_init].
+      { by iFrame. }
+      { rewrite -EQ_TID''. 
+        rewrite (cp_weaken _ π); [| by apply phase_le_init].        
         iApply (MU_burn_cp _ _ _ _ (fun R1 R2 => (⌜ R1 = {[ si ]} /\ R2 = ∅ ⌝)%I) with "[$CP $PH OB]").
         iModIntro. do 2 iExists _. iSplit.
         2: { iPureIntro. split; [split| ]; try reflexivity. done. }
         by rewrite union_empty_r_L. }
+      { by rewrite -EQ_TID''. }
           
+      rewrite -EQ_TID''. 
+      
       iMod "STEP". iModIntro.
       iMod "STEP". iModIntro. iNext. 
       iMod "STEP". iModIntro.
       iApply (step_fupdN_wand with "[STEP]"); first by iApply "STEP".
       iIntros "STEP".
-      iMod "STEP" as (δ' ℓ) "(HSI & He2 & WPS' & MOD) /=".
+      iMod "STEP" as (δ' ℓ) "(HSI & CTI & He2 & WPS' & MOD) /=".
 
       iDestruct "MOD" as (π' ??) "(PH & [->->] & _ & MOD')".
       rewrite union_empty_r_L. 
@@ -1144,22 +1155,21 @@ Section WaitFreePR.
       iModIntro.
       do 2 iExists _.
       iSplitL "TI".
-      { simpl. rewrite EQ_TID'. iFrame. }
+      { iFrame. }
+
+      (* Set Printing Implicit. *)
 
       iAssert (wp_tc s e' (S (trace_length etr) <=? ii) Φ -∗
                wptp_wfree s
                (etr :tr[ Some (locale_of t1 e) ]: (t1 ++ e' :: t2 ++ efs, σ'))
-               (Φs ++ newposts (t1 ++ e :: t2) (t1 ++ e' :: t2 ++ efs) (irisG0 := {|
-    iris_invGS :=
-      @iem_invGS heap_lang
-        (AM2M
-           (@ObligationsAM (@sigO natO (λ i : nat, i < 2)) unitO
-              (locale heap_lang) WF_SB OP Nat.inhabited))
-        HeapLangEM EM Σ Hinv;
-    state_interp :=
-      @state_interp heap_lang M Σ (@IEM_irisG heap_lang M HeapLangEM EM Σ Hinv);
-    fork_post := λ (_ : locale heap_lang) (_ : val), True        
-  |})))%I with "[WPS1 WPS2 WPS']" as "WPS". 
+               (Φs ++
+
+                  (* newposts (t1 ++ e :: t2) (t1 ++ e' :: t2 ++ efs) (irisG0 := (@IEM_irisG heap_lang _ HeapLangEM EM Σ (@pwt_Hinv Σ PWT))) *)
+                   (let _ := IEMGS_into_Looping (@pwt_Hinv _ PWT) cti_cond
+                    in newposts (t1 ++ e :: t2) (t1 ++ e' :: t2 ++ efs))
+
+              ))%I
+        with "[WPS1 WPS2 WPS']" as "WPS". 
       { iIntros "WP".
         rewrite app_comm_cons app_assoc.
         iApply wptp_from_gen_app. iSplitR "WPS'".
@@ -1168,15 +1178,11 @@ Section WaitFreePR.
              2: { rewrite !length_app. simpl. lia. }
              rewrite EQ_TID' in STEP. 
              apply step_fork_hl in STEP as [[? ->] | (?&->&?)].
-             - simpl. set_solver.
-             - rewrite wptp_gen_singleton. rewrite /thread_pr.
-               rewrite decide_False.
-               2: { intros ->. rewrite /locale_of in EQ_TID'. 
-                    rewrite !length_app /= in EQ_TID'. lia. }
-               rewrite big_sepL_singleton. simpl.
-               rewrite app_nil_r.
-             replace (locale_of (t1 ++ e' :: t2) x) with (locale_of (t1 ++ e :: t2) x); [done| ].
-             rewrite /locale_of. rewrite !length_app. simpl. lia. } 
+             { simpl. set_solver. }
+
+             (** in case of tokens, there must be no forks, at least for τi *)
+             (* TODO: try to unify the proof with no-tokens case *)
+             admit. }
           
       rewrite EQ_Φs. iApply wptp_from_gen_app. iSplitL "WPS1".
       { iApply (wptp_wfree_upd_other with "[$]").
@@ -1208,7 +1214,7 @@ Section WaitFreePR.
         iSpecialize ("PHS" with "[PH]"); [by eauto| ].
                     
         iAssert (cur_phases (etr :tr[ Some (locale_of t1 e) ]: (t1 ++ e' :: t2 ++ efs, σ')) ∗
-                   cur_obls_sigs (etr :tr[ Some (locale_of t1 e) ]: (t1 ++ e' :: t2 ++ efs, σ')))%I with "[-]" as "[PHS OBS]".
+                   cur_obls_sigs (etr :tr[ Some (locale_of t1 e) ]: (t1 ++ e' :: t2 ++ efs, σ')))%I with "[-CTI]" as "[PHS OBS]".
         { destruct step_fork eqn:SF; simpl. 
           - iDestruct "MOD'" as (?) "(PH' & OB & OB')".
             iSplitL "PH' PHS".
@@ -1217,11 +1223,37 @@ Section WaitFreePR.
           - iSplitL "PHS".
             + by iApply "PHS".
             + iApply ("OBLS" with "[-] [//]"). by iFrame. }
-        iFrame.
+        by iFrame.
       * iClear "He2".
+
+        (* rewrite /cti_cond. iSpecialize ("CTI" with "[]"). *)
+        (* { iPureIntro. simpl. lia.  *)
+        iAssert (unit_tok)%I with "[CTI]" as "TOK".
+        { rewrite /ct_interp_tok /ct_interp.
+          iDestruct "CTI" as "(%&?&[($ & %) | (%&%&%&%CONTRA)])".
+          exfalso. destruct CONTRA as [-> CALL].
+          red in CALL. simpl in CALL.
+          rewrite Nat.sub_0_r in CALL. 
+          destruct CALL as (a & CALL & PREV & NORET & ?).
+          destruct FIT as [_ _ _ PREVS_RET]. move PREVS_RET at bottom.
+          destruct CALL as (?&?&?). 
+          ospecialize * PREVS_RET.
+          { simpl. rewrite H. lia. }
+          { rewrite /ii in H. rewrite -H. apply PREV. }
+          { rewrite H1 /=. eauto. }
+
+          destruct PREVS_RET as (r&RET_PREV&RET).
+          edestruct (_ !! r) eqn:RTH; [| done]. simpl in RET.
+          ospecialize * (NORET r).
+          { rewrite H. lia. }
+          rewrite RTH /= in NORET.
+          destruct RET. 
+          edestruct not_return_nval; eauto. 
+          red. eauto. }
+        
         iDestruct (th_phase_frag_halve with "PH") as "[PH PH']". 
-        iSpecialize ("WPS" with "[CPP PH']").
-        { iPoseProof (get_call_wp with "[] [$] [$]") as "WP".
+        iSpecialize ("WPS" with "[CPP PH' TOK]").
+        { iPoseProof (get_call_wp with "[] [$] [$] [$]") as "WP".
           { iDestruct "INV" as "[??]". done. }
           (* TODO: extract lemma *)
           clear LEN2 PH CORR.
@@ -1261,7 +1293,8 @@ Section WaitFreePR.
           - iSplitL "PHS".
             + by iApply "PHS".
             + iApply ("OBLS" with "[-] [//]"). iFrame. }
-        iFrame.            
+        iFrame.
+        simpl. iIntros (?). lia.  
     + apply Nat.leb_gt in LEN. 
       apply fits_inf_call_prev in FIT.
       apply fits_inf_call_last_or_short in FIT as [NVAL | SHORT].
@@ -1342,8 +1375,8 @@ Section WaitFreePR.
 
       subst e'.
       rewrite EQ_TID'. do 2 iExists _.
-      by iFrame.
-  Qed.
+      iFrame. iModIntro. iIntros (?). simpl in *. lia.  
+  Admitted.
 
   Lemma wptp_wfree_take_step'_other
     (STEP: locale_step c oτ c')
