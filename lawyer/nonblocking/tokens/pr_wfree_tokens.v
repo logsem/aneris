@@ -1317,6 +1317,9 @@ Section WaitFreePR.
       apply fits_inf_call_prev in FIT.
       apply fits_inf_call_last_or_short in FIT as [NVAL | SHORT].
       2: { simpl in *. lia. }
+
+      rewrite leb_correct_conv; [| simpl in *; lia].  
+      
       rewrite FIN in NVAL. apply runs_call_helper in NVAL; eauto.
       destruct NVAL as (e_ & CUR & NVAL).
 
@@ -1344,8 +1347,7 @@ Section WaitFreePR.
       simpl. rewrite !app_nil_r.
       iDestruct "HSI" as "(%MSTEP & HEAP & MSI)".
 
-      iSpecialize ("PHS" with "[PH]").
-      { rewrite leb_correct_conv; [| simpl in *; lia]. eauto. }
+      iSpecialize ("PHS" with "[PH]"); [by eauto| ].
 
       iAssert (wptp_wfree s (etr :tr[ Some τi ]: (t1 ++ fill Ki x :: t2, σ')) Φs)%I with "[WPS1 WPS2 He2]" as "WPS".    
       { rewrite /wptp_wfree. simpl.
