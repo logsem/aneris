@@ -93,6 +93,7 @@ Section typed_interp.
 
   Context (tok: iProp Σ).
   Context (si_add: execution_trace heap_lang -> iProp Σ).
+  Context (PRES: tok_add_pres tok si_add).
   Local Notation interp' := (interp tok si_add). 
 
   Ltac inv_binop_eval H :=
@@ -102,7 +103,7 @@ Section typed_interp.
   Lemma interp_binop_eval op n1 n2
     (NOLOC: forall l, n1 ≠ LitV (LitLoc l)):
     ⊢ from_option interp' (⌜ True ⌝) (bin_op_eval op n1 n2).
-  Proof using tok si_add.
+  Proof using All.
     destruct (bin_op_eval op n1 n2) eqn:EVAL; [| done]. simpl.
     inv_binop_eval EVAL.
     5: set_solver.
@@ -151,7 +152,7 @@ Section typed_interp.
     (* tok -∗ *)
     (* pwp MaybeStuck ⊤ τ (App (Val f) (Val a)) (fun v => pers_pred_car interp' v ∗ tok). *)
     interp_expr' τ (App (Val f) (Val a)). 
-  Proof using.
+  Proof using All.
     iIntros "Hv1 Hv2 T". rewrite /interp_expr. 
     destruct (@decide (exists b s e, f = RecV b s e)) as [FUN| ]. 
     { destruct f.
@@ -164,7 +165,7 @@ Section typed_interp.
   Qed. 
     
   Lemma logrel_app e1 e2 : logrel' e1 -∗ logrel' e2 -∗ logrel' (App e1 e2).
-  Proof.
+  Proof using All.
     iIntros "#IH1 #IH2 !#" (vs τ) "#Henv T"; rewrite /interp_expr /=.
     rewrite subst_env_arg2; [| done]. 
     iApply (wp_bind [AppRCtx _]).
@@ -196,15 +197,15 @@ Section typed_interp.
       (* pwp MaybeStuck ⊤ τ0 (App (Val (RecV b x (subst_env vs' f))) (Val v)) *)
       (*     (fun v => pers_pred_car interp' v ∗ tok). *)
       interp_expr' τ0 (App (Val (RecV b x (subst_env vs' f))) (Val v)). 
-  Proof using.
+  Proof using All.
     iIntros "#IH #Henv".
     iLöb as "IHrec".
-    iModIntro. iIntros (τ' v) "#ARG T".
-    foobar. relax sswp_pwp. 
-    iApply sswp_pwp; [done| ].
+    iModIntro. iIntros (τ' v) "#ARG TOK".
+    iApply (sswp_pwp_pres with "[-TOK] TOK").
+    1, 2: done. 
     iApply sswp_pure_step; [done| ].
     do 2 iModIntro. 
-    simpl.
+    simpl. iIntros "TOK". 
 
     destruct x; simpl.
     - destruct b; simpl.
@@ -238,28 +239,30 @@ Section typed_interp.
           iEval (rewrite interp_unfold). simpl. iApply "IHrec".
   Qed.
 
-  Lemma logrel_rec b x f : logrel f -∗ logrel (Rec b x f).
-  Proof.
-    iIntros "#IH !#" (vs τ) "#Henv T"; rewrite /interp_expr /=.
+  Lemma logrel_rec b x f : logrel' f -∗ logrel' (Rec b x f).
+  Proof using All.
+    iIntros "#IH !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_rec.
-    iApply sswp_pwp; [done| ]. 
+    iApply (sswp_pwp_pres with "[] TOK").
+    1, 2: done. 
     iApply sswp_pure_step; [done| ].
+    iIntros "!> !> TOK". iFrame "TOK".      
     iApply wp_value.
     rewrite {2}interp_unfold. simpl. 
-    do 2 iModIntro.
-    iFrame "T". 
+    iModIntro.
 
-    iApply (logrel_App_RecV_env with "[$]").
+    iIntros "**". 
+    iApply (logrel_App_RecV_env with "[$] [] [$] [$]").
     - intros ? ->. simpl. set_solver.
     - intros ? ->. simpl. rewrite dom_rm_binder. destruct b; set_solver.
     - iApply interp_env_subseteq; [| done].
-      etrans; apply rm_binder_subseteq. 
+      etrans; apply rm_binder_subseteq.
   Qed.
 
-  Lemma interp_RecV b x f : logrel f -∗ interp (RecV b x f).
-  Proof using.
+  Lemma interp_RecV b x f : logrel' f -∗ interp' (RecV b x f).
+  Proof using All.
     iIntros "#IHf". iEval (rewrite interp_unfold). simpl.
-    iModIntro. iIntros (τ' v) "#IHv T".
+    iModIntro. iIntros (τ' v) "#IHv TOK".
     iPoseProof (logrel_App_RecV_env _ _ _ ∅) as "LR".
     3: { rewrite subst_env_empty. iApply ("LR" with "[$] [] [$] [$]").
          iApply interp_env_nil. }
@@ -303,20 +306,21 @@ Section typed_interp.
   (* Qed. *)
 
   Lemma logrel_unop op e:
-    logrel e -∗ logrel (UnOp op e).
-  Proof.
-    iIntros "#IH !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
+    logrel' e -∗ logrel' (UnOp op e).
+  Proof using All.
+    iIntros "#IH !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_arg1; [| done]. 
 
     iApply (wp_bind [UnOpCtx _]).
-    iApply wp_wand; [by iApply "IH"| ].
-    iIntros (v) "#Hv /=".
+    iApply (wp_wand with "[TOK]"); [by iApply "IH"| ].
+    iIntros (v) "[#Hv TOK] /=".
 
     destruct (un_op_eval op v) eqn:EVAL; [| solve_stuck_case].
-    iApply sswp_pwp; [done| ].
+    iApply (sswp_pwp_pres with "[] TOK").
+    1, 2: done. 
     iApply sswp_pure_step; [by apply EVAL| ].
-    iIntros "!> !>".
-    iApply wp_value.
+    iIntros "!> !> TOK".
+    iApply wp_value. iFrame. 
 
     rewrite {3}interp_unfold.
     inv_unop_eval EVAL; done. 
