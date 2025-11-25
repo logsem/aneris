@@ -115,18 +115,24 @@ Definition si_add_none {Λ} {Σ} (etr: execution_trace Λ): iProp Σ := emp%I.
 
 (* TODO: move? *)
 Definition IEMGS_into_Looping_simpl {Σ} `(Hinv : @IEMGS Λ M LG EM Σ) :=
-  IEMGS_into_Looping Hinv si_add_none. 
+  IEMGS_into_Looping Hinv si_add_none.
+
+Definition tok_add_pres `{invGS_gen HasNoLc Σ, heap1GS Σ}
+  (tok: iProp Σ) (si_add: execution_trace heap_lang -> iProp Σ) :=
+  forall etr τ c, tok -∗ si_add etr ==∗ tok ∗ si_add (trace_extend etr τ c). 
 
 (* TODO: move? try to unify with sswp_MU_wp_fupd  *)
-Lemma sswp_pwp_fupd {Σ} {iG: invGS_gen HasNoLc Σ} {hG: heap1GS Σ}
+Lemma sswp_pwp_fupd_pres {Σ} {iG: invGS_gen HasNoLc Σ} {hG: heap1GS Σ}
   s E E' τ e Φ
-  (NVAL: language.to_val e = None):
-  let iG := irisG_looping HeapLangEM si_add_none (lG := hG) in 
-  (|={E,E'}=> sswp s E' e (λ e', ▷ |={E',E}=> pwp s E τ e' Φ)%I) -∗
-    pwp s E τ e Φ.
+  tok si_add
+  (NVAL: language.to_val e = None)
+  (PRES: tok_add_pres tok si_add):
+  let iG := irisG_looping HeapLangEM si_add (lG := hG) in 
+  (|={E,E'}=> sswp s E' e (λ e', ▷ |={E',E}=> tok -∗ pwp s E τ e' Φ)%I) -∗
+    tok -∗ pwp s E τ e Φ.
 Proof using.
   rewrite /pwp wp_unfold /wp_pre.
-  iIntros "Hsswp". rewrite NVAL. 
+  iIntros "Hsswp TOK". rewrite NVAL. 
   iIntros (extr atr K tp1 tp2 σ1 Hvalid Hζ Hextr) "(Hσ & ADD)".
   iMod "Hsswp" as "foo".
   rewrite /sswp. rewrite NVAL.
@@ -144,18 +150,55 @@ Proof using.
   iApply (step_fupd_wand with "Hsswp").
   iIntros ">(Hσ & HMU & ->)".
   iApply fupd_mask_intro; [set_solver| ]. iIntros "CLOS' !> !>".
-  iMod "CLOS'" as "_". iMod "HMU". iModIntro.
+  iMod (PRES with "[$] [$]") as "[TOK ADD]".  
+  iMod "CLOS'" as "_". iMod "HMU". iSpecialize ("HMU" with "[$]"). 
+  iModIntro.
   iExists tt, tt. by iFrame.
 Qed. 
+
+Lemma sswp_pwp_pres {Σ} {iG: invGS_gen HasNoLc Σ} {hG: heap1GS Σ}
+  s E τ e Φ
+  tok si_add
+  (NVAL: language.to_val e = None)
+  (PRES: tok_add_pres tok si_add):
+  let iG := irisG_looping HeapLangEM si_add (lG := hG) in 
+  sswp s E e (λ e', ▷ (tok -∗ pwp s E τ e' Φ))%I -∗
+  tok -∗ pwp s E τ e Φ.
+Proof using.
+  simpl. iIntros "SSWP TOK". iApply (sswp_pwp_fupd_pres with "[SSWP]"); try done.  
+  iModIntro. iApply (sswp_wand with "[] [$]").
+  iIntros. by do 2 iModIntro.
+Qed.
+
+Lemma tok_pres_empty `{invGS_gen HasNoLc Σ, heap1GS Σ}: tok_add_pres emp (fun _ => emp%I).
+Proof using. red. set_solver. Qed.
+
+Lemma sswp_pwp_fupd {Σ} {iG: invGS_gen HasNoLc Σ} {hG: heap1GS Σ}
+  s E E' τ e Φ
+  (NVAL: language.to_val e = None):
+  let iG := irisG_looping HeapLangEM si_add_none (lG := hG) in 
+  (|={E,E'}=> sswp s E' e (λ e', ▷ |={E',E}=> pwp s E τ e' Φ)%I) -∗
+    pwp s E τ e Φ.
+Proof using.
+  simpl. iIntros "SSWP".
+  iApply (sswp_pwp_fupd_pres with "[SSWP]").
+  { done. }
+  { by apply tok_pres_empty. }
+  2: done.
+  iMod "SSWP". iModIntro.
+  iApply (sswp_wand with "[] [$]").
+  iIntros (?) "? !>".
+  iApply (fupd_mono with "[$]"). set_solver.
+Qed.
 
 Lemma sswp_pwp {Σ} {iG: invGS_gen HasNoLc Σ} {hG: heap1GS Σ}
   s E τ e Φ
   (NVAL: language.to_val e = None):
   let iG := irisG_looping HeapLangEM si_add_none (lG := hG) in 
-  sswp s E e (λ e', ▷ pwp s E τ e' Φ)%I -∗
+  sswp s E e (λ e', ▷ (pwp s E τ e' Φ))%I -∗
   pwp s E τ e Φ.
 Proof using.
-  simpl. iIntros. iApply sswp_pwp_fupd; [done| ].
+  simpl. iIntros "SSWP". iApply (sswp_pwp_fupd with "[SSWP]"); try done.  
   iModIntro. iApply (sswp_wand with "[] [$]").
   iIntros. by do 2 iModIntro.
 Qed.
