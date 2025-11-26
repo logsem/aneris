@@ -269,13 +269,212 @@ Section typed_interp.
     all: set_solver.
   Qed.
 
+  Lemma logrel_unop op e:
+    logrel' e -∗ logrel' (UnOp op e).
+  Proof using All.
+    iIntros "#IH !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    rewrite subst_env_arg1; [| done]. 
+
+    iApply (wp_bind [UnOpCtx _]).
+    iApply (wp_wand with "[TOK]"); [by iApply "IH"| ].
+    iIntros (v) "[#Hv TOK] /=".
+
+    destruct (un_op_eval op v) eqn:EVAL; [| solve_stuck_case].
+    iApply (sswp_pwp_pres with "[] TOK").
+    1, 2: done. 
+    iApply sswp_pure_step; [by apply EVAL| ].
+    iIntros "!> !> TOK".
+    iApply wp_value. iFrame. 
+
+    rewrite {3}interp_unfold.
+    inv_unop_eval EVAL; done. 
+  Qed.
+
+  Lemma logrel_binop op e1 e2
+    (VALID: valid_bin_op op):
+    logrel' e1 -∗ logrel' e2 -∗ logrel' (BinOp op e1 e2).
+  Proof using All.
+    iIntros "#IH1 #IH2 !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    rewrite subst_env_arg2; [| done]. 
+    rewrite {3}/pwp.
+
+    iApply (wp_bind [BinOpRCtx _ _]).
+    iApply (wp_wand with "[TOK]"); [by iApply "IH2"| ].
+    iIntros (v2) "[#Hv2 TOK] /=".
+    iApply (wp_bind [BinOpLCtx _ _]).
+    iApply (wp_wand with "[TOK]"); [by iApply "IH1"| ].
+    iIntros (v1) "[#Hv1 TOK] /=".
+
+    destruct (bin_op_eval op v1 v2) eqn:EVAL; [| solve_stuck_case]. 
+
+    iApply (sswp_pwp_pres with "[] TOK").
+    1, 2: done. 
+    iApply sswp_pure_step; [by apply EVAL| ].
+    iIntros "!> !> TOK".
+    iApply wp_value. iFrame. 
+
+    iClear "IH1 IH2 Henv Hv2 Hv1". 
+    inv_binop_eval EVAL; by rewrite interp_unfold.
+  Qed.
+
+  Lemma logrel_pair e1 e2 : logrel' e1 -∗ logrel' e2 -∗ logrel' (Pair e1 e2).
+  Proof using All.
+    iIntros "#IH1 #IH2 !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    rewrite subst_env_arg2; [| done]. 
+
+    iApply (wp_bind [PairRCtx _]).
+    iApply (wp_wand with "[TOK]"); [by iApply "IH2"| ].
+    iIntros (v2) "[#Hv2 TOK] /=".
+    iApply (wp_bind [PairLCtx _]).
+    iApply (wp_wand with "[TOK]") ; [by iApply "IH1"| ].
+    iIntros (v1) "[#Hv1 TOK] /=".
+
+    iApply (sswp_pwp_pres with "[] TOK").
+    1, 2: done. 
+    iApply sswp_pure_step; [done| ].
+    iIntros "!> !> TOK". iFrame. 
+    iApply wp_value.
+    iClear "IH1 IH2".
+    rewrite {3}interp_unfold. simpl.
+    iIntros "!>". do 2 iExists _. iSplitR; [done| ].
+    iFrame "#∗". 
+  Qed.
+
+  Lemma logrel_fst e : logrel' e -∗ logrel' (Fst e).
+  Proof using All.
+    iIntros "#IH !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    rewrite subst_env_arg1; [| done].  
+    iApply (wp_bind [FstCtx]).
+    iApply (wp_wand with "[TOK]"); first by iApply "IH".
+    iIntros (v) "[#Hv TOK] /=".
+
+    destruct (@decide (exists v1 v2, v = PairV v1 v2)) as [(?&?&->) | NO]. 
+    { destruct v.
+      3: { left. eauto. }
+      all: right; set_solver. }
+    2: solve_stuck_case. 
+
+    iApply (sswp_pwp_pres with "[] TOK").
+    1, 2: done. 
+    iApply sswp_pure_step; [done| ].
+    rewrite {2}interp_unfold. simpl.
+    iIntros "!>!> TOK". iFrame. 
+    iApply wp_value.    
+    iDestruct "Hv" as (??) "(%EQ&?&?)".
+    inversion EQ. subst.
+    iFrame "#∗".
+  Qed.
+
+  Lemma logrel_snd e : logrel' e -∗ logrel' (Snd e).
+  Proof using All.
+    iIntros "#IH !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    rewrite subst_env_arg1; [| done]. 
+    iApply (wp_bind [SndCtx]).
+    iApply (wp_wand with "[TOK]"); first by iApply "IH".
+    iIntros (v) "[#Hv TOK] /=".
+    destruct (@decide (exists v1 v2, v = PairV v1 v2)) as [(?&?&->) | NO]. 
+    { destruct v.
+      3: { left. eauto. }
+      all: right; set_solver. }
+    2: solve_stuck_case. 
+    
+    iApply (sswp_pwp_pres with "[] TOK").
+    1, 2: done. 
+    iApply sswp_pure_step; [done| ].
+    rewrite {2}interp_unfold. simpl.
+    iIntros "!>!> TOK". iFrame. 
+    iApply wp_value.    
+    iDestruct "Hv" as (??) "(%EQ&?&?)".
+    inversion EQ. subst.
+    iFrame "#∗".
+  Qed.
+
+  Lemma logrel_injl e : logrel' e -∗ logrel' (InjL e).
+  Proof using All.
+    iIntros "#IH !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    rewrite subst_env_arg1; [| done]. 
+    iApply (wp_bind [InjLCtx]).
+    iApply (wp_wand with "[TOK]"); first by iApply "IH".
+    iIntros (v) "[#Hv TOK] /=".
+    
+    iApply (sswp_pwp_pres with "[] TOK").
+    1, 2: done. 
+    iApply sswp_pure_step; [done| ].
+    iIntros "!> !> TOK". iFrame "#∗".
+    iApply wp_value.
+    iClear "IH".
+    rewrite {2}interp_unfold. simpl.
+    iLeft. iExists _. by iFrame "#∗".     
+  Qed.
+
+  Lemma logrel_injr e : logrel' e -∗ logrel' (InjR e).
+  Proof using All.
+    iIntros "#IH !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    rewrite subst_env_arg1; [| done]. 
+    iApply (wp_bind [InjRCtx]).
+    iApply (wp_wand with "[TOK]"); first by iApply "IH".
+    iIntros (v) "[#Hv TOK] /=".
+    
+    iApply (sswp_pwp_pres with "[] TOK").
+    1, 2: done. 
+    iApply sswp_pure_step; [done| ].
+    iIntros "!> !> TOK". iFrame "#∗".
+    iApply wp_value.
+    iClear "IH".
+    rewrite {2}interp_unfold. simpl.
+    iRight. iExists _. by iFrame "#∗".     
+  Qed.
+
+  Lemma logrel_case e0 e1 e2 : logrel' e0 -∗ logrel' e1 -∗ logrel' e2 -∗ logrel' (Case e0 e1 e2).
+  Proof using All.
+    iIntros "#IH0 #IH1 #IH2 !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    rewrite subst_env_arg3; [| done]. 
+    iApply (wp_bind [CaseCtx _ _]).
+    iApply (wp_wand with "[TOK]"); first by iApply "IH0".
+    iIntros (v0) "[#Hv0 TOK] /=".
+
+    destruct (@decide ((exists v, v0 = InjLV v) \/ (exists v, v0 = InjRV v))) as [CASE| ]. 
+    { destruct v0.
+      4, 5: by left; eauto.
+      all: right; set_solver. }
+    2: solve_stuck_case.
+
+    destruct CASE as [(?&->) | (?&->)].
+    - iApply (sswp_pwp_pres with "[] TOK").
+      1, 2: done. 
+      iApply sswp_pure_step; [done| ].
+      rewrite {4}interp_unfold. simpl.
+      do 2 iModIntro.
+      iDestruct "Hv0" as "[(%&%&U1) | (%&%&?)]"; [| done].
+      inversion H. subst. 
+
+      iIntros "TOK". 
+      iApply (wp_bind [AppLCtx _]).
+      iApply (wp_wand with "[TOK]"); [by iApply "IH1"| ].
+      iIntros (v1) "[#V1 TOK]". simpl.
+      by iApply wp_app_val_val.
+    - iApply (sswp_pwp_pres with "[] TOK").
+      1, 2: done. 
+      iApply sswp_pure_step; [done| ].
+      rewrite {4}interp_unfold. simpl.
+      do 2 iModIntro.
+      iDestruct "Hv0" as "[(%&%&?) | (%&%&U2)]"; [done| ].
+      inversion H. subst. 
+
+      iIntros "TOK". 
+      iApply (wp_bind [AppLCtx _]).
+      iApply (wp_wand with "[TOK]"); [by iApply "IH2"| ].
+      iIntros (v2) "[#V2 TOK]". simpl.
+      by iApply wp_app_val_val.
+  Qed.
+
   (* Lemma pwp_fork s E τ e Φ: *)
   (*   (∀ τ', pwp s ⊤ τ' e (fun _ => ⌜ True ⌝)) -∗ *)
   (*   Φ (LitV $ LitUnit) -∗ *)
   (*   pwp s E τ (Fork e) Φ. *)
   (* Proof using. *)
   (*   rewrite /pwp wp_unfold /wp_pre. *)
-  (*   iIntros "FORK POST". simpl.  *)
+  (*   iIntros "FORK POST". simpl. *)
   (*   iIntros (extr atr K tp1 tp2 σ1 Hvalid Hζ Hextr) "Hσ". *)
   (*   (* iMod "Hsswp" as "foo". *) *)
   (*   iSimpl in "Hσ". *)
@@ -305,211 +504,24 @@ Section typed_interp.
   (*   - iSplitL; [| done]. iApply "FORK". *)
   (* Qed. *)
 
-  Lemma logrel_unop op e:
-    logrel' e -∗ logrel' (UnOp op e).
+  (* Lemma logrel_fork e : logrel e -∗ logrel (Fork e). *)
+  (* Proof using All. *)
+  (*   iIntros "#IH !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=. *)
+  (*   rewrite subst_env_arg1; [| done]. *)
+  (*   iApply pwp_fork. *)
+  (*   2: by rewrite {2}interp_unfold. *)
+  (*   iIntros (?). *)
+  (*   iApply (wp_wand with "[TOK]"); [by iApply "IH"| ]. *)
+  (*   by iIntros.  *)
+  (* Qed. *)
+
+  Lemma logrel_if e0 e1 e2 : logrel' e0 -∗ logrel' e1 -∗ logrel' e2 -∗ logrel' (If e0 e1 e2).
   Proof using All.
-    iIntros "#IH !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
-    rewrite subst_env_arg1; [| done]. 
-
-    iApply (wp_bind [UnOpCtx _]).
-    iApply (wp_wand with "[TOK]"); [by iApply "IH"| ].
-    iIntros (v) "[#Hv TOK] /=".
-
-    destruct (un_op_eval op v) eqn:EVAL; [| solve_stuck_case].
-    iApply (sswp_pwp_pres with "[] TOK").
-    1, 2: done. 
-    iApply sswp_pure_step; [by apply EVAL| ].
-    iIntros "!> !> TOK".
-    iApply wp_value. iFrame. 
-
-    rewrite {3}interp_unfold.
-    inv_unop_eval EVAL; done. 
-  Qed.
-
-  Lemma logrel_binop op e1 e2
-    (VALID: valid_bin_op op):
-    logrel e1 -∗ logrel e2 -∗ logrel (BinOp op e1 e2).
-  Proof.
-    iIntros "#IH1 #IH2 !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
-    rewrite subst_env_arg2; [| done]. 
-    rewrite {3}/pwp.
-
-    iApply (wp_bind [BinOpRCtx _ _]).
-    iApply wp_wand; [by iApply "IH2"| ].
-    iIntros (v2) "#Hv2 /=".
-    iApply (wp_bind [BinOpLCtx _ _]).
-    iApply wp_wand; [by iApply "IH1"| ].
-    iIntros (v1) "#Hv1 /=".
-
-    destruct (bin_op_eval op v1 v2) eqn:EVAL; [| solve_stuck_case]. 
-
-    iApply sswp_pwp; [done| ].
-    iApply sswp_pure_step; [by apply EVAL| ].
-    iIntros "!> !>".
-    iApply wp_value.
-
-    iClear "IH1 IH2 Henv Hv2 Hv1". 
-    inv_binop_eval EVAL; by rewrite interp_unfold.
-  Qed.
-
-  Lemma logrel_pair e1 e2 : logrel e1 -∗ logrel e2 -∗ logrel (Pair e1 e2).
-  Proof.
-    iIntros "#IH1 #IH2 !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
-    rewrite subst_env_arg2; [| done]. 
-
-    iApply (wp_bind [PairRCtx _]).
-    iApply wp_wand; [by iApply "IH2"| ].
-    iIntros (v2) "#Hv2 /=".
-    iApply (wp_bind [PairLCtx _]).
-    iApply wp_wand; [by iApply "IH1"| ].
-    iIntros (v1) "#Hv1 /=".
-
-    iApply sswp_pwp; [done| ]. 
-    iApply sswp_pure_step; [done| ].
-    iIntros "!> !>".
-    iApply wp_value.
-    iClear "IH1 IH2".
-    rewrite {3}interp_unfold. simpl.
-    iIntros "!>". do 2 iExists _. iSplitR; [done| ].
-    iFrame "#∗". 
-  Qed.
-
-  Lemma logrel_fst e : logrel e -∗ logrel (Fst e).
-  Proof.
-    iIntros "#IH !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
-    rewrite subst_env_arg1; [| done].  
-    iApply (wp_bind [FstCtx]).
-    iApply wp_wand; first by iApply "IH".
-    iIntros (v) "#Hv /=".
-
-    destruct (@decide (exists v1 v2, v = PairV v1 v2)) as [(?&?&->) | NO]. 
-    { destruct v.
-      3: { left. eauto. }
-      all: right; set_solver. }
-    2: solve_stuck_case. 
-    
-    iApply sswp_pwp; [done| ]. 
-    iApply sswp_pure_step; [done| ].
-    iApply wp_value.
-    iClear "IH".
-    rewrite {1}interp_unfold. simpl.
-    iNext. iDestruct "Hv" as (??) "(%EQ&?&?)".
-    inversion EQ. subst.
-    iIntros "!>". iFrame "#∗".
-  Qed.
-
-  Lemma logrel_snd e : logrel e -∗ logrel (Snd e).
-  Proof.
-    iIntros "#IH !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
-    rewrite subst_env_arg1; [| done]. 
-    iApply (wp_bind [SndCtx]).
-    iApply wp_wand; first by iApply "IH".
-    iIntros (v) "#Hv /=".
-
-    destruct (@decide (exists v1 v2, v = PairV v1 v2)) as [(?&?&->) | NO]. 
-    { destruct v.
-      3: { left. eauto. }
-      all: right; set_solver. }
-    2: solve_stuck_case. 
-    
-    iApply sswp_pwp; [done| ]. 
-    iApply sswp_pure_step; [done| ].
-    iApply wp_value.
-    iClear "IH".
-    rewrite {1}interp_unfold. simpl.
-    iNext. iDestruct "Hv" as (??) "(%EQ&?&?)".
-    inversion EQ. subst.
-    iIntros "!>". iFrame "#∗".
-  Qed.
-
-  Lemma logrel_injl e : logrel e -∗ logrel (InjL e).
-  Proof.
-    iIntros "#IH !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
-    rewrite subst_env_arg1; [| done]. 
-    iApply (wp_bind [InjLCtx]).
-    iApply wp_wand; first by iApply "IH".
-    iIntros (v) "#Hv /=".
-    
-    iApply sswp_pwp; [done| ]. 
-    iApply sswp_pure_step; [done| ].
-    iApply wp_value.
-    iClear "IH".
-    rewrite {2}interp_unfold. simpl.
-    iIntros "!> !> !>". iFrame "#∗". by iLeft. 
-  Qed.
-
-  Lemma logrel_injr e : logrel e -∗ logrel (InjR e).
-  Proof.
-    iIntros "#IH !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
-    rewrite subst_env_arg1; [| done]. 
-    iApply (wp_bind [InjRCtx]).
-    iApply wp_wand; first by iApply "IH".
-    iIntros (v) "#Hv /=".
-    
-    iApply sswp_pwp; [done| ].
-    iApply sswp_pure_step; [done| ].
-    iApply wp_value.
-    iClear "IH".
-    rewrite {2}interp_unfold. simpl.
-    iIntros "!> !> !>". iFrame "#∗". by iRight. 
-  Qed.
-  Lemma logrel_case e0 e1 e2 : logrel e0 -∗ logrel e1 -∗ logrel e2 -∗ logrel (Case e0 e1 e2).
-  Proof.
-    iIntros "#IH0 #IH1 #IH2 !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
-    rewrite subst_env_arg3; [| done]. 
-    iApply (wp_bind [CaseCtx _ _]).
-    iApply wp_wand; first by iApply "IH0".
-    iIntros (v0) "#Hv0 /=".
-
-    destruct (@decide ((exists v, v0 = InjLV v) \/ (exists v, v0 = InjRV v))) as [CASE| ]. 
-    { destruct v0.
-      4, 5: by left; eauto.
-      all: right; set_solver. }
-    2: solve_stuck_case.
-
-    destruct CASE as [(?&->) | (?&->)].
-    - iApply sswp_pwp; [done| ].
-      iApply sswp_pure_step; [done| ].
-      rewrite {4}interp_unfold. simpl.
-      do 2 iModIntro.
-      iDestruct "Hv0" as "[(%&%&U1) | (%&%&?)]"; [| done].
-      inversion H. subst. 
-
-      iApply (wp_bind [AppLCtx _]).
-      iApply wp_wand; [by iApply "IH1"| ].
-      iIntros (v1) "#V1". simpl.
-      by iApply wp_app_val_val.
-    - iApply sswp_pwp; [done| ].
-      iApply sswp_pure_step; [done| ].
-      rewrite {4}interp_unfold. simpl.
-      do 2 iModIntro.
-      iDestruct "Hv0" as "[(%&%&?) | (%&%&U2)]"; [done| ].
-      inversion H. subst. 
-
-      iApply (wp_bind [AppLCtx _]).
-      iApply wp_wand; [by iApply "IH2"| ].
-      iIntros (v2) "#V2". simpl.
-      by iApply wp_app_val_val.
-  Qed.
-
-  Lemma logrel_fork e : logrel e -∗ logrel (Fork e).
-  Proof.
-    iIntros "#IH !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
-    rewrite subst_env_arg1; [| done].
-    iApply pwp_fork.
-    2: by rewrite {2}interp_unfold.
-    iIntros (?).
-    iApply wp_wand; [by iApply "IH"| ].
-    by iIntros. 
-  Qed.
-
-  Lemma logrel_if e0 e1 e2 : logrel e0 -∗ logrel e1 -∗ logrel e2 -∗ logrel (If e0 e1 e2).
-  Proof.
-    iIntros "#IH0 #IH1 #IH2 !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
+    iIntros "#IH0 #IH1 #IH2 !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_arg3; [| done]. 
     iApply (wp_bind [IfCtx _ _]).
-    iApply wp_wand; first by iApply "IH0".
-    iIntros (v0) "#Hv0 /=".
+    iApply (wp_wand with "[TOK]"); first by iApply "IH0".
+    iIntros (v0) "[#Hv0 TOK] /=".
     destruct (@decide (exists b, v0 = LitV $ LitBool b)) as [BOOL| ]. 
     { destruct v0.
       2-5: right; set_solver.
@@ -519,18 +531,21 @@ Section typed_interp.
     2: solve_stuck_case. 
     destruct BOOL as (b&->).
     destruct b.
-    - iApply sswp_pwp; [done| ].
+    - iApply (sswp_pwp_pres with "[] TOK").
+      1, 2: done. 
       iApply sswp_pure_step; [done| ].
       do 2 iModIntro.
       by iApply "IH1".
-    - iApply sswp_pwp; [done| ].
+    - iApply (sswp_pwp_pres with "[] TOK").
+      1, 2: done. 
       iApply sswp_pure_step; [done| ].
       do 2 iModIntro.
       by iApply "IH2".
   Qed.
 
   Instance is_loc_dec v: Decision (exists l, v = LitV $ LitLoc l).
-  Proof using. 
+  Proof using.
+    clear. 
     destruct v.
     2-5: right; set_solver.
     destruct l.
@@ -540,6 +555,7 @@ Section typed_interp.
 
   Instance is_int_dec v: Decision (exists (n: Z), v = LitV $ LitInt n).
   Proof using. 
+    clear. 
     destruct v.
     2-5: right; set_solver.
     destruct l.
@@ -547,16 +563,16 @@ Section typed_interp.
     left; eauto.
   Qed.
 
-  Lemma logrel_alloc en ea : logrel en -∗ logrel ea -∗ logrel (AllocN en ea).
-  Proof.
-    iIntros "#IHn #IHa !>" (vs τ) "#Henv"; rewrite /interp_expr /=.
+  Lemma logrel_alloc en ea : logrel' en -∗ logrel' ea -∗ logrel' (AllocN en ea).
+  Proof using All.
+    iIntros "#IHn #IHa !>" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_arg2; [| done]. 
     iApply (wp_bind [AllocNRCtx _]).
-    iApply wp_wand; [by iApply "IHa"| ]. 
-    iIntros (v) "#Hv /=".
+    iApply (wp_wand with "[TOK]"); [by iApply "IHa"| ]. 
+    iIntros (v) "[#Hv TOK] /=".
     iApply (wp_bind [AllocNLCtx _]).
-    iApply wp_wand; [by iApply "IHn"| ]. 
-    iIntros (vn) "#Hn /=".
+    iApply (wp_wand with "[TOK]"); [by iApply "IHn"| ]. 
+    iIntros (vn) "[#Hn TOK] /=".
 
     destruct (is_int_dec vn) as [INT| ].
     2: solve_stuck_case. 
@@ -564,7 +580,9 @@ Section typed_interp.
     destruct (decide (0 < x)) as [NZ | ].
     2: solve_stuck_case. 
 
-    iApply sswp_pwp_fupd; [done| ]. iModIntro.
+    iApply (sswp_pwp_fupd_pres with "[] TOK").
+    1, 2: done.
+    iModIntro.
     iApply wp_allocN_seq; [done| ].
     iIntros "!> %l L".
     iModIntro.
@@ -572,16 +590,17 @@ Section typed_interp.
     destruct (Z.to_nat x) eqn:X; [lia| ]. 
     rewrite -cons_seq. simpl. iDestruct "L" as "[[L _] _]".
     rewrite Nat2Z.inj_0. rewrite loc_add_0.
-
-    iApply wp_value. rewrite {5}interp_unfold. simpl.
-    iExists _. iSplitR; [done| ].
-
-    iApply inv_alloc. iNext. iLeft. by iFrame.
+    iMod (inv_alloc with "[L]") as "#L".
+    2: { iModIntro. iIntros "$".
+         iApply wp_value. rewrite {5}interp_unfold. simpl.
+         iExists _. iSplitR; [done| ].
+         iApply "L". }
+    iLeft. iFrame "L #∗". 
   Qed.
 
   Ltac solve_head_stuck_with_freed :=
     rewrite ?heap_lang_defs.pointsto_unseal;
-    iIntros "* %VALID %LAST SI";
+    iIntros "* %VALID %LAST (SI & ADD)";
     simpl; iDestruct (gen_heap_valid with "SI [$]") as %V;
     iMod (fupd_mask_subseteq ∅) as "_"; [set_solver| ];
     iModIntro; iPureIntro;
@@ -590,17 +609,20 @@ Section typed_interp.
         rewrite LAST /= in V end;
     solve_head_stuck. 
 
-  Ltac solve_stuck_case_with_freed :=
+  (* Ltac solve_stuck_case_with_freed := *)
+  Ltac solve_stuck_case_with_freed' :=
     iApply ectx_lifting.wp_lift_head_stuck;
       [done | apply srav_helper; solve_no_fill_item | solve_head_stuck_with_freed]. 
+  Ltac solve_stuck_case_with_freed :=
+    unshelve solve_stuck_case_with_freed'; by apply _.
 
-  Lemma logrel_free e : logrel e -∗ logrel (Free e).
-  Proof.
-    iIntros "#IH !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
+  Lemma logrel_free e : logrel' e -∗ logrel' (Free e).
+  Proof using All.
+    iIntros "#IH !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_arg1; [| done]. 
     iApply (wp_bind [FreeCtx]).
-    iApply wp_wand; first by iApply "IH".
-    iIntros (v) "#Hv /=".
+    iApply (wp_wand with "[TOK]"); first by iApply "IH".
+    iIntros (v) "[#Hv TOK] /=".
     destruct (is_loc_dec v) as [LOC| ]. 
     2: solve_stuck_case.
     destruct LOC as (l&->).
@@ -608,24 +630,25 @@ Section typed_interp.
     iDestruct "Hv" as "(% & %EQ & INVl)". inversion_clear EQ.
     iApply wp_atomic. 
     iInv "INVl" as "[(%v & >L & #IIv) | >FREE]" "CLOS"; iModIntro. 
-    2: solve_stuck_case_with_freed.
+    2: solve_stuck_case_with_freed. 
 
-    iApply sswp_pwp; [done| ]. 
+    iApply (sswp_pwp_pres with "[-TOK] TOK").
+    1, 2: done. 
     iApply (wp_free with "L").
-    iIntros "!> FREE !>".
+    iIntros "!> FREE !> $".
     simpl. iApply wp_value.
     iMod ("CLOS" with "[FREE]") as "_".
     { by iRight. }
     by rewrite {4}interp_unfold /=. 
   Qed.
 
-  Lemma logrel_load e : logrel e -∗ logrel (Load e).
-  Proof.
-    iIntros "#IH !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
+  Lemma logrel_load e : logrel' e -∗ logrel' (Load e).
+  Proof using All.
+    iIntros "#IH !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_arg1; [| done]. 
     iApply (wp_bind [LoadCtx]).
-    iApply wp_wand; first by iApply "IH".
-    iIntros (v) "#Hv /=".
+    iApply (wp_wand with "[TOK]"); first by iApply "IH".
+    iIntros (v) "[#Hv TOK] /=".
     destruct (is_loc_dec v) as [LOC| ]. 
     2: solve_stuck_case.
     destruct LOC as (l&->).
@@ -635,25 +658,26 @@ Section typed_interp.
     iInv "INVl" as "[(%v & >L & #IIv) | >FREE]" "CLOS"; iModIntro. 
     2: solve_stuck_case_with_freed.
 
-    iApply sswp_pwp; [done| ]. 
+    iApply (sswp_pwp_pres with "[-TOK] TOK").
+    1, 2: done. 
     iApply (wp_load with "L").
-    iIntros "!> L !>".
+    iIntros "!> L !> $".
     simpl. iApply wp_value.
     iMod ("CLOS" with "[L IIv]") as "_".
     { iLeft. by iFrame. } 
     by iFrame. 
   Qed.
 
-  Lemma logrel_store el ev : logrel el -∗ logrel ev -∗ logrel (Store el ev).
-  Proof.
-    iIntros "#IHl #IHv !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
+  Lemma logrel_store el ev : logrel' el -∗ logrel' ev -∗ logrel' (Store el ev).
+  Proof using All.
+    iIntros "#IHl #IHv !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_arg2; [| done].
     iApply (wp_bind [StoreRCtx _]).
-    iApply wp_wand; first by iApply "IHv".
-    iIntros (v) "#Hv /=".
+    iApply (wp_wand with "[TOK]"); first by iApply "IHv".
+    iIntros (v) "[#Hv TOK] /=".
     iApply (wp_bind [StoreLCtx _]).
-    iApply wp_wand; first by iApply "IHl".
-    iIntros (lv) "#Hl /=".
+    iApply (wp_wand with "[TOK]"); first by iApply "IHl".
+    iIntros (lv) "[#Hl TOK] /=".
     destruct (is_loc_dec lv) as [LOC| ]. 
     2: solve_stuck_case.
     destruct LOC as (l&->).
@@ -663,40 +687,29 @@ Section typed_interp.
     iApply wp_atomic. 
     iInv "INVl" as "[(%v_ & >L & #IIv) | >FREE]" "CLOS"; iModIntro. 
     2: solve_stuck_case_with_freed.
-    
-    iApply sswp_pwp; [done| ].
+
+    iApply (sswp_pwp_pres with "[-TOK] TOK").
+    1, 2: done. 
     iApply (wp_store with "[$]").
-    iIntros "!> L !>". simpl. iApply wp_value.
+    iIntros "!> L !> $". simpl. iApply wp_value.
     iMod ("CLOS" with "[L Hv]").
     { iLeft. by iFrame. }
     by rewrite {6}interp_unfold.
   Qed.
 
-  (* TODO: move to trillium *)
-  Lemma wp_lift_pure_head_stuck' τ E Φ e :
-    to_val e = None →
-    sub_redexes_are_values e →
-    (∀ σ, head_stuck e σ) →
-    ⊢ WP e @ τ; E ?{{ Φ }}.
-  Proof using.
-    iIntros (?? Hstuck). iApply ectx_lifting.wp_lift_head_stuck; [done|done|].
-    iIntros (???????) "_". iMod (fupd_mask_subseteq ∅) as "_"; first set_solver.
-    auto; done.
-  Qed.
-
-  Lemma logrel_CmpXchg el es ef : logrel el -∗ logrel es -∗ logrel ef -∗ logrel (CmpXchg el es ef).
-  Proof.
-    iIntros "#IHl #IHs #IHf !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
+  Lemma logrel_CmpXchg el es ef : logrel' el -∗ logrel' es -∗ logrel' ef -∗ logrel' (CmpXchg el es ef).
+  Proof using All.
+    iIntros "#IHl #IHs #IHf !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_arg3; [| done]. 
     iApply (wp_bind [CmpXchgRCtx _ _]).
-    iApply wp_wand; first by iApply "IHf".
-    iIntros (f) "#Hf /=".
+    iApply (wp_wand with "[TOK]"); first by iApply "IHf".
+    iIntros (f) "[#Hf TOK] /=".
     iApply (wp_bind [CmpXchgMCtx _ _]).
-    iApply wp_wand; first by iApply "IHs".
-    iIntros (s) "#Hs /=".
+    iApply (wp_wand with "[TOK]"); first by iApply "IHs".
+    iIntros (s) "[#Hs TOK] /=".
     iApply (wp_bind [CmpXchgLCtx _ _]).
-    iApply wp_wand; first by iApply "IHl".
-    iIntros (lv) "#Hl /=".
+    iApply (wp_wand with "[TOK]"); first by iApply "IHl".
+    iIntros (lv) "[#Hl TOK] /=".
     destruct (is_loc_dec lv) as [LOC| ]. 
     2: solve_stuck_case.
     destruct LOC as (l&->).
@@ -710,18 +723,19 @@ Section typed_interp.
  
     destruct (decide (vals_compare_safe v s)).
     2: solve_stuck_case_with_freed. 
-    
-    iApply sswp_pwp; [done| ].
+
+    iApply (sswp_pwp_pres with "[-TOK] TOK").
+    1, 2: done.
     destruct (decide (s = v)) as [-> | ?]. 
     - iApply (wp_cmpxchg_suc with "[$L //]"); try done.
-      iIntros "!> L !>". iApply wp_value. simpl. 
+      iIntros "!> L !> $". iApply wp_value. simpl. 
       iMod ("CLOS" with "[L Hf]").
       { iLeft. by iFrame. } 
       rewrite {8}interp_unfold. simpl.
       iModIntro. do 2 iExists _. iSplit; [done| ].
       iFrame "#∗". by rewrite {8}interp_unfold. 
     - iApply (wp_cmpxchg_fail with "[$L //]"); try done.
-      iIntros "!> L !>".
+      iIntros "!> L !> $".
       iApply wp_value. simpl.  
       iMod ("CLOS" with "[L IIv]").
       { iLeft. by iFrame. }
@@ -730,16 +744,16 @@ Section typed_interp.
       iFrame "#∗". by rewrite {8}interp_unfold. 
   Qed.
 
-  Lemma logrel_FAA el ea : logrel el -∗ logrel ea -∗ logrel (FAA el ea).
-  Proof.
-    iIntros "#IHl #IHa !#" (vs τ) "#Henv"; rewrite /interp_expr /=.
+  Lemma logrel_FAA el ea : logrel' el -∗ logrel' ea -∗ logrel' (FAA el ea).
+  Proof using All.
+    iIntros "#IHl #IHa !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_arg2; [| done]. 
     iApply (wp_bind [FaaRCtx _]).
-    iApply wp_wand; [by iApply "IHa"| ]. 
-    iIntros (av) "#Ha /=".
+    iApply (wp_wand with "[TOK]"); [by iApply "IHa"| ]. 
+    iIntros (av) "[#Ha TOK] /=".
     iApply (wp_bind [FaaLCtx _]).
-    iApply wp_wand; [by iApply "IHl"| ]. 
-    iIntros (lv) "#Hl /=".
+    iApply (wp_wand with "[TOK]"); [by iApply "IHl"| ]. 
+    iIntros (lv) "[#Hl TOK] /=".
 
     destruct (is_loc_dec lv) as [LOC| ]. 
     2: solve_stuck_case.
@@ -759,68 +773,111 @@ Section typed_interp.
     destruct (is_int_dec v) as [INT| ].
     2: { solve_stuck_case_with_freed. }
     destruct INT as (?&->).
-    
-    iApply sswp_pwp; [done| ].
+
+    iApply (sswp_pwp_pres with "[-TOK] TOK").
+    1, 2: done. 
     iApply (wp_faa with "[$]"). 
-    iIntros "!> L".
-    do 1 iModIntro.
+    iIntros "!> L !> $".
     iApply wp_value. simpl. 
     iMod ("CLOS" with "[L]").
     { iLeft. iFrame. by rewrite {6}interp_unfold. }
     by rewrite {6}interp_unfold.
   Qed.
 
-  Lemma logrel_ChooseNat: ⊢ logrel ChooseNat.
-  Proof using.
-    iIntros "!#" (vs τ) "#Henv"; rewrite /interp_expr /=.
+  Lemma logrel_ChooseNat: ⊢ logrel' ChooseNat.
+  Proof using All.
+    iIntros "!#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite (subst_env_arg1 (fun _ => ChooseNat) _ (Val $ LitV $ LitUnit)); [| done].
-    iApply sswp_pwp; [done| ].
+    iApply (sswp_pwp_pres with "[-TOK] TOK").
+    1, 2: done. 
     iApply wp_choose_nat.
-    iIntros "!> % !>".
+    iIntros "!> % !> $".
     iApply wp_value.
     by rewrite interp_unfold.
-  Qed.    
+  Qed.
+
+  (* TODO: is is possible to separate valid_client and no_forks? *)
+  Fixpoint valid_client_no_forks (e : expr) : Prop :=
+    match e with
+    | Val v => valid_val_nf v
+    | Fork _ => False
+    | Var _ | ChooseNat => True
+    | Rec _ _  e | UnOp _ e | Fst e | Snd e |
+      InjL e | InjR e | Load e | Free e
+      => valid_client_no_forks e
+    | App e1 e2 | Pair e1 e2 | 
+      AllocN e1 e2 | Store e1 e2 | FAA e1 e2
+      => valid_client_no_forks e1 /\ valid_client_no_forks e2
+    | BinOp op e1 e2 => valid_bin_op op /\ valid_client_no_forks e1 /\ valid_client_no_forks e2
+    | If e0 e1 e2 | Case e0 e1 e2 | CmpXchg e0 e1 e2
+      => valid_client_no_forks e0 /\ valid_client_no_forks e1 /\ valid_client_no_forks e2
+    end
+  with valid_val_nf (v: val) : Prop :=
+    match v with
+    | LitV b => valid_base_lit b
+    | RecV _ _ e => valid_client_no_forks e
+    | PairV v1 v2 => valid_val_nf v1 /\ valid_val_nf v2
+    | InjLV v | InjRV v => valid_val_nf v
+  end.
 
   Scheme expr_ind_mut := Induction for expr Sort Prop
-  with val_ind_mut := Induction for val Sort Prop.  
+  with val_ind_mut := Induction for val Sort Prop.
 
-  Theorem fundamental e : valid_client e → ⊢ logrel e.
-  Proof.
-    pattern e. apply expr_ind_mut with (P0 := fun v => valid_val v → ⊢ interp v).
+  Lemma valid_client_no_forks_weaken e:
+    valid_client_no_forks e -> valid_client e.
+  Proof using.
+    clear. 
+    pattern e. apply expr_ind_mut with (P0 := fun v => valid_val_nf v → valid_val v); clear e.
+    all: simpl in *; done || tauto.
+  Qed. 
+  Lemma valid_val_nf_weaken v:
+    valid_val_nf v -> valid_val v.
+  Proof using.
+    induction v; eauto; simpl.
+    - apply valid_client_no_forks_weaken.
+    - intros (?&?). split; auto. 
+  Qed.
+
+  Theorem fundamental e:
+    valid_client_no_forks e -> ⊢ logrel' e.
+  Proof using All.
+    pattern e. apply expr_ind_mut with (P0 := fun v => valid_val_nf v → ⊢ interp' v).
     all: intros; simpl in *. 
     - iIntros "!#" (vs τ) "#Henv".
       rewrite (subst_env_arg1 (fun _ => Val v) _ (Val $ LitV $ LitUnit)); [| done].
-      rewrite /interp_expr.
+      rewrite /interp_expr. iIntros "$". 
       iApply wp_value.
-      by iApply H.
+      by iApply H. 
     - apply logrel_var.
     - iApply logrel_rec. by iApply H.
     - destruct H1. 
-      iApply logrel_app; [by iApply H | by iApply H0].
+      iApply logrel_app; [iApply H | iApply H0]; tauto. 
     - iApply logrel_unop. by iApply H.
     - destruct H1 as (?&?&?).
-      iApply logrel_binop; [done | by iApply H | by iApply H0].
+      iApply logrel_binop; [done | iApply H | iApply H0]; tauto. 
     - destruct H2 as (?&?&?).
-      iApply logrel_if; [by iApply H | by iApply H0 | by iApply H1].
+      iApply logrel_if; [iApply H | iApply H0 | iApply H1]; tauto. 
     - destruct H1 as (?&?).
-      iApply logrel_pair; [by iApply H | by iApply H0].
+      iApply logrel_pair; [iApply H | iApply H0]; tauto. 
     - iApply logrel_fst. by iApply H.  
     - iApply logrel_snd. by iApply H.
     - iApply logrel_injl. by iApply H.
     - iApply logrel_injr. by iApply H.
     - destruct H2 as (?&?&?).
-      iApply logrel_case; [by iApply H | by iApply H0 | by iApply H1].
-    - iApply logrel_fork. by iApply H.
+      iApply logrel_case; [iApply H | iApply H0 | iApply H1]; tauto. 
+    - 
+      (* iApply logrel_fork. by iApply H. *)
+      done. 
     - destruct H1 as (?&?).
-      iApply logrel_alloc; [by iApply H | by iApply H0].
-    - iApply logrel_free. by iApply H.
+      iApply logrel_alloc; [iApply H | iApply H0]; tauto. 
+    - iApply logrel_free. by iApply H. 
     - iApply logrel_load. by iApply H.
     - destruct H1 as (?&?).
-      iApply logrel_store; [by iApply H | by iApply H0].
+      iApply logrel_store; [iApply H | iApply H0]; tauto. 
     - destruct H2 as (?&?&?).
-      iApply logrel_CmpXchg; [by iApply H | by iApply H0 | by iApply H1].
+      iApply logrel_CmpXchg; [iApply H | iApply H0 | iApply H1]; tauto. 
     - destruct H1 as (?&?).
-      iApply logrel_FAA; [by iApply H | by iApply H0].
+      iApply logrel_FAA; [iApply H | iApply H0]; tauto. 
     - by iApply logrel_ChooseNat. 
     - rewrite interp_unfold. destruct l; done.   
     - intros. simpl in *.
@@ -828,7 +885,7 @@ Section typed_interp.
     - rewrite interp_unfold. simpl.
       iExists _, _. iNext. iSplit; [done| ].
       destruct H1. 
-      iSplit; [by iApply H | by iApply H0].
+      iSplit; [iApply H | iApply H0]; tauto. 
     - rewrite interp_unfold. simpl.
       iLeft. iExists _. iSplit; [done| ].
       by iApply H.
