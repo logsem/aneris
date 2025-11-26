@@ -796,52 +796,35 @@ Section typed_interp.
     by rewrite interp_unfold.
   Qed.
 
-  (* TODO: is is possible to separate valid_client and no_forks? *)
-  Fixpoint valid_client_no_forks (e : expr) : Prop :=
+  Fixpoint no_forks (e : expr) : Prop :=
     match e with
-    | Val v => valid_val_nf v
     | Fork _ => False
+    | Val v => val_nf v
     | Var _ | ChooseNat => True
     | Rec _ _  e | UnOp _ e | Fst e | Snd e |
       InjL e | InjR e | Load e | Free e
-      => valid_client_no_forks e
-    | App e1 e2 | Pair e1 e2 | 
-      AllocN e1 e2 | Store e1 e2 | FAA e1 e2
-      => valid_client_no_forks e1 /\ valid_client_no_forks e2
-    | BinOp op e1 e2 => valid_bin_op op /\ valid_client_no_forks e1 /\ valid_client_no_forks e2
+      => no_forks e
+    | App e1 e2 | Pair e1 e2 | AllocN e1 e2 |
+      Store e1 e2 | FAA e1 e2 | BinOp _ e1 e2
+      => no_forks e1 /\ no_forks e2    
     | If e0 e1 e2 | Case e0 e1 e2 | CmpXchg e0 e1 e2
-      => valid_client_no_forks e0 /\ valid_client_no_forks e1 /\ valid_client_no_forks e2
+      => no_forks e0 /\ no_forks e1 /\ no_forks e2
     end
-  with valid_val_nf (v: val) : Prop :=
+  with val_nf (v: val) : Prop :=
     match v with
-    | LitV b => valid_base_lit b
-    | RecV _ _ e => valid_client_no_forks e
-    | PairV v1 v2 => valid_val_nf v1 /\ valid_val_nf v2
-    | InjLV v | InjRV v => valid_val_nf v
+    | LitV b => True
+    | RecV _ _ e => no_forks e
+    | PairV v1 v2 => val_nf v1 /\ val_nf v2
+    | InjLV v | InjRV v => val_nf v
   end.
 
   Scheme expr_ind_mut := Induction for expr Sort Prop
   with val_ind_mut := Induction for val Sort Prop.
 
-  Lemma valid_client_no_forks_weaken e:
-    valid_client_no_forks e -> valid_client e.
-  Proof using.
-    clear. 
-    pattern e. apply expr_ind_mut with (P0 := fun v => valid_val_nf v → valid_val v); clear e.
-    all: simpl in *; done || tauto.
-  Qed. 
-  Lemma valid_val_nf_weaken v:
-    valid_val_nf v -> valid_val v.
-  Proof using.
-    induction v; eauto; simpl.
-    - apply valid_client_no_forks_weaken.
-    - intros (?&?). split; auto. 
-  Qed.
-
   Theorem fundamental e:
-    valid_client_no_forks e -> ⊢ logrel' e.
+    valid_client e -> no_forks e -> ⊢ logrel' e.
   Proof using All.
-    pattern e. apply expr_ind_mut with (P0 := fun v => valid_val_nf v → ⊢ interp' v).
+    pattern e. apply expr_ind_mut with (P0 := fun v => valid_val v -> val_nf v → ⊢ interp' v).
     all: intros; simpl in *. 
     - iIntros "!#" (vs τ) "#Henv".
       rewrite (subst_env_arg1 (fun _ => Val v) _ (Val $ LitV $ LitUnit)); [| done].
