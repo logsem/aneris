@@ -743,9 +743,6 @@ Section typed_interp.
     by rewrite interp_unfold.
   Qed.    
 
-  Scheme expr_ind_mut := Induction for expr Sort Prop
-  with val_ind_mut := Induction for val Sort Prop.  
-
   Theorem fundamental e : valid_client e → ⊢ logrel e.
   Proof.
     pattern e. apply expr_ind_mut with (P0 := fun v => valid_val v → ⊢ interp v).
