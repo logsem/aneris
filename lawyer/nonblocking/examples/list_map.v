@@ -50,27 +50,32 @@ Section ListMapSpec.
 
   Existing Instance OHE.
 
-  Context (f: val) (n: nat) (P Q: val -> Prop).
+  Context (f: val) (n: nat) (P Q: val -> Prop) (f_inv: iProp Σ).
+  Context (F_INV_PERS: Persistent f_inv). 
   Context (F_SPEC: forall τ π a, ⊢ 
-            {{{ cp_mul π d n ∗ th_phase_eq τ π ∗ ⌜ P a ⌝}}}
+            {{{ cp_mul π d n ∗ th_phase_eq τ π ∗ ⌜ P a ⌝ ∗ f_inv }}}
               f a @ τ
             {{{ v, RET v; th_phase_eq τ π ∗ ⌜ Q v ⌝ }}}).
 
   Let K := 20.
 
+  Definition hl_map_fuel (l: val) := (S $ hl_list_size l) * (K + n). 
+
   Lemma list_map_spec' τ π (l: val)
     (LIST: is_hl_list P l):
-    cp_mul π d (S (hl_list_size l) * (K + n)) -∗ 
-    th_phase_eq τ π -∗ 
+    cp_mul π d (hl_map_fuel l) -∗ 
+    th_phase_eq τ π -∗
+    f_inv -∗
     WP hl_list_map f l @τ {{ l', th_phase_eq τ π ∗ ⌜is_hl_list Q l'⌝ }}.
-  Proof using F_SPEC. 
-    iIntros "CPS PH".
+  Proof using F_SPEC F_INV_PERS. 
+    iIntros "CPS PH #F_INV".
     iInduction LIST as [| ] "IH"; rewrite /hl_list_map. 
     { pure_steps. 
       wp_bind (Rec _ _ _)%E.
       pure_steps.
       iFrame. iPureIntro.
       by constructor. }
+    rewrite /hl_map_fuel. 
     rewrite (Nat.mul_succ_l (hl_list_size $ InjRV _)).
     iDestruct (cp_mul_split with "CPS") as "[CPS' CPS]".
     iSpecialize ("IH" with "CPS'"). 
@@ -80,7 +85,7 @@ Section ListMapSpec.
 
     wp_bind (Fst _)%E. pure_steps.
     wp_bind (f _)%E. 
-    iApply (F_SPEC with "[$CPSf $PH]").
+    iApply (F_SPEC with "[$CPSf $PH $F_INV]").
     { done. }
     iIntros "!>" (v') "[PH %Qv']".
     
@@ -97,12 +102,12 @@ Section ListMapSpec.
   Qed.
 
   Lemma list_map_spec τ π (l: val):
-    {{{ cp_mul π d ((S $ hl_list_size l) * (K + n)) ∗ th_phase_eq τ π ∗ 
-        ⌜ is_hl_list P l ⌝ }}}
+    {{{ cp_mul π d (hl_map_fuel l) ∗ th_phase_eq τ π ∗ 
+        ⌜ is_hl_list P l ⌝ ∗ f_inv }}}
       hl_list_map f l @ τ
     {{{ l', RET l'; th_phase_eq τ π ∗ ⌜ is_hl_list Q l' ⌝ }}}.
-  Proof using F_SPEC.
-    iIntros (Φ) "(CPS & PH & %LIST) POST".
+  Proof using F_SPEC F_INV_PERS.
+    iIntros (Φ) "(CPS & PH & %LIST & #F_INV) POST".
     iApply (wp_wand with "[-]"). 
     { iApply wp_frame_step_r'. iSplitR "POST"; [| iAccu]. 
       by iApply (list_map_spec' with "[$] [$]"). }
@@ -117,13 +122,13 @@ From lawyer.nonblocking Require Import om_wfree_inst.
 
 Section ListMapWFree.
 
-  Context `(M_WFREE: WaitFreeSpec m).
+  Context `(F_WFREE: WaitFreeSpec f).
 
   Definition hlm_is_init_st (c: cfg heap_lang) :=
-    wfs_is_init_st _ M_WFREE c.
+    wfs_is_init_st _ F_WFREE c.
 
   Definition hlm_mod_inv {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ} :=
-    wfs_mod_inv _ M_WFREE. 
+    wfs_mod_inv _ F_WFREE. 
 
   (* wfs_mod_inv_Pers `{heap1GS Σ, invGS_gen HasNoLc Σ} :: *)
   (*   Persistent wfs_mod_inv; *)
@@ -132,13 +137,31 @@ Section ListMapWFree.
     forall c (INIT: hlm_is_init_st c), ⊢ hl_phys_init_resource c ={⊤}=∗ hlm_mod_inv.
   Proof using. apply wfs_init_mod. Qed.
 
-  (* wfs_spec: *)
-  (* forall {M: Model} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ} *)
-  (*   τ π q (a: val), *)
-  (*   {{{ cp_mul π d_wfr0 wfs_F ∗ th_phase_frag τ π q ∗  *)
-  (*       (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv ) }}} *)
-  (*     App m a @ τ *)
-  (*   {{{ v, RET v; th_phase_frag τ π q }}}; *)
- 
+  Let map_f: val := λ: "v", hl_list_map f "v".
 
+  Lemma hlm_spec:
+  forall {M: Model} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ}
+    τ π (l: val),
+    {{{ cp_mul π d_wfr0 (S $ hl_map_fuel (wfs_F _ F_WFREE) l) ∗ th_phase_eq τ π ∗
+        (let _: heap1GS Σ := iem_phys HeapLangEM EM in hlm_mod_inv ) ∗
+        ⌜ is_hl_list (fun _ => True) l ⌝
+    }}}
+      App map_f l @ τ
+    {{{ v, RET v; th_phase_eq τ π }}}.
+  Proof using.
+    simpl. intros.
+    iIntros "(CPS & PH & #INV & %LIST) POST". rewrite /map_f.
+    pure_step. 
+
+    iApply (list_map_spec with "[-POST]").
+    3: { iFrame. iSplit; [| iApply "INV"]. done. }
+    { apply _. }
+    { Unshelve. 2: exact (fun _ => True).
+      iIntros "**" (?). iIntros "!> (?&?&?&?) POST".
+      iApply (wfs_spec _ F_WFREE with "[-POST]").
+      2: { iIntros "!> **". iApply "POST". iSplit; done. }
+      iFrame. }
+    iIntros "!> % (?&?)". by iApply "POST".
+  Qed.
+      
 End ListMapWFree. 
