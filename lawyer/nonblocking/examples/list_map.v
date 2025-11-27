@@ -56,7 +56,7 @@ Section ListMapSpec.
               f a @ τ
             {{{ v, RET v; th_phase_eq τ π ∗ ⌜ Q v ⌝ }}}).
 
-  Local Definition K := 20.
+  Let K := 20.
 
   Lemma list_map_spec' τ π (l: val)
     (LIST: is_hl_list P l):
@@ -111,3 +111,34 @@ Section ListMapSpec.
   Qed.
 
 End ListMapSpec. 
+
+
+From lawyer.nonblocking Require Import om_wfree_inst.
+
+Section ListMapWFree.
+
+  Context `(M_WFREE: WaitFreeSpec m).
+
+  Definition hlm_is_init_st (c: cfg heap_lang) :=
+    wfs_is_init_st _ M_WFREE c.
+
+  Definition hlm_mod_inv {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ} :=
+    wfs_mod_inv _ M_WFREE. 
+
+  (* wfs_mod_inv_Pers `{heap1GS Σ, invGS_gen HasNoLc Σ} :: *)
+  (*   Persistent wfs_mod_inv; *)
+
+  Lemma hlm_init_mod `{heap1GS Σ, invGS_gen HasNoLc Σ}:
+    forall c (INIT: hlm_is_init_st c), ⊢ hl_phys_init_resource c ={⊤}=∗ hlm_mod_inv.
+  Proof using. apply wfs_init_mod. Qed.
+
+  (* wfs_spec: *)
+  (* forall {M: Model} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ} *)
+  (*   τ π q (a: val), *)
+  (*   {{{ cp_mul π d_wfr0 wfs_F ∗ th_phase_frag τ π q ∗  *)
+  (*       (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv ) }}} *)
+  (*     App m a @ τ *)
+  (*   {{{ v, RET v; th_phase_frag τ π q }}}; *)
+ 
+
+End ListMapWFree. 
