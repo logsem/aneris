@@ -90,7 +90,8 @@ Section UnderCtx.
 
   Fixpoint expr_depth (e: expr) :=
     match e with
-    | Val _ | Var _ | ChooseNat => 0
+    | Val _ (** for the purposes expr_depth is used, depth of this value is irrelevant *)
+    | Var _ | ChooseNat => 0
     | Rec _ _ e | UnOp _ e | Fst e | Snd e | InjL e
     | InjR e | Fork e | Free e | Load e
                                  => S $ expr_depth e
