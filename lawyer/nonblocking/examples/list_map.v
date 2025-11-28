@@ -4,7 +4,7 @@ From lawyer Require Import program_logic sub_action_em action_model.
 From lawyer.examples Require Import obls_tactics.
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_model.
 From heap_lang Require Import lang notation. 
-
+From lawyer.nonblocking Require Import wait_free_spec_defs. 
 
 (* Local Definition hl_nil: val := NONEV.  *)
 (* Local Definition hl_cons (v l: val): val := SOMEV (v, l). *)
@@ -50,33 +50,28 @@ Section ListMapSpec.
 
   Existing Instance OHE.
 
-  Context (f: val) (n: nat) (P Q: val -> Prop) (f_inv: iProp Σ).
-  Context (F_INV_PERS: Persistent f_inv). 
-  Context (F_SPEC: forall τ π a, ⊢ 
-            {{{ cp_mul π d n ∗ th_phase_eq τ π ∗ ⌜ P a ⌝ ∗ f_inv }}}
-              f a @ τ
-            {{{ v, RET v; th_phase_eq τ π ∗ ⌜ Q v ⌝ }}}).
-
   Let K := 20.
 
-  Definition hl_map_fuel (l: val) := (S $ hl_list_size l) * (K + n). 
+  Definition hl_map_fuel (l: val) (F: nat) := (K + F) * (S $ hl_list_size l). 
 
   Lemma list_map_spec' τ π (l: val)
-    (LIST: is_hl_list P l):
-    cp_mul π d (hl_map_fuel l) -∗ 
-    th_phase_eq τ π -∗
-    f_inv -∗
+    f F P Q
+    (LIST: is_hl_list P l)
+    :
+    cp_mul π d (hl_map_fuel l F) -∗ 
+    th_phase_eq τ π -∗ 
+    wait_free_method_gen f d F P Q -∗
     WP hl_list_map f l @τ {{ l', th_phase_eq τ π ∗ ⌜is_hl_list Q l'⌝ }}.
-  Proof using F_SPEC F_INV_PERS. 
-    iIntros "CPS PH #F_INV".
+  Proof using. 
+    iIntros "CPS PH #F_SPEC".
     iInduction LIST as [| ] "IH"; rewrite /hl_list_map. 
-    { pure_steps. 
+    { pure_steps.  
       wp_bind (Rec _ _ _)%E.
       pure_steps.
       iFrame. iPureIntro.
       by constructor. }
-    rewrite /hl_map_fuel. 
-    rewrite (Nat.mul_succ_l (hl_list_size $ InjRV _)).
+    rewrite /hl_map_fuel.
+    rewrite (Nat.mul_succ_r _ (hl_list_size (InjRV _))).
     iDestruct (cp_mul_split with "CPS") as "[CPS' CPS]".
     iSpecialize ("IH" with "CPS'"). 
     iDestruct (cp_mul_split with "CPS") as "[CPS CPSf]".
@@ -85,7 +80,7 @@ Section ListMapSpec.
 
     wp_bind (Fst _)%E. pure_steps.
     wp_bind (f _)%E. 
-    iApply (F_SPEC with "[$CPSf $PH $F_INV]").
+    iApply ("F_SPEC" with "[$CPSf $PH]").
     { done. }
     iIntros "!>" (v') "[PH %Qv']".
     
@@ -101,13 +96,14 @@ Section ListMapSpec.
     iFrame. iPureIntro. by constructor.
   Qed.
 
-  Lemma list_map_spec τ π (l: val):
-    {{{ cp_mul π d (hl_map_fuel l) ∗ th_phase_eq τ π ∗ 
-        ⌜ is_hl_list P l ⌝ ∗ f_inv }}}
+  Lemma list_map_spec τ π (l: val)
+    f F P Q :
+    {{{ cp_mul π d (hl_map_fuel l F) ∗ th_phase_eq τ π ∗ 
+        ⌜ is_hl_list P l ⌝ ∗ wait_free_method_gen f d F P Q }}}
       hl_list_map f l @ τ
     {{{ l', RET l'; th_phase_eq τ π ∗ ⌜ is_hl_list Q l' ⌝ }}}.
-  Proof using F_SPEC F_INV_PERS.
-    iIntros (Φ) "(CPS & PH & %LIST & #F_INV) POST".
+  Proof using.
+    iIntros (Φ) "(CPS & PH & %LIST & #SPEC) POST".
     iApply (wp_wand with "[-]"). 
     { iApply wp_frame_step_r'. iSplitR "POST"; [| iAccu]. 
       by iApply (list_map_spec' with "[$] [$]"). }
@@ -118,9 +114,9 @@ Section ListMapSpec.
 End ListMapSpec. 
 
 
-From lawyer.nonblocking Require Import om_wfree_inst.
-
 Section ListMapWFree.
+
+  foobar. use truly higher-order spec. 
 
   Context `(F_WFREE: WaitFreeSpec f).
 
@@ -154,7 +150,7 @@ Section ListMapWFree.
     pure_step. 
 
     iApply (list_map_spec with "[-POST]").
-    3: { iFrame. iSplit; [| iApply "INV"]. done. }
+    2: { iFrame. iSplit; [| iApply "INV"]. done. }
     { apply _. }
     { Unshelve. 2: exact (fun _ => True).
       iIntros "**" (?). iIntros "!> (?&?&?&?) POST".
@@ -163,5 +159,5 @@ Section ListMapWFree.
       iFrame. }
     iIntros "!> % (?&?)". by iApply "POST".
   Qed.
-      
+       
 End ListMapWFree. 

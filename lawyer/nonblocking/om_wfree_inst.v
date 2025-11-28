@@ -2,6 +2,7 @@ From iris.proofmode Require Import tactics.
 From lawyer.examples Require Import orders_lib.
 From lawyer.obligations Require Import env_helpers obligations_model.
 From lawyer.nonblocking.logrel Require Import logrel.
+From lawyer.nonblocking Require Import wait_free_spec_defs.
 
 
 Definition WF_Degree := bounded_nat 2.
@@ -71,12 +72,9 @@ Record WaitFreeSpec (m: val) := {
       ⊢ hl_phys_init_resource c ={⊤}=∗ wfs_mod_inv;
   wfs_F: nat;
   wfs_spec:
-  forall {M: Model} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ}
-    τ π q (a: val),
-    {{{ cp_mul π d_wfr0 wfs_F ∗ th_phase_frag τ π q ∗ 
-        (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv ) }}}
-      App m a @ τ
-    {{{ v, RET v; th_phase_frag τ π q }}};
+  forall {M} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ},
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv) ⊢
+    wait_free_method m d_wfr0 wfs_F;
 
   (* TODO: derive it from wfs_spec *)
   wfs_safety_spec:
