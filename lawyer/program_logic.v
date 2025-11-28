@@ -8,10 +8,10 @@ From heap_lang Require Export heap_lang_defs tactics notation sswp_logic locales
 Close Scope Z. 
 
 Lemma tac_wp_bind `{irisG heap_lang M Σ}
-  K Δ s E Φ e f :
+  K Δ s τ E Φ e f :
   f = (λ e, fill K e) → (* as an eta expanded hypothesis so that we can `simpl` it *)
-  envs_entails Δ (WP e @ s; E {{ v, WP f (Val v) @ s; E {{ Φ }} }})%I →
-  envs_entails Δ (WP fill K e @ s; E {{ Φ }}).
+  envs_entails Δ (WP e @ s; τ; E {{ v, WP f (Val v) @ s; τ; E {{ Φ }} }})%I →
+  envs_entails Δ (WP fill K e @ s; τ; E {{ Φ }}).
 Proof. rewrite envs_entails_unseal=> -> ->. by apply: wp_bind. Qed.
 
 Ltac wp_bind_core K :=

@@ -92,22 +92,21 @@ Lemma mk_ref_safety_spec
 Proof using.
   iIntros "**". rewrite interp_unfold /mk_ref /=.
   iModIntro. iIntros (τ v) "IIv".
+  
 
   iApply sswp_pwp; [done| ].
   iApply sswp_pure_step; [done| ].
   do 2 iModIntro.
   simpl. 
 
-  (* Set Printing Coercions. *)
-  (* Unset Printing Notations. *)
-  iApply (wp_bind [AppRCtx _]). 
+  rewrite /pwp. wp_bind (ref _)%E. 
   iApply sswp_pwp; [done| ].
   iApply wp_alloc. iIntros "!>" (l) "L _".
   do 1 iModIntro. simpl.
 
   iApply wp_value.
 
-  iApply (wp_bind [AppLCtx _]). 
+  wp_bind (Rec _ _ _)%E. 
   iApply sswp_pwp; [done| ].
   iApply sswp_pure_step; [done| ].
   do 2 iModIntro. simpl.
