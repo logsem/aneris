@@ -17,7 +17,7 @@ Inductive is_hl_list (P: val -> Prop) : val -> Prop :=
 .
 
 
-Definition hl_list_map: val :=
+Definition hl_list_map_cur: val :=
   rec: "lm" "f" "l" :=
     Case "l"
       (λ: <>, NONE)
@@ -27,8 +27,8 @@ Definition hl_list_map: val :=
          SOME (Pair "v'" "l'") )
   .
 
-Definition hl_list_map_unc: val :=
-  λ: "x", hl_list_map (Fst "x") (Snd "x"). 
+Definition hl_list_map: val :=
+  λ: "x", hl_list_map_cur (Fst "x") (Snd "x"). 
 
 Fixpoint hl_list_size (l: val): nat :=
   match l with
@@ -57,13 +57,13 @@ Section ListMapPhys.
     interp f -∗ interp l -∗
       @pwp _ _ 
       (@irisG_looping heap_lang HeapLangEM Σ iG hG (@si_add_none heap_lang Σ))
-      trillium.bi.weakestpre.MaybeStuck ⊤ τ (hl_list_map f l)
+      trillium.bi.weakestpre.MaybeStuck ⊤ τ (hl_list_map_cur f l)
       (@interp Σ iG hG).
   Proof using.
     iIntros "#IIf #IIl".
     iLöb as "IH" forall (l) "IIl". 
 
-    rewrite {2}/hl_list_map. 
+    rewrite {2}/hl_list_map_cur. 
     destruct (@decide (l = NONEV \/ exists v, l = SOMEV v)) as [OK| ]. 
     { admit. }
     2: { (* stuck *)
@@ -127,7 +127,7 @@ Section ListMapPhys.
     wp_bind (Snd _)%E.
     do 2 pwp_pure_step.
 
-    fold hl_list_map.
+    fold hl_list_map_cur.
 
     iApply trillium.program_logic.weakestpre.wp_wand.
     { by iApply ("IH" $! l'). }
@@ -146,9 +146,9 @@ Section ListMapPhys.
  
 
   Lemma list_map_phys_spec:
-    ⊢ persistent_pred.pers_pred_car interp hl_list_map_unc.
+    ⊢ persistent_pred.pers_pred_car interp hl_list_map.
   Proof using.
-    iIntros. rewrite interp_unfold /hl_list_map_unc /=.
+    iIntros. rewrite interp_unfold /hl_list_map /=.
     iModIntro. iIntros (τ v) "#IIv".
 
     iApply sswp_pwp; [done| ]. iApply sswp_pure_step; [done| ].
@@ -210,10 +210,10 @@ Section ListMapSpec.
     cp_mul π d (hl_map_fuel F l) -∗ 
     th_phase_frag τ π q -∗ 
     wait_free_method_gen f d (fun _ => F) (fun v => ⌜ P v ⌝) (fun v => ⌜ Q v ⌝) -∗
-    WP hl_list_map f l @τ {{ l', th_phase_frag τ π q ∗ ⌜is_hl_list Q l'⌝ }}.
+    WP hl_list_map_cur f l @τ {{ l', th_phase_frag τ π q ∗ ⌜is_hl_list Q l'⌝ }}.
   Proof using. 
     iIntros "CPS PH #F_SPEC".
-    iInduction LIST as [| ] "IH"; rewrite /hl_list_map. 
+    iInduction LIST as [| ] "IH"; rewrite /hl_list_map_cur. 
     { pure_steps.  
       wp_bind (Rec _ _ _)%E.
       pure_steps.
@@ -249,7 +249,7 @@ Section ListMapSpec.
     f F P Q :
     {{{ cp_mul π d (hl_map_fuel F l) ∗ th_phase_frag τ π q ∗
         ⌜ is_hl_list P l ⌝ ∗ wait_free_method_gen f d (fun _ => F) (fun v => ⌜ P v ⌝) (fun v => ⌜ Q v ⌝) }}}
-      hl_list_map f l @ τ
+      hl_list_map_cur f l @ τ
     {{{ l', RET l'; th_phase_frag τ π q ∗ ⌜ is_hl_list Q l' ⌝ }}}.
   Proof using.
     iIntros (Φ) "(CPS & PH & %LIST & #SPEC) POST".
@@ -267,11 +267,11 @@ Section ListMapSpec.
     f F P Q :
     {{{ cp_mul π d (hl_map_unc_fuel F l) ∗ th_phase_frag τ π q ∗ 
         ⌜ is_hl_list P l ⌝ ∗ wait_free_method_gen f d (fun _ => F) (fun v => ⌜ P v ⌝) (fun v => ⌜ Q v ⌝) }}}
-      hl_list_map_unc (f, l)%V @ τ
+      hl_list_map (f, l)%V @ τ
     {{{ l', RET l'; th_phase_frag τ π q ∗ ⌜ is_hl_list Q l' ⌝ }}}.
   Proof using.
     iIntros (Φ) "(CPS & PH & %LIST & #SPEC) POST".
-    rewrite /hl_list_map_unc.
+    rewrite /hl_list_map.
     pure_step_cases. 
     wp_bind (Snd _)%E. do 2 pure_step_cases. 
     wp_bind (Fst _)%E. do 2 pure_step_cases.
@@ -305,7 +305,7 @@ Section ListMapWFree.
   forall {M} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ}
     (f: val heap_lang) (F_inner: nat),
     (let _: heap1GS Σ := iem_phys HeapLangEM EM in hlm_mod_inv) ⊢
-      wait_free_method_gen hl_list_map_unc d_wfr0
+      wait_free_method_gen hl_list_map d_wfr0
       (from_option (hl_map_unc_fuel F_inner) 0 ∘ hl_snd_opt)
       (ho_arg_restr f hlm_arg_restr F_inner)
       (fun _ => emp).
@@ -332,10 +332,10 @@ Section ListMapWFree.
        
   Lemma hlm_phys_spec
    {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ}:
-    hlm_mod_inv ⊢ persistent_pred.pers_pred_car interp hl_list_map_unc.
+    hlm_mod_inv ⊢ persistent_pred.pers_pred_car interp hl_list_map.
   Proof using. iIntros "_". iApply list_map_phys_spec. Qed.
 
-  Definition hlm_WF_HO_spec: WaitFreeSpecHO hl_list_map_unc hlm_arg_restr := {|
+  Definition hlm_WF_HO_spec: WaitFreeSpecHO hl_list_map hlm_arg_restr := {|
     wfsho_init_mod Σ _ _ := hlm_init_mod;
     wfsho_spec := @hlm_spec;
     wfsho_safety_spec Σ _ _ := hlm_phys_spec;
