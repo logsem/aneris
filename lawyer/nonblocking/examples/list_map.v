@@ -1,7 +1,6 @@
 From iris.proofmode Require Import tactics.
 From iris.base_logic Require Import invariants.
 From lawyer Require Import program_logic sub_action_em action_model.
-From lawyer.examples Require Import obls_tactics.
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_model.
 From heap_lang Require Import lang notation. 
 From lawyer.nonblocking Require Import wait_free_spec_defs. 
@@ -28,6 +27,8 @@ Definition hl_list_map: val :=
          SOME (Pair "v'" "l'") )
   .
 
+Definition hl_list_map_unc: val :=
+  λ: "x", hl_list_map (Fst "x") (Snd "x"). 
 
 Fixpoint hl_list_size (l: val): nat :=
   match l with
@@ -36,6 +37,154 @@ Fixpoint hl_list_size (l: val): nat :=
   | _ => 0 (** we only use this function on lists *)
   end. 
 
+
+From lawyer.nonblocking.logrel Require Import logrel.
+From iris.base_logic Require Import invariants.
+
+From iris.proofmode Require Import proofmode coq_tactics tactics.
+
+(* TODO: move *)
+Ltac pwp_pure_step := 
+    (iApply sswp_pwp; [done| ]; iApply sswp_pure_step; [done| ]; do 2 iModIntro; iEval (simpl) ) ||
+    (iApply trillium.program_logic.weakestpre.wp_value; []).   
+Ltac pwp_pure_steps := repeat pwp_pure_step. 
+
+Section ListMapPhys.
+
+  Context {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ}.
+
+  Lemma list_map_phys_spec' τ (f l: heap_lang.val):
+    interp f -∗ interp l -∗
+      @pwp _ _ 
+      (@irisG_looping heap_lang HeapLangEM Σ iG hG (@si_add_none heap_lang Σ))
+      trillium.bi.weakestpre.MaybeStuck ⊤ τ (hl_list_map f l)
+      (@interp Σ iG hG).
+  Proof using.
+    iIntros "#IIf #IIl".
+    iLöb as "IH" forall (l) "IIl". 
+
+    rewrite {2}/hl_list_map. 
+    destruct (@decide (l = NONEV \/ exists v, l = SOMEV v)) as [OK| ]. 
+    { admit. }
+    2: { (* stuck *)
+         admit. }
+
+    destruct OK as [-> | [v ->]].
+    { rewrite /pwp. 
+      wp_bind (App _ f)%E.
+
+      pwp_pure_step.
+      rewrite /pwp. wp_bind (Rec _ _ _)%E. pwp_pure_step. 
+      iApply trillium.program_logic.weakestpre.wp_value.
+
+      do 2 pwp_pure_step.
+      rewrite /pwp. wp_bind (Rec _ _ _)%E. 
+      repeat pwp_pure_step.
+      done. }
+
+    rewrite /pwp. 
+    wp_bind (App _ f)%E.
+    pwp_pure_steps.
+    rewrite /pwp. wp_bind (Rec _ _ _)%E. pwp_pure_steps.
+
+    rewrite /pwp. wp_bind (Fst _)%E.
+    destruct (@decide (exists v1 v2, v = PairV v1 v2)) as [(c&l'&->) | NO]. 
+    { destruct v.
+      3: { left. eauto. }
+      all: right; set_solver. }
+    2: { admit. }
+
+    rewrite {4}interp_unfold /=.
+    pwp_pure_steps.    
+    wp_bind (App f _)%E.
+
+    iDestruct "IIl" as "[(%&%&?) | (%&%EQ&IIw)]".
+    { done. }
+    inversion EQ. subst. clear EQ.
+    rewrite {4}interp_unfold /=.
+    repeat setoid_rewrite bi.later_exist.
+    iDestruct "IIw" as "(%&%&(>%EQ&#IIc&#IIl))".
+    inversion EQ. subst a a0. clear EQ. 
+
+    destruct (@decide (exists b s e, f = RecV b s e)) as [FUN| ]. 
+    { destruct f.
+      2: by left; eauto.
+      all: right; set_solver. }
+    2: { admit. }
+
+    destruct FUN as (b&s&ff&->). 
+    rewrite {1}interp_unfold. simpl.
+
+    iApply trillium.program_logic.weakestpre.wp_wand.
+    { by iApply "IIf". }
+
+    iIntros "%v #IIv".
+    wp_bind (Rec _ _ _)%E.
+    do 3 pwp_pure_step.
+
+    rewrite /pwp. wp_bind (App _ _ _)%E. 
+    
+    wp_bind (Snd _)%E.
+    do 2 pwp_pure_step.
+
+    fold hl_list_map.
+
+    iApply trillium.program_logic.weakestpre.wp_wand.
+    { by iApply ("IH" $! l'). }
+
+    iIntros (l2) "#IIl2".
+    wp_bind (Rec _ _ _)%E.
+    pwp_pure_steps.
+
+    rewrite /pwp. wp_bind (Pair _ _)%E.
+    pwp_pure_steps.
+    rewrite {9}interp_unfold /=.
+    iRight. iExists _. iNext. iSplit; [done| ].
+    rewrite {9}interp_unfold /=. iNext. 
+    do 2 iExists _. iSplit; [done| ]. iFrame "#∗".
+  Admitted.    
+ 
+
+  Lemma list_map_phys_spec:
+    ⊢ persistent_pred.pers_pred_car interp hl_list_map_unc.
+  Proof using.
+    iIntros. rewrite interp_unfold /hl_list_map_unc /=.
+    iModIntro. iIntros (τ v) "#IIv".
+
+    iApply sswp_pwp; [done| ]. iApply sswp_pure_step; [done| ].
+    do 2 iModIntro. simpl.
+
+    rewrite /pwp.
+    wp_bind (Snd _)%E.
+    destruct (@decide (exists v1 v2, v = PairV v1 v2)) as [(f&l&->) | NO]. 
+    { destruct v.
+      3: { left. eauto. }
+      all: right; set_solver. }
+    2: { admit. (* stuck *) }
+
+    rewrite {1}interp_unfold /=.
+
+    iApply sswp_pwp; [done| ]. iApply sswp_pure_step; [done| ].
+    do 2 iModIntro. simpl.
+
+    iDestruct "IIv" as "(%w1 & %w2 & %EQ & IIf & IIl)".
+    inversion EQ. subst w1 w2. clear EQ.  
+    
+    rewrite /pwp.
+    iApply trillium.program_logic.weakestpre.wp_value.
+    wp_bind (Fst _)%E.
+    
+    iApply sswp_pwp; [done| ]. iApply sswp_pure_step; [done| ].
+    do 2 iModIntro. simpl.
+
+    iApply trillium.program_logic.weakestpre.wp_value.
+    by iApply list_map_phys_spec'.
+  Admitted.
+
+End ListMapPhys.
+
+
+From lawyer.examples Require Import obls_tactics.
 
 Section ListMapSpec.
   Context {Σ: gFunctors}. 
@@ -52,16 +201,16 @@ Section ListMapSpec.
 
   Let K := 20.
 
-  Definition hl_map_fuel (l: val) (F: nat) := (K + F) * (S $ hl_list_size l). 
+  Definition hl_map_fuel (F: nat) (l: val heap_lang)  := (K + F) * (S $ hl_list_size l). 
 
-  Lemma list_map_spec' τ π (l: val)
+  Lemma list_map_spec' τ π q (l: val heap_lang)
     f F P Q
     (LIST: is_hl_list P l)
     :
-    cp_mul π d (hl_map_fuel l F) -∗ 
-    th_phase_eq τ π -∗ 
-    wait_free_method_gen f d F P Q -∗
-    WP hl_list_map f l @τ {{ l', th_phase_eq τ π ∗ ⌜is_hl_list Q l'⌝ }}.
+    cp_mul π d (hl_map_fuel F l) -∗ 
+    th_phase_frag τ π q -∗ 
+    wait_free_method_gen f d (fun _ => F) (fun v => ⌜ P v ⌝) (fun v => ⌜ Q v ⌝) -∗
+    WP hl_list_map f l @τ {{ l', th_phase_frag τ π q ∗ ⌜is_hl_list Q l'⌝ }}.
   Proof using. 
     iIntros "CPS PH #F_SPEC".
     iInduction LIST as [| ] "IH"; rewrite /hl_list_map. 
@@ -96,12 +245,12 @@ Section ListMapSpec.
     iFrame. iPureIntro. by constructor.
   Qed.
 
-  Lemma list_map_spec τ π (l: val)
+  Lemma list_map_spec τ π q l
     f F P Q :
-    {{{ cp_mul π d (hl_map_fuel l F) ∗ th_phase_eq τ π ∗ 
-        ⌜ is_hl_list P l ⌝ ∗ wait_free_method_gen f d F P Q }}}
+    {{{ cp_mul π d (hl_map_fuel F l) ∗ th_phase_frag τ π q ∗
+        ⌜ is_hl_list P l ⌝ ∗ wait_free_method_gen f d (fun _ => F) (fun v => ⌜ P v ⌝) (fun v => ⌜ Q v ⌝) }}}
       hl_list_map f l @ τ
-    {{{ l', RET l'; th_phase_eq τ π ∗ ⌜ is_hl_list Q l' ⌝ }}}.
+    {{{ l', RET l'; th_phase_frag τ π q ∗ ⌜ is_hl_list Q l' ⌝ }}}.
   Proof using.
     iIntros (Φ) "(CPS & PH & %LIST & #SPEC) POST".
     iApply (wp_wand with "[-]"). 
@@ -111,53 +260,85 @@ Section ListMapSpec.
     iIntros "% ([??] & POST)". iApply "POST". iFrame.
   Qed.
 
-End ListMapSpec. 
+  Definition hl_map_unc_fuel (F: nat) (l: val heap_lang) :=
+    5 + hl_map_fuel F l. 
 
+  Lemma list_map_spec_unc τ π q l
+    f F P Q :
+    {{{ cp_mul π d (hl_map_unc_fuel F l) ∗ th_phase_frag τ π q ∗ 
+        ⌜ is_hl_list P l ⌝ ∗ wait_free_method_gen f d (fun _ => F) (fun v => ⌜ P v ⌝) (fun v => ⌜ Q v ⌝) }}}
+      hl_list_map_unc (f, l)%V @ τ
+    {{{ l', RET l'; th_phase_frag τ π q ∗ ⌜ is_hl_list Q l' ⌝ }}}.
+  Proof using.
+    iIntros (Φ) "(CPS & PH & %LIST & #SPEC) POST".
+    rewrite /hl_list_map_unc.
+    pure_step_cases. 
+    wp_bind (Snd _)%E. do 2 pure_step_cases. 
+    wp_bind (Fst _)%E. do 2 pure_step_cases.
+    iApply (list_map_spec with "[-POST]").
+    2: done. 
+    iFrame "#∗". iSplit; [| done].
+    iApply (cp_mul_weaken with "[$]"); [done| lia].
+  Qed.
+
+End ListMapSpec.
+
+
+From lawyer.nonblocking Require Import om_wfree_inst. 
 
 Section ListMapWFree.
 
-  foobar. use truly higher-order spec. 
+  Definition hlm_is_init_st (c: cfg heap_lang) := True. 
 
-  Context `(F_WFREE: WaitFreeSpec f).
-
-  Definition hlm_is_init_st (c: cfg heap_lang) :=
-    wfs_is_init_st _ F_WFREE c.
-
-  Definition hlm_mod_inv {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ} :=
-    wfs_mod_inv _ F_WFREE. 
-
-  (* wfs_mod_inv_Pers `{heap1GS Σ, invGS_gen HasNoLc Σ} :: *)
-  (*   Persistent wfs_mod_inv; *)
+  Definition hlm_mod_inv {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ}: iProp Σ := True. 
 
   Lemma hlm_init_mod `{heap1GS Σ, invGS_gen HasNoLc Σ}:
     forall c (INIT: hlm_is_init_st c), ⊢ hl_phys_init_resource c ={⊤}=∗ hlm_mod_inv.
-  Proof using. apply wfs_init_mod. Qed.
+  Proof using. set_solver. Qed.
 
-  Let map_f: val := λ: "v", hl_list_map f "v".
+  Definition hl_snd_opt (v: val heap_lang) :=
+    match v with | PairV _ v2 => Some v2 | _ => None end.
+
+  Definition hlm_arg_restr := is_hl_list (fun _ => (True: Prop)). 
 
   Lemma hlm_spec:
-  forall {M: Model} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ}
-    τ π (l: val),
-    {{{ cp_mul π d_wfr0 (S $ hl_map_fuel (wfs_F _ F_WFREE) l) ∗ th_phase_eq τ π ∗
-        (let _: heap1GS Σ := iem_phys HeapLangEM EM in hlm_mod_inv ) ∗
-        ⌜ is_hl_list (fun _ => True) l ⌝
-    }}}
-      App map_f l @ τ
-    {{{ v, RET v; th_phase_eq τ π }}}.
+  forall {M} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ}
+    (f: val heap_lang) (F_inner: nat),
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in hlm_mod_inv) ⊢
+      wait_free_method_gen hl_list_map_unc d_wfr0
+      (from_option (hl_map_unc_fuel F_inner) 0 ∘ hl_snd_opt)
+      (ho_arg_restr f hlm_arg_restr F_inner)
+      (fun _ => emp).
   Proof using.
     simpl. intros.
-    iIntros "(CPS & PH & #INV & %LIST) POST". rewrite /map_f.
-    pure_step. 
+    rewrite /wait_free_method_gen.
+    iIntros "#INV". iIntros "**".
+    iIntros "!>" (?) "(CPS & PH & #LIST) POST".
 
-    iApply (list_map_spec with "[-POST]").
-    2: { iFrame. iSplit; [| iApply "INV"]. done. }
-    { apply _. }
-    { Unshelve. 2: exact (fun _ => True).
-      iIntros "**" (?). iIntros "!> (?&?&?&?) POST".
-      iApply (wfs_spec _ F_WFREE with "[-POST]").
-      2: { iIntros "!> **". iApply "POST". iSplit; done. }
-      iFrame. }
-    iIntros "!> % (?&?)". by iApply "POST".
+    rewrite /ho_arg_restr. iDestruct "LIST" as "(% & (-> & %LIST) & #WFS)".
+    simpl. 
+
+    iApply (list_map_spec_unc with "[-POST]").
+    { iFrame. iSplit; [iPureIntro; by apply LIST| ].
+      rewrite /wait_free_method_gen.
+      iIntros "**". iIntros "!> % (CPS & PH & _) POST".
+      iApply ("WFS" with "[-POST]"). 
+      { iFrame. }
+      iIntros "!> % PH". iApply ("POST" with "[$PH]").
+      Unshelve. 2: exact (fun _ => True). done. }
+    iIntros "!> % (?&?)". iApply "POST".
+    iFrame. 
   Qed.
        
+  Lemma hlm_phys_spec
+   {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ}:
+    hlm_mod_inv ⊢ persistent_pred.pers_pred_car interp hl_list_map_unc.
+  Proof using. iIntros "_". iApply list_map_phys_spec. Qed.
+
+  Definition hlm_WF_HO_spec: WaitFreeSpecHO hl_list_map_unc hlm_arg_restr := {|
+    wfsho_init_mod Σ _ _ := hlm_init_mod;
+    wfsho_spec := @hlm_spec;
+    wfsho_safety_spec Σ _ _ := hlm_phys_spec;
+  |}.
+
 End ListMapWFree. 
