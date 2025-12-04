@@ -1,8 +1,9 @@
 From fairness Require Import locales_helpers utils.
 From heap_lang Require Export lang tactics notation.
 From trillium.traces Require Import exec_traces trace_lookup.
+From fairness Require Import utils_traces.
 
-Close Scope Z. 
+Close Scope Z_scope. 
   
 Lemma from_locale_from_lookup tp0 tp tid e :
   from_locale_from tp0 tp tid = Some e <-> (tp !! (tid - length tp0)%nat = Some e ∧ (length tp0 <= tid)%nat).
@@ -426,29 +427,19 @@ Lemma enabled_disabled_step_between (etr: extrace heap_lang) i j ci cj τ
   (VALID: extrace_valid etr):
   exists k, i <= k < j /\ etr L!! k = Some $ Some τ.
 Proof using.
-  apply Nat.le_sum in LE as [d ->].
-  edestruct @decide as [EX | NO].
-  2: { by apply EX. }
-  { apply ex_fin_dec with (l := seq i d).
-    { solve_decision. }
-    intros ? [??]. by apply in_seq. }
-  destruct DISj. generalize dependent ci. generalize dependent i.
-  induction d.
-  { setoid_rewrite Nat.add_0_r. set_solver. }
-  intros.
-  pose proof JTH as JTH'. 
-  apply mk_is_Some, state_lookup_prev with (j := S i) in JTH as [ci' ITH']; [| lia].
-  pose proof ITH' as [oτ ITHl]%mk_is_Some%label_lookup_states'.
-  rewrite -Nat.add_1_r in ITH'.
-  opose proof * (trace_valid_steps'' _ _ _ i) as STEP; eauto.
-  { apply extrace_valid_alt in VALID; eauto. }
-  red in ENi. destruct ENi as (? & EE & ?).
-  eapply locale_step_other_same in STEP; eauto.
-  2: { intros [=->]. destruct NO. eexists. split; eauto. lia. }
-  eapply IHd; eauto.
-  { rewrite -JTH'. f_equal. lia. }
-  { intros (?&?&?). destruct NO. eexists. split; eauto. lia. }
-  red. eauto.
+  pose proof @steps_not_kept_step_between as KEPT.
+  apply extrace_valid_alt in VALID. 
+  ospecialize * (KEPT _ _ _ _ VALID _ (locale_enabled τ) (fun τ' => τ' ≠ Some τ)).
+  4: by apply LE.
+  all: eauto.
+  { red. intros.
+    destruct Pst as (?&E&?).
+    pose proof E as E'. 
+    erewrite <- locale_step_other_same in E; eauto.
+    red. eexists. split; eauto. congruence. }
+  destruct KEPT as (?&?&?&?&?).
+  eexists. split; eauto. rewrite H0.
+  apply dec_stable in H1. congruence.
 Qed.
 
 Lemma locale_step_val_preserved c1 oτ c2 τv v

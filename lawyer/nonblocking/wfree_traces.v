@@ -18,15 +18,52 @@ Section CallInTrace.
   Definition no_return_before tr tpc i k :=
     ¬ (exists j, j <= k /\ has_return_at tr (TraceCtx i tpc) j). 
 
+  Definition not_stuck_tid τ c :=
+    exists e, from_locale c.1 τ = Some e /\ not_stuck e c.2.
+
+  Definition stuck_tid τ c :=
+    exists e, from_locale c.1 τ = Some e /\ stuck e c.2.
+
+  Lemma stuck_tid_neg τ c:
+    ¬ not_stuck_tid τ c /\ is_Some (from_locale c.1 τ) <-> stuck_tid τ c.
+  Proof using.
+    rewrite /not_stuck_tid /stuck_tid.
+    setoid_rewrite <- not_not_stuck. 
+    split.
+    - intros (?&(?&?)). eexists. split; eauto.  
+    - intros (?&?&?). split; eauto.
+      intros (?&?&?). edestruct H0; eauto. congruence.   
+  Qed.
+    
+  (* TODO: is it provable for general Λ? *)
+  Global Instance not_stuck_dec {Λ} e (c: language.state Λ): Decision (not_stuck e c).
+  Proof using.
+    rewrite /not_stuck.
+    apply or_dec; try solve_decision.
+    rewrite /reducible.
+  Admitted. 
+
+  Global Instance not_stuck_tid_dec τ c: Decision (not_stuck_tid τ c).
+  Proof using.
+    rewrite /not_stuck_tid.
+    apply ex_fin_dec with (l := c.1).
+    { solve_decision. }
+    intros ? (?%from_locale_lookup&?).
+    apply elem_of_list_In. eapply elem_of_list_lookup; eauto.
+  Qed.
+
+  Definition locale_enabled_safe τ c :=
+    locale_enabled τ c /\ not_stuck_tid τ c. 
+
   (** see fair_call_strenghten for an equivalent definition used in paper *)
   Definition fair_call tr '(TpoolCtx K τ as tpc) i :=
     forall k ck, i <= k -> 
             tr S!! k = Some ck ->
-            locale_enabled τ ck ->
+            locale_enabled_safe τ ck ->
             (* ¬ (exists j, j <= k /\ has_return_at tr (TraceCtx i tpc) j) -> *)
             no_return_before tr tpc i k ->
     exists d cd, tr S!! (k + d) = Some cd /\
-            fairness_sat locale_enabled tid_match τ cd (tr L!! (k + d)). 
+            fairness_sat locale_enabled_safe tid_match τ cd (tr L!! (k + d)). 
 
   Definition always_returns tr :=    
     forall tc a ci, let '(TraceCtx i tpc) := tc in
@@ -108,8 +145,9 @@ Section CallInTrace.
 
   (** definition used in paper *)
   Definition fair_call_strong tr '(TpoolCtx K τ as tpc) i :=
-    forall k, i <= k -> is_Some (tr S!! k) -> no_return_before tr tpc i k ->
-    exists d, tr L!! (k + d) = Some $ Some τ.
+    forall k c, i <= k -> tr S!! k = Some c ->
+           no_return_before tr tpc i k ->           
+    exists d, tr L!! (k + d) = Some $ Some τ \/ from_option (stuck_tid τ) False (tr S!! (k + d)). 
 
   (** τ is enabled at j and cannot get disabled without taking steps *)
   Lemma fair_call_strenghten tr K τ i
@@ -122,23 +160,52 @@ Section CallInTrace.
     apply forall_proper. intros k. 
     split.
     2: { intros FAIR ? LE KTH EN NORET.
+         destruct (decide (not_stuck_tid τ ck)).
+         2: { exists 0. rewrite Nat.add_0_r.
+              eexists. split; eauto.
+              red. left. intros (?&?). by apply n. } 
          ospecialize * FAIR; eauto.
-         destruct FAIR as [? STEP]. 
-         pose proof STEP as [[??] _]%mk_is_Some%label_lookup_states.
-         do 2 eexists. split; eauto.
-         red. eauto. right. eexists. by split; eauto. }
-    intros FAIR LE [? KTH] NORET.
+         destruct FAIR as [d STEP].
+         destruct STEP as [STEP | STUCK]. 
+         - pose proof STEP as [[??] _]%mk_is_Some%label_lookup_states.
+           do 2 eexists. split; eauto.
+           red. eauto. right. eexists. by split; eauto.
+         - destruct (tr S!! (k + d)) eqn:DTH; [| done]. simpl in STUCK.
+           exists d. eexists. split; eauto.
+           red. left. intros (?&NS).
+           apply stuck_tid_neg in STUCK. tauto. }
+           
+    intros FAIR c LE KTH NORET.
     destruct (tr S!! i) eqn:ITH; [| done]. simpl in CALLi. destruct CALLi.
+    destruct (decide (not_stuck_tid τ c)) as [NS | STUCK].
+    2: { exists 0. right. rewrite Nat.add_0_r KTH /=.
+         apply stuck_tid_neg. split; auto.
+         eapply from_locale_trace in LE; eauto.
+         by rewrite KTH /= in LE. } 
+         
     ospecialize * FAIR; eauto.
-    { odestruct (decide (locale_enabled _ _ )) as [EN | DIS]; [by apply EN| ].
+    { odestruct (decide (locale_enabled_safe _ _ )) as [EN | DIS]; [by apply EN| ].
       eapply call_returns_if_not_continues in LE; eauto.
       { destruct LE as (?&?&?&?&?&RET).
         edestruct NORET. eexists. split; [apply H0| ].
         red. do 2 eexists. split; eauto. lia. }
       { eapply (@call_nval_at _ _ App); eauto. }
-      intros NVAL. apply DIS. eapply nval_enabled; eauto. }
+      intros NVAL. apply DIS.
+      split; auto. 
+      eapply nval_enabled; eauto. }
     rewrite /fairness_sat in FAIR. destruct FAIR as (d&?&?&[DIS | (?&?&STEP)]).
     2: { red in STEP. subst. eauto. }
+
+    rewrite /locale_enabled_safe in DIS.
+    apply not_and_r in DIS as [DIS | STUCK].
+    2: { eexists. right. erewrite H0. simpl.
+         apply stuck_tid_neg. split; auto.
+         pose proof KTH as KK. eapply (from_locale_trace _ k) in KK.
+         { erewrite H0 in KK. apply KK. }
+         { eauto. }
+         2: lia.
+         destruct NS as (?&?&?). eauto. }
+    
     eapply (enabled_disabled_step_between _ k (k + d)) in DIS; eauto.
     2: lia.
     2: { eapply no_return_before_equiv_nvals in NORET; eauto.
