@@ -62,19 +62,14 @@ Proof using.
   iIntros "**". iApply (mk_ref_init_inv with "[$]").
 Qed. 
 
-Lemma mk_ref_wfree_spec:
-  ∀ (M : Model) (EM : ExecutionModel heap_lang M) (Σ : gFunctors) 
-    (OHE : OM_HL_Env OP_HL_WF EM Σ) (τ : locale heap_lang) 
-    (π : Phase) (q : Qp) (a : val) (Φ : val → iPropI Σ),
-    cp_mul π d_wfr0 5 ∗ th_phase_frag τ π q ∗
-    (λ (M0 : Model) (EM0 : ExecutionModel heap_lang M0) 
-       (Σ0 : gFunctors) (_ : OM_HL_Env OP_HL_WF EM0 Σ0), mk_ref_inv)
-      M EM Σ OHE -∗
-    ▷ (∀ v : val, th_phase_frag τ π q -∗ Φ v) -∗
-    WP mk_ref a @τ {{ v, Φ v }}.
-Proof using.
-  intros. simpl. 
-  iIntros "(CPS & PH & #INV) POST".
+Lemma mk_ref_wfree_spec {M} {EM: ExecutionModel heap_lang M} {Σ : gFunctors}
+  (OHE : OM_HL_Env OP_HL_WF EM Σ):
+  (let _: heap1GS Σ := iem_phys HeapLangEM EM in mk_ref_inv)
+  ⊢ wait_free_spec_defs.wait_free_method mk_ref d_wfr0 5.
+Proof using. 
+  rewrite /wait_free_spec_defs.wait_free_method.
+  iIntros "#INV" (τ π q a). simpl. 
+  iIntros "!>" (Φ) "(CPS & PH) POST".
   iApply (mk_ref_spec with "[-POST]").
   { iFrame. }
   iIntros "!> % (?&?)". iApply "POST". iFrame.
@@ -127,6 +122,6 @@ Qed.
 
 Definition mk_ref_WF_spec: WaitFreeSpec mk_ref := {|
   wfs_init_mod Σ _ _ := mk_ref_wfree_init_inv;
-  wfs_spec := mk_ref_wfree_spec;
+  wfs_spec := @mk_ref_wfree_spec;
   wfs_safety_spec := @mk_ref_safety_spec;
 |}.

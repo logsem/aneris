@@ -83,17 +83,14 @@ End Counter.
 
 From lawyer.nonblocking Require Import om_wfree_inst.
 
-Lemma counter_wfree_spec (l: loc):
-  ∀ (M : Model) (EM : ExecutionModel heap_lang M) (Σ : gFunctors) 
-    (OHE : OM_HL_Env OP_HL_WF EM Σ) (τ : locale heap_lang) 
-    (π : Phase) (q : Qp) (a : val) (Φ : val → iPropI Σ),
-    let _: heap1GS Σ := (iem_phys HeapLangEM EM) in
-    cp_mul π d_wfr0 5 ∗ th_phase_frag τ π q ∗ counter_inv l -∗
-    ▷ (∀ v : val, th_phase_frag τ π q -∗ Φ v) -∗
-    WP incr l a @τ {{ v, Φ v }}.
+Lemma counter_wfree_spec (l: loc)
+  {M} {EM: ExecutionModel heap_lang M} {Σ : gFunctors}
+    (OHE : OM_HL_Env OP_HL_WF EM Σ):
+  (let _: heap1GS Σ := iem_phys HeapLangEM EM in counter_inv l)
+  ⊢ wait_free_spec_defs.wait_free_method (incr l) d_wfr0 5.
 Proof using.
-  intros. simpl.
-  iIntros "(CPS & PH & #INV) POST".
+  simpl. rewrite /wait_free_spec_defs.wait_free_method. 
+  iIntros "#INV" (τ π q a). iIntros "!> %Φ (CPS & PH) POST".
   iApply (counter_mock_spec with "[-POST]").
   { by iFrame. }
   iIntros "!> % ?". by iApply "POST".
@@ -143,6 +140,6 @@ Qed.
 
 Definition counter_WF_spec (l: loc): WaitFreeSpec (incr l) := {|
   wfs_init_mod Σ _ _ := counter_wfree_init_inv l;
-  wfs_spec := counter_wfree_spec l;
+  wfs_spec := @counter_wfree_spec l;
   wfs_safety_spec Σ _ _ := counter_safety_spec l;
 |}. 

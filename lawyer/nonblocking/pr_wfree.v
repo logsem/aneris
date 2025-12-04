@@ -52,7 +52,8 @@ Section WaitFreePR.
   Proof using.
     simpl. iIntros "#INV CPS PH".
     pose proof (@wfs_spec _ WFS _ EM Σ OHE) as SPEC. 
-    iApply (SPEC with "[-]").
+    iApply (SPEC with "[] [-]").
+    { done. }
     2: { by iIntros "!> **". } 
     iSplitL "CPS"; [| by iFrame].
     iApply (cp_mul_weaken with "[$]"); [| done].
@@ -76,7 +77,7 @@ Section WaitFreePR.
   Definition wp_tc {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
     (s: stuckness) (e: expr) (b: bool) Φ :=
     if b then
-      let _ := iris_OM_into_Looping (EM := EM) in
+      let _ := IEMGS_into_Looping Hinv si_add_none in
       pwp s ⊤ τi e Φ
     else
       let e' := default (Val #false) (under_ctx Ki e) in
@@ -85,7 +86,7 @@ Section WaitFreePR.
 
   Definition thread_pr {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} s N :=
     (fun e τ Φ => if decide (τi = τ) then wp_tc s e (N <=? ii) Φ
-                 else let _ := iris_OM_into_Looping (EM := EM) in pwp s ⊤ τ e Φ).
+                 else let _ := IEMGS_into_Looping Hinv si_add_none in pwp s ⊤ τ e Φ).
 
   Definition wptp_wfree {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
     (s: stuckness) (etr: execution_trace heap_lang) (Φs : list (val → iPropI Σ)):
@@ -133,6 +134,7 @@ Section WaitFreePR.
       [done| rewrite ectx_fill_emp // | .. ].
       { done. }
       { simpl. rewrite /phys_SI. simpl.
+        iSplit; [| done]. 
         by iDestruct "HSI" as "(?&?&?)". }
       simpl. by rewrite Hex.
     - apply fits_inf_call_last_or_short in FIT as [NVAL | SHORT].
@@ -162,6 +164,7 @@ Section WaitFreePR.
       [done| rewrite ectx_fill_emp // | .. ].
       { done. }
       { simpl. rewrite /phys_SI. simpl.
+        iSplit; [| done]. 
         by iDestruct "HSI" as "(?&?&?)". }
       simpl. by rewrite Hex in NS.
     (* TODO: get rid of this? *)
@@ -714,8 +717,7 @@ Section WaitFreePR.
     { iApply (ep_weaken with "[$]"). apply (phase_le_init π). } 
     { (* TODO: Make a lemma *)
       rewrite /sgns_level_gt. rewrite /sgns_levels_gt'.
-      iApply empty_sgns_levels_rel. 
-}
+      iApply empty_sgns_levels_rel. }
     { rewrite /WF_SB. lia. }
     iModIntro. iFrame "#∗".
   Qed.
@@ -724,7 +726,7 @@ Section WaitFreePR.
     s (etr: execution_trace heap_lang) tp0 tp Φs
     (OTHER: τi ∉ locales_of_list_from tp0 tp):
     wptp_from_gen (thread_pr s (trace_length etr)) tp0 tp Φs ⊣⊢
-    let _ := iris_OM_into_Looping (EM := EM) in
+    let _ := IEMGS_into_Looping _ si_add_none (EM := EM) in
     wptp_from tp0 s tp Φs.
   Proof using.
     rewrite /wptp_from_gen.
@@ -1093,9 +1095,10 @@ Section WaitFreePR.
 
       rewrite {1}/obls_τi. iDestruct "OB" as "(%si & OB & SGN & EP)".
 
-      iDestruct (@pwp_MU_ctx_take_step _ _ _ Hinv with "TI [CP PH OB] WP") as "STEP".
+      iDestruct (@pwp_MU_ctx_take_step _ _ _ Hinv with "TI [] [CP PH OB] WP") as "STEP".
       1-2: by eauto. 
       { red. rewrite FIN. erewrite ectx_fill_emp. reflexivity. }
+      { done. }
       { done. }
       { rewrite (cp_weaken _ π); [| by apply phase_le_init].
         iApply (MU_burn_cp _ _ _ _ (fun R1 R2 => (⌜ R1 = {[ si ]} /\ R2 = ∅ ⌝)%I) with "[$CP $PH OB]").
@@ -1108,7 +1111,7 @@ Section WaitFreePR.
       iMod "STEP". iModIntro.
       iApply (step_fupdN_wand with "[STEP]"); first by iApply "STEP".
       iIntros "STEP".
-      iMod "STEP" as (δ' ℓ) "(HSI & He2 & WPS' & MOD) /=".
+      iMod "STEP" as (δ' ℓ) "(HSI & _ & He2 & WPS' & MOD) /=".
 
       iDestruct "MOD" as (π' ??) "(PH & [->->] & _ & MOD')".
       rewrite union_empty_r_L. 
@@ -1363,9 +1366,10 @@ Section WaitFreePR.
 
       remember (step_fork (trace_last etr) (t1 ++ e' :: t2 ++ efs, σ')) as sf.
 
-      iDestruct (@pwp_MU_ctx_take_step _ _ _ Hinv with "TI [CP PH OB OBτi] WP") as "STEP".
+      iDestruct (@pwp_MU_ctx_take_step _ _ _ Hinv with "TI [] [CP PH OB OBτi] WP") as "STEP".
       1-2: by eauto.
       { red. rewrite FIN. erewrite ectx_fill_emp. reflexivity. }
+      { done. }
       { done. }
       { clear FIT NO1 NO2 NO'.
         clear LEN VALID PSTEP.
@@ -1419,9 +1423,9 @@ Section WaitFreePR.
       iMod "STEP". iModIntro.
       iApply (step_fupdN_wand with "[STEP]"); first by iApply "STEP".
       iIntros "STEP".
-      iMod "STEP" as (δ' ℓ) "(HSI & He2 & WPS' & MOD) /=".
+      iMod "STEP" as (δ' ℓ) "(HSI & _ & He2 & WPS' & MOD) /=".
 
-      iDestruct "MOD" as (π' R1 R2) "(PH & (-> & MOD) & %DISJ12 & MOD')".        
+      iDestruct "MOD" as (π' R1 R2) "(PH & (-> & MOD) & %DISJ12 & MOD')".
       rewrite union_empty_l_L. 
         
       iAssert (@state_interp _ M _ _ (etr :tr[ Some τ ]: (t1 ++ e' :: t2 ++ efs, σ')) _)%I with "[HSI]" as "TI".
@@ -1688,9 +1692,10 @@ Section WaitFreePR.
 
       remember (step_fork (trace_last etr) (t1 ++ e' :: t2 ++ efs, σ')) as sf.
 
-      iDestruct (@pwp_MU_ctx_take_step _ _ _ Hinv with "TI [OB PH OBτi] WP") as "STEP".
+      iDestruct (@pwp_MU_ctx_take_step _ _ _ Hinv with "TI [] [OB PH OBτi] WP") as "STEP".
       1-2: by eauto.
       { red. rewrite FIN. erewrite ectx_fill_emp. reflexivity. }
+      { done. }
       { done. }
       { rewrite -Heqsf. 
         iApply (MU_burn_cp _ _ _ _ (fun (R1 R2: gset SignalId) => (⌜ R1 = ∅ /\ R2 = ∅⌝ ∗ obls_τi)%I) with "[-]").
@@ -1705,7 +1710,7 @@ Section WaitFreePR.
       iMod "STEP". iModIntro.
       iApply (step_fupdN_wand with "[STEP]"); first by iApply "STEP".
       iIntros "STEP".
-      iMod "STEP" as (δ' ℓ) "(HSI & He2 & WPS' & MOD) /=".
+      iMod "STEP" as (δ' ℓ) "(HSI & _ & He2 & WPS' & MOD) /=".
 
       iDestruct "MOD" as (π' R1 R2) "(PH & ((-> & ->) & OBτi) & %DISJ12 & MOD')".
       rewrite union_empty_l_L. 
@@ -1837,7 +1842,11 @@ Section WaitFreePR.
       (fits_inf_call ic m ai) :=
     {| pr_pr := pr_pr_wfree |}.
   Next Obligation.
-    apply @wptp_wfree_posts. 
+    intros.
+    iIntros "PR SI".
+    iPoseProof (wptp_wfree_posts with "PR") as "W"; [done| ].
+    iMod (pre_step_elim with "SI W") as "(SI & POSTS & CLOS)". 
+    by iFrame. 
   Qed.
   Next Obligation.
     apply @wptp_wfree_not_stuck. 

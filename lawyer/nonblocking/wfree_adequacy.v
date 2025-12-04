@@ -275,7 +275,7 @@ Section WFAdequacy.
 
   Lemma init_pwp {Σ} {hG :heap1GS Σ} {iG: invGS_gen HasNoLc Σ} τ e0
     (VALID: valid_client e0):
-    let _ := irisG_looping HeapLangEM (lG := hG) in 
+    let _ := irisG_looping HeapLangEM si_add_none (lG := hG) in 
     wfs_mod_inv _ SPEC ⊢ pwp MaybeStuck ⊤ τ (subst "m" m e0) (λ _, True).
   Proof using SPEC.
     simpl. opose proof * (fundamental e0) as FTLR. 
@@ -847,7 +847,7 @@ Section WFAdequacy.
     forall j K, let tpc := TpoolCtx K τ in
            j < i ->
            from_option (fun c => exists a, call_at tpc c m a (APP := App)) False (tr S!! j) ->
-           exists r, r <= i /\ from_option (fun c => exists v, return_at tpc c v) False (tr S!! r).
+           exists r, j < r <= i /\ from_option (fun c => exists v, return_at tpc c v) False (tr S!! r).
 
   (* TODO: move *)
   Lemma trace_infinite_cons {St L : Type} (tr: trace St L) s l:
@@ -984,7 +984,7 @@ Section WFAdequacy.
       red in MAIN. eapply MAIN in PREV.
       2: { apply trace_take_fwd_lookup_Some in JJ. rewrite JJ. eauto. }
       destruct PREV as (r&PREV'&RET).
-      exists r. split; [done| ].
+      exists r. split; [done| ]. 
       destruct (extr S!! r) eqn:RTH; [| done]. 
       eapply (trace_take_fwd_lookup_Some' _ n) in RTH; eauto.
       2: { lia. }
