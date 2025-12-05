@@ -31,15 +31,17 @@ Section WFAdequacy.
   Let τi := tpctx_tid tpc. 
   Context (m ai: val).
 
-  Definition no_extra_obls (_: cfg heap_lang) (δ: mstate M) :=
-    forall τ', default ∅ (ps_obls δ !! τ') ≠ ∅ -> τ' = τi.
+  Definition call_progresses (c: cfg heap_lang) :=
+    τi ∈ locales_of_cfg c -> not_stuck_tid τi c.
 
   Definition obls_sim_rel_wfree extr omtr :=
-    obls_sim_rel extr omtr /\ no_extra_obls (trace_last extr) (trace_last omtr).
+    obls_sim_rel extr omtr /\ no_extra_obls (trace_last extr) (trace_last omtr) /\
+    call_progresses (trace_last extr). 
 
   Let fic := fits_inf_call ic m ai.
 
-  Definition obls_st_rel_wfree c δ := obls_st_rel c δ /\ no_extra_obls c δ. 
+  Definition obls_st_rel_wfree c δ := 
+    obls_st_rel c δ /\ no_extra_obls c δ /\ call_progresses c. 
 
   Definition obls_om_traces_match_wfree: extrace heap_lang -> trace (mstate M) (mlabel M) -> Prop :=
     obls_om_traces_match_gen obls_st_rel_wfree. 
@@ -78,8 +80,9 @@ Section WFAdequacy.
          simpl in INIT. red in INIT.
          rewrite /locales_of_cfg in INIT. rewrite list_to_set_nil in INIT.
          apply proj1, eq_sym, dom_empty_inv_L in INIT.
-         rewrite INIT. set_solver. } 
-           
+         rewrite INIT.
+         split; [| split]; try set_solver.
+         red. set_solver. }           
 
     unshelve epose proof (@PR_strong_simulation_adequacy_traces_multiple _ _ EM 
                             HeapLangEM obls_sim_rel_wfree (fits_inf_call ic m ai)
@@ -407,7 +410,9 @@ Section WFAdequacy.
          iApply fupd_mask_intro_discard; [done| ].
 
          rewrite /wfree_trace_inv. iDestruct "INV" as "((%NOOBS' & %NVAL) & _)".
-         rewrite /obls_sim_rel_wfree. iSplit; [| done].
+         iPureIntro. 
+
+         rewrite /obls_sim_rel_wfree. split; [|done].
 
          destruct extr.
          { iPureIntro.
