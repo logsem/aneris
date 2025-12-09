@@ -67,7 +67,7 @@ Abort.
     Both specifications rely on the module invariant `wfs_mod_inv`.
     It is crucial that this invariant doesn't involve any model resources (compare e.g. Σ restrictions for the invariant and the model-based spec).
     That's because it has to be preserved when either of the specs is used. *)
-Record WaitFreeSpec (m: val) := {
+Record WaitFreeSpec (s: stuckness) (m: val) := {
   wfs_is_init_st: cfg heap_lang -> Prop;
   (** for wait-free modules, we expect that invariant doesn't contain OM resources *)
   wfs_mod_inv {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ}: iProp Σ;
@@ -83,7 +83,7 @@ Record WaitFreeSpec (m: val) := {
   wfs_spec:
   forall {M} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ},
     (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv) ⊢
-    wait_free_method m d_wfr0 wfs_F;
+    wait_free_method s m d_wfr0 wfs_F;
 
   wfs_safety_spec:
     ∀ {Σ : gFunctors} `{heap1GS Σ, invGS_gen HasNoLc Σ},
@@ -92,10 +92,11 @@ Record WaitFreeSpec (m: val) := {
 
 
 Definition ho_arg_restr {M} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ}
+   s
   (f: val) (P: val -> Prop) (F: nat) (fa: val) : iProp Σ :=
-  ∃ a, ⌜ fa = PairV f a /\ P a ⌝ ∗ wait_free_method f d_wfr0 F. 
+  ∃ a, ⌜ fa = PairV f a /\ P a ⌝ ∗ wait_free_method s f d_wfr0 F. 
 
-Record WaitFreeSpecHO (m: val) (P: val -> Prop) := {
+Record WaitFreeSpecHO (s: stuckness) (m: val) (P: val -> Prop) := {
   wfsho_is_init_st: cfg heap_lang -> Prop;
   (** for wait-free modules, we expect that invariant doesn't contain OM resources *)
   wfsho_mod_inv {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ}: iProp Σ;
@@ -119,8 +120,8 @@ Record WaitFreeSpecHO (m: val) (P: val -> Prop) := {
   forall {M} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ}
     (f: val) (F_inner: nat),
     (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfsho_mod_inv) ⊢
-    wait_free_method_gen m d_wfr0 (wfsho_F_fun F_inner)
-      (ho_arg_restr f P F_inner) (fun _ => emp);
+    wait_free_method_gen s m d_wfr0 (wfsho_F_fun F_inner)
+      (ho_arg_restr s f P F_inner) (fun _ => emp);
 
   (** Contrary to the Lawyer spec above, physical-only spec doesn't place any restrictions on the argument (besides satisfying LR for values).
       That's because in an arbitrary client, `m` can be called with any argument before the "target" call (considered by the adequacy theorem) happens.

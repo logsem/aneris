@@ -209,7 +209,7 @@ Section ListMapSpec.
     :
     cp_mul π d (hl_map_fuel F l) -∗ 
     th_phase_frag τ π q -∗ 
-    wait_free_method_gen f d (fun _ => F) (fun v => ⌜ P v ⌝) (fun v => ⌜ Q v ⌝) -∗
+    wait_free_method_gen NotStuck f d (fun _ => F) (fun v => ⌜ P v ⌝) (fun v => ⌜ Q v ⌝) -∗
     WP hl_list_map_cur f l @τ {{ l', th_phase_frag τ π q ∗ ⌜is_hl_list Q l'⌝ }}.
   Proof using. 
     iIntros "CPS PH #F_SPEC".
@@ -248,7 +248,7 @@ Section ListMapSpec.
   Lemma list_map_spec τ π q l
     f F P Q :
     {{{ cp_mul π d (hl_map_fuel F l) ∗ th_phase_frag τ π q ∗
-        ⌜ is_hl_list P l ⌝ ∗ wait_free_method_gen f d (fun _ => F) (fun v => ⌜ P v ⌝) (fun v => ⌜ Q v ⌝) }}}
+        ⌜ is_hl_list P l ⌝ ∗ wait_free_method_gen NotStuck f d (fun _ => F) (fun v => ⌜ P v ⌝) (fun v => ⌜ Q v ⌝) }}}
       hl_list_map_cur f l @ τ
     {{{ l', RET l'; th_phase_frag τ π q ∗ ⌜ is_hl_list Q l' ⌝ }}}.
   Proof using.
@@ -266,7 +266,7 @@ Section ListMapSpec.
   Lemma list_map_spec_unc τ π q l
     f F P Q :
     {{{ cp_mul π d (hl_map_unc_fuel F l) ∗ th_phase_frag τ π q ∗ 
-        ⌜ is_hl_list P l ⌝ ∗ wait_free_method_gen f d (fun _ => F) (fun v => ⌜ P v ⌝) (fun v => ⌜ Q v ⌝) }}}
+        ⌜ is_hl_list P l ⌝ ∗ wait_free_method_gen NotStuck f d (fun _ => F) (fun v => ⌜ P v ⌝) (fun v => ⌜ Q v ⌝) }}}
       hl_list_map (f, l)%V @ τ
     {{{ l', RET l'; th_phase_frag τ π q ∗ ⌜ is_hl_list Q l' ⌝ }}}.
   Proof using.
@@ -305,9 +305,9 @@ Section ListMapWFree.
   forall {M} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ}
     (f: val heap_lang) (F_inner: nat),
     (let _: heap1GS Σ := iem_phys HeapLangEM EM in hlm_mod_inv) ⊢
-      wait_free_method_gen hl_list_map d_wfr0
+      wait_free_method_gen NotStuck hl_list_map d_wfr0
       (from_option (hl_map_unc_fuel F_inner) 0 ∘ hl_snd_opt)
-      (ho_arg_restr f hlm_arg_restr F_inner)
+      (ho_arg_restr NotStuck f hlm_arg_restr F_inner)
       (fun _ => emp).
   Proof using.
     simpl. intros.
@@ -335,10 +335,10 @@ Section ListMapWFree.
     hlm_mod_inv ⊢ persistent_pred.pers_pred_car interp hl_list_map.
   Proof using. iIntros "_". iApply list_map_phys_spec. Qed.
 
-  Definition hlm_WF_HO_spec: WaitFreeSpecHO hl_list_map hlm_arg_restr := {|
+  Definition hlm_WF_HO_spec: WaitFreeSpecHO NotStuck hl_list_map hlm_arg_restr := {|
     wfsho_init_mod Σ _ _ := hlm_init_mod;
     wfsho_spec := @hlm_spec;
     wfsho_safety_spec Σ _ _ := hlm_phys_spec;
   |}.
 
-End ListMapWFree. 
+End ListMapWFree.

@@ -65,7 +65,7 @@ Qed.
 Lemma mk_ref_wfree_spec {M} {EM: ExecutionModel heap_lang M} {Σ : gFunctors}
   (OHE : OM_HL_Env OP_HL_WF EM Σ):
   (let _: heap1GS Σ := iem_phys HeapLangEM EM in mk_ref_inv)
-  ⊢ wait_free_spec_defs.wait_free_method mk_ref d_wfr0 5.
+  ⊢ wait_free_spec_defs.wait_free_method NotStuck mk_ref d_wfr0 5.
 Proof using. 
   rewrite /wait_free_spec_defs.wait_free_method.
   iIntros "#INV" (τ π q a). simpl. 
@@ -120,7 +120,7 @@ Proof using.
 Qed.
   
 
-Definition mk_ref_WF_spec: WaitFreeSpec mk_ref := {|
+Definition mk_ref_WF_spec: WaitFreeSpec NotStuck mk_ref := {|
   wfs_init_mod Σ _ _ := mk_ref_wfree_init_inv;
   wfs_spec := @mk_ref_wfree_spec;
   wfs_safety_spec := @mk_ref_safety_spec;

@@ -10,11 +10,12 @@ From lawyer.obligations Require Import obligations_resources env_helpers obligat
 Definition wait_free_method
   {M} {EM: ExecutionModel heap_lang M} {Σ} `{OP: OP_HL DegO LvlO LIM}
   {OHE: OM_HL_Env OP EM Σ}
+  (s: stuckness)
   (m: val) (d: DegO) (F: nat)
   : iProp Σ :=
   ∀ τ π q (a: val), 
     {{{ cp_mul π d F ∗ th_phase_frag τ π q }}}
-      App m a @ τ
+      App m a @ s ; τ ; ⊤
     {{{ v, RET v; th_phase_frag τ π q }}}. 
 
 
@@ -22,10 +23,11 @@ Definition wait_free_method
 Definition wait_free_method_gen
   {M} {EM: ExecutionModel heap_lang M} {Σ} `{OP: OP_HL DegO LvlO LIM}
   {OHE: OM_HL_Env OP EM Σ}
+  (s: stuckness)
   (m: val) (d: DegO) (F: val -> nat) (P Q: val -> iProp Σ)
   : iProp Σ :=
   ∀ τ π q (a: val), 
     {{{ cp_mul π d (F a) ∗ th_phase_frag τ π q ∗ P a }}}
-      App m a @ τ
+      App m a @ s; τ; ⊤
     {{{ v, RET v; th_phase_frag τ π q ∗ Q v }}}. 
   

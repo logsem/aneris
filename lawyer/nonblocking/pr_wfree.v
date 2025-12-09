@@ -44,8 +44,9 @@ Section WaitFreePR.
   Let Ki := tpctx_ctx tc.
   Let τi := tpctx_tid tc. 
 
-  Context `(WFS: WaitFreeSpec m).
-  Let F := wfs_F _ WFS. 
+  Context (s': stuckness). 
+  Context `(WFS: WaitFreeSpec s' m).
+  Let F := wfs_F _ _ WFS. 
   
   Open Scope WFR_scope. 
 
@@ -63,12 +64,12 @@ Section WaitFreePR.
   Lemma get_call_wp {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
     (a: val) π:
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
-    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ WFS) -∗
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ _ WFS) -∗
     cp_mul π0 d0 F -∗ th_phase_frag τi π (1 / 2)%Qp -∗
-    WP m a @ τi {{ _, ⌜ True ⌝ }}.
+    WP m a @ s' ; τi ; ⊤ {{ _, ⌜ True ⌝ }}.
   Proof using.
     simpl. iIntros "#INV CPS PH".
-    pose proof (@wfs_spec _ WFS _ EM Σ OHE) as SPEC. 
+    pose proof (@wfs_spec _ _ WFS _ EM Σ OHE) as SPEC. 
     iApply (SPEC with "[] [-]").
     { done. }
     2: { by iIntros "!> **". } 
@@ -80,8 +81,6 @@ Section WaitFreePR.
   Definition no_extra_obls (_: cfg heap_lang) (δ: mstate M) :=
     forall τ', default ∅ (ps_obls δ !! τ') ≠ ∅ -> τ' = τi.
 
-  Context (s': stuckness). 
-
   Definition call_progresses (etr: execution_trace heap_lang) := 
     s' = NotStuck -> ii < trace_length etr -> 
     (* τi ∈ locales_of_cfg (trace_last extr) ->  --- implied by <= assumption and FIC *)
@@ -92,7 +91,7 @@ Section WaitFreePR.
     ⌜ no_extra_obls (trace_last extr) (trace_last omtr) /\
       from_option (fun e => to_val e = None) True (from_locale (trace_last extr).1 τi) /\
       call_progresses extr ⌝ ∗
-    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ WFS). 
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ _ WFS). 
   
   Context (ai: val). 
 
@@ -343,7 +342,7 @@ Section WaitFreePR.
     :
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
     let RES := (cur_obls_sigs etr ∗ wptp_wfree s etr Φs ∗ state_interp etr mtr)%I in
-    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ WFS) -∗
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ _ WFS) -∗
     RES
     ={⊤}=∗ wfree_trace_inv etr mtr ∗ RES. 
   Proof using.

@@ -7,17 +7,7 @@ From trillium.traces Require Import exec_traces trace_lookup inftraces.
 
 Close Scope Z.
 
-Section CallInTrace.
-  Context (m: val).
-  
-  Definition has_return_at (tr: extrace heap_lang) '(TraceCtx i tpc as tc) j :=
-    exists r cj, i <= j /\ tr S!! j = Some cj /\ return_at tpc cj r.
-
-  Definition has_return tr tc := exists j, has_return_at tr tc j.
-
-  Definition no_return_before tr tpc i k :=
-    ¬ (exists j, j <= k /\ has_return_at tr (TraceCtx i tpc) j). 
-
+(* TODO: move all of this *)
   Definition not_stuck_tid τ c :=
     exists e, from_locale c.1 τ = Some e /\ not_stuck e c.2.
 
@@ -52,6 +42,23 @@ Section CallInTrace.
     apply elem_of_list_In. eapply elem_of_list_lookup; eauto.
   Qed.
 
+
+Section CallInTrace.
+  Context (m: val).
+  
+  Definition has_return_at (tr: extrace heap_lang) '(TraceCtx i tpc as tc) j :=
+    exists r cj, i <= j /\ tr S!! j = Some cj /\ return_at tpc cj r.
+
+  Definition has_return tr tc := exists j, has_return_at tr tc j.
+
+  Definition gets_stuck_at (tr: extrace heap_lang) '(TraceCtx i (TpoolCtx _ τ)) j :=
+    exists cj, i <= j /\ tr S!! j = Some cj /\ stuck_tid τ cj.
+
+  Definition gets_stuck tr tc := exists j, gets_stuck_at tr tc j.
+
+  Definition no_return_before tr tpc i k :=
+    ¬ (exists j, j <= k /\ has_return_at tr (TraceCtx i tpc) j). 
+
   Definition locale_enabled_safe τ c :=
     locale_enabled τ c /\ not_stuck_tid τ c. 
 
@@ -65,23 +72,24 @@ Section CallInTrace.
     exists d cd, tr S!! (k + d) = Some cd /\
             fairness_sat locale_enabled_safe tid_match τ cd (tr L!! (k + d)). 
 
-  Definition always_returns tr :=    
+  (* TODO: rename *)
+  Definition always_returns (s: stuckness) tr :=    
     forall tc a ci, let '(TraceCtx i tpc) := tc in
       (* fair_ex (tpctx_tid tpc) tr -> *)
       fair_call tr tpc i ->
       tr S!! i = Some ci ->
       call_at tpc ci m a (APP := App) ->
-      has_return tr tc.
+      has_return tr tc \/ s = MaybeStuck /\ gets_stuck tr tc. 
 
   Definition valid_op_client e := exists e0, e = subst "m" m e0 /\ valid_client e0.
 
   Definition valid_init_tpool (tp: list expr) := Forall valid_op_client tp. 
   
-  Definition wait_free (is_init_st: cfg heap_lang -> Prop) := forall etr,
+  Definition wait_free (is_init_st: cfg heap_lang -> Prop) (s: stuckness) := forall etr,
       valid_init_tpool (trfirst etr).1 ->
       is_init_st (trfirst etr) ->
       extrace_valid etr ->
-      always_returns etr.
+      always_returns s etr.
 
   Lemma no_return_before_equiv_nvals tr tpc c i k
     (VALID: extrace_valid tr)
@@ -220,21 +228,21 @@ Section CallInTrace.
     eauto.
   Qed.
 
-  Definition always_returns_strong tr :=    
+  Definition always_returns_strong s tr :=
     forall tc a ci, let '(TraceCtx i tpc) := tc in
       fair_call_strong tr tpc i ->
       tr S!! i = Some ci ->
       call_at tpc ci m a (APP := App) ->
-      has_return tr tc.
+      has_return tr tc \/ s = MaybeStuck /\ gets_stuck tr tc. 
 
-  Definition wait_free_strong (is_init_st: cfg heap_lang -> Prop) := forall etr,
+  Definition wait_free_strong (is_init_st: cfg heap_lang -> Prop) s := forall etr,
       valid_init_tpool (trfirst etr).1 ->
       is_init_st (trfirst etr) ->
       extrace_valid etr ->
-      always_returns_strong etr.
+      always_returns_strong s etr.
 
-  Lemma wait_free_equiv C:
-    wait_free C <-> wait_free_strong C. 
+  Lemma wait_free_equiv C s:
+    wait_free C s <-> wait_free_strong C s.
   Proof using.
     rewrite /wait_free /wait_free_strong.
     repeat (apply forall_proper; intros).
@@ -257,11 +265,11 @@ Section RestrWFree.
     Forall2 (fun m e => valid_op_client m e /\ no_forks e) ms' tp. 
 
   (** TODO: account for multiple m's in unrestricted wait-freedom too *)
-  Definition wait_free_restr (ms: gmap val nat) (is_init_st: cfg heap_lang -> Prop) := forall etr,
+  Definition wait_free_restr (ms: gmap val nat) (is_init_st: cfg heap_lang -> Prop) s := forall etr,
       valid_init_tpool_restr (trfirst etr).1 ms ->
       is_init_st (trfirst etr) ->
       extrace_valid etr ->
-      forall m, m ∈ dom ms -> always_returns m etr.  
+      forall m, m ∈ dom ms -> always_returns m s etr.  
 
 End RestrWFree.
 
