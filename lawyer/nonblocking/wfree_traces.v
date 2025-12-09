@@ -143,13 +143,17 @@ Section CallInTrace.
     eapply fill_not_val; eauto.
   Qed.
 
-  (** definition used in paper *)
+  (** definition used in paper *)  
   Definition fair_call_strong tr '(TpoolCtx K τ as tpc) i :=
     forall k c, i <= k -> tr S!! k = Some c ->
            no_return_before tr tpc i k ->           
-    exists d, tr L!! (k + d) = Some $ Some τ \/ from_option (stuck_tid τ) False (tr S!! (k + d)). 
+    exists d, tr L!! (k + d) = Some $ Some τ \/
+         (** Note that we allow τ to be not stuck at k and stuck at (k+d).
+             There are programs where a thread gets (un)stuck due to other threads' actions, i.e. trying to read a location being deallocated concurrently.
+             In fact, we exclude such programs (to prove logical relation).
+             But we do not exploit the resulting "being stuck is a thread-local property". *)
+         from_option (stuck_tid τ) False (tr S!! (k + d)). 
 
-  (** τ is enabled at j and cannot get disabled without taking steps *)
   Lemma fair_call_strenghten tr K τ i
     (tpc := TpoolCtx K τ)
     (VALID: extrace_valid tr)
