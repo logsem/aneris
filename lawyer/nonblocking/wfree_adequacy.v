@@ -832,7 +832,32 @@ Section WFAdequacy.
   Lemma int_ref_inf_proj_one {St1 L1 St2 L2}  (tr1: trace St1 L1) (tr2: trace St2 L2)
     (R: finite_trace St1 L1 -> Prop):
     int_ref_inf tr1 tr2 (fun tr' _ => R tr') -> int_ref_inf_one tr1 R.
-  Proof using. done. Qed. 
+  Proof using. done. Qed.
+
+
+  Lemma ref_call_progress_last tr i c
+    (ITH: tr S!! i = Some c)
+    (REF: int_ref_inf_one tr (call_progresses ic s')):
+    s' = NotStuck -> ii <= i -> 
+    not_stuck_tid τi c.
+  Proof using.
+    clear -ITH REF. 
+    intros NS GE. 
+    pose proof (trace_has_len tr) as [? LEN].
+    pose proof ITH as LT. eapply mk_is_Some, state_lookup_dom in LT; eauto.
+    assert (trace_length (trace_take_fwd i tr) = S i).
+    { apply Nat.le_antisymm.
+      1: by apply trace_take_fwd_length_bound.
+      opose proof * (trace_take_fwd_length i tr); eauto.
+      destruct x; try lia.
+      rewrite H.
+      simpl in LT. lia. }
+    specialize (REF i). red in REF.    
+    rewrite H in REF. ospecialize * REF; try (done || lia).
+    symmetry in H. apply trace_lookup_last in H.
+    eapply trace_take_fwd_lookup_Some' in ITH; [| reflexivity].
+    set_solver.
+  Qed.
 
   (* TODO: find existinc *)
   Instance stuckness_eqdec: EqDecision stuckness.
@@ -844,6 +869,7 @@ Section WFAdequacy.
     (VALID : extrace_valid extr)
     (FAIR : fair_call extr tpc ii)
     (INIT_TP : tpool_init_restr (trfirst extr).1)
+    (CALL: from_option (fun c => call_at tpc c m ai (APP := App)) False (extr S!! ii))
     (M_FUN: exists f x b, m = RecV f x b):
     terminating_trace extr /\ int_ref_inf_one extr (call_progresses ic s') ∨
     (∃ k, ¬ fits_inf_call ic m ai (trace_take_fwd k extr)) \/
@@ -881,7 +907,7 @@ Section WFAdequacy.
          eapply state_lookup_dom_neg in IITH; eauto.
          split; [| done].
          eapply terminating_trace_equiv; eauto.
-         destruct x; try done. eauto. }
+         destruct x; try done. }
 
     add_case (∀ j, ii ≤ j → from_option (not_stuck_tid τi) True (extr S!! j)) IF_NS. 
     { intros NS. 
@@ -923,7 +949,7 @@ Section WFAdequacy.
          symmetry in H0. apply trace_lookup_last in H0.
          eapply trace_take_fwd_lookup_Some' in ITH; [| reflexivity].
          set_solver. }
-
+    
     destruct (Classical_Prop.classic (∃ k, gets_stuck_at extr ic k)) as [| NS]. 
     { do 2 right. tauto. }
     apply IF_NS.
@@ -935,16 +961,15 @@ Section WFAdequacy.
     apply stuck_tid_neg. split; eauto.
     eapply from_locale_trace in H as TI'; eauto.
     { by rewrite JTH in TI'. }
-    eapply locales_of_cfg_Some. eapply expr_at_in_locales.
 
-    (* TODO: follows from IREF1 and IITH;
-       would rather make a lemma and use it in similar places *)
-    admit.
-  Admitted.  
+    simpl in CALL. do 2 red in CALL. simpl in CALL.
+    rewrite /tpc tc_helper in CALL. eauto.
+  Qed. 
 
   Theorem simple_om_simulation_adequacy_terminate_multiple_waitfree extr
         (ETR0: valid_init_tpool m (trfirst extr).1)
         (MOD_INIT: wfs_is_init_st s' m SPEC (trfirst extr))
+        (CALL: from_option (fun c => call_at tpc c m ai (APP := App)) False (extr S!! ii))
     :
     extrace_valid extr -> 
     fair_call extr tpc ii ->
