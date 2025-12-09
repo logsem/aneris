@@ -20,7 +20,9 @@ Inductive is_hl_list (P: val -> Prop) : val -> Prop :=
 Definition hl_list_map_cur: val :=
   rec: "lm" "f" "l" :=
     Case "l"
-      (λ: <>, NONE)
+      (** heap_lang has limited pattern-matching,
+          so we exclude (InjLV v ∧ v ≠ ()) explicitly *)
+      (λ: "v'", if: "v'" = #() then NONEV else #() #())
       (λ: "vl",
          let: "v'" := "f" (Fst "vl") in
          let: "l'" := "lm" "f" (Snd "vl") in
@@ -38,14 +40,19 @@ Fixpoint hl_list_size (l: val): nat :=
   end. 
 
 
-From lawyer.nonblocking.logrel Require Import logrel.
+From lawyer.nonblocking.logrel Require Import logrel stuck_utils.
 From iris.base_logic Require Import invariants.
 
 From iris.proofmode Require Import proofmode coq_tactics tactics.
 
+Ltac solve_vcs := 
+  match goal with
+    |- vals_compare_safe ?x ?y => red; set_solver
+  end. 
+
 (* TODO: move *)
 Ltac pwp_pure_step := 
-    (iApply sswp_pwp; [done| ]; iApply sswp_pure_step; [done| ]; do 2 iModIntro; iEval (simpl) ) ||
+    (iApply sswp_pwp; [done| ]; iApply sswp_pure_step; (try solve_vcs || done); [ ]; do 2 iModIntro; iEval (simpl) ) ||
     (iApply trillium.program_logic.weakestpre.wp_value; []).   
 Ltac pwp_pure_steps := repeat pwp_pure_step. 
 
@@ -64,35 +71,44 @@ Section ListMapPhys.
     iLöb as "IH" forall (l) "IIl". 
 
     rewrite {2}/hl_list_map_cur. 
-    destruct (@decide (l = NONEV \/ exists v, l = SOMEV v)) as [OK| ]. 
-    { admit. }
-    2: { (* stuck *)
-         admit. }
-
-    destruct OK as [-> | [v ->]].
-    { rewrite /pwp. 
-      wp_bind (App _ f)%E.
-
-      pwp_pure_step.
-      rewrite /pwp. wp_bind (Rec _ _ _)%E. pwp_pure_step. 
-      iApply trillium.program_logic.weakestpre.wp_value.
-
-      do 2 pwp_pure_step.
-      rewrite /pwp. wp_bind (Rec _ _ _)%E. 
-      repeat pwp_pure_step.
-      done. }
 
     rewrite /pwp. 
     wp_bind (App _ f)%E.
-    pwp_pure_steps.
-    rewrite /pwp. wp_bind (Rec _ _ _)%E. pwp_pure_steps.
+    
+    pwp_pure_step.
+    rewrite /pwp. wp_bind (Rec _ _ _)%E. pwp_pure_step. 
+    iApply trillium.program_logic.weakestpre.wp_value.
+    
+    do 1 pwp_pure_step.
+
+    destruct (is_InjLV_dec l) as [[? ->] | ?].
+    { pwp_pure_step.
+      rewrite /pwp. wp_bind (Rec _ _ _)%E. pwp_pure_step. 
+      iApply trillium.program_logic.weakestpre.wp_value.
+      pwp_pure_step.
+      rewrite /pwp. wp_bind (_ = _)%E. pwp_pure_step.
+      destruct (decide (x = #())).
+      - rewrite bool_decide_eq_true_2; [| done].
+        repeat pwp_pure_step.
+        rewrite {5}interp_unfold. simpl.
+        iNext. iLeft. iExists _. iSplit; [done| ].
+        by rewrite {5}interp_unfold.
+      - pwp_pure_step.
+        rewrite bool_decide_eq_false_2; [| done].
+        repeat pwp_pure_step.
+        solve_stuck_case. }
+
+    destruct (is_InjRV_dec l) as [[v ->] | ?].
+    2: solve_stuck_case.
+
+    repeat pwp_pure_step.
+    rewrite /pwp. wp_bind (Rec _ _ _)%E. pwp_pure_step.
+    iApply trillium.program_logic.weakestpre.wp_value.
+    wp_bind (App _ _)%E. pwp_pure_step.    
 
     rewrite /pwp. wp_bind (Fst _)%E.
-    destruct (@decide (exists v1 v2, v = PairV v1 v2)) as [(c&l'&->) | NO]. 
-    { destruct v.
-      3: { left. eauto. }
-      all: right; set_solver. }
-    2: { admit. }
+    destruct (is_PairV_dec v) as [(c&l'&->) | NO].
+    2: solve_stuck_case.
 
     rewrite {4}interp_unfold /=.
     pwp_pure_steps.    
@@ -106,13 +122,9 @@ Section ListMapPhys.
     iDestruct "IIw" as "(%&%&(>%EQ&#IIc&#IIl))".
     inversion EQ. subst a a0. clear EQ. 
 
-    destruct (@decide (exists b s e, f = RecV b s e)) as [FUN| ]. 
-    { destruct f.
-      2: by left; eauto.
-      all: right; set_solver. }
-    2: { admit. }
+    destruct (is_RecV_dec f) as [(b&s&ff&->)| ].
+    2: solve_stuck_case. 
 
-    destruct FUN as (b&s&ff&->). 
     rewrite {1}interp_unfold. simpl.
 
     iApply trillium.program_logic.weakestpre.wp_wand.
@@ -142,8 +154,9 @@ Section ListMapPhys.
     iRight. iExists _. iNext. iSplit; [done| ].
     rewrite {9}interp_unfold /=. iNext. 
     do 2 iExists _. iSplit; [done| ]. iFrame "#∗".
-  Admitted.    
- 
+
+    Unshelve. all: apply _. 
+  Qed. 
 
   Lemma list_map_phys_spec:
     ⊢ persistent_pred.pers_pred_car interp hl_list_map.
@@ -156,11 +169,8 @@ Section ListMapPhys.
 
     rewrite /pwp.
     wp_bind (Snd _)%E.
-    destruct (@decide (exists v1 v2, v = PairV v1 v2)) as [(f&l&->) | NO]. 
-    { destruct v.
-      3: { left. eauto. }
-      all: right; set_solver. }
-    2: { admit. (* stuck *) }
+    destruct (is_PairV_dec v) as [(f&l&->) | NO].
+    2: solve_stuck_case. 
 
     rewrite {1}interp_unfold /=.
 
@@ -179,7 +189,9 @@ Section ListMapPhys.
 
     iApply trillium.program_logic.weakestpre.wp_value.
     by iApply list_map_phys_spec'.
-  Admitted.
+
+    Unshelve. all: apply _. 
+  Qed.
 
 End ListMapPhys.
 
@@ -203,6 +215,8 @@ Section ListMapSpec.
 
   Definition hl_map_fuel (F: nat) (l: val heap_lang)  := (K + F) * (S $ hl_list_size l). 
 
+  (** ******************** safe specs ****************) 
+
   Lemma list_map_spec' τ π q (l: val heap_lang)
     f F P Q
     (LIST: is_hl_list P l)
@@ -214,9 +228,17 @@ Section ListMapSpec.
   Proof using. 
     iIntros "CPS PH #F_SPEC".
     iInduction LIST as [| ] "IH"; rewrite /hl_list_map_cur. 
-    { pure_steps.  
+    { split_cps "CPS" 10.
+      { rewrite /hl_map_fuel. lia. }
+      iClear "CPS". iRename "CPS'" into "CPS". 
+      pure_steps.  
       wp_bind (Rec _ _ _)%E.
       pure_steps.
+      wp_bind (_ = _)%E.
+      iApply sswp_MU_wp; [done| ].
+      iApply sswp_pure_step; [set_solver| ].
+      MU_by_burn_cp.
+      pure_steps. 
       iFrame. iPureIntro.
       by constructor. }
     rewrite /hl_map_fuel.
@@ -280,6 +302,50 @@ Section ListMapSpec.
     iFrame "#∗". iSplit; [| done].
     iApply (cp_mul_weaken with "[$]"); [done| lia].
   Qed.
+
+  (* (** ******************** unsafe specs ****************)  *)
+
+  (* Lemma list_map_spec'_unsafe τ π q (l: val heap_lang) *)
+  (*   f F (* P Q *) *)
+  (*   (* (LIST: is_hl_list P l) *) *)
+  (*   : *)
+  (*   cp_mul π d (hl_map_fuel F l) -∗  *)
+  (*   th_phase_frag τ π q -∗  *)
+  (*   wait_free_method_gen MaybeStuck f d (fun _ => F) (fun v => ⌜ True ⌝) (fun v => ⌜ True ⌝) -∗ *)
+  (*   WP hl_list_map_cur f l @ MaybeStuck; τ; ⊤  {{ l', th_phase_frag τ π q }}. *)
+  (* Proof using.  *)
+  (*   iIntros "CPS PH #F_SPEC". *)
+  (*   iInduction LIST as [| ] "IH"; rewrite /hl_list_map_cur.  *)
+  (*   { pure_steps.   *)
+  (*     wp_bind (Rec _ _ _)%E. *)
+  (*     pure_steps. *)
+  (*     iFrame. iPureIntro. *)
+  (*     by constructor. } *)
+  (*   rewrite /hl_map_fuel. *)
+  (*   rewrite (Nat.mul_succ_r _ (hl_list_size (InjRV _))). *)
+  (*   iDestruct (cp_mul_split with "CPS") as "[CPS' CPS]". *)
+  (*   iSpecialize ("IH" with "CPS'").  *)
+  (*   iDestruct (cp_mul_split with "CPS") as "[CPS CPSf]". *)
+  (*   simpl.  *)
+  (*   pure_steps. wp_bind (Rec _ _ _)%E. pure_steps. *)
+
+  (*   wp_bind (Fst _)%E. pure_steps. *)
+  (*   wp_bind (f _)%E.  *)
+  (*   iApply ("F_SPEC" with "[$CPSf $PH]"). *)
+  (*   { done. } *)
+  (*   iIntros "!>" (v') "[PH %Qv']". *)
+    
+  (*   wp_bind (Rec _ _ _)%E. do 3 pure_step_cases. *)
+  (*   wp_bind (Snd _)%E. do 2 pure_step_cases.  *)
+  (*   wp_bind (App _ _ _)%E. *)
+  (*   iApply (wp_wand with "[IH PH]"). *)
+  (*   { iApply ("IH" with "[$]"). }  *)
+
+  (*   simpl. iIntros (h) "(PH & %LIST')". *)
+  (*   wp_bind (Rec _ _ _)%E. pure_steps. *)
+  (*   wp_bind (Pair _ _)%E. pure_steps. *)
+  (*   iFrame. iPureIntro. by constructor. *)
+  (* Qed. *)
 
 End ListMapSpec.
 

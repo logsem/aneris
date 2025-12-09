@@ -2,7 +2,7 @@
 (* From iris.program_logic Require Export weakestpre. *)
 
 From iris.proofmode Require Import proofmode coq_tactics.
-From lawyer.nonblocking.logrel Require Export persistent_pred logrel substitutions valid_client.
+From lawyer.nonblocking.logrel Require Export persistent_pred logrel substitutions valid_client stuck_utils.
 From lawyer.nonblocking Require Export pwp. 
 From iris.base_logic Require Import invariants.
 From iris.prelude Require Import options.
@@ -21,42 +21,6 @@ Section typed_interp.
   
   Notation D := (persistent_predO val (iPropI Σ)).
         
-  (* TODO: move? *)
-  Lemma srav_helper (e: expr)
-    (NO_FILL_ITEM: ¬ exists i e', e = fill_item i e' /\ to_val e' = None):
-    sub_redexes_are_values e.
-  Proof using.
-    red. simpl. intros. 
-    rewrite /fill in H.
-    rewrite foldl_foldr_rev in H. simpl in H.
-    destruct (rev K) eqn:RR.
-    { eapply (@f_equal _ _ length) in RR.
-      rewrite length_rev /= in RR.
-      destruct K; simpl in *; done. }
-    
-    clear RR. simpl in H.
-    rewrite -(rev_involutive l) in H. rewrite -foldl_foldr_rev in H.
-    replace (foldl (flip fill_item) e' (rev l)) with (fill (rev l) e') in H by done.
-
-    destruct NO_FILL_ITEM. do 2 eexists. split; eauto.
-    destruct (to_val (fill _ _)) eqn:VV; [| done].
-    apply to_val_fill_some in VV as (?&->). done. 
-  Qed.
-
-  Ltac solve_no_fill_item := 
-    intros (i&?&FILL&NVAL);
-    destruct i; simpl in FILL; try congruence;
-    inversion FILL; subst; done.
-
-  Ltac solve_head_stuck := 
-    intros; red; simpl; split; [done| ];
-    red; simpl; intros ??? STEP;
-    inversion STEP; subst; (congruence || by eauto || set_solver).
-
-  Ltac solve_stuck_case :=
-    iApply ectx_lifting.wp_lift_pure_head_stuck;
-      [done | apply srav_helper; solve_no_fill_item | solve_head_stuck ..].
-
   Lemma bin_op_eval_inv op a b r
     (EVAL: bin_op_eval op a b = Some r):
     (op = EqOp /\ vals_compare_safe a b /\ r = LitV $ LitBool $ bool_decide (a = b)) \/
@@ -131,12 +95,8 @@ Section typed_interp.
     WP App (Val f) (Val a) @τ ?{{ v, pers_pred_car interp v }}.
   Proof using.
     iIntros "Hv1 Hv2".
-    destruct (@decide (exists b s e, f = RecV b s e)) as [FUN| ]. 
-    { destruct f.
-      2: by left; eauto.
-      all: right; set_solver. }
+    destruct (is_RecV_dec f) as [(b&s&ff&->)| ].
     2: solve_stuck_case.    
-    destruct FUN as (b&s&ff&->). 
     rewrite {1}interp_unfold. simpl.
     by iApply "Hv1".
   Qed. 
@@ -345,10 +305,7 @@ Section typed_interp.
     iApply wp_wand; first by iApply "IH".
     iIntros (v) "#Hv /=".
 
-    destruct (@decide (exists v1 v2, v = PairV v1 v2)) as [(?&?&->) | NO]. 
-    { destruct v.
-      3: { left. eauto. }
-      all: right; set_solver. }
+    destruct (is_PairV_dec v) as [(?&?&->) | NO]. 
     2: solve_stuck_case. 
     
     iApply sswp_pwp; [done| ]. 
@@ -369,10 +326,7 @@ Section typed_interp.
     iApply wp_wand; first by iApply "IH".
     iIntros (v) "#Hv /=".
 
-    destruct (@decide (exists v1 v2, v = PairV v1 v2)) as [(?&?&->) | NO]. 
-    { destruct v.
-      3: { left. eauto. }
-      all: right; set_solver. }
+    destruct (is_PairV_dec v) as [(?&?&->) | NO]. 
     2: solve_stuck_case. 
     
     iApply sswp_pwp; [done| ]. 
@@ -424,10 +378,7 @@ Section typed_interp.
     iApply wp_wand; first by iApply "IH0".
     iIntros (v0) "#Hv0 /=".
 
-    destruct (@decide ((exists v, v0 = InjLV v) \/ (exists v, v0 = InjRV v))) as [CASE| ]. 
-    { destruct v0.
-      4, 5: by left; eauto.
-      all: right; set_solver. }
+    destruct (decide ((exists v, v0 = InjLV v) \/ (exists v, v0 = InjRV v))) as [CASE| ].
     2: solve_stuck_case.
 
     destruct CASE as [(?&->) | (?&->)].
@@ -473,14 +424,8 @@ Section typed_interp.
     iApply (wp_bind [IfCtx _ _]).
     iApply wp_wand; first by iApply "IH0".
     iIntros (v0) "#Hv0 /=".
-    destruct (@decide (exists b, v0 = LitV $ LitBool b)) as [BOOL| ]. 
-    { destruct v0.
-      2-5: right; set_solver.
-      destruct l.
-      2: left; eauto.
-      all: right; set_solver. }
-    2: solve_stuck_case. 
-    destruct BOOL as (b&->).
+    destruct (is_bool_dec v0) as [(b&->)| ].
+    2: solve_stuck_case.
     destruct b.
     - iApply sswp_pwp; [done| ].
       iApply sswp_pure_step; [done| ].
@@ -490,24 +435,6 @@ Section typed_interp.
       iApply sswp_pure_step; [done| ].
       do 2 iModIntro.
       by iApply "IH2".
-  Qed.
-
-  Instance is_loc_dec v: Decision (exists l, v = LitV $ LitLoc l).
-  Proof using. 
-    destruct v.
-    2-5: right; set_solver.
-    destruct l.
-    1-4, 6: right; set_solver.
-    left. eauto.
-  Qed. 
-
-  Instance is_int_dec v: Decision (exists (n: Z), v = LitV $ LitInt n).
-  Proof using. 
-    destruct v.
-    2-5: right; set_solver.
-    destruct l.
-    2-6: right; set_solver.
-    left; eauto.
   Qed.
 
   Lemma logrel_alloc en ea : logrel en -∗ logrel ea -∗ logrel (AllocN en ea).
