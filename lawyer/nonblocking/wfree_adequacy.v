@@ -309,7 +309,7 @@ Section WFAdequacy.
   Definition init_om_wfree_state
     (* (F: nat) (TI: nat) (d0 d1: Degree) (τi: locale Λ) (l0: Level) (ii: nat) *)
     (c: cfg heap_lang): ProgressState :=
-    let CPS := (2 * F + ii) *: {[+ d0 +]} ⊎ {[+ d1 +]} in
+    let CPS := (2 * (F ai) + ii) *: {[+ d0 +]} ⊎ {[+ d1 +]} in
     let δ0 := init_om_state c CPS 0 in
     let s0 := (0: SignalId) in
     let obls' := if (decide (τi ∈ locales_of_cfg c))
@@ -419,7 +419,7 @@ Section WFAdequacy.
   (** for simplicity, we forget about the specific phases *)
   Lemma init_wfree_resources_weak `{!ObligationsGS Σ} c:
     obls_init_resource (init_om_wfree_state c) () -∗
-    (cp_mul π0 d0 (2 * F) ∗ cp_mul π0 d0 ii ∗ cp π0 d1) ∗
+    (cp_mul π0 d0 (2 * (F ai)) ∗ cp_mul π0 d0 ii ∗ cp π0 d1) ∗
     (⌜ τi ∈ locales_of_cfg c ⌝ →
      ∃ s, obls τi {[ s ]} ∗ sgn s l0 (Some false) ∗ ep s π0 d0) ∗
     ([∗ set] τ ∈ locales_of_cfg c ∖ {[ τi ]}, obls τ ∅) ∗
@@ -483,7 +483,7 @@ Section WFAdequacy.
    ⊢ wptp_from_gen (thread_pr ic s' MaybeStuck N) tp0 tp
       (map (λ (_ : nat) (_ : val), ⌜ True ⌝%I)
          (adequacy_utils.locales_of_list_from tp0 tp)).
-  Proof using SPEC.
+  Proof using SPEC ai.
     iIntros "#INV". 
     iInduction tp as [|e tp] "IH" forall (tp0 NO).
     { simpl. iApply wptp_from_gen_nil. }
@@ -508,7 +508,7 @@ Section WFAdequacy.
     (ETR0: tpool_init_restr c.1):
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
     (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ _ SPEC) -∗
-    (⌜ ii = 0 ⌝ → ∃ π, cp_mul π0 d0 F ∗ th_phase_frag τi π (/2)%Qp) -∗
+    (⌜ ii = 0 ⌝ → ∃ π, cp_mul π0 d0 (F ai) ∗ th_phase_frag τi π (/2)%Qp) -∗
     wptp_wfree ic s' MaybeStuck {tr[ c ]}
       (map (λ _ _, True) (adequacy_utils.locales_of_list c.1)).
   Proof using.
@@ -557,6 +557,7 @@ Section WFAdequacy.
     (ETR0: tpool_init_restr tp):
     exists e0, from_locale tp τ = Some (subst "m" m e0).
   Proof using.
+    clear -IN ETR0. 
     destruct ETR0 as [TP _].
     apply elem_of_locales_of_list_from_from_locale_from in IN as (e & IN).
     rewrite /from_locale IN.
@@ -808,6 +809,7 @@ Section WFAdequacy.
   Instance under_ctx_ex_dec (extr: extrace heap_lang):
     Decision (∃ e, from_locale (trfirst extr).1 τi = Some e ∧ under_ctx Ki e = Some (m ai)).
   Proof using.
+    clear. 
     apply ex_fin_dec with
       (l := from_option (flip cons nil) [] (from_locale (trfirst extr).1 τi)).
     { solve_decision. }
@@ -1019,6 +1021,7 @@ Section WFAdequacy.
     (STEP: locale_step c1 oτ c2):
     nval_at tpc_ c2 \/ exists r, return_at tpc_ c2 r.
   Proof using.
+    clear -NVAL STEP. 
     red in NVAL. destruct NVAL as (e & EXPR & NVAL).
     pose proof EXPR as [eτi TI]%expr_at_in_locales%locales_of_cfg_Some.
     2: by apply c1. 

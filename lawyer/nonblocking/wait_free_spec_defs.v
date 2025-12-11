@@ -11,10 +11,10 @@ Definition wait_free_method
   {M} {EM: ExecutionModel heap_lang M} {Σ} `{OP: OP_HL DegO LvlO LIM}
   {OHE: OM_HL_Env OP EM Σ}
   (s: stuckness)
-  (m: val) (d: DegO) (F: nat)
+  (m: val) (d: DegO) (F: val -> nat)
   : iProp Σ :=
   ∀ τ π q (a: val), 
-    {{{ cp_mul π d F ∗ th_phase_frag τ π q }}}
+    {{{ cp_mul π d (F a) ∗ th_phase_frag τ π q }}}
       App m a @ s ; τ ; ⊤
     {{{ v, RET v; th_phase_frag τ π q }}}. 
 

@@ -65,7 +65,7 @@ Section WaitFreePR.
     (a: val) π:
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
     (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ _ WFS) -∗
-    cp_mul π0 d0 F -∗ th_phase_frag τi π (1 / 2)%Qp -∗
+    cp_mul π0 d0 (F a) -∗ th_phase_frag τi π (1 / 2)%Qp -∗
     WP m a @ s' ; τi ; ⊤ {{ _, ⌜ True ⌝ }}.
   Proof using.
     simpl. iIntros "#INV CPS PH".
@@ -185,7 +185,7 @@ Section WaitFreePR.
 
   Definition extra_fuel `{!ObligationsGS Σ} (etr: execution_trace heap_lang) :=
     let len := trace_length etr in
-    if len <=? ii then (cp_mul π0 d0 (S ii - len) ∗ cp_mul π0 d0 F)%I else ⌜ True ⌝%I.
+    if len <=? ii then (cp_mul π0 d0 (S ii - len) ∗ cp_mul π0 d0 (F ai))%I else ⌜ True ⌝%I.
 
   Definition cur_phases `{!ObligationsGS Σ} (etr: execution_trace heap_lang): iProp Σ :=
     let c := trace_last etr in
@@ -438,7 +438,7 @@ Section WaitFreePR.
     etr c' τ
     (BEFORE: trace_length etr <= ii):
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
-    let fuel_pre := cp_mul π0 d0 F in
+    let fuel_pre := cp_mul π0 d0 (F ai) in
     ⊢ extra_fuel etr -∗ cp π0 d0 ∗ fuel_pre ∗
       ((⌜ trace_length etr < ii ⌝ → fuel_pre) -∗ extra_fuel (etr :tr[ Some τ]: c')).
   Proof using.
@@ -557,6 +557,7 @@ Section WaitFreePR.
       let oτ' := step_fork (trace_last etr) c' in
       (obls_τi -∗ from_option (fun τ' => obls τ' ∅) ⌜ True ⌝ oτ' -∗ cur_obls_sigs (etr :tr[ Some τi ]: c')).
   Proof using.
+    clear s' m WFS F. 
     simpl. iIntros "(OBLS & OB)".
     rewrite /cur_obls_sigs /obls_τi'. simpl.
     rewrite decide_True.
@@ -588,6 +589,7 @@ Section WaitFreePR.
     let etr' := etr :tr[ Some τi ]: c' in
     ph etr ∗ (ph etr' -∗ from_option (fun τ' => ∃ π', th_phase_eq τ' π') ⌜ True ⌝ oτ' -∗ cur_phases etr').
   Proof using.
+    clear s' m ai WFS F. 
     #[local] Arguments Nat.leb _ _ : simpl nomatch.
     rewrite /cur_phases. simpl. iIntros "(PHS & PH)".
     iSpecialize ("PH" with "[]").
@@ -634,6 +636,7 @@ Section WaitFreePR.
       (obls τ ∅ -∗ obls_τi' c' -∗ (∀ τ', ⌜ oτ' = Some τ' /\ τ' ≠ τi ⌝ → obls τ' ∅) -∗
        cur_obls_sigs (etr :tr[ Some τi ]: c')).
   Proof using.
+    clear s' m ai WFS F. 
     simpl. iIntros "(OBLS & OBτi)". iFrame "OBτi". 
     rewrite /cur_obls_sigs. simpl.
     iDestruct (big_sepS_elem_of_acc with "[$]") as "(OB & OBLS)".
@@ -919,6 +922,7 @@ Section WaitFreePR.
     wptp_from_gen (thread_pr s N) tp0 tp Φs -∗
     wptp_from_gen (thread_pr s (S N)) tp0 tp Φs.
   Proof using.
+    clear m ai WFS F.
     iIntros "WPS". iApply (big_sepL2_impl with "[$]").
     iModIntro. iIntros (i pfi Φi PFith Φith).
     rewrite /thread_pr.
@@ -967,7 +971,8 @@ Section WaitFreePR.
     (locale_of t1 e ∉ locales_of_list_from (t1 ++ [e']) t2) ∧
     locale_of t1 e ∉ locales_of_list_from (t1 ++ [e'] ++ t2) efs.
   Proof using.
-    clear FIN VALID. 
+    clear FIN VALID.
+    clear s' m ai WFS F.
     pose proof (thread_pool_split c'.1 τ) as SPLIT.
     rewrite -Heqc' /= in SPLIT. destruct SPLIT as (tp1 & tp2 & tp' & EQ & TP' & NO1 & NO2).
     destruct TP' as [-> | (e_ & -> & LOC)].
@@ -1283,7 +1288,6 @@ Section WaitFreePR.
           clear STEP VALID FIN.
           clear (* H H1 *) NO' NO2 NO1.
           clear dependent Φs1.
-          Unshelve. 2: exact ai. 
           rewrite /wp_tc. rewrite leb_correct_conv.
           2: { simpl. lia. }
           destruct FIT. 

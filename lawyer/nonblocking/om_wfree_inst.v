@@ -78,7 +78,8 @@ Record WaitFreeSpec (s: stuckness) (m: val) := {
       ⊢ hl_phys_init_resource c ={⊤}=∗ wfs_mod_inv;
 
   
-  wfs_F: nat;
+  (* wfs_F: nat; *)
+  wfs_F: val -> nat;
   (* TODO: relax to non-trivial degrees? *)
   wfs_spec:
   forall {M} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ},
@@ -90,10 +91,24 @@ Record WaitFreeSpec (s: stuckness) (m: val) := {
       wfs_mod_inv ⊢ interp m;
 }.
 
+Program Definition WFS_weaken m (WFS: WaitFreeSpec NotStuck m): WaitFreeSpec MaybeStuck m := {|
+  wfs_init_mod _ _ _ := wfs_init_mod _ _ WFS; 
+  wfs_safety_spec _ _ _ := wfs_safety_spec _ _ WFS; 
+  wfs_F := wfs_F _ _ WFS; 
+|}.
+Final Obligation. 
+  simpl. intros.
+  iIntros "#?". rewrite /wait_free_method.
+  iIntros (**).
+  iIntros (?) "!> (?&?) POST".
+  iApply wp_stuck_weaken.
+  iApply (wfs_spec _ _ WFS with "[] [-POST]"); iFrame "#∗".
+Qed.
+
 
 Definition ho_arg_restr {M} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ}
    s
-  (f: val) (P: val -> Prop) (F: nat) (fa: val) : iProp Σ :=
+  (f: val) (P: val -> Prop) (F: val -> nat) (fa: val) : iProp Σ :=
   ∃ a, ⌜ fa = PairV f a /\ P a ⌝ ∗ wait_free_method s f d_wfr0 F. 
 
 Record WaitFreeSpecHO (s: stuckness) (m: val) (P: val -> Prop) := {
@@ -110,7 +125,7 @@ Record WaitFreeSpecHO (s: stuckness) (m: val) (P: val -> Prop) := {
   (** The amount of fuel consumed by higher-order function is determined by:
       - amount of fuel consumed by its function argument
       - the actual argument (e.g. length of the list) *)
-  wfsho_F_fun: nat -> val -> nat;
+  wfsho_F_fun: (val -> nat) -> val -> nat;
   (** We assume our higher-order function `m` in the uncurried form, e.g.
         list_map x = let '(f, l) = x in ...
       Then, we consider the calls of form `m (f, a)`, where `f` is an arbitrary (first-order) function and `a` fits the additional restriction (e.g. being a list).
@@ -118,7 +133,7 @@ Record WaitFreeSpecHO (s: stuckness) (m: val) (P: val -> Prop) := {
       With that, if enough fuel is provided, the call must safely terminate. *)
   wfsho_spec:
   forall {M} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ}
-    (f: val) (F_inner: nat),
+    (f: val) (F_inner: val -> nat),
     (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfsho_mod_inv) ⊢
     wait_free_method_gen s m d_wfr0 (wfsho_F_fun F_inner)
       (ho_arg_restr s f P F_inner) (fun _ => emp);
@@ -155,4 +170,5 @@ Record WaitFreeSpecGen (m: val)
   (* wfs_safety_spec: *)
   (*   ∀ {Σ : gFunctors} `{heap1GS Σ, invGS_gen HasNoLc Σ}, *)
   (*     wfs_mod_inv ⊢ interp m; *)    
-}. 
+}.
+
