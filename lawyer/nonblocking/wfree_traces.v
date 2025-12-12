@@ -54,7 +54,11 @@ Section CallInTrace.
   Definition gets_stuck_at (tr: extrace heap_lang) '(TraceCtx i (TpoolCtx _ τ)) j :=
     exists cj, i <= j /\ tr S!! j = Some cj /\ stuck_tid τ cj.
 
-  Definition gets_stuck tr tc := exists j, gets_stuck_at tr tc j.
+  (* Definition gets_stuck tr tc := exists j, gets_stuck_at tr tc j. *)
+  (* TODO: write a comment *)
+  (* so far this stronger condition is necessary to prove main call reduction *)
+  Definition gets_stuck_ae tr tc :=
+    forall N, is_Some (tr S!! N) -> exists j, j >= N /\ is_Some (tr S!! j) /\ gets_stuck_at tr tc j.
 
   Definition no_return_before tr tpc i k :=
     ¬ (exists j, j <= k /\ has_return_at tr (TraceCtx i tpc) j). 
@@ -79,7 +83,7 @@ Section CallInTrace.
       fair_call tr tpc i ->
       tr S!! i = Some ci ->
       call_at tpc ci m a (APP := App) ->
-      has_return tr tc \/ s = MaybeStuck /\ gets_stuck tr tc. 
+      has_return tr tc \/ s = MaybeStuck /\ gets_stuck_ae tr tc. 
 
   Definition valid_op_client e := exists e0, e = subst "m" m e0 /\ valid_client e0.
 
@@ -233,7 +237,7 @@ Section CallInTrace.
       fair_call_strong tr tpc i ->
       tr S!! i = Some ci ->
       call_at tpc ci m a (APP := App) ->
-      has_return tr tc \/ s = MaybeStuck /\ gets_stuck tr tc. 
+      has_return tr tc \/ s = MaybeStuck /\ gets_stuck_ae tr tc. 
 
   Definition wait_free_strong (is_init_st: cfg heap_lang -> Prop) s := forall etr,
       valid_init_tpool (trfirst etr).1 ->

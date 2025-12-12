@@ -742,13 +742,11 @@ Section WFAdequacy.
       extr omtr)
   (NORET : ¬ ∃ j : nat, has_return_at extr ic j)
   (IITH : is_Some (extr S!! ii))
-  (PROGRESS:
-    forall j, ii <= j -> 
-    (* s' = NotStuck -> *)
-    (* ii < trace_length etr -> *)
-    from_option (not_stuck_tid τi) True (extr S!! j)
-    (* τi ∈ locales_of_cfg (trace_last extr) ->  --- implied by <= assumption and FIC *)
-  )
+  (* (PROGRESS: *)
+  (*   forall j, ii <= j ->  *)
+  (*   from_option (not_stuck_tid τi) True (extr S!! j) *)
+  (* ) *)
+  (PROGRESS: exists N, ii <= N /\ is_Some (extr S!! N) /\ ∀ j, N ≤ j → from_option (not_stuck_tid τi) True (extr S!! j))
     :
   ∀ τ, obls_trace_fair τ omtr.
   Proof using.
@@ -778,8 +776,10 @@ Section WFAdequacy.
     rewrite /no_return_before in FAIR. 
     rewrite -tc_helper -ic_helper in FAIR.
     
-    assert (exists cm: cfg heap_lang, extr S!! (max n ii) = Some cm) as [cm MTH].
-    { edestruct (Nat.max_spec_le n ii) as [[? ->] | [? ->]]; eauto. }
+    destruct PROGRESS as (N & LE_N & NTH & PROGRESS). 
+
+    assert (exists cm: cfg heap_lang, extr S!! (max n N) = Some cm) as [cm MTH].
+    { edestruct (Nat.max_spec_le n N) as [[? ->] | [? ->]]; eauto. }
     destruct (decide (locale_enabled τi cm)) as [ENm | DISm].
     2: { (* there must've been a step between n and m*)
       opose proof * (enabled_disabled_step_between extr n) as STEP; eauto.
@@ -799,7 +799,7 @@ Section WFAdequacy.
     { intros (?&?&?). eauto. }
     
     destruct FAIR as (d & FAIR).
-    destruct (max_plus_consume n ii d) as [? EQ]. rewrite EQ in FAIR. 
+    destruct (max_plus_consume n N d) as [? EQ]. rewrite EQ in FAIR. 
     destruct FAIR as (c' & DTH & STEP).
     eapply obls_fairness_preservation.fairness_sat_ex_om_helper; eauto; try congruence.
     simpl.
@@ -875,6 +875,61 @@ Section WFAdequacy.
   Instance stuckness_eqdec: EqDecision stuckness.
   Proof using. red. intros [] []; (by left) || (by right). Qed. 
 
+  (* TODO: use this def above *)
+  Definition never_stuck_ea (etr: extrace heap_lang) '(TraceCtx i (TpoolCtx K τ)) :=
+    ∃ N, i ≤ N ∧ is_Some (etr S!! N)
+      ∧ ∀ j, N ≤ j → from_option (not_stuck_tid τ) True (etr S!! j).
+
+  Lemma not_all_ex_not_iff: ∀ (A : Type) (P : A → Prop),
+      ¬ (∀ x : A, P x) <-> ∃ x : A, ¬ P x.
+  Proof using.
+    split.
+    - apply not_forall_exists_not.
+    - apply Classical_Pred_Type.ex_not_not_all.
+  Qed.
+
+  Lemma not_ex_all_not_iff: ∀ (A : Type) (P : A → Prop), ¬ (∃ x : A, P x) <-> ∀ x : A, ¬ P x. 
+  Proof using.
+    split.
+    - apply not_exists_forall_not. 
+    - apply Classical_Pred_Type.all_not_not_ex. 
+  Qed.
+
+  Lemma not_impl_and_not_iff: ∀ P Q : Prop, ¬ (P → Q) <-> P ∧ ¬ Q.
+  Proof using.
+    clear. 
+    split.
+    - apply Classical_Prop.imply_to_and.
+    - tauto.
+  Qed. 
+
+  (* Lemma not_gets_stuck_ae_equiv etr tc: *)
+  (*   (¬ gets_stuck_ae etr tc) <-> never_stuck_ea etr tc. *)
+  (* Proof using. *)
+  (*   destruct tc as [? [??]].  *)
+  (*   rewrite /gets_stuck_ae /never_stuck_ea. *)
+  (*   split. *)
+  (*   -  *)
+  (*     rewrite not_all_ex_not_iff. intros (N & NS).   *)
+  (*     rewrite not_impl_and_not_iff.  *)
+  (*     do 2 rewrite (and_comm (is_Some (etr S!! x)) _). *)
+  (*     rewrite and_assoc.  *)
+  (*     do 2 rewrite (and_comm _ (is_Some (etr S!! x))). *)
+
+  (*     apply traces.utils_logic.iff_and_pre. intros. *)
+  (*   rewrite not_ex_all_not_iff. *)
+  (*   split. *)
+  (*   - intros. *)
+  (*     destruct (decide (tctx_index <= x)). *)
+  (*     2: { specialize (H0 x). *)
+  (*          eapply @not_and_l in H0. *)
+  (*          2: { rewrite /ge; solve_decision. } *)
+  (*          destruct H0 as [? | X]; [lia| ]. *)
+  (*          apply not_and_l in X. *)
+  (*          destruct X as [? | X]; [done| ]. *)
+           
+           
+
   (* TODO: rename *)
   Lemma simple_om_simulation_adequacy_terminate_multiple_waitfree_impl extr
     (MOD_INIT : wfs_is_init_st s' m SPEC (trfirst extr))
@@ -885,7 +940,7 @@ Section WFAdequacy.
     (M_FUN: exists f x b, m = RecV f x b):
     terminating_trace extr /\ int_ref_inf_one extr (call_progresses ic s') ∨
     (∃ k, ¬ fits_inf_call ic m ai (trace_take_fwd k extr)) \/
-    (s' = MaybeStuck /\ exists k, gets_stuck_at extr ic k). 
+    (s' = MaybeStuck /\ gets_stuck_ae extr ic). 
   Proof using. 
     opose proof (om_simulation_adequacy_model_trace_multiple_waitfree
                 wfreeΣ _ (trfirst extr).1 _ _ _ _ _ VALID _ _) as ADEQ.
@@ -921,7 +976,7 @@ Section WFAdequacy.
          eapply terminating_trace_equiv; eauto.
          destruct x; try done. }
 
-    add_case (∀ j, ii ≤ j → from_option (not_stuck_tid τi) True (extr S!! j)) IF_NS. 
+    add_case (exists N, ii <= N /\ is_Some (extr S!! N) /\ ∀ j, N ≤ j → from_option (not_stuck_tid τi) True (extr S!! j)) IF_NS. 
     { intros NS. 
     
       assert (forall τ, obls_trace_fair τ omtr) as OM_FAIR.
@@ -939,6 +994,7 @@ Section WFAdequacy.
     destruct (decide (s' = MaybeStuck)) as [S'|S']. 
     2: { apply IF_NS. 
 
+         exists ii. split; [lia| ]. split; [done| ]. 
          intros.
          destruct (extr S!! j) eqn:ITH; [| done]. simpl.
          clear -IREF H ITH S'.
@@ -962,22 +1018,40 @@ Section WFAdequacy.
          eapply trace_take_fwd_lookup_Some' in ITH; [| reflexivity].
          set_solver. }
     
-    destruct (Classical_Prop.classic (∃ k, gets_stuck_at extr ic k)) as [| NS]. 
+    destruct (Classical_Prop.classic (gets_stuck_ae extr ic)) as [| NS]. 
     { do 2 right. tauto. }
     apply IF_NS.
+
+    rewrite /gets_stuck_ae in NS.
+    rewrite not_all_ex_not_iff in NS. destruct NS as (N & NS).
+    apply not_impl_and_not_iff in NS as ([? NTH] & NS).
+    exists (max ii N). split; [lia| ].
+    split.
+    { pose proof (Nat.max_spec_le ii N) as [[? MAX] | [? MAX]]; rewrite MAX; eauto. }
     intros. destruct (extr S!! j) eqn:JTH; [| done]. simpl.
-    destruct (decide (not_stuck_tid τi c)) as [NS' | STUCK]; [done| ].
-    destruct NS. exists j. red. 
-    rewrite ic_helper /=. unfold tpc. rewrite tc_helper.
-    eexists. repeat split; eauto.
+    rewrite not_ex_all_not_iff in NS.
+    specialize (NS j). rewrite /ge in NS. rewrite !not_and_l in NS.
+    destruct NS as [? | [? | NS]].
+    { lia. }
+    { set_solver. }
+    rewrite /gets_stuck_at /= in NS.
+    rewrite ic_helper /tpc tc_helper in NS.
+    rewrite JTH in NS.
+    destruct (decide (not_stuck_tid τi c)); [done| ]. destruct NS.
+    eexists. repeat split.
+    { lia. }
     apply stuck_tid_neg. split; eauto.
-    eapply from_locale_trace in H as TI'; eauto.
-    { by rewrite JTH in TI'. }
-
-    simpl in CALL. do 2 red in CALL. simpl in CALL.
-    rewrite /tpc tc_helper in CALL. eauto.
-  Qed. 
-
+    opose proof * from_locale_trace.
+    { done. }
+    { apply IITH. }
+    { simpl in CALL.
+      move CALL at bottom. do 2 red in CALL.
+      rewrite /tpc tc_helper /= in CALL.
+      apply mk_is_Some in CALL. apply CALL. }
+    { etrans; [| apply H]. lia. }
+    by rewrite JTH in H0.
+  Qed.
+  
   Theorem simple_om_simulation_adequacy_terminate_multiple_waitfree extr
         (ETR0: valid_init_tpool m (trfirst extr).1)
         (MOD_INIT: wfs_is_init_st s' m SPEC (trfirst extr))
@@ -988,7 +1062,7 @@ Section WFAdequacy.
     (exists f x b, m = RecV f x b) ->
     terminating_trace extr /\ int_ref_inf_one extr (call_progresses ic s') \/ 
     (exists k, ¬ fits_inf_call ic m ai (trace_take_fwd k extr)) \/
-    (s' = MaybeStuck /\ exists k, gets_stuck_at extr ic k). 
+    (s' = MaybeStuck /\ gets_stuck_ae extr ic). 
   Proof.
     intros VALID FAIR M_FUN. 
 
@@ -1114,7 +1188,7 @@ Section WFAdequacy.
     :
     terminating_trace extr /\ int_ref_inf_one extr (call_progresses ic s')
     \/ has_return extr ic \/
-    (s' = MaybeStuck /\ exists k, gets_stuck_at extr ic k). 
+    (s' = MaybeStuck /\ gets_stuck_ae extr ic). 
   Proof.
     opose proof * (simple_om_simulation_adequacy_terminate_multiple_waitfree) as ADEQ; eauto.
 
@@ -1327,7 +1401,7 @@ Definition always_returns_main s m tr :=
       tr S!! i = Some ci ->
       previous_calls_return_tr tr i (tpctx_tid tpc) m ->
       call_at tpc ci m a (APP := App) ->
-      has_return tr tc \/ s = MaybeStuck /\ gets_stuck tr tc. 
+      has_return tr tc \/ s = MaybeStuck /\ gets_stuck_ae tr tc.
 
 Lemma main_returns_reduction s' m etr
   (VALID: extrace_valid etr)
@@ -1344,7 +1418,19 @@ Proof using.
 
   destruct X as (j & K' & a' & c' & ?&?&?&?&PREV&NVALj).
   ospecialize * (MAIN_RET (TraceCtx j (TpoolCtx K' τ))).
-  1-4: by eauto.  
+  1-4: by eauto.
+
+  destruct MAIN_RET as [RETj | [-> STUCKj]].
+  2: { right. split; [done| ].
+       (* TODO: extract a lemma *)
+       red. intros.
+       red in STUCKj. odestruct (STUCKj (max i N) _) as (?&?&?&?).
+       { pose proof (Nat.max_spec_le i N) as [[? MAX] | [? MAX]]; rewrite MAX; eauto. }
+       exists x. repeat split; eauto.
+       { lia. }
+       red. red in H7. destruct H7 as (?&?&?&?).
+       eexists. repeat split; eauto.
+       lia. }
   
 Admitted.
 
