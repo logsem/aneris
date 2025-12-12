@@ -1561,12 +1561,17 @@ Proof using.
       red. exists k, r, ck. split; eauto. lia. }
   
   destruct s'.
-  2: { destruct (decide (not_stuck_tid (tpctx_tid tpc) c)).
+  2: {
+       destruct (decide (not_stuck_tid (tpctx_tid tpc) c)).
        - by apply IF_NS.
        - right. split; auto.
-         red. exists (len - 1). red. destruct tpc. 
+         red. intros N [? NTH].
+         exists (len - 1). repeat split; eauto.
+         { red. eapply mk_is_Some, state_lookup_dom in NTH; eauto.
+           simpl in NTH. lia. }
+         red. destruct tpc.
          eexists. repeat split; eauto.
-         apply stuck_tid_neg. split; auto. 
+         apply stuck_tid_neg. split; auto.
          eapply from_locale_trace in DOM; eauto.
          by rewrite LAST in DOM. }
   
