@@ -1310,16 +1310,26 @@ Lemma find_main_call etr i K τ m a ci
     let tpc' := TpoolCtx K' τ in
     fair_call etr tpc' i' /\ etr S!! i' = Some ci' /\ call_at tpc' ci' m a' (APP := App) /\
     previous_calls_return_tr etr i' τ m /\
-    i' <= i /\ nval_at tpc' ci.
+    i' <= i /\
+      (* nval_at tpc' ci /\ *)
+      no_return_before etr tpc' i' i.
 Proof using.
   subst tpc.
-  assert (exists j cj Kj aj, fair_call etr {| tpctx_ctx := Kj; tpctx_tid := τ |} j /\ etr S!! j = Some cj /\ call_at {| tpctx_ctx := Kj; tpctx_tid := τ |} cj m aj (APP := App) /\ j ≤ i ∧ nval_at {| tpctx_ctx := Kj; tpctx_tid := τ |} ci /\ ¬ has_return etr (TraceCtx j {| tpctx_ctx := Kj; tpctx_tid := τ |})) as [j JJ].
+  assert (exists j cj Kj aj, fair_call etr {| tpctx_ctx := Kj; tpctx_tid := τ |} j /\ etr S!! j = Some cj /\ call_at {| tpctx_ctx := Kj; tpctx_tid := τ |} cj m aj (APP := App) /\ j ≤ i ∧
+    (* nval_at {| tpctx_ctx := Kj; tpctx_tid := τ |} ci /\ *)
+    no_return_before etr {| tpctx_ctx := Kj; tpctx_tid := τ |} j i /\
+    ¬ has_return etr (TraceCtx j {| tpctx_ctx := Kj; tpctx_tid := τ |})) as [j JJ].
   { do 4 eexists. repeat split; eauto.
+    red. intros (k & ? & (?&?&?&?&?)).
+    assert (k = i) as -> by lia.
+    rewrite ITH in H1. inversion H1. subst x0. 
+    eapply not_return_nval; eauto.
     eapply call_nval_at; eauto. done. }
-  clear FAIR NORET CALL K a. 
+
+  clear FAIR NORET CALL K a.
   
   revert JJ. pattern j. apply lt_wf_ind; clear j.
-  intros j IH. intros (cj&Kj&aj&FAIRj&JTH&CALLj&LEji&NVALj&NORETj).
+  intros j IH. intros (cj&Kj&aj&FAIRj&JTH&CALLj&LEji& NVALj &NORETj).
   destruct (Classical_Prop.classic (previous_calls_return_tr etr j τ m)) as [| NESTED].
   { exists j. do 3 eexists. simpl. repeat split; eauto.
     by rewrite CALLj. }
@@ -1362,12 +1372,27 @@ Proof using.
   do 3 eexists. repeat split; eauto. 
   2: { lia. }
   2: { edestruct decide as [NVAL | NNVAL]; [| by apply NVAL| ].
-       { apply _. }       
-       destruct NNVAL. red.
-       red in NVALj. destruct NVALj as (?&JJ&NVj).
-       eexists. rewrite /expr_at. rewrite JJ.
-       rewrite ectx_comp_comp. split; [reflexivity| ].
-       by apply fill_not_val. }
+       { admit. }
+
+       rewrite /no_return_before in NNVAL.
+       apply NNP_P in NNVAL.
+
+       (* TODO: ? make a lemma, use below  *)
+       
+       destruct NNVAL as (r & ? & v & cr & LEkr & RTH & RETr).
+       destruct (decide (r <= j)).
+       - destruct X. exists r. split.
+         { split; try lia.
+           destruct (decide (k = r)) as [<- | ?]; [| lia].
+           set_solver. }
+         rewrite RTH /=.
+         rewrite RETr. eauto.
+       - opose proof * (nested_call_returns_earlier _ _ _ _ τ Kk _ ck k _ _ cj) as RETj; eauto.
+         { lia. }
+         { lia. }
+         destruct RETj as (rj & ? & ? & ?&?&?&RETj).
+         destruct NORETj. red.
+         exists rj. red. eauto. }
   { eapply (fair_call_extend _ _ _ _ j k); eauto.
     { lia. }
     red. rewrite /exec_traces.locale_enabled /not_stuck_tid.
@@ -1392,7 +1417,7 @@ Proof using.
     destruct RETj as (rj & ? & ? & ?&?&?&RETj).
     destruct NORETj. red.
     exists rj. red. eauto.  
-Qed.
+Admitted. 
 
 
 Definition always_returns_main s m tr :=
@@ -1431,8 +1456,32 @@ Proof using.
        red. red in H7. destruct H7 as (?&?&?&?).
        eexists. repeat split; eauto.
        lia. }
+
+  destruct RETj as (r & v & cr & LEjr & RTH & RETr).
+  assert (i <= r) as LEir.
+  { destruct (Nat.lt_ge_cases r i) as [LT | LEri]; [| done].
+    destruct NVALj. exists r. split; [lia| ].
+    red. do 2 eexists. eauto. }
+
+  destruct M_FUN as (?&?&?&->).
+  eapply no_return_before_equiv_nvals with (j := i) in NVALj; eauto.
+  2: { red. rewrite /expr_at. rewrite H2. eauto. }
+  rewrite ITH /= in NVALj. -
   
-Admitted.
+  destruct NVALj as (ej & JJ & NVALj). 
+  opose proof * (call_ctx_is_deeper x x0 x1 K' ej K a) as [K_ ->]. 
+  { red in JJ. simpl in JJ. 
+    apply Some_inj.
+    rewrite -JJ.
+    do 2 red in CALL. simpl in CALL.
+    by rewrite -CALL. }
+  { done. }
+
+  opose proof * (nested_call_returns_earlier _ _ _ _ τ K' _ c' j _ _ ci) as RETj; eauto.
+  destruct RETj as (rj & ? & ? & ?&?&?&RETj).
+  destruct NORET. red.
+  exists rj. red. eauto.
+Qed.
 
 
 Theorem wfree_is_wait_free s' m
