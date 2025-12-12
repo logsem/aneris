@@ -1297,6 +1297,36 @@ Proof using.
   eauto.
 Qed.
 
+(* TODO: move *)
+Global Instance no_return_before_dec etr κ i j: Decision (no_return_before etr κ i j).
+Proof using.
+  rewrite /no_return_before.
+  apply not_dec. apply ex_fin_dec with (l := seq i (S $ j - i)).
+  2: { intros ? [? RET].
+       destruct RET as (r & cj & ? & JTH & RET).
+       apply in_seq. lia. }
+  intros. apply and_dec; [solve_decision| ].
+  rewrite /has_return_at.
+  destruct (decide (i <= a)).
+  2: { right. by intros (?&?&?&?&?). }
+  destruct (etr S!! a) eqn:ATH.
+  2: { right. by intros (?&?&?&?&?). }
+  rewrite /return_at.
+  rewrite /expr_at. destruct κ as [K τ]. simpl.
+  destruct (from_locale c.1 τ) eqn:TT. 
+  2: { right. intros (?&?&?&?&?). set_solver. }
+  destruct (under_ctx K e) eqn:KE.
+  2: { erewrite under_ctx_spec_neg in KE.
+       right. intros (?&?&?&?&?). set_solver. }
+  apply under_ctx_spec in KE.
+  destruct (to_val e0) eqn:VV.
+  2: { right. intros (?&?&?&?&?).
+       inversion H0. subst. rewrite TT in H1.
+       inversion H1. apply ectx_fill_inj in H3. by subst. }
+  apply of_to_val in VV as <-. subst e. 
+  left. eauto.
+Qed.  
+
 Lemma find_main_call etr i K τ m a ci
   (tpc := TpoolCtx K τ)
   (VALID : extrace_valid etr)
@@ -1372,7 +1402,7 @@ Proof using.
   do 3 eexists. repeat split; eauto. 
   2: { lia. }
   2: { edestruct decide as [NVAL | NNVAL]; [| by apply NVAL| ].
-       { admit. }
+       { apply _. }
 
        rewrite /no_return_before in NNVAL.
        apply NNP_P in NNVAL.
@@ -1417,7 +1447,7 @@ Proof using.
     destruct RETj as (rj & ? & ? & ?&?&?&RETj).
     destruct NORETj. red.
     exists rj. red. eauto.  
-Admitted. 
+Qed. 
 
 
 Definition always_returns_main s m tr :=
