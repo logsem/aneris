@@ -565,6 +565,24 @@ Section WFAdequacy.
     eapply from_locale_from_elem_of; eauto.
   Qed.
 
+  (* TODO: move *)
+  Lemma RecV_App_not_stuck (mm a: val) c e τ K
+    (M_FUN: ∃ f x b, mm = (rec: f x := b)%V)
+    (EXPR: from_locale c.1 τ = Some e)
+    (CALL: under_ctx K e = Some (mm a)):
+  not_stuck_tid τ c.
+  Proof using.
+    destruct M_FUN as (?&?&?&->). 
+    red. eexists.
+    split; eauto.
+    apply under_ctx_spec in CALL. subst e.
+    destruct c. 
+    red. right. red. do 3 eexists.
+    simpl.
+    econstructor; eauto.
+    simpl. by apply BetaS.
+  Qed.
+
   Lemma PR_premise_wfree `{hPre: @heapGpreS Σ M EM} c
     (ETR0: tpool_init_restr c.1)
     (MOD_INIT: wfs_is_init_st _ m SPEC c)
@@ -634,16 +652,8 @@ Section WFAdequacy.
          - red. simpl.
            intros _ TI0.
            destruct ETR0 as (?&CALL0&?).
-           destruct (CALL0 ltac:(lia)) as (?&?&?).
-           (* TODO: make a lemma *)
-           destruct M_FUN as (?&?&?&->). 
-           red. eexists. split; eauto.
-           apply under_ctx_spec in H2. subst x.
-           destruct c. 
-           red. right. red. do 3 eexists.
-           simpl.
-           econstructor; eauto.
-           simpl. by apply BetaS. }
+           destruct (CALL0 ltac:(lia)) as (?&?&?).           
+           eapply RecV_App_not_stuck; eauto. }
     
     iSplitR.
     { simpl. iApply hl_config_wp. }
@@ -1192,19 +1202,123 @@ End WFAdequacy.
 (* Lemma no_return_before_equiv tr tpc i k: *)
 (*   no_return_before tr tpc i k <-> *)
 
+Lemma fair_call_extend etr Ki Kj τ i j ci
+  (FAIR: fair_call etr (TpoolCtx Ki τ) i)
+  (LE: j <= i)
+  (ITH: etr S!! i = Some ci)
+  (NSTUCKi: locale_enabled_safe τ ci)
+  (NORET: ¬ has_return etr (TraceCtx i (TpoolCtx Ki τ))):
+  fair_call etr (TpoolCtx Kj τ) j.
+Proof using.
+  red. intros k ck LEjk KTH ENk NORETk.
+  red in FAIR. ospecialize * (FAIR (max i k) (if (decide (i <= k)) then ck else ci)).
+  { lia. }
+  { destruct decide; [rewrite -KTH| rewrite -ITH]; f_equal; lia. }
+  { destruct decide; done. }
+  { red. intros (r & DOMr & RETr).
+    destruct NORET. red. eauto. }
+  destruct FAIR as [d FAIR].
+  rewrite Nat.max_comm in FAIR. 
+  pose proof (max_plus_consume k i d) as [d' EQ]. rewrite EQ in FAIR.
+  eauto.
+Qed.
+
 Lemma find_main_call etr i K τ m a ci
   (tpc := TpoolCtx K τ)
   (VALID : extrace_valid etr)
   (FAIR : fair_call etr tpc i)
   (ITH : etr S!! i = Some ci)
-  (CALL : call_at tpc ci m a (APP := App)):
+  (CALL : call_at tpc ci m a (APP := App))
+  (M_FUN: exists f x b, m = RecV f x b)
+  (NORET: ¬ has_return etr (TraceCtx i tpc))
+  :
   exists i' K' a' ci',
     let tpc' := TpoolCtx K' τ in
     fair_call etr tpc' i' /\ etr S!! i' = Some ci' /\ call_at tpc' ci' m a' (APP := App) /\
     previous_calls_return_tr etr i' τ m /\
     i' <= i /\ nval_at tpc' ci.
 Proof using.
-Admitted.
+  subst tpc.
+  assert (exists j cj Kj aj, fair_call etr {| tpctx_ctx := Kj; tpctx_tid := τ |} j /\ etr S!! j = Some cj /\ call_at {| tpctx_ctx := Kj; tpctx_tid := τ |} cj m aj (APP := App) /\ j ≤ i ∧ nval_at {| tpctx_ctx := Kj; tpctx_tid := τ |} ci /\ ¬ has_return etr (TraceCtx j {| tpctx_ctx := Kj; tpctx_tid := τ |})) as [j JJ].
+  { do 4 eexists. repeat split; eauto.
+    eapply call_nval_at; eauto. done. }
+  clear FAIR NORET CALL K a. 
+  
+  revert JJ. pattern j. apply lt_wf_ind; clear j.
+  intros j IH. intros (cj&Kj&aj&FAIRj&JTH&CALLj&LEji&NVALj&NORETj).
+  destruct (Classical_Prop.classic (previous_calls_return_tr etr j τ m)) as [| NESTED].
+  { exists j. do 3 eexists. simpl. repeat split; eauto.
+    by rewrite CALLj. }
+
+  rewrite /previous_calls_return_tr in NESTED.
+  apply not_forall_exists_not in NESTED as (k & X). 
+  apply not_forall_exists_not in X as (Kk & X).
+  apply Classical_Prop.imply_to_and in X as [LTkj X]. 
+  apply Classical_Prop.imply_to_and in X as [CALL' X].
+
+  pose proof JTH as KTH. eapply mk_is_Some, state_lookup_prev in KTH as [ck KTH].
+  2: { apply Nat.lt_le_incl, LTkj. }
+  rewrite KTH /= in CALL'. destruct CALL' as [ak CALLk].
+
+  ospecialize (IH k _ _).
+  { lia. }
+  2: done.
+  
+  assert (nval_at {| tpctx_ctx := Kk; tpctx_tid := τ |} cj) as NVALkj.
+  { edestruct decide as [NVAL | NNVAL]; [| by apply NVAL| ].
+    { apply _. }
+    eapply (call_returns_if_not_continues _ k j) in NNVAL; eauto.
+    3: lia.
+    2: { eapply call_nval_at; eauto. done. }
+    destruct NNVAL as (r&?&?&DOMr&RTH&RETr).
+    destruct X. exists r. split; [lia| ].
+    rewrite RTH /=. eauto.
+    rewrite RETr. eauto. }
+
+  destruct M_FUN as (?&?&?&->).
+  destruct NVALkj as (ek & KJ & NVALkj). 
+  opose proof * (call_ctx_is_deeper x x0 x1 Kk ek Kj aj) as [K' ->]. 
+  { red in KJ. simpl in KJ. 
+    apply Some_inj.
+    rewrite -KJ.
+    do 2 red in CALLj. simpl in CALLj.
+    by rewrite -CALLj. }
+  { done. }
+  
+  do 3 eexists. repeat split; eauto. 
+  2: { lia. }
+  2: { edestruct decide as [NVAL | NNVAL]; [| by apply NVAL| ].
+       { apply _. }       
+       destruct NNVAL. red.
+       red in NVALj. destruct NVALj as (?&JJ&NVj).
+       eexists. rewrite /expr_at. rewrite JJ.
+       rewrite ectx_comp_comp. split; [reflexivity| ].
+       by apply fill_not_val. }
+  { eapply (fair_call_extend _ _ _ _ j k); eauto.
+    { lia. }
+    red. rewrite /exec_traces.locale_enabled /not_stuck_tid.
+    split.
+    - rewrite CALLj /=. 
+      eexists. split; eauto.
+      by apply fill_not_val. 
+    - eapply RecV_App_not_stuck in CALLj; eauto.
+      by apply under_ctx_spec. }
+
+  intros (r & v & cr & LEkr & RTH & RETr).
+  destruct (decide (r <= j)).
+  - destruct X. exists r. split.
+    { split; try lia.
+      destruct (decide (k = r)) as [<- | ?]; [| lia].
+      set_solver. }
+    rewrite RTH /=.
+    rewrite RETr. eauto.
+  - opose proof * (nested_call_returns_earlier _ _ _ _ τ Kk _ ck k _ _ cj) as RETj; eauto.
+    { lia. }
+    { lia. }
+    destruct RETj as (rj & ? & ? & ?&?&?&RETj).
+    destruct NORETj. red.
+    exists rj. red. eauto.  
+Qed.
 
 
 Definition always_returns_main s m tr :=
@@ -1216,15 +1330,22 @@ Definition always_returns_main s m tr :=
       has_return tr tc \/ s = MaybeStuck /\ gets_stuck tr tc. 
 
 Lemma main_returns_reduction s' m etr
-  (VALID: extrace_valid etr):
+  (VALID: extrace_valid etr)
+  (M_FUN: exists f x b, m = RecV f x b):
   always_returns_main s' m etr -> always_returns m s' etr.
 Proof using.
   rewrite /always_returns_main /always_returns. 
   intros MAIN_RET. intros [i [K τ]] a ci FAIR ITH CALL.
+
+  odestruct (@Classical_Prop.classic _) as [RET | NORET]; [by apply RET| ].
+  apply Classical_Prop.not_or_and in NORET as (NORET & ?). 
+  
   opose proof * find_main_call as X; eauto.
-  destruct X as (i0 & K0 & a0 & c0 & ?&?&?&?&PREV&NVALi0).
-  ospecialize * (MAIN_RET (TraceCtx i0 (TpoolCtx K0 τ))).
-  1-4: by eauto. 
+
+  destruct X as (j & K' & a' & c' & ?&?&?&?&PREV&NVALj).
+  ospecialize * (MAIN_RET (TraceCtx j (TpoolCtx K' τ))).
+  1-4: by eauto.  
+  
 Admitted.
 
 
@@ -1234,7 +1355,7 @@ Theorem wfree_is_wait_free s' m
   wait_free m (wfs_is_init_st _ _ SPEC) s'.
 Proof using.
   red. intros etr ETR0 MOD_INIT VALID.
-  apply main_returns_reduction; [done| ].  
+  apply main_returns_reduction; try done. 
   red. intros [i tpc] a ci FAIR ITH MAIN CALL.
 
   opose proof * (obls_terminates_impl_multiple_waitfree (TraceCtx i tpc)) as ADEQ; eauto.
