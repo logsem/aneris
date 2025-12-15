@@ -7,41 +7,6 @@ From trillium.traces Require Import exec_traces trace_lookup inftraces.
 
 Close Scope Z.
 
-(* TODO: move all of this *)
-  Definition not_stuck_tid τ c :=
-    exists e, from_locale c.1 τ = Some e /\ not_stuck e c.2.
-
-  Definition stuck_tid τ c :=
-    exists e, from_locale c.1 τ = Some e /\ stuck e c.2.
-
-  Lemma stuck_tid_neg τ c:
-    ¬ not_stuck_tid τ c /\ is_Some (from_locale c.1 τ) <-> stuck_tid τ c.
-  Proof using.
-    rewrite /not_stuck_tid /stuck_tid.
-    setoid_rewrite <- not_not_stuck. 
-    split.
-    - intros (?&(?&?)). eexists. split; eauto.  
-    - intros (?&?&?). split; eauto.
-      intros (?&?&?). edestruct H0; eauto. congruence.   
-  Qed.
-    
-  (* TODO: is it provable for general Λ? *)
-  Global Instance not_stuck_dec {Λ} e (c: language.state Λ): Decision (not_stuck e c).
-  Proof using.
-    rewrite /not_stuck.
-    apply or_dec; try solve_decision.
-    rewrite /reducible.
-  Admitted. 
-
-  Global Instance not_stuck_tid_dec τ c: Decision (not_stuck_tid τ c).
-  Proof using.
-    rewrite /not_stuck_tid.
-    apply ex_fin_dec with (l := c.1).
-    { solve_decision. }
-    intros ? (?%from_locale_lookup&?).
-    apply elem_of_list_In. eapply elem_of_list_lookup; eauto.
-  Qed.
-
 
 Section CallInTrace.
   Context (m: val).
@@ -54,11 +19,20 @@ Section CallInTrace.
   Definition gets_stuck_at (tr: extrace heap_lang) '(TraceCtx i (TpoolCtx _ τ)) j :=
     exists cj, i <= j /\ tr S!! j = Some cj /\ stuck_tid τ cj.
 
-  (* Definition gets_stuck tr tc := exists j, gets_stuck_at tr tc j. *)
+  Definition gets_stuck_once tr tc := exists j, gets_stuck_at tr tc j.
   (* TODO: write a comment *)
   (* so far this stronger condition is necessary to prove main call reduction *)
   Definition gets_stuck_ae tr tc :=
     forall N, is_Some (tr S!! N) -> exists j, j >= N /\ is_Some (tr S!! j) /\ gets_stuck_at tr tc j.
+
+  Lemma gets_stuck_ae_stronger tr tc:
+    gets_stuck_ae tr tc -> gets_stuck_once tr tc.
+  Proof using.
+    intros STUCK. red.
+    ospecialize * (STUCK 0 _).
+    { by rewrite state_lookup_0. }
+    destruct STUCK as (?&?&?&?). eauto.
+  Qed.
 
   Definition no_return_before tr tpc i k :=
     ¬ (exists j, j <= k /\ has_return_at tr (TraceCtx i tpc) j). 
@@ -143,16 +117,6 @@ Section CallInTrace.
       rewrite JTH /= in CONT.
       destruct RET.
       eapply not_return_nval; eauto.
-  Qed.
-
-  (* TODO: move, use in other places *)
-  Lemma nval_enabled K τ c
-    (NVAL: nval_at (TpoolCtx K τ) c):
-  locale_enabled τ c.
-  Proof using. 
-    red. red in NVAL. simpl in NVAL. destruct NVAL as (?&?&?).
-    eexists. split; eauto.
-    eapply fill_not_val; eauto.
   Qed.
 
   (** definition used in paper *)  
@@ -256,6 +220,55 @@ Section CallInTrace.
       rewrite H0; simpl; exists x4; eauto.
   Qed.
 
+  Global Instance no_return_before_dec etr κ i j: Decision (no_return_before etr κ i j).
+  Proof using.
+    rewrite /no_return_before.
+    apply not_dec. apply ex_fin_dec with (l := seq i (S $ j - i)).
+    2: { intros ? [? RET].
+         destruct RET as (r & cj & ? & JTH & RET).
+         apply in_seq. lia. }
+    intros. apply and_dec; [solve_decision| ].
+    rewrite /has_return_at.
+    destruct (decide (i <= a)).
+    2: { right. by intros (?&?&?&?&?). }
+    destruct (etr S!! a) eqn:ATH.
+    2: { right. by intros (?&?&?&?&?). }
+    rewrite /return_at.
+    rewrite /expr_at. destruct κ as [K τ]. simpl.
+    destruct (from_locale c.1 τ) eqn:TT. 
+    2: { right. intros (?&?&?&?&?). set_solver. }
+    destruct (under_ctx K e) eqn:KE.
+    2: { erewrite under_ctx_spec_neg in KE.
+         right. intros (?&?&?&?&?). set_solver. }
+    apply under_ctx_spec in KE.
+    destruct (to_val e0) eqn:VV.
+    2: { right. intros (?&?&?&?&?).
+         inversion H0. subst. rewrite TT in H1.
+         inversion H1. apply ectx_fill_inj in H3. by subst. }
+    apply of_to_val in VV as <-. subst e. 
+    left. eauto.
+  Qed.  
+
+  Lemma always_returns_impl etr s1 s2
+    (S12: stuckness_le s1 s2):
+    always_returns s1 etr -> always_returns s2 etr.
+  Proof using.
+    rewrite /always_returns. simpl.
+    intros AR [i tpc] **.
+    ospecialize * (AR (trace_context.TraceCtx i tpc)); eauto.
+    destruct AR as [| (->&?)]; [by left| ].
+    destruct s2; try done. by right.
+  Qed.
+  
+  Lemma wait_free_impl C1 C2 s1 s2
+    (C21: forall c, C2 c -> C1 c)
+    (S12: stuckness_le s1 s2):
+    wait_free C1 s1 -> wait_free C2 s2.
+  Proof using.
+    rewrite /wait_free. simpl. intros WF ? INIT ??.
+    eapply always_returns_impl; eauto.
+  Qed.
+  
 End CallInTrace.
 
 
@@ -317,15 +330,6 @@ Section FitsInfCall.
     rewrite trace_lookup_last in fic_cont0. 
     2: { lia. }
     simpl in fic_cont0. by left.
-  Qed.
-
-  (* TODO: move *)
-  Lemma ft_lookup_old {St L: Type} (tr: finite_trace St L) s l i c
-    (ITH: tr !! i = Some c):
-    (tr :tr[ l ]: s) !! i = Some c.
-  Proof using. 
-    rewrite trace_lookup_extend_lt; [done| ]. 
-    by apply trace_lookup_lt_Some.
   Qed.
 
   Lemma fits_inf_call_prev: filter_pref_closed fits_inf_call. 

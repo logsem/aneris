@@ -73,21 +73,6 @@ Section UnderCtx.
     all: try by (inversion EQ; subst; done).
   Qed.
 
-  (* TODO: find existing / duplicates? *)
-  Lemma fill_item_not_val i e
-    (NVAL: to_val e = None):
-    to_val (fill_item i e) = None.
-  Proof using.
-    destruct (to_val (fill_item _ _)) eqn:V; [| done].
-    apply mk_is_Some, fill_item_val in V.
-    destruct V. set_solver.
-  Qed.
-
-  (* (* TODO: move, find existing? *) *)
-  (* Lemma fill_item_not_eq i e: *)
-  (*   fill_item i e ≠ e. *)
-  (* Proof using. *)
-
   Fixpoint expr_depth (e: expr) :=
     match e with
     | Val _ (** for the purposes expr_depth is used, depth of this value is irrelevant *)
@@ -110,6 +95,7 @@ Section UnderCtx.
 
   From lawyer.nonblocking.logrel Require Import substitutions.
 
+  (* TODO: upstream most of fill/fill_item lemmas below *)
   (* TODO: move, find existing? *)
   Lemma fill_app K1 K2 (e: expr):
     fill K1 (fill K2 e) = fill (K2 ++ K1) e. 

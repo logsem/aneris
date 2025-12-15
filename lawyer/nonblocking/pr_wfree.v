@@ -16,18 +16,6 @@ Close Scope Z.
   Proof using. clear. simpl. iSplit; set_solver. Qed. 
 
 
-  (* TODO: move; isn't it already proven somewhere? *)
-  Lemma not_stuck_fill (ec: expr) K σ
-    (NS: not_stuck ec σ)
-    (NV: to_val ec = None):
-  not_stuck (fill K ec) σ.
-  Proof using.
-    destruct NS as [VAL | RED]. 
-    { simpl in VAL. rewrite NV in VAL. red in VAL. set_solver. }
-    red. right. eapply reducible_fill; eauto.
-  Qed.
-
-
 Section WaitFreePR.
 
   Let OP := om_hl_OP (OP_HL := OP_HL_WF). 
@@ -616,15 +604,6 @@ Section WaitFreePR.
     iFrame. done. 
   Qed.
 
-  (* TODO: move, refactor? *)
-  Lemma newelems_app_drop {A: Type} (t1 t1' t2: list A)
-    (LEN: length t1' = length t1)
-    :
-    newelems t1 (t1' ++ t2) = t2.
-  Proof using.
-    rewrite /newelems. by list_simplifier.
-  Qed.
-
   Lemma cur_obls_sigs_other_step `{!ObligationsGS Σ}
     etr c' τ
     (STEP: locale_step (trace_last etr) (Some τ) c')
@@ -933,17 +912,6 @@ Section WaitFreePR.
     eexists (_, _). split; eauto.
     rewrite -surjective_pairing.
     apply elem_of_list_In. eapply elem_of_list_lookup; eauto.
-  Qed.
-
-  (* TODO: move *)
-  Lemma locales_of_list_from_app' (tp0 tp1 tp2: list expr):
-    adequacy_utils.locales_of_list_from tp0 (tp1 ++ tp2) =
-    adequacy_utils.locales_of_list_from tp0 tp1 ++
-    adequacy_utils.locales_of_list_from (tp0 ++ tp1) tp2.
-  Proof using.
-    rewrite /adequacy_utils.locales_of_list_from.
-    rewrite !prefixes_from_app.
-    by rewrite !fmap_app.
   Qed.
 
   Local Lemma ic_helper:

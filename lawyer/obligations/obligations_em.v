@@ -172,17 +172,6 @@ Section ObligationsEM.
     set_solver.
   Qed. 
 
-  (* TODO: move *)
-  Lemma zip_lookup_Some_1 {A B: Type} (la: list A) (lb: list B) i a b:
-    zip la lb !! i = Some (a, b) -> la !! i = Some a /\ lb !! i = Some b.
-  Proof using.
-    clear. 
-    revert la lb a b. induction i.
-    { intros. destruct la, lb; simpl in *; try discriminate. set_solver. }
-    intros. destruct la, lb; simpl in *; try discriminate.
-    apply IHi in H. done.
-  Qed.
-
   Lemma ipa_NoDup1 c: NoDup (init_phases_asg c).*1.
   Proof using. 
     rewrite fst_zip.
@@ -240,20 +229,6 @@ Section ObligationsEM.
     apply N. apply LT'.
   Qed.
 
-  (* TODO: move *)
-  Lemma flatten_gset_map_img_gtg_empty (ts: gset (locale Λ)):
-    flatten_gset $ map_img $ gset_to_gmap ∅ ts = (∅: gset SignalId).
-  Proof using.
-    clear. 
-    pattern ts. apply set_ind; clear ts.
-    { red. intros ????. set_solver. }
-    { done. }
-    intros. rewrite gset_to_gmap_union_singleton.
-    rewrite map_img_insert_L. rewrite delete_notin.
-    2: { by apply lookup_gset_to_gmap_None. }
-    rewrite flatten_gset_union flatten_gset_singleton. set_solver.
-  Qed.    
-
   Lemma init_om_st_wf c ds eb:
     om_st_wf (init_om_state c ds eb).
   Proof using.
@@ -267,7 +242,7 @@ Section ObligationsEM.
     - eapply cpb_init_phases_π0; eauto. 
     - red. simpl. set_solver.
     - red. simpl.
-      rewrite flatten_gset_map_img_gtg_empty. done.  
+      erewrite @flatten_gset_map_img_gtg_empty. done.  
     - red. simpl. 
       intros ???.
       destruct (_ !! τ1) eqn:X, (_ !! τ2) eqn:Y; simpl; try done.

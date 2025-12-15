@@ -110,17 +110,6 @@ Section WaitFreePR.
     iProp Σ :=
     wptp_gen (thread_pr s (trace_length etr)) (trace_last etr).1 Φs.
 
-  (* TODO: move; isn't it already proven somewhere? *)
-  Lemma not_stuck_fill (ec: expr) K σ
-    (NS: not_stuck ec σ)
-    (NV: to_val ec = None):
-  not_stuck (fill K ec) σ.
-  Proof using.
-    destruct NS as [VAL | RED]. 
-    { simpl in VAL. rewrite NV in VAL. red in VAL. set_solver. }
-    red. right. eapply reducible_fill; eauto.
-  Qed.
-
   Lemma wptp_wfre_not_stuck {Σ} {PWT: PrWfreeTok Σ}
     ex atr σ tp trest s Φs :
     valid_exec ex →
@@ -556,15 +545,6 @@ Section WaitFreePR.
     iFrame. done. 
   Qed.
 
-  (* TODO: move, refactor? *)
-  Lemma newelems_app_drop {A: Type} (t1 t1' t2: list A)
-    (LEN: length t1' = length t1)
-    :
-    newelems t1 (t1' ++ t2) = t2.
-  Proof using.
-    rewrite /newelems. by list_simplifier.
-  Qed.
-
   Lemma cur_obls_sigs_other_step `{!ObligationsGS Σ}
     etr c' τ
     (STEP: locale_step (trace_last etr) (Some τ) c')
@@ -874,17 +854,6 @@ Section WaitFreePR.
     eexists (_, _). split; eauto.
     rewrite -surjective_pairing.
     apply elem_of_list_In. eapply elem_of_list_lookup; eauto.
-  Qed.
-
-  (* TODO: move *)
-  Lemma locales_of_list_from_app' (tp0 tp1 tp2: list expr):
-    adequacy_utils.locales_of_list_from tp0 (tp1 ++ tp2) =
-    adequacy_utils.locales_of_list_from tp0 tp1 ++
-    adequacy_utils.locales_of_list_from (tp0 ++ tp1) tp2.
-  Proof using.
-    rewrite /adequacy_utils.locales_of_list_from.
-    rewrite !prefixes_from_app.
-    by rewrite !fmap_app.
   Qed.
 
   Local Lemma ic_helper:
@@ -1399,48 +1368,6 @@ Section WaitFreePR.
       rewrite EQ_TID'. do 2 iExists _.
       iFrame. iModIntro. iIntros (?). simpl in *. lia.  
   Admitted.
-
-  (* TODO: move *)
-  Lemma bump_inside_call K s0 e τ c''
-    (OTHER: τ ≠ τi)
-    (CALL: inside_call m τi K s0 etr e)
-    (STEP: locale_step (trace_last etr) (Some τ) c'')
-    :
-  inside_call m τi K s0 (etr :tr[ Some τ ]: c'') e.
-  Proof using.
-    clear -CALL (* LONG *) STEP OTHER.
-    unfold inside_call in *.
-    destruct CALL as (a & CALL & PREV & NORET & CUR).
-    exists a. repeat split.
-    - destruct CALL as (?&?&?).
-      eexists. split; eauto. rewrite -H.
-      apply trace_lookup_extend_lt. lia.
-    - simpl in *. lia.
-    - simpl. rewrite Nat.sub_0_r.
-      intros j [GE LE]. apply Nat.le_lteq in LE as [LT | ->].
-      { simpl in *. specialize (NORET j ltac:(lia)).
-        destruct (etr !! j) eqn:JTH; [| done].
-        rewrite trace_lookup_extend_lt; [| done].
-        by rewrite JTH. }
-      rewrite trace_lookup_extend /=; [| done].
-      specialize (NORET (trace_length etr -1) ltac:(lia)).
-      destruct (etr !! (trace_length etr - 1)) eqn:LAST; [| done]. simpl in *.
-      rewrite trace_lookup_last in LAST.
-      2: simpl; lia.
-      inversion LAST. subst c.
-      destruct NORET as (?&?&?). simpl in *.
-      eapply locale_step_other_same in STEP; eauto.
-      2: congruence.
-      red. eauto.
-    - simpl.
-      destruct ((trace_last etr).1 !! τi) eqn:TT; [| done]. simpl in *.
-      apply under_ctx_spec in CUR. subst. 
-      eapply locale_step_other_same in STEP; eauto.
-      2: { apply from_locale_lookup. eauto. }
-      2: congruence.
-      apply from_locale_lookup in STEP. rewrite STEP /=.
-      eapply under_ctx_spec; eauto.
-  Qed.
 
   Lemma bump_cti τ c''
     (OTHER: τ ≠ τi)

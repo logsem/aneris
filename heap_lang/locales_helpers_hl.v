@@ -99,6 +99,7 @@ Proof.
 Qed. 
 
   (* TODO: move the lemmas below to appropriate places *)
+
   (* TODO: this is pretty much the definition of locales_of_list *)
   Lemma locales_of_list_from_locales t0 (es : list expr):
     locales_of_list_from t0 es = map (fun '(l, e) => locale_of l e) (prefixes_from t0 es).
@@ -415,6 +416,40 @@ Proof using.
   - rewrite -H. rewrite !length_app /=. done.
   - etrans; [| apply H0]. rewrite !length_app /=. done.
 Qed.    
+
+
+Lemma prefixes_simpl {A B: Type} (es tp: list expr) (P: nat -> B -> A) (s: B): 
+  (λ '(tnew, e) (_ : val), P (locale_of tnew e) s) <$> prefixes_from es (drop (length es) tp) = map (fun i _ => P i s) (seq (length es) (length tp - length es)). 
+Proof using.
+  destruct (decide (length es < length tp)).
+  2: { rewrite skipn_all2; [| lia].
+       replace (length tp - length es) with 0.
+       { done. }
+       simpl in n. lia. }
+  
+  remember (drop (length es) tp) as tp'.
+  replace (length tp - length es) with (length tp').
+  2: { subst. rewrite length_drop. lia. }
+  clear Heqtp'. simpl.
+  
+  clear l. revert es. 
+  
+  induction tp'.
+  { simpl. done. }
+  
+  intros. simpl.
+  f_equal.
+  pose proof (IHtp' (es ++ [a])).
+  replace (S (length es)) with (length (es ++ [a])).
+  2: { simpl. rewrite length_app. simpl. lia. } 
+  rewrite -H. simpl. done.
+Qed.
+
+Lemma indexes_seq {A: Type} (l: list A):
+  indexes l = seq 0 (length l).
+Proof using.
+  rewrite /indexes. rewrite imap_seq_0. by rewrite list_fmap_id.
+Qed.
 
 
 (* TODO: ? generalize *)

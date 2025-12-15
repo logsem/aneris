@@ -1,4 +1,5 @@
 From iris.proofmode Require Import proofmode coq_tactics.
+From fairness Require Import utils.
 From lawyer.nonblocking.logrel Require Export substitutions.
 From lawyer.nonblocking Require Export pwp. 
 From heap_lang Require Import lang. 

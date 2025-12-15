@@ -1,6 +1,6 @@
 From stdpp Require Import base.
 From iris.proofmode Require Import tactics.
-From fairness Require Export utils_logic.
+From fairness Require Export utils_logic utils_maps.
 From iris.algebra Require Import gset.
 
 Section SetMapProperties.
@@ -260,6 +260,19 @@ Section GsetPick.
   Proof.
     rewrite /gset_pick. rewrite elements_singleton. done.
   Qed. 
+
+  Lemma flatten_gset_map_img_gtg_empty `{Countable K'} (ts: gset K'):
+    flatten_gset $ map_img $ gset_to_gmap ∅ ts = (∅: gset K).
+  Proof using.
+    clear. 
+    pattern ts. apply set_ind; clear ts.
+    { red. intros ????. set_solver. }
+    { done. }
+    intros. rewrite gset_to_gmap_union_singleton.
+    rewrite map_img_insert_L. rewrite delete_notin.
+    2: { by apply lookup_gset_to_gmap_None. }
+    rewrite flatten_gset_union flatten_gset_singleton. set_solver.
+  Qed.
 
 End GsetPick.
 

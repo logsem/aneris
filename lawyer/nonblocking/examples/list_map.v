@@ -5,8 +5,6 @@ From lawyer.obligations Require Import obligations_resources obligations_logic e
 From heap_lang Require Import lang notation. 
 From lawyer.nonblocking Require Import wait_free_spec_defs. 
 
-(* Local Definition hl_nil: val := NONEV.  *)
-(* Local Definition hl_cons (v l: val): val := SOMEV (v, l). *)
 
 Close Scope Z. 
 
@@ -41,24 +39,9 @@ Fixpoint hl_list_size (l: val): nat :=
 
 
 From lawyer.nonblocking.logrel Require Import logrel stuck_utils.
+From lawyer.nonblocking.examples Require Import pwp_tactics. 
 From iris.base_logic Require Import invariants.
 
-From iris.proofmode Require Import proofmode coq_tactics tactics.
-
-Ltac solve_vcs := 
-  match goal with
-    |- vals_compare_safe ?x ?y => red; set_solver
-  end. 
-
-(* TODO: move *)
-Ltac pwp_pure_step :=
-    try (iEval (rewrite /pwp));
-    try (iApply trillium.program_logic.weakestpre.wp_value; []);
-    try (wp_bind (Rec _ _ _)%E || wp_bind (App _ _)%E);
-    (iApply sswp_pwp; [done| ]; iApply sswp_pure_step; (try solve_vcs || done); [ ]; do 2 iModIntro; iEval (simpl) );
-    try (iApply trillium.program_logic.weakestpre.wp_value; [] || iEval (rewrite /pwp)). 
-
-Ltac pwp_pure_steps := repeat pwp_pure_step. 
 
 Section ListMapPhys.
 

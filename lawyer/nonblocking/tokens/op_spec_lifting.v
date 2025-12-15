@@ -23,65 +23,6 @@ Section SpecLifting.
   (* TODO: ct_interp_tok doesn't need an entire trace_ctx *)
   Let mock_tctx := TraceCtx 99 (TpoolCtx ectx_emp τ). 
 
-  (* TODO: move *)
-  Lemma ct_auth_frag_agree c1 c2:
-    ct_auth c1 -∗ ct_frag c2 -∗ ⌜ c2 = c1 ⌝. 
-  Proof using.
-    simpl.
-    rewrite bi.wand_curry -own_op.
-    iIntros "X". iDestruct (own_valid with "[$]") as %V.
-    iPureIntro. symmetry. by apply excl_auth_agree_L.
-  Qed.  
-
-  (* TODO: move *)
-  Lemma ct_auth_frag_update c1 c2 c':
-    ct_auth c1 -∗ ct_frag c2 ==∗ ct_auth c' ∗ ct_frag c'. 
-  Proof using.
-    simpl. 
-    rewrite bi.wand_curry -!own_op.
-    iApply own_update. apply excl_auth_update. 
-  Qed.
-
-  Lemma inside_call_extend extr tp1 tp2 K e σ1
-    (Hζ : locale_of tp1 (fill K e) = τ)
-    (Hextr : trace_ends_in extr (tp1 ++ fill K e :: tp2, σ1))
-    (s : nat)
-    (CALL : inside_call m (tpctx_tid (tctx_tpctx mock_tctx)) K s extr e)
-    (e2 : expr)
-    (σ2 : state)
-    (H : ectx_language.prim_step e σ1 e2 σ2 [])
-    (V2 : to_val e2 = None):
-    inside_call m τ K s (extr :tr[ Some τ ]: (tp1 ++ fill K e2 :: tp2 ++ [], σ2)) e2.
-  Proof using.
-    red in CALL. destruct CALL as (a & CALL & PREV & NORET & CUR).
-    pose proof (trace_length_at_least extr) as LENnz. simpl in LENnz.
-    remember (trace_length extr) as N.
-    red. exists a. simpl. rewrite -HeqN. rewrite -HeqN in LENnz PREV.
-     repeat split.
-    - destruct CALL as (?&CALL&?). eexists. split; eauto.
-      rewrite -CALL. apply trace_lookup_extend_lt. rewrite -HeqN. lia.
-    - lia.
-    - simpl. intros j DOM.
-      assert (s <= j <= trace_length extr - 1 \/ j = trace_length extr) as [DOM' | ->].
-      { lia. }
-      + pose proof DOM' as X%NORET. 
-        destruct (extr !! j) eqn:JTH; rewrite JTH /= in X; [| done].
-        rewrite trace_lookup_extend_lt.
-        2: { rewrite -HeqN. lia. }
-        rewrite JTH. eauto.
-      + rewrite trace_lookup_last.
-        2: { simpl. rewrite -HeqN. lia. }
-        simpl.
-        red. eexists. split; [| apply V2]. 
-        red.
-        rewrite -Hζ. rewrite /from_locale.
-        by rewrite from_locale_from_locale_of.
-    - rewrite app_nil_r.
-      rewrite -Hζ. rewrite /locale_of.
-      rewrite list_lookup_middle; [| done].
-      simpl. by apply under_ctx_spec.
-  Qed. 
-
   Lemma lift_call e
     (NVAL: to_val e = None):
     (let _ := IEMGS_into_Looping (@pwt_Hinv _ PWT) si_add_none in

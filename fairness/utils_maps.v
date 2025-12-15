@@ -112,6 +112,20 @@ Section gmap.
     intros. intros [? ?]%elem_of_dom. eapply map_disjoint_spec; eauto.
   Qed. 
 
+  Lemma gmap_insert_delete_union {A: Type} k a (mm: gmap K A):
+    <[ k := a ]> mm = {[ k := a ]} ∪ delete k mm.
+  Proof using.
+    apply map_eq. intros k'.
+    destruct (decide (k' = k)) as [-> | ?].
+    { rewrite lookup_insert.
+      erewrite lookup_union_Some_l; eauto.
+      by apply lookup_singleton_Some. }
+    rewrite lookup_insert_ne; [| done].
+    rewrite lookup_union_r.
+    2: { by apply lookup_singleton_None. }
+    symmetry. by apply lookup_delete_ne.
+  Qed.
+
 End gmap.
 
 Lemma map_img_insert_L :

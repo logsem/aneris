@@ -1,5 +1,6 @@
 From iris.proofmode Require Import tactics.
-From trillium.traces Require Import inftraces trace_lookup exec_traces trace_len. 
+From iris.algebra Require Import auth gmap gset excl gmultiset big_op mono_nat gmap_view.
+From trillium.traces Require Import inftraces trace_lookup exec_traces trace_len trace_utils. 
 From trillium.program_logic Require Import execution_model weakestpre adequacy simulation_adequacy_em_cond. 
 From trillium.prelude Require Import classical.
 From fairness Require Import fairness locales_helpers utils.
@@ -12,149 +13,6 @@ From heap_lang Require Import lang simulation_adequacy.
 
 
 Close Scope Z.
-
- 
-  Lemma max_plus_consume n mm k:
-    exists d, n `max` mm + k = n + d.
-  Proof using.
-    edestruct (Nat.max_spec_le n mm) as [[LE ->] | [LE ->]]; eauto.
-    apply Nat.le_sum in LE as [? ->].
-    rewrite -Nat.add_assoc. eauto.
-  Qed.
-
-  (* TODO: move *)
-  Lemma ft_prepend_lookup_0 {St L: Type} (tr: finite_trace St L) s l:
-    ft_prepend tr s l !! 0 = Some s.
-  Proof using.
-    induction tr.
-    { done. }
-    simpl.
-    rewrite trace_lookup_extend_lt; [done| ]. 
-    by apply trace_lookup_lt_Some.
-  Qed.
-
-  (* TODO: move *)
-  Lemma ft_prepend_length  {St L: Type} (tr: finite_trace St L) s l:
-    trace_length (ft_prepend tr s l) = S (trace_length tr).
-  Proof using.
-    generalize dependent s. generalize dependent l. induction tr.
-    { simpl. lia. }
-    intros. simpl. rewrite IHtr. lia.
-  Qed.
-
-  (* TODO: move *)
-  Lemma ft_prepend_lookup_S {St L: Type} (tr: finite_trace St L) s l i:
-    ft_prepend tr s l !! (S i) = tr !! i.
-  Proof using.
-    generalize dependent i. induction tr.
-    { simpl. rewrite /lookup /trace_lookup. simpl.
-      destruct i; done. }
-    intros. simpl.
-    
-    simpl. rewrite /lookup. rewrite /trace_lookup. simpl.
-    replace (trace_length (ft_prepend tr s l)) with (S (trace_length tr)).
-    2: { by rewrite ft_prepend_length. } 
-
-    destruct (decide (trace_length tr = i)). 
-    - rewrite !bool_decide_true; try lia. done.
-    - rewrite !bool_decide_false; try lia.
-      erewrite IHtr. done.      
-  Qed.
-
-  (* TODO: move *)
-  Lemma trace_take_fwd_lookup_Some (etr: extrace heap_lang) n i c
-    (ITH: trace_take_fwd n etr !! i = Some c):
-    etr S!! i = Some c.
-  Proof using.
-    generalize dependent c. generalize dependent n. generalize dependent etr.
-    induction i.
-    { intros [|] ??; destruct n; simpl; try done.
-      rewrite state_lookup_0. simpl.
-      by rewrite ft_prepend_lookup_0. } 
-    intros. destruct etr.
-    { destruct n; done. }
-    simpl. destruct n; [done| ].
-    rewrite state_lookup_cons.
-    simpl in ITH.
-    rewrite ft_prepend_lookup_S in ITH. eauto.
-  Qed.
-
-  (* TODO: move *)
-  Lemma trace_take_fwd_lookup_Some' (etr: extrace heap_lang) n i c
-    (ITH: etr S!! i = Some c)
-    (LE: i <= n):
-    trace_take_fwd n etr !! i = Some c. 
-  Proof using.
-    generalize dependent c. generalize dependent n. generalize dependent etr.
-    induction i.
-    { intros [|] ??; destruct n; simpl; try done.
-      rewrite state_lookup_0. simpl.
-      by rewrite ft_prepend_lookup_0. } 
-    intros. destruct etr.
-    { destruct n; done. }
-    simpl. destruct n.
-    { lia. }
-    rewrite state_lookup_cons in ITH.
-    simpl. 
-    rewrite ft_prepend_lookup_S.
-    eapply IHi; eauto. lia. 
-  Qed.
-
-  (* TODO: move *)
-  Lemma trace_infinite_cons {St L : Type} (tr: trace St L) s l:
-    trace_len_is tr my_omega.NOinfinity <-> trace_len_is (tr_cons s l tr) my_omega.NOinfinity.
-  Proof using.
-    clear. 
-    split; intros LEN. 
-    - eapply trace_len_cons in LEN; eauto.
-    - eapply trace_len_tail in LEN; eauto.
-  Qed. 
-
-  (* TODO: move *)
-  Lemma trace_take_fwd_length {St L : Type} n (tr: trace St L) len
-    (LEN: trace_len_is tr len):
-    trace_length (trace_take_fwd n tr) = 
-    match len with | my_omega.NOnum l => min l (S n) | my_omega.NOinfinity => S n end.
-  Proof using.
-    clear -LEN. 
-    destruct len; simpl.
-    { generalize dependent tr. 
-      induction n.
-      { simpl. destruct tr; simpl; lia. }
-      intros tr INF. 
-      simpl.
-      destruct tr.
-      { pose proof (@trace_len_singleton _ L s).
-        eapply trace_len_uniq in INF; eauto. done. }
-      simpl. rewrite ft_prepend_length.
-      f_equal. apply IHn.
-      eapply trace_infinite_cons; eauto. }
-    generalize dependent n0. generalize dependent tr.
-    induction n.
-    { intros. simpl.
-      apply trace_len_gt_0 in LEN. simpl in LEN.
-      destruct tr; simpl; lia. }
-    intros tr l LEN.
-    pose proof LEN as NZ%trace_len_gt_0. simpl in NZ. destruct l; [lia| ].  
-    destruct tr.
-    2: { simpl. rewrite ft_prepend_length.
-         f_equal. apply IHn.
-         apply trace_len_tail in LEN. eauto. }
-    simpl.
-    pose proof (@trace_len_singleton _ L s) as LEN'. 
-    eapply trace_len_uniq in LEN; eauto.
-    inversion LEN. subst. lia.
-  Qed.
-
-  (* TODO: move *)
-  Lemma trace_take_fwd_length_bound {St L : Type} n (tr: trace St L):
-    trace_length (trace_take_fwd n tr) <= S n. 
-  Proof using.
-    clear -tr. 
-    pose proof (trace_has_len tr) as [??].
-    erewrite trace_take_fwd_length; eauto.
-    destruct x; lia.
-  Qed.
 
 
 Section WFAdequacy.
@@ -188,25 +46,6 @@ Section WFAdequacy.
   Definition obls_om_traces_match_wfree: extrace heap_lang -> trace (mstate M) (mlabel M) -> Prop :=
     obls_om_traces_match_gen obls_st_rel_wfree. 
 
-  (* TODO: move *)
-  Lemma int_ref_int_singleton {St1 L1 St2 L2: Type}
-    (R: finite_trace St1 L1 -> finite_trace St2 L2 -> Prop) (s1: St1) (s2: St2)
-    (REL0: R (trace_singleton s1) (trace_singleton s2)):
-    int_ref_inf ⟨ s1 ⟩ ⟨ s2 ⟩ R.
-  Proof using.
-    clear -REL0.
-    red. intros.
-    destruct i.
-    { done. }
-    do 2 (erewrite trace_take_fwd_short' with (i := S _) (j := 0); [| by rewrite from_trace_simpl| lia]). 
-    by rewrite !trace_take_fwd_0_first.
-  Qed.
-
-  (* TODO: move *)
-  Lemma no_expr_in_empty_pool κ σ e:
-    ¬ expr_at κ ([], σ) e.
-  Proof using. destruct κ. rewrite /expr_at. set_solver. Qed. 
-
   Theorem om_simulation_adequacy_model_trace_multiple_waitfree Σ
         `{hPre: @heapGpreS Σ M EM} (s: stuckness)
         (es: list expr) σ1 (s1: mstate M) p
@@ -217,7 +56,7 @@ Section WFAdequacy.
     :
     PR_premise_multiple obls_sim_rel_wfree (fits_inf_call ic m ai) Σ s es σ1 s1 (p: @em_init_param _ _ EM) ->
     (∃ omtr, obls_om_traces_match_wfree extr omtr ∧ trfirst omtr = s1 /\
-              int_ref_inf extr omtr obls_sim_rel_wfree
+              int_ref_inf obls_sim_rel_wfree extr omtr
     ) \/
     (exists k, ¬ (fits_inf_call ic m ai) (trace_take_fwd k extr)).
   Proof using.
@@ -355,13 +194,11 @@ Section WFAdequacy.
       by apply strict_spec, proj2 in LT.
     - red. simpl. rewrite map_union_empty.
       destruct decide. 
-      2: { pose proof (flatten_gset_map_img_gtg_empty (locales_of_cfg c)) as D. simpl in D. rewrite D.
-        done. }
+      2: by rewrite flatten_gset_map_img_gtg_empty. 
       rewrite map_img_insert_L.
       rewrite -gset_to_gmap_difference_singleton.
       rewrite flatten_gset_union.
-      pose proof (flatten_gset_map_img_gtg_empty (locales_of_cfg c ∖ {[τi]})) as D. simpl in D. rewrite D.
-      rewrite flatten_gset_singleton. set_solver.
+      by rewrite flatten_gset_map_img_gtg_empty. 
     - red. simpl. 
       intros ???.
       destruct (_ !! τ1) eqn:X, (_ !! τ2) eqn:Y; simpl; try done.
@@ -374,6 +211,7 @@ Section WFAdequacy.
         (try apply lookup_gset_to_gmap_Some in X as [? <-]);
         (try apply lookup_gset_to_gmap_Some in Y as [? <-]);
         done.
+    
   Qed.
 
   Lemma obls_τi_enabled c δ
@@ -398,23 +236,6 @@ Section WFAdequacy.
     - eapply elem_of_dom; eauto. red in OBS.
       destruct lookup; done.
   Qed.
-
-  (* TODO: move *)
-  Lemma gmap_insert_delete_union `{Countable K} {A: Type} k a (mm: gmap K A):
-        <[ k := a ]> mm = {[ k := a ]} ∪ delete k mm.
-  Proof using.
-    apply map_eq. intros k'.
-    destruct (decide (k' = k)) as [-> | ?].
-    { rewrite lookup_insert.
-      erewrite lookup_union_Some_l; eauto.
-      by apply lookup_singleton_Some. }
-    rewrite lookup_insert_ne; [| done].
-    rewrite lookup_union_r.
-    2: { by apply lookup_singleton_None. }
-    symmetry. by apply lookup_delete_ne.
-  Qed.
-
-  From iris.algebra Require Import auth gmap gset excl gmultiset big_op mono_nat gmap_view.
 
   (** for simplicity, we forget about the specific phases *)
   Lemma init_wfree_resources_weak `{!ObligationsGS Σ} c:
@@ -827,29 +648,9 @@ Section WFAdequacy.
     simpl. rewrite RUNS. simpl. tauto.
   Qed.
 
-  (* (* TODO: move *) *)
-  (* Lemma trace_take_fwd_len {St L: Type} (tr: finite_trace St L) i: *)
-  (*   trace_length (trace_take_fwd i tr) =  *)
-
-  (* TODO: move, find existing? *)
-  Definition int_ref_inf_one {St1 L1} tr (R: finite_trace St1 L1 -> Prop) :=
-    forall i, R (trace_take_fwd i tr).
-
-  Lemma int_ref_inf_impl {St1 L1 St2 L2}  (tr1: trace St1 L1) (tr2: trace St2 L2)
-    (R Q: finite_trace St1 L1 -> finite_trace St2 L2 -> Prop)
-    (IMPL: forall tr1 tr2, R tr1 tr2 -> Q tr1 tr2):
-    int_ref_inf tr1 tr2 R -> int_ref_inf tr1 tr2 Q. 
-  Proof using. intros ? ?. by apply IMPL. Qed. 
-
-  Lemma int_ref_inf_proj_one {St1 L1 St2 L2}  (tr1: trace St1 L1) (tr2: trace St2 L2)
-    (R: finite_trace St1 L1 -> Prop):
-    int_ref_inf tr1 tr2 (fun tr' _ => R tr') -> int_ref_inf_one tr1 R.
-  Proof using. done. Qed.
-
-
   Lemma ref_call_progress_last tr i c
     (ITH: tr S!! i = Some c)
-    (REF: int_ref_inf_one tr (call_progresses ic s')):
+    (REF: int_ref_inf_one (call_progresses ic s') tr):
     s' = NotStuck -> ii <= i -> 
     not_stuck_tid τi c.
   Proof using.
@@ -938,7 +739,7 @@ Section WFAdequacy.
     (INIT_TP : tpool_init_restr (trfirst extr).1)
     (CALL: from_option (fun c => call_at tpc c m ai (APP := App)) False (extr S!! ii))
     (M_FUN: exists f x b, m = RecV f x b):
-    terminating_trace extr /\ int_ref_inf_one extr (call_progresses ic s') ∨
+    terminating_trace extr /\ int_ref_inf_one (call_progresses ic s') extr ∨
     (∃ k, ¬ fits_inf_call ic m ai (trace_take_fwd k extr)) \/
     (s' = MaybeStuck /\ gets_stuck_ae extr ic). 
   Proof using. 
@@ -957,14 +758,17 @@ Section WFAdequacy.
     { eapply obls_init_wf. rewrite OM0. apply init_om_wfree_is_init. }
 
     destruct (Classical_Prop.classic (∃ j, has_return_at extr ic j)) as [[j RET]| NORET].
-    { red in RET. rewrite ic_helper in RET. destruct RET as (r & cj & ? & JTH & RET).
+    { red in RET. rewrite ic_helper in RET.
+      destruct RET as (r & cj & ? & JTH & RET).
       right. left. exists j. intros [_ NVALS _]. 
       specialize (NVALS _ H).
-      erewrite trace_take_fwd_lookup_Some' in NVALS; eauto.
-      simpl in NVALS.
+
+      eapply trace_take_fwd_lookup_Some' in JTH.
+      2: reflexivity.
+      rewrite JTH /= in NVALS.
       edestruct not_return_nval; eauto. }
 
-    assert (int_ref_inf_one extr (call_progresses ic s')) as IREF1.
+    assert (int_ref_inf_one (call_progresses ic s') extr) as IREF1.
     { eapply int_ref_inf_proj_one. eapply int_ref_inf_impl; eauto.
       by intros ?? (?&?&?). }
 
@@ -1060,7 +864,7 @@ Section WFAdequacy.
     extrace_valid extr -> 
     fair_call extr tpc ii ->
     (exists f x b, m = RecV f x b) ->
-    terminating_trace extr /\ int_ref_inf_one extr (call_progresses ic s') \/ 
+    terminating_trace extr /\ int_ref_inf_one (call_progresses ic s') extr \/ 
     (exists k, ¬ fits_inf_call ic m ai (trace_take_fwd k extr)) \/
     (s' = MaybeStuck /\ gets_stuck_ae extr ic). 
   Proof.
@@ -1186,7 +990,7 @@ Section WFAdequacy.
     (CALL: from_option (fun c => call_at tpc c m ai (APP := App)) False (extr S!! ii))
     (M_FUN: exists f x b, m = RecV f x b)
     :
-    terminating_trace extr /\ int_ref_inf_one extr (call_progresses ic s')
+    terminating_trace extr /\ int_ref_inf_one (call_progresses ic s') extr
     \/ has_return extr ic \/
     (s' = MaybeStuck /\ gets_stuck_ae extr ic). 
   Proof.
@@ -1267,15 +1071,6 @@ Section WFAdequacy.
 End WFAdequacy.
 
 
-(* Definition no_return_before_alt tr tpc i k := *)
-(*   forall j c a K, j < i -> etr S!! j = Some c -> *)
-(*              call_at tpc c m a (APP := App) -> *)
-(*              exists has_return_at tr *)
-
-(* (* TODO: move *) *)
-(* Lemma no_return_before_equiv tr tpc i k: *)
-(*   no_return_before tr tpc i k <-> *)
-
 Lemma fair_call_extend etr Ki Kj τ i j ci
   (FAIR: fair_call etr (TpoolCtx Ki τ) i)
   (LE: j <= i)
@@ -1297,35 +1092,6 @@ Proof using.
   eauto.
 Qed.
 
-(* TODO: move *)
-Global Instance no_return_before_dec etr κ i j: Decision (no_return_before etr κ i j).
-Proof using.
-  rewrite /no_return_before.
-  apply not_dec. apply ex_fin_dec with (l := seq i (S $ j - i)).
-  2: { intros ? [? RET].
-       destruct RET as (r & cj & ? & JTH & RET).
-       apply in_seq. lia. }
-  intros. apply and_dec; [solve_decision| ].
-  rewrite /has_return_at.
-  destruct (decide (i <= a)).
-  2: { right. by intros (?&?&?&?&?). }
-  destruct (etr S!! a) eqn:ATH.
-  2: { right. by intros (?&?&?&?&?). }
-  rewrite /return_at.
-  rewrite /expr_at. destruct κ as [K τ]. simpl.
-  destruct (from_locale c.1 τ) eqn:TT. 
-  2: { right. intros (?&?&?&?&?). set_solver. }
-  destruct (under_ctx K e) eqn:KE.
-  2: { erewrite under_ctx_spec_neg in KE.
-       right. intros (?&?&?&?&?). set_solver. }
-  apply under_ctx_spec in KE.
-  destruct (to_val e0) eqn:VV.
-  2: { right. intros (?&?&?&?&?).
-       inversion H0. subst. rewrite TT in H1.
-       inversion H1. apply ectx_fill_inj in H3. by subst. }
-  apply of_to_val in VV as <-. subst e. 
-  left. eauto.
-Qed.  
 
 Lemma find_main_call etr i K τ m a ci
   (tpc := TpoolCtx K τ)
@@ -1616,7 +1382,7 @@ Proof using.
     lia. }      
   simpl in *.
   eapply trace_take_fwd_lookup_Some' in LAST.
-  2: { apply Nat.le_succ_diag_r. }      
+  2: { apply Nat.le_succ_diag_r. }
   pose proof LEN as ?%trace_len_gt_0. simpl in H. 
   replace (S (len - 1)) with len in LAST; [| lia]. 
   

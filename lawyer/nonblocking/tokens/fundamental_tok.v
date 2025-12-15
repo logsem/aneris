@@ -2,7 +2,7 @@
 (* From iris.program_logic Require Export weakestpre. *)
 
 From iris.proofmode Require Import proofmode coq_tactics.
-From lawyer.nonblocking.logrel Require Export persistent_pred substitutions valid_client.
+From lawyer.nonblocking.logrel Require Export persistent_pred substitutions valid_client stuck_utils.
 From lawyer.nonblocking.tokens Require Export logrel_tok.
 (* From lawyer.nonblocking Require Export pwp.  *)
 From iris.base_logic Require Import invariants.
@@ -21,47 +21,7 @@ Section typed_interp.
   Existing Instance iG. 
   
   Notation D := (persistent_predO val (iPropI Σ)).
-        
-  (* TODO: move? *)
-  Lemma srav_helper (e: expr)
-    (NO_FILL_ITEM: ¬ exists i e', e = fill_item i e' /\ to_val e' = None):
-    sub_redexes_are_values e.
-  Proof using.
-    red. simpl. intros. 
-    rewrite /fill in H.
-    rewrite foldl_foldr_rev in H. simpl in H.
-    destruct (rev K) eqn:RR.
-    { eapply (@f_equal _ _ length) in RR.
-      rewrite length_rev /= in RR.
-      destruct K; simpl in *; done. }
-    
-    clear RR. simpl in H.
-    rewrite -(rev_involutive l) in H. rewrite -foldl_foldr_rev in H.
-    replace (foldl (flip fill_item) e' (rev l)) with (fill (rev l) e') in H by done.
-
-    destruct NO_FILL_ITEM. do 2 eexists. split; eauto.
-    destruct (to_val (fill _ _)) eqn:VV; [| done].
-    apply to_val_fill_some in VV as (?&->). done. 
-  Qed.
-
-  Ltac solve_no_fill_item := 
-    intros (i&?&FILL&NVAL);
-    destruct i; simpl in FILL; try congruence;
-    inversion FILL; subst; done.
-
-  Ltac solve_head_stuck := 
-    intros; red; simpl; split; [done| ];
-    red; simpl; intros ??? STEP;
-    inversion STEP; subst; (congruence || by eauto || set_solver).
-
-  (* TODO: why the shelved goal appears now? *)
-  (* Ltac solve_stuck_case := *)
-  Ltac solve_stuck_case' :=
-    iApply ectx_lifting.wp_lift_pure_head_stuck;
-      [done | apply srav_helper; solve_no_fill_item | solve_head_stuck].
-  Ltac solve_stuck_case :=
-    unshelve solve_stuck_case'; by apply _. 
-
+  
   Lemma bin_op_eval_inv op a b r
     (EVAL: bin_op_eval op a b = Some r):
     (op = EqOp /\ vals_compare_safe a b /\ r = LitV $ LitBool $ bool_decide (a = b)) \/
@@ -132,7 +92,9 @@ Section typed_interp.
   (*   apply _. *)
   (*   Show Proof. *)
 
-  Existing Instance state_inhabited. 
+  Existing Instance state_inhabited.
+
+  Ltac solve_stuck_case := unshelve stuck_utils.solve_stuck_case; apply _. 
 
   Lemma logrel_var x : ⊢ logrel' (Var x).
   Proof.

@@ -561,18 +561,6 @@ Section typed_interp.
     by rewrite {6}interp_unfold.
   Qed.
 
-  (* TODO: move to trillium *)
-  Lemma wp_lift_pure_head_stuck' τ E Φ e :
-    to_val e = None →
-    sub_redexes_are_values e →
-    (∀ σ, head_stuck e σ) →
-    ⊢ WP e @ τ; E ?{{ Φ }}.
-  Proof using.
-    iIntros (?? Hstuck). iApply ectx_lifting.wp_lift_head_stuck; [done|done|].
-    iIntros (???????) "_". iMod (fupd_mask_subseteq ∅) as "_"; first set_solver.
-    auto; done.
-  Qed.
-
   Lemma logrel_CmpXchg el es ef : logrel el -∗ logrel es -∗ logrel ef -∗ logrel (CmpXchg el es ef).
   Proof.
     iIntros "#IHl #IHs #IHf !#" (vs τ) "#Henv"; rewrite /interp_expr /=.

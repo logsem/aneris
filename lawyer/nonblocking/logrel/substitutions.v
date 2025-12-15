@@ -28,16 +28,6 @@ Proof using.
   - simpl. by rewrite decide_False.
 Qed.
 
-(* TODO: move *)
-Lemma foldl_foldr_rev {A B : Type} (f : B → A → B) (b : B) (la : list A):
-  foldl f b la = foldr (flip f) b (rev la). 
-Proof using.
-  generalize dependent b. induction la.
-  { done. }
-  simpl. intros. rewrite IHla.
-  by rewrite foldr_app.
-Qed.
-
 Lemma subst_env_arg3
   (F: expr -> expr -> expr -> expr)
   (DISTR: forall e1 e2 e3 s v, subst s v (F e1 e2 e3) = F (subst s v e1) (subst s v e2) (subst s v e3)):

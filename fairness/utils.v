@@ -1,7 +1,7 @@
 From iris.algebra Require Import gmap gset.
 From iris.proofmode Require Import tactics.
 From trillium.prelude Require Import quantifiers finitary.
-From fairness Require Export utils_coPset utils_logic utils_maps utils_sets utils_relations utils_multisets.
+From fairness Require Export utils_coPset utils_logic utils_maps utils_sets utils_relations utils_multisets utils_lists.
 
 
 (* TODO: move these lemmas to appropriate places *)
@@ -90,37 +90,6 @@ Section bigop_utils.
 End bigop_utils.
 
 
-
-Lemma fmap_flat_map {A B C: Type} (f : A → list B) (g: B -> C) (l : list A):
-  g <$> (flat_map f l) = flat_map ((fmap g) ∘ f) l.
-Proof.
-  induction l; [done| ].
-  simpl. rewrite fmap_app. congruence.
-Qed.
-
-Lemma concat_NoDup {A: Type} (ll : list (list A)):
-  (forall i l, ll !! i = Some l -> NoDup l) ->
-  (forall i j li lj, i ≠ j -> ll !! i = Some li -> ll !! j = Some lj -> li ## lj) ->
-  NoDup (concat ll).
-Proof.
-  induction ll.
-  { constructor. }
-  intros. simpl. apply NoDup_app. repeat split.
-  { apply (H 0). done. }
-  2: { apply IHll.
-       - intros. apply (H (S i)). done.
-       - intros. apply (H0 (S i) (S j)); auto. }
-  intros. intros [lx [INlx INx]]%elem_of_list_In%in_concat.
-  apply elem_of_list_In, elem_of_list_lookup_1 in INlx as [ix IX].
-  eapply (H0 0 (S ix)).
-  - lia.
-  - simpl. reflexivity.
-  - simpl. apply IX.
-  - eauto.
-  - by apply elem_of_list_In.
-Qed.
-
-
 Ltac add_case C name :=
   match goal with
   | |- ?G => assert (C -> G) as name
@@ -177,15 +146,13 @@ Section Arithmetic.
     by rewrite Qp.mul_div_r Qp.mul_inv_r.
   Qed.
 
+  Lemma max_plus_consume n mm k:
+    exists d, n `max` mm + k = n + d.
+  Proof using.
+    edestruct (Nat.max_spec_le n mm) as [[LE ->] | [LE ->]]; eauto.
+    apply Nat.le_sum in LE as [? ->].
+    rewrite -Nat.add_assoc. eauto.
+  Qed.
+
 End Arithmetic.
 
-
-(* TODO: find existing*)
-Lemma nth_error_lookup {A: Type} (l: list A) i:
-  nth_error l i = l !! i.
-Proof using.
-  rewrite /lookup. 
-  generalize dependent i. induction l.
-  { simpl. intros. by destruct i. }
-  intros. destruct i; try done. simpl. eauto.
-Qed.

@@ -145,28 +145,6 @@ Section OblsAdequacy.
     by rewrite ITH in VALID. 
   Qed.
 
-  (* TODO: move to Trillium*)
-Lemma traces_match_impl_strong {S1 S2 L1 L2}
-      (Rℓ1: L1 -> L2 -> Prop) (Rs1: S1 -> S2 -> Prop)
-      (Rℓ2: L1 -> L2 -> Prop) (Rs2: S1 -> S2 -> Prop)
-      (trans1 trans1': S1 -> L1 -> S1 -> Prop)
-      (trans2 trans2': S2 -> L2 -> S2 -> Prop)
-      tr1 tr2 :
-  (∀ ℓ1 ℓ2, Rℓ1 ℓ1 ℓ2 → Rℓ2 ℓ1 ℓ2) →
-  (∀ s1 s2, Rs1 s1 s2 → Rs2 s1 s2) →
-  (forall s ℓ s', trans1 s ℓ s' -> trans1' s ℓ s') ->
-  (forall s ℓ s', trans2 s ℓ s' -> trans2' s ℓ s') ->
-  traces_match Rℓ1 Rs1 trans1 trans2 tr1 tr2 →
-  traces_match Rℓ2 Rs2 trans1' trans2' tr1 tr2.
-Proof.
-  intros HRℓ HRs T1 T2. revert tr1 tr2. cofix IH. intros tr1 tr2 Hmatch.
-  inversion Hmatch; simplify_eq.
-  - constructor 1. by apply HRs.
-  - constructor 2; [by apply HRℓ|by apply HRs|..].
-    3: by apply IH.
-    all: eauto. 
-Qed.
-
   Lemma obls_matching_traces_OM SR extr mtr
     (SR_LIVE: forall c δ, SR c δ -> obls_st_rel c δ)
     (MATCH: obls_om_traces_match_gen SR extr mtr)
@@ -376,34 +354,6 @@ Qed.
     rewrite OB_ in OB. congruence.
   Qed.
 
-  (* TODO: move *)
-  Lemma prefixes_simpl {A: Type} (es tp: list expr) (P: nat -> gset SignalId -> A): 
-    ((λ '(tnew, e) (_ : val), P (locale_of tnew e) ∅) <$> prefixes_from es (drop (length es) tp)) = (map (fun i _ => P i ∅) (seq (length es) (length tp - length es))). 
-  Proof using.
-    destruct (decide (length es < length tp)).
-    2: { rewrite skipn_all2; [| lia].
-         replace (length tp - length es) with 0.
-         { done. }
-         simpl in n. lia. }
-
-    remember (drop (length es) tp) as tp'.
-    replace (length tp - length es) with (length tp').
-    2: { subst. rewrite length_drop. lia. }
-    clear Heqtp'. simpl.
-
-    clear l. revert es. 
-
-    induction tp'.
-    { simpl. done. }
-
-    intros. simpl.
-    f_equal.
-    pose proof (IHtp' (es ++ [a])).
-    replace (S (length es)) with (length (es ++ [a])).
-    2: { simpl. rewrite length_app. simpl. lia. } 
-    rewrite -H2. simpl. done.
-  Qed.    
-
   (* TODO: generalize? *)
   Lemma om_sim_RAH_multiple
           {Σ: gFunctors} {Hinv: @heapGS Σ M EM}
@@ -503,18 +453,6 @@ Qed.
 
     iApply (no_obls_live_tids with "[$] [$] [$]"). done.
   Qed.
-
-  (* TODO: move *)
-  Lemma indexes_seq {A: Type} (l: list A):
-    indexes l = seq 0 (length l).
-  Proof using.
-    rewrite /indexes. rewrite imap_seq_0. by rewrite list_fmap_id.
-  Qed.
-
-  (* Lemma foo `{heapGS Σ M}: heap1GS Σ. *)
-  (*   clear -H2. *)
-  (*   apply H2. *)
-  (*   Show Proof. *)
 
   Lemma obls_match_impl_multiple Σ
     {HEAP: @heapGpreS Σ M EM}
