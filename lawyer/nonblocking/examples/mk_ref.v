@@ -52,7 +52,7 @@ Section SimpleExample.
 End SimpleExample.
 
 
-From lawyer.nonblocking Require Import om_wfree_inst. 
+From lawyer.nonblocking Require Import om_wfree_inst wfree_traces. 
 
 Lemma mk_ref_wfree_init_inv:
   ∀ {Σ : gFunctors} `{heap1GS Σ, invGS_gen HasNoLc Σ} (c : cfg heap_lang),
@@ -120,7 +120,7 @@ Proof using.
 Qed.
   
 
-Definition mk_ref_WF_spec: WaitFreeSpec NotStuck mk_ref := {|
+Definition mk_ref_WF_spec: WaitFreeSpec NotStuck any_arg mk_ref := {|
   wfs_init_mod Σ _ _ := mk_ref_wfree_init_inv;
   wfs_spec := @mk_ref_wfree_spec;
   wfs_safety_spec := @mk_ref_safety_spec;

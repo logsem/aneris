@@ -142,8 +142,9 @@ Section WFAdequacy.
 
   Open Scope WFR_scope. 
 
-  Context (SPEC: WaitFreeSpec s' m).
-  Let F := wfs_F _ _ SPEC.
+  Context (P: val -> Prop) (Pai: P ai).
+  Context (SPEC: WaitFreeSpec s' P m).
+  Let F := wfs_F _ _ _ SPEC.
 
   Definition init_om_wfree_state
     (* (F: nat) (TI: nat) (d0 d1: Degree) (τi: locale Λ) (l0: Level) (ii: nat) *)
@@ -246,6 +247,7 @@ Section WFAdequacy.
     ([∗ set] τ ∈ locales_of_cfg c ∖ {[ τi ]}, obls τ ∅) ∗
     ([∗ set] τ ∈ locales_of_cfg c, ∃ π, th_phase_eq τ π).  
   Proof using.
+    clear dependent Pai. 
     iIntros "INIT". 
     rewrite /obls_init_resource /init_om_wfree_state. simpl.
     rewrite union_empty_r_L map_union_empty. 
@@ -282,7 +284,7 @@ Section WFAdequacy.
   Lemma init_pwp {Σ} {hG :heap1GS Σ} {iG: invGS_gen HasNoLc Σ} τ e0
     (VALID: valid_client e0):
     let _ := irisG_looping HeapLangEM si_add_none (lG := hG) in 
-    wfs_mod_inv _ _ SPEC ⊢ pwp MaybeStuck ⊤ τ (subst "m" m e0) (λ _, True).
+    wfs_mod_inv _ _ _ SPEC ⊢ pwp MaybeStuck ⊤ τ (subst "m" m e0) (λ _, True).
   Proof using SPEC.
     simpl. opose proof * (fundamental e0) as FTLR. 
     { done. }
@@ -300,11 +302,12 @@ Section WFAdequacy.
   Lemma init_wptp_wfree_pwps `{Hinv: @IEMGS _ _ HeapLangEM EM Σ} tp0 tp N
     (NO: τi ∉ locales_of_list_from tp0 tp)
     (SUBST: Forall (λ e, ∃ e0, e = subst "m" m e0 /\ valid_client e0) tp):
-    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ _ SPEC)
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ _ _ SPEC)
    ⊢ wptp_from_gen (thread_pr ic s' MaybeStuck N) tp0 tp
       (map (λ (_ : nat) (_ : val), ⌜ True ⌝%I)
          (adequacy_utils.locales_of_list_from tp0 tp)).
   Proof using SPEC ai.
+    clear Pai. 
     iIntros "#INV". 
     iInduction tp as [|e tp] "IH" forall (tp0 NO).
     { simpl. iApply wptp_from_gen_nil. }
@@ -328,11 +331,11 @@ Section WFAdequacy.
   Lemma init_wptp_wfree `{Hinv: @IEMGS _ _ HeapLangEM EM Σ} c
     (ETR0: tpool_init_restr c.1):
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
-    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ _ SPEC) -∗
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ _ _ SPEC) -∗
     (⌜ ii = 0 ⌝ → ∃ π, cp_mul π0 d0 (F ai) ∗ th_phase_frag τi π (/2)%Qp) -∗
     wptp_wfree ic s' MaybeStuck {tr[ c ]}
       (map (λ _ _, True) (adequacy_utils.locales_of_list c.1)).
-  Proof using.
+  Proof using Pai.
     simpl. iIntros "#INV T".
     rewrite /wptp_wfree. simpl. 
     destruct (thread_pool_split c.1 τi) as (tp1 & tp2 & tp' & EQ & TP' & NO1 & NO2).
@@ -365,6 +368,7 @@ Section WFAdequacy.
     iDestruct ("T" with "[//]") as (π) "[CPS PH]".
     rewrite half_inv2. 
     iPoseProof (get_call_wp _ _ SPEC ai with "[$] [$] [$]") as "WP".
+    { done. }
     destruct (II0 eq_refl) as (e_ & IN & CTX).
     rewrite LOC EQ /= in IN.
     rewrite /from_locale in IN. rewrite from_locale_from_locale_of in IN.
@@ -406,22 +410,22 @@ Section WFAdequacy.
 
   Lemma PR_premise_wfree `{hPre: @heapGpreS Σ M EM} c
     (ETR0: tpool_init_restr c.1)
-    (MOD_INIT: wfs_is_init_st _ m SPEC c)
+    (MOD_INIT: wfs_is_init_st _ _ m SPEC c)
     (M_FUN: exists f x b, m = RecV f x b)
     :
   PR_premise_multiple obls_sim_rel_wfree (fits_inf_call ic m ai)
     Σ MaybeStuck c.1 c.2
     (init_om_wfree_state c) ((): @em_init_param _ _ EM).
-  Proof using.    
+  Proof using Pai.
     red. iIntros (Hinv) "(PHYS & MOD)". simpl.
-    iMod (@wfs_init_mod _ _ SPEC with "[PHYS]") as "#INV".
+    iMod (@wfs_init_mod _ _ _ SPEC with "[PHYS]") as "#INV".
     2: { iFrame. }
     { by rewrite -surjective_pairing. } 
          
     iModIntro.
     iExists (wfree_trace_inv ic s' SPEC).
     
-    iExists (PR_wfree ic s' SPEC ai). simpl.
+    iExists (PR_wfree ic s' SPEC _ Pai). simpl.
 
     do 2 rewrite bi.sep_assoc. iSplitL.
     2: { rewrite /adequacy_cond.rel_always_holds_with_trace_inv.
@@ -571,7 +575,8 @@ Section WFAdequacy.
     :
   ∀ τ, obls_trace_fair τ omtr.
   Proof using.
-    clear m SPEC F fic. 
+    clear m SPEC F fic.
+    clear dependent ai.
     intros. destruct (decide (τ = τi)) as [-> | NEQ].
     2: { red. apply fair_by_equiv. red. intros n OB.
          destruct (omtr S!! n) eqn:NTH; rewrite NTH in OB; [| done].
@@ -733,7 +738,7 @@ Section WFAdequacy.
 
   (* TODO: rename *)
   Lemma simple_om_simulation_adequacy_terminate_multiple_waitfree_impl extr
-    (MOD_INIT : wfs_is_init_st s' m SPEC (trfirst extr))
+    (MOD_INIT : wfs_is_init_st s' _ m SPEC (trfirst extr))
     (VALID : extrace_valid extr)
     (FAIR : fair_call extr tpc ii)
     (INIT_TP : tpool_init_restr (trfirst extr).1)
@@ -742,7 +747,7 @@ Section WFAdequacy.
     terminating_trace extr /\ int_ref_inf_one (call_progresses ic s') extr ∨
     (∃ k, ¬ fits_inf_call ic m ai (trace_take_fwd k extr)) \/
     (s' = MaybeStuck /\ gets_stuck_ae extr ic). 
-  Proof using. 
+  Proof using Pai.
     opose proof (om_simulation_adequacy_model_trace_multiple_waitfree
                 wfreeΣ _ (trfirst extr).1 _ _ _ _ _ VALID _ _) as ADEQ.
     { apply init_om_wfree_is_init. }
@@ -858,7 +863,7 @@ Section WFAdequacy.
   
   Theorem simple_om_simulation_adequacy_terminate_multiple_waitfree extr
         (ETR0: valid_init_tpool m (trfirst extr).1)
-        (MOD_INIT: wfs_is_init_st s' m SPEC (trfirst extr))
+        (MOD_INIT: wfs_is_init_st _ _ _ SPEC (trfirst extr))
         (CALL: from_option (fun c => call_at tpc c m ai (APP := App)) False (extr S!! ii))
     :
     extrace_valid extr -> 
@@ -982,7 +987,7 @@ Section WFAdequacy.
   Lemma obls_terminates_impl_multiple_waitfree
     (extr : extrace heap_lang)
     (ETR0: valid_init_tpool m (trfirst extr).1)
-    (MOD_INIT: wfs_is_init_st s' m SPEC (trfirst extr))
+    (MOD_INIT: wfs_is_init_st _ _ _ SPEC (trfirst extr))
     (VALID: extrace_valid extr)
     (* (FAIR: fair_ex τi extr) *)
     (FAIR: fair_call extr tpc ii)
@@ -1216,21 +1221,26 @@ Proof using.
 Qed. 
 
 
-Definition always_returns_main s m tr :=
+Definition always_returns_main s P m tr :=
   forall tc a ci, let '(TraceCtx i tpc) := tc in
       fair_call tr tpc i ->
       tr S!! i = Some ci ->
       previous_calls_return_tr tr i (tpctx_tid tpc) m ->
       call_at tpc ci m a (APP := App) ->
+      P a ->
       has_return tr tc \/ s = MaybeStuck /\ gets_stuck_ae tr tc.
 
+(** This is the culprit of why we don't actually use non-trivial argument predicate P.
+    The call argument at index i satisfying P doesn't imply the same for argument at a previous call at some index j.
+    However in fact, this reduction is only really needed for proving restricted wait-freedom, and the corresponding case studies we consider do not restrict their argument.
+    So in theory it might be possible to allow argument restriction for full wait-freedom and avoid it for restricted wait-freedom. *)
 Lemma main_returns_reduction s' m etr
   (VALID: extrace_valid etr)
   (M_FUN: exists f x b, m = RecV f x b):
-  always_returns_main s' m etr -> always_returns m s' etr.
+  always_returns_main s' any_arg m etr -> always_returns m s' any_arg etr.
 Proof using.
   rewrite /always_returns_main /always_returns. 
-  intros MAIN_RET. intros [i [K τ]] a ci FAIR ITH CALL.
+  intros MAIN_RET. intros [i [K τ]] a ci FAIR ITH CALL _.
 
   odestruct (@Classical_Prop.classic _) as [RET | NORET]; [by apply RET| ].
   apply Classical_Prop.not_or_and in NORET as (NORET & ?). 
@@ -1240,6 +1250,7 @@ Proof using.
   destruct X as (j & K' & a' & c' & ?&?&?&?&PREV&NVALj).
   ospecialize * (MAIN_RET (TraceCtx j (TpoolCtx K' τ))).
   1-4: by eauto.
+  { done. }
 
   destruct MAIN_RET as [RETj | [-> STUCKj]].
   2: { right. split; [done| ].
@@ -1281,17 +1292,20 @@ Qed.
 
 
 Theorem wfree_is_wait_free s' m
-  (SPEC: WaitFreeSpec s' m)
+  (SPEC: WaitFreeSpec s' any_arg m)
   (M_FUN: exists f x b, m = RecV f x b):
-  wait_free m (wfs_is_init_st _ _ SPEC) s'.
+  wait_free m (wfs_is_init_st _ _ _ SPEC) s' any_arg.
 Proof using.
   red. intros etr ETR0 MOD_INIT VALID.
   apply main_returns_reduction; try done. 
-  red. intros [i tpc] a ci FAIR ITH MAIN CALL.
+  red. intros [i tpc] a ci FAIR ITH MAIN CALL _.
 
-  opose proof * (obls_terminates_impl_multiple_waitfree (TraceCtx i tpc)) as ADEQ; eauto.
+  opose proof * (obls_terminates_impl_multiple_waitfree (TraceCtx i tpc)) as ADEQ.
+  3: by apply MOD_INIT. 
+  all: eauto.
+  { done. }
   { simpl. by rewrite ITH. }
-
+  
   destruct ADEQ as [[TERM PROGRESS]| [? | ?]].
   2, 3: tauto. 
 

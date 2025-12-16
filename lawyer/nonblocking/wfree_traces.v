@@ -51,23 +51,25 @@ Section CallInTrace.
             fairness_sat locale_enabled_safe tid_match τ cd (tr L!! (k + d)). 
 
   (* TODO: rename *)
-  Definition always_returns (s: stuckness) tr :=    
+  Definition always_returns (s: stuckness) (P: val -> Prop) tr :=    
     forall tc a ci, let '(TraceCtx i tpc) := tc in
       (* fair_ex (tpctx_tid tpc) tr -> *)
       fair_call tr tpc i ->
       tr S!! i = Some ci ->
       call_at tpc ci m a (APP := App) ->
+      P a -> 
       has_return tr tc \/ s = MaybeStuck /\ gets_stuck_ae tr tc. 
 
   Definition valid_op_client e := exists e0, e = subst "m" m e0 /\ valid_client e0.
 
   Definition valid_init_tpool (tp: list expr) := Forall valid_op_client tp. 
   
-  Definition wait_free (is_init_st: cfg heap_lang -> Prop) (s: stuckness) := forall etr,
+  Definition wait_free (is_init_st: cfg heap_lang -> Prop)
+    (s: stuckness) (P: val -> Prop) := forall etr,
       valid_init_tpool (trfirst etr).1 ->
       is_init_st (trfirst etr) ->
       extrace_valid etr ->
-      always_returns s etr.
+      always_returns s P etr.
 
   Lemma no_return_before_equiv_nvals tr tpc c i k
     (VALID: extrace_valid tr)
@@ -196,21 +198,22 @@ Section CallInTrace.
     eauto.
   Qed.
 
-  Definition always_returns_strong s tr :=
+  Definition always_returns_strong s P tr :=
     forall tc a ci, let '(TraceCtx i tpc) := tc in
       fair_call_strong tr tpc i ->
       tr S!! i = Some ci ->
       call_at tpc ci m a (APP := App) ->
+      P a -> 
       has_return tr tc \/ s = MaybeStuck /\ gets_stuck_ae tr tc. 
 
-  Definition wait_free_strong (is_init_st: cfg heap_lang -> Prop) s := forall etr,
+  Definition wait_free_strong (is_init_st: cfg heap_lang -> Prop) s P := forall etr,
       valid_init_tpool (trfirst etr).1 ->
       is_init_st (trfirst etr) ->
       extrace_valid etr ->
-      always_returns_strong s etr.
+      always_returns_strong s P etr.
 
-  Lemma wait_free_equiv C s:
-    wait_free C s <-> wait_free_strong C s.
+  Lemma wait_free_equiv C s P:
+    wait_free C s P <-> wait_free_strong C s P.
   Proof using.
     rewrite /wait_free /wait_free_strong.
     repeat (apply forall_proper; intros).
@@ -247,11 +250,14 @@ Section CallInTrace.
          inversion H1. apply ectx_fill_inj in H3. by subst. }
     apply of_to_val in VV as <-. subst e. 
     left. eauto.
-  Qed.  
+  Qed.
 
-  Lemma always_returns_impl etr s1 s2
-    (S12: stuckness_le s1 s2):
-    always_returns s1 etr -> always_returns s2 etr.
+  Definition any_arg: val -> Prop := fun _ => True. 
+
+  Lemma always_returns_impl etr s1 s2 P1 P2
+    (S12: stuckness_le s1 s2)
+    (P21: forall v, P2 v -> P1 v):
+    always_returns s1 P1 etr -> always_returns s2 P2 etr.
   Proof using.
     rewrite /always_returns. simpl.
     intros AR [i tpc] **.
@@ -260,10 +266,11 @@ Section CallInTrace.
     destruct s2; try done. by right.
   Qed.
   
-  Lemma wait_free_impl C1 C2 s1 s2
+  Lemma wait_free_impl C1 C2 s1 s2 P1 P2
     (C21: forall c, C2 c -> C1 c)
-    (S12: stuckness_le s1 s2):
-    wait_free C1 s1 -> wait_free C2 s2.
+    (S12: stuckness_le s1 s2)
+    (P21: forall v, P2 v -> P1 v):
+    wait_free C1 s1 P1 -> wait_free C2 s2 P2.
   Proof using.
     rewrite /wait_free. simpl. intros WF ? INIT ??.
     eapply always_returns_impl; eauto.
@@ -282,11 +289,12 @@ Section RestrWFree.
     Forall2 (fun m e => valid_op_client m e /\ no_forks e) ms' tp. 
 
   (** TODO: account for multiple m's in unrestricted wait-freedom too *)
-  Definition wait_free_restr (ms: gmap val nat) (is_init_st: cfg heap_lang -> Prop) s := forall etr,
+  Definition wait_free_restr (ms: gmap val nat) (is_init_st: cfg heap_lang -> Prop)
+    s P := forall etr,
       valid_init_tpool_restr (trfirst etr).1 ms ->
       is_init_st (trfirst etr) ->
       extrace_valid etr ->
-      forall m, m ∈ dom ms -> always_returns m s etr.  
+      forall m, m ∈ dom ms -> always_returns m s P etr.
 
 End RestrWFree.
 

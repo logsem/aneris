@@ -394,7 +394,7 @@ Section ListMapSpec.
 End ListMapSpec.
 
 
-From lawyer.nonblocking Require Import om_wfree_inst. 
+From lawyer.nonblocking Require Import om_wfree_inst wfree_traces. 
 
 Section ListMapWFree.
 
@@ -551,19 +551,19 @@ Section ListMapWFree.
     by iApply list_map_phys_spec'.
   Qed.
 
-  Program Definition hlm_WF_fix_spec_unsafe f (WFf: WaitFreeSpec MaybeStuck f) F
+  Program Definition hlm_WF_fix_spec_unsafe f (WFf: WaitFreeSpec MaybeStuck any_arg f) F
     (* TODO: try to lift this restriction *)
-    (F_FUEL: wfs_F _ _ WFf = fun _ => F)
+    (F_FUEL: wfs_F _ _ _ WFf = fun _ => F)
     :
-    WaitFreeSpec MaybeStuck (λ: "x", hl_list_map_cur f "x")%V := {|
-    wfs_is_init_st := wfs_is_init_st _ _ WFf;
-    wfs_mod_inv Σ _ _ := (hlm_mod_inv ∗ wfs_mod_inv _ _ WFf)%I;
+    WaitFreeSpec MaybeStuck any_arg (λ: "x", hl_list_map_cur f "x")%V := {|
+    wfs_is_init_st := wfs_is_init_st _ _ _ WFf;
+    wfs_mod_inv Σ _ _ := (hlm_mod_inv ∗ wfs_mod_inv _ _ _ WFf)%I;
     wfs_F := S ∘ (hl_map_fuel F);
   |}.
   Next Obligation.
     intros. simpl.
     iIntros "INIT".
-    iMod (wfs_init_mod _ _ WFf with "[$]") as "foo"; [done| ].
+    iMod (wfs_init_mod _ _ _ WFf with "[$]") as "foo"; [done| ].
     iFrame "#∗". done.
   Qed.
   Next Obligation.
@@ -575,7 +575,7 @@ Section ListMapWFree.
     { iFrame "#∗".
       rewrite /wait_free_method_gen. iIntros (**).
       iIntros (Ψ) "!> (CP & PH & _) POST".
-      iApply (wfs_spec _ _ WFf with "[$] [-POST]").
+      iApply (wfs_spec _ _ _ WFf with "[$] [-POST]").
       { iFrame. rewrite F_FUEL. iApply "CP". }
       iNext. iIntros "% PH". iApply "POST". by iFrame. }
     { iFrame. }
@@ -587,5 +587,43 @@ Section ListMapWFree.
     iApply hlm_fix_phys_spec. iFrame "#∗".
     iApply wfs_safety_spec. by iFrame.
   Qed.
+
+  (* TODO: not usable with the current adequacy theorem *)
+  (* Program Definition hlm_WF_fix_spec_safe f (WFf: WaitFreeSpec NotStuck any_arg f) F *)
+  (*   (* TODO: try to lift this restriction *) *)
+  (*   (F_FUEL: wfs_F _ _ _ WFf = fun _ => F) *)
+  (*   : *)
+  (*   WaitFreeSpec NotStuck hlm_arg_restr (λ: "x", hl_list_map_cur f "x")%V := {| *)
+  (*   wfs_is_init_st := wfs_is_init_st _ _ _ WFf; *)
+  (*   wfs_mod_inv Σ _ _ := (hlm_mod_inv ∗ wfs_mod_inv _ _ _ WFf)%I; *)
+  (*   wfs_F := S ∘ (hl_map_fuel F); *)
+  (* |}. *)
+  (* Next Obligation. *)
+  (*   intros. simpl. *)
+  (*   iIntros "INIT". *)
+  (*   iMod (wfs_init_mod _ _ _ WFf with "[$]") as "foo"; [done| ]. *)
+  (*   iFrame "#∗". done. *)
+  (* Qed. *)
+  (* Next Obligation. *)
+  (*   intros. simpl. *)
+  (*   iIntros "(#INVl & #INVf)". *)
+  (*   rewrite /wait_free_method_gen. iIntros (**). *)
+  (*   iIntros (Φ) "!> (CP & PH & ?) POST". *)
+  (*   iApply (hlm_spec_fix with "[] [-POST]").  *)
+  (*   { iFrame "#∗". *)
+  (*     rewrite /wait_free_method_gen. iIntros (**). *)
+  (*     iIntros (Ψ) "!> (CP & PH & _) POST". *)
+  (*     iApply (wfs_spec _ _ _ WFf with "[$] [-POST]"). *)
+  (*     { iFrame. rewrite F_FUEL. iApply "CP". } *)
+  (*     iNext. iIntros "% PH". iApply "POST". by iFrame. } *)
+  (*   { iFrame. } *)
+  (*   iNext. iIntros "% (PH & _)". iApply "POST". by iFrame. *)
+  (* Qed.  *)
+  (* Final Obligation. *)
+  (*   intros. simpl. *)
+  (*   iIntros "(#INVl & #INVf)". *)
+  (*   iApply hlm_fix_phys_spec. iFrame "#∗". *)
+  (*   iApply wfs_safety_spec. by iFrame. *)
+  (* Qed. *)
   
 End ListMapWFree.

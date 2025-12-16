@@ -81,7 +81,7 @@ Section Counter.
 End Counter.
 
 
-From lawyer.nonblocking Require Import om_wfree_inst.
+From lawyer.nonblocking Require Import om_wfree_inst wfree_traces.
 
 Lemma counter_wfree_spec (l: loc)
   {M} {EM: ExecutionModel heap_lang M} {Σ : gFunctors}
@@ -138,7 +138,7 @@ Proof using.
 Qed.
 
 
-Definition counter_WF_spec (l: loc): WaitFreeSpec trillium.bi.weakestpre.NotStuck (incr l) := {|
+Definition counter_WF_spec (l: loc): WaitFreeSpec trillium.bi.weakestpre.NotStuck any_arg (incr l) := {|
   wfs_init_mod Σ _ _ := counter_wfree_init_inv l;
   wfs_spec := @counter_wfree_spec l;
   wfs_safety_spec Σ _ _ := counter_safety_spec l;

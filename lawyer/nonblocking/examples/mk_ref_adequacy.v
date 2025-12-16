@@ -1,7 +1,7 @@
 From heap_lang Require Import lang.
 From lawyer.nonblocking Require Import mk_ref wfree_adequacy wfree_traces.
 
-Theorem mk_ref_is_wait_free: wait_free mk_ref (fun _ => True) NotStuck.
+Theorem mk_ref_is_wait_free: wait_free mk_ref (fun _ => True) NotStuck any_arg.
 Proof using.
   eapply (wfree_is_wait_free _ _ mk_ref_WF_spec).
   eauto. 

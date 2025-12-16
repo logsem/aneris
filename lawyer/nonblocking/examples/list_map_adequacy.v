@@ -4,10 +4,12 @@ From lawyer.nonblocking Require Import counter list_map wfree_adequacy wfree_tra
   
 
 Theorem list_map_incr_is_wait_free
-  (l0: loc := Loc 0)
-  : wait_free (λ: "x", hl_list_map_cur (incr l0) "x")%V (counter_is_init_st l0) MaybeStuck.
+  (l0: loc := Loc 0) :
+  wait_free (λ: "x", hl_list_map_cur (incr l0) "x")%V
+    (counter_is_init_st l0) MaybeStuck any_arg.
 Proof using.
   eapply wait_free_impl with (s1 := MaybeStuck).
+  3: done. 
   3: { apply wfree_is_wait_free. eauto. }
   2: done.
   Unshelve.

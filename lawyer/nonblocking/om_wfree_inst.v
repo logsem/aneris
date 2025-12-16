@@ -40,34 +40,9 @@ From heap_lang Require Import heap_lang_defs lang notation.
 From lawyer.obligations Require Import obligations_resources.
 
 
-Lemma foo:
-  forall {M: Model} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ},
-    heap1GS Σ.
-Proof using.
-  intros.
-  exact (iem_phys _ EM).
-  Show Proof.
-  Abort. 
-
-Lemma foo:
-  forall {M: Model} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ},
-    invGS_gen HasNoLc Σ.
-Proof using.
-  intros.
-  apply _.
-  Show Proof. 
-Abort. 
-
-
-(** Lawyer representation of wait-freedom of a "first-order" function `m`.
-    Consists of two specs: model-based and physical-only.
-    Neither of them restricts the arguments that `m` is called with.
-    With that, the model-based spec implies that `m` must safely terminate with any argument while preserving physical and model interpretation, as well as invariants.
-    Physical-only spec requires that physical interpretation and invariants are preserved, while allowing `m` to get stuck (however, since it satisfies the model-based spec, it won't actually get stuck).
-    Both specifications rely on the module invariant `wfs_mod_inv`.
-    It is crucial that this invariant doesn't involve any model resources (compare e.g. Σ restrictions for the invariant and the model-based spec).
-    That's because it has to be preserved when either of the specs is used. *)
-Record WaitFreeSpec (s: stuckness) (m: val) := {
+(** So far P is only actually set to (fun _ => True).
+    See comment for wfree_adequacy.main_returns_reduction. *)
+Record WaitFreeSpec (s: stuckness) (P: val -> Prop) (m: val) := {
   wfs_is_init_st: cfg heap_lang -> Prop;
   (** for wait-free modules, we expect that invariant doesn't contain OM resources *)
   wfs_mod_inv {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ}: iProp Σ;
@@ -83,17 +58,18 @@ Record WaitFreeSpec (s: stuckness) (m: val) := {
   wfs_spec:
   forall {M} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ},
     (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv) ⊢
-    wait_free_method_gen s m d_wfr0 wfs_F (fun _ => ⌜ True ⌝) (fun _ => ⌜ True ⌝);
+    wait_free_method_gen s m d_wfr0 wfs_F (fun v => ⌜ P v ⌝) (fun _ => ⌜ True ⌝);
 
   wfs_safety_spec:
     ∀ {Σ : gFunctors} `{heap1GS Σ, invGS_gen HasNoLc Σ},
       wfs_mod_inv ⊢ interp m;
 }.
 
-Program Definition WFS_weaken m (WFS: WaitFreeSpec NotStuck m): WaitFreeSpec MaybeStuck m := {|
-  wfs_init_mod _ _ _ := wfs_init_mod _ _ WFS; 
-  wfs_safety_spec _ _ _ := wfs_safety_spec _ _ WFS; 
-  wfs_F := wfs_F _ _ WFS; 
+Program Definition WFS_weaken m P (WFS: WaitFreeSpec NotStuck P m):
+  WaitFreeSpec MaybeStuck P m := {|
+  wfs_init_mod _ _ _ := wfs_init_mod _ _ _ WFS; 
+  wfs_safety_spec _ _ _ := wfs_safety_spec _ _ _ WFS; 
+  wfs_F := wfs_F _ _ _ WFS; 
 |}.
 Final Obligation. 
   simpl. intros.
@@ -101,7 +77,7 @@ Final Obligation.
   iIntros (**).
   iIntros (?) "!> (?&?&?) POST".
   iApply wp_stuck_weaken.
-  iApply (wfs_spec _ _ WFS with "[] [-POST]"); iFrame "#∗".
+  iApply (wfs_spec _ _ _ WFS with "[] [-POST]"); iFrame "#∗".
 Qed.
 
 
