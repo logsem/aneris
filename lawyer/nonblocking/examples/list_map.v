@@ -569,8 +569,8 @@ Section ListMapWFree.
   Next Obligation.
     intros. simpl.
     iIntros "(#INVl & #INVf)".
-    rewrite /wait_free_method. iIntros (**).
-    iIntros (Φ) "!> (CP & PH) POST".
+    rewrite /wait_free_method_gen. iIntros (**).
+    iIntros (Φ) "!> (CP & PH & ?) POST".
     iApply (hlm_spec_fix_unsafe with "[] [-POST]"). 
     { iFrame "#∗".
       rewrite /wait_free_method_gen. iIntros (**).

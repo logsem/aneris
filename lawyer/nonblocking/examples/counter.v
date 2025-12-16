@@ -87,13 +87,13 @@ Lemma counter_wfree_spec (l: loc)
   {M} {EM: ExecutionModel heap_lang M} {Σ : gFunctors}
     (OHE : OM_HL_Env OP_HL_WF EM Σ):
   (let _: heap1GS Σ := iem_phys HeapLangEM EM in counter_inv l)
-  ⊢ wait_free_spec_defs.wait_free_method NotStuck (incr l) d_wfr0 (fun _ => 5%nat).
+  ⊢ wait_free_spec_defs.wait_free_method_gen NotStuck (incr l) d_wfr0 (fun _ => 5%nat) (fun _ => True) (fun _ => True).
 Proof using.
-  simpl. rewrite /wait_free_spec_defs.wait_free_method. 
-  iIntros "#INV" (τ π q a). iIntros "!> %Φ (CPS & PH) POST".
+  simpl. rewrite /wait_free_spec_defs.wait_free_method_gen. 
+  iIntros "#INV" (τ π q a). iIntros "!> %Φ (CPS & PH & ?) POST".
   iApply (counter_mock_spec with "[-POST]").
   { by iFrame. }
-  iIntros "!> % ?". by iApply "POST".
+  iIntros "!> % ?". iApply "POST". by iFrame. 
 Qed.
 
 Lemma counter_wfree_init_inv (l : loc):
