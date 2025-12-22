@@ -215,28 +215,59 @@ Qed.
     rewrite !prefixes_from_length in EQUIV. done.
   Qed.
 
+  Lemma locale_step_inv c1 c2 τ
+    (STEP: locale_step c1 (Some τ) c2):
+    exists tp tp' K e1 e2 efs,
+      c1.1 = tp ++ [fill K e1] ++ tp' /\ 
+      c2.1 = tp ++ [fill K e2] ++ tp' ++ efs /\
+      τ = locale_of tp (fill K e1) /\
+      head_step e1 c1.2 e2 c2.2 efs .
+  Proof using.
+    inversion STEP; subst. simpl.
+    inversion H3. subst. simpl in *.
+    set_solver.
+  Qed.
+
+  Lemma step_fork_hl_strong t1 t2 K e e' efs σ σ'
+    (c := (t1 ++ (fill K e) :: t2, σ))
+    (c' := (t1 ++ (fill K e') :: t2 ++ efs, σ'))
+    (STEP: head_step e σ e' σ' efs):
+    step_fork c c' = None /\ efs = [] \/ 
+    exists ef, efs = [ef] /\ e = Fork ef /\ e' = Val #() /\ 
+          step_fork c c' = Some (locale_of c.1 ef).
+  Proof using.
+    subst c c'.
+    (* rewrite /locale_of in H. *)
+    (* inversion H0. subst.  *)
+    (* assert (t0 = t1 /\ e1 = e /\ t3 = t2 /\ e2 = e' /\ efs0 = efs) as (-> & -> & -> & -> & ->).  *)
+    (* { by list_simplifier. } *)
+    (* simpl in H3. clear H H0 H4 H1. *)
+    (* inversion H3. subst. simpl in *. *)
+    inversion STEP; subst.
+    all: try by (left; split; [| reflexivity];
+                 apply step_fork_locales_equiv; rewrite app_nil_r;
+                 apply locales_equiv_middle). 
+    right. do 2 eexists. repeat split; eauto.
+    rewrite app_comm_cons. rewrite app_assoc. 
+    rewrite step_fork_fork; [done| ].
+    apply locales_equiv_middle. done.
+  Qed.
+
   Lemma step_fork_hl t1 t2 e e' efs σ σ'
     (c := (t1 ++ e :: t2, σ))
     (c' := (t1 ++ e' :: t2 ++ efs, σ'))
     (STEP: locale_step c (Some (locale_of t1 e)) c'):
     step_fork c c' = None /\ efs = [] \/ exists ef, efs = [ef] /\ step_fork c c' = Some (locale_of c.1 ef).
   Proof using.
-    inversion STEP; subst. subst c c'.
-    rewrite /locale_of in H.
-    inversion H0. subst. 
-    assert (t0 = t1 /\ e1 = e /\ t3 = t2 /\ e2 = e' /\ efs0 = efs) as (-> & -> & -> & -> & ->). 
+    subst c c'.
+    rewrite /locale_of in STEP.
+    inversion STEP. subst.
+    assert (t0 = t1 /\ e1 = e /\ t3 = t2 /\ e2 = e' /\ efs0 = efs) as (-> & -> & -> & -> & ->).
     { by list_simplifier. }
-    simpl in H3. clear H H0 H4 H1.
+    simpl in *.
     inversion H3. subst. simpl in *.
-    inversion H1; subst.
-    all: try by (left; split; [| reflexivity];
-                 apply step_fork_locales_equiv; rewrite app_nil_r;
-                 apply locales_equiv_middle). 
-    right. eexists. split; eauto.
-    rewrite app_comm_cons. rewrite app_assoc. 
-    rewrite step_fork_fork; [done| ].
-    apply locales_equiv_middle. done.
-  Qed.
+    eapply step_fork_hl_strong in H5 as [[??] | (?&?&?&?&?)]; eauto.
+  Qed.  
 
 Lemma locale_step_step_fork_exact c1 c2 τ
   (STEP: locale_step c1 (Some τ) c2):
