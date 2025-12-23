@@ -2,7 +2,8 @@ From iris.proofmode Require Import tactics.
 From lawyer.examples Require Import orders_lib.
 From lawyer.obligations Require Import env_helpers obligations_model.
 From lawyer.nonblocking Require Import om_wfree_inst.
-From lawyer.nonblocking.logrel Require Import logrel.
+(* From lawyer.nonblocking.logrel Require Import logrel. *)
+From lawyer.nonblocking.logrel_tok Require Import logrel.
 
 
 From trillium.program_logic Require Import weakestpre. 

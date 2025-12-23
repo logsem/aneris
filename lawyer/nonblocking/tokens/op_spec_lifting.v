@@ -3,6 +3,8 @@ From trillium.traces Require Import inftraces trace_lookup exec_traces trace_len
 From fairness Require Import fairness locales_helpers.
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am obls_termination obligations_wf.
 From lawyer.nonblocking Require Import trace_context wptp_gen pwp wfree_traces calls pwp_ext pr_wfree_tokens om_wfree_inst_tokens.
+(* From lawyer.nonblocking.logrel Require Import logrel. *)
+From lawyer.nonblocking.tokens Require Import sub_expr.
 From trillium.program_logic Require Import execution_model weakestpre adequacy_utils adequacy_cond simulation_adequacy_em_cond. 
 From lawyer Require Import action_model sub_action_em.
 From lawyer Require Import program_logic.  
@@ -14,21 +16,42 @@ From heap_lang Require Import sswp_logic lang locales_helpers_hl.
 Close Scope Z. 
 
 Section SpecLifting.
-  Context `{PWT: PrWfreeTok Σ}.
 
   Context {M: Model} {EM: ExecutionModel heap_lang M}.
 
   Context (m: val) (τ: locale heap_lang). 
 
+  Lemma restore_ssv `{heap1GS Σ, invGS_gen HasNoLc Σ} cs K s extr e (r: val)
+    (CALL : inside_call m τ K s extr e)
+    (STH: extr !! s = Some cs)
+    (RET: return_at (TpoolCtx K τ) (trace_last extr) r):
+  safe_sub_values τ cs -∗ interp r -∗
+  safe_sub_values τ (trace_last extr).
+  Proof using.
+    iIntros "#SSV0 #RET".
+    rewrite /safe_sub_values. iIntros (e' v E_ SUB).
+    red in CALL. destruct CALL as (?&?&?&?& LAST).
+    rewrite E_ /= in LAST.
+    apply under_ctx_spec in LAST as <-.
+    Set Printing Coercions.
+    destruct (decide (is_sub_expr v e)).
+    - (* LR for values must be preserved for sub-values *)
+      admit.
+    - (* v must belong to the context K which hasn't changed *)
+      admit.
+  Admitted.
+
   (* TODO: ct_interp_tok doesn't need an entire trace_ctx *)
   Let mock_tctx := TraceCtx 99 (TpoolCtx ectx_emp τ). 
+
+  Context `{PWT: PrWfreeTok Σ}.
 
   Lemma lift_call e
     (NVAL: to_val e = None):
     (let _ := IEMGS_into_Looping (@pwt_Hinv _ PWT) si_add_none in
-     WP e @τ {{ _, unit_tok }}) -∗
+     WP e @τ {{ v, interp v ∗ unit_tok }}) -∗
     ct_frag (Some e) -∗
-    (let _ := IEMGS_into_Looping (@pwt_Hinv _ PWT) (@ct_interp_tok mock_tctx m _ PWT) in WP e @τ {{ _, ct_frag None }}).
+    (let _ := IEMGS_into_Looping (@pwt_Hinv _ PWT) (@ct_interp_tok mock_tctx m _ PWT) in WP e @τ {{ v, interp v ∗ ct_frag None }}).
   Proof using.
     simpl. 
     iIntros "WP MRK".
@@ -42,7 +65,7 @@ Section SpecLifting.
 
     rewrite /ct_interp_tok /ct_interp. iDestruct "CTI" as "(%&AUTH & X)".
     iDestruct (ct_auth_frag_agree with "[$] [$]") as %EQ. 
-    iDestruct "X" as "[(?&%) | (%&%&%&->&%CALL)]".
+    iDestruct "X" as "[(?&%&SSV) | (%&%&%& [-> %CALL] & #SSV0)]".
     { subst. done. }
     inversion EQ. subst e0. clear EQ.
 
@@ -76,7 +99,7 @@ Section SpecLifting.
       iModIntro. do 2 iExists _. iFrame.
       assert (efs = []) as -> by admit. repeat rewrite big_sepL_nil.
       iSplitL "TOK".
-      { iLeft. by iFrame. }
+      { iLeft. iFrame. }
       iSplit; [| done]. by iApply @wp_value.
       Unshelve. 2, 3: exact tt. exact looping_trace. }
 

@@ -1073,7 +1073,7 @@ Section WaitFreePR.
     ct_interp_tok (etr :tr[ τ ]: c'') -∗ unit_tok.
   Proof using.
     rewrite /ct_interp_tok /ct_interp.
-    iIntros "(%&?&[($ & %) | (%&%&%&%CONTRA)])".
+    iIntros "(%&?&[($ & %) | (%&%&%&%CONTRA&SSV0)])".
     exfalso. destruct CONTRA as [-> ?].
     eapply no_ongoing_call; eauto.
   Qed.    
@@ -1371,18 +1371,18 @@ Section WaitFreePR.
   Admitted.
 
   (* TODO: move *)
-  Lemma bump_ssv_other etr_ τ c''
+  Lemma bump_ssv_other τ c1 c2
     (OTHER: τ ≠ τi)
-    (STEP: locale_step (trace_last etr_) (Some τ) c''):
+    (STEP: locale_step c1 (Some τ) c2):
     let _: heap1GS Σ := iem_phys HeapLangEM EM in 
-    safe_sub_values τi etr_ -∗ safe_sub_values τi (etr_ :tr[ Some τ ]: c'').
+    safe_sub_values τi c1 -∗ safe_sub_values τi c2.
   Proof using.
     clear -OTHER STEP. 
     simpl. iIntros "#SSV".
     rewrite /safe_sub_values. iIntros "**".
     iApply "SSV"; eauto. iPureIntro.
     (* no forks, so τi is always present in the trace *)
-    assert (τi ∈ locales_of_cfg (trace_last etr_)) as IN by admit.
+    assert (τi ∈ locales_of_cfg c1) as IN by admit.
     apply locales_of_cfg_Some in IN as [? IN].
     2: { apply empty_state. }
     apply from_locale_lookup in H.
@@ -1398,13 +1398,16 @@ Section WaitFreePR.
   Proof using.
     clear WFST F.
     rewrite /ct_interp_tok /ct_interp.
-    iIntros "(%&?&[(? & -> & #?) | (%&%&%&->&%)])".
+    iIntros "(%&?&[(? & % & #?) | (%&%&%& [-> %]&?)])".
     - iExists _. iFrame. iLeft. iFrame.
       iSplit; [done| ].
       by iApply bump_ssv_other. 
     - iExists _. iFrame. iRight.
-      do 3 iExists _. iPureIntro. split; eauto.
-      apply bump_inside_call; eauto.
+      do 3 iExists _. iSplit.
+      + iPureIntro. split; eauto.
+        apply bump_inside_call; eauto.
+      + destruct (etr !! s0) eqn:S0; [| done].
+        eapply ft_lookup_old in S0. by erewrite S0.
   Qed.
 
   Lemma bump_cti_cond τ c''
