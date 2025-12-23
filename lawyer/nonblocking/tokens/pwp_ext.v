@@ -3,6 +3,8 @@ From trillium.traces Require Import inftraces trace_lookup exec_traces trace_len
 From fairness Require Import fairness locales_helpers.
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am obls_termination obligations_wf.
 From lawyer.nonblocking Require Import trace_context wptp_gen pwp wfree_traces calls.
+From lawyer.nonblocking.logrel Require Import logrel.
+From lawyer.nonblocking.tokens Require Import sub_expr.
 From trillium.program_logic Require Import execution_model weakestpre adequacy_utils adequacy_cond simulation_adequacy_em_cond. 
 From lawyer Require Import action_model sub_action_em.
 From lawyer Require Import program_logic.  
@@ -148,13 +150,19 @@ Section PwpExtra.
       eapply under_ctx_spec; eauto.
   Qed.
 
+  Definition safe_sub_values `{heap1GS Σ} (etr: execution_trace heap_lang): iProp Σ :=
+    ∀ e v, ⌜ (trace_last etr).1 !! τ = Some e ⌝ -∗
+           ⌜ is_sub_expr (Val v) e ⌝ -∗ 
+           interp v.
+
   Context (tok: iProp Σ).
 
-  Definition ct_interp (etr: execution_trace heap_lang): iProp Σ
+  Definition ct_interp `{heap1GS Σ} (etr: execution_trace heap_lang): iProp Σ
     (* (oe: option expr) *)
     :=
     ∃ (oe: option expr), ct_auth oe ∗
-    (tok ∗ ⌜ oe = None ⌝ ∨ ∃ e K s, ⌜ oe = Some e /\ inside_call K s etr e⌝)
+    (tok ∗ ⌜ oe = None ⌝ ∗ safe_sub_values etr ∨
+     ∃ e K s, ⌜ oe = Some e /\ inside_call K s etr e⌝)
   .
 
   (* Definition irisG_phys_cti (LG: LangEM heap_lang) `{invGS_gen HasNoLc Σ} {lG: lgem_GS Σ}: *)

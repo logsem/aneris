@@ -80,8 +80,9 @@ Section WaitFreePR.
       pwt_UT :: UnitToken Σ;
   }.
 
-  Definition ct_interp_tok `{PWT: PrWfreeTok Σ} (etr: execution_trace heap_lang): iProp Σ
-    := ct_interp m τi unit_tok etr.
+  Definition ct_interp_tok `{PWT: PrWfreeTok Σ} (etr: execution_trace heap_lang): iProp Σ :=
+    let _: heap1GS Σ := iem_phys HeapLangEM EM in
+    ct_interp m τi unit_tok etr.
 
   Definition cti_cond `{PWT: PrWfreeTok Σ} (etr: execution_trace heap_lang): iProp Σ
     :=
@@ -1369,6 +1370,27 @@ Section WaitFreePR.
       iFrame. iModIntro. iIntros (?). simpl in *. lia.  
   Admitted.
 
+  (* TODO: move *)
+  Lemma bump_ssv_other etr_ τ c''
+    (OTHER: τ ≠ τi)
+    (STEP: locale_step (trace_last etr_) (Some τ) c''):
+    let _: heap1GS Σ := iem_phys HeapLangEM EM in 
+    safe_sub_values τi etr_ -∗ safe_sub_values τi (etr_ :tr[ Some τ ]: c'').
+  Proof using.
+    clear -OTHER STEP. 
+    simpl. iIntros "#SSV".
+    rewrite /safe_sub_values. iIntros "**".
+    iApply "SSV"; eauto. iPureIntro.
+    (* no forks, so τi is always present in the trace *)
+    assert (τi ∈ locales_of_cfg (trace_last etr_)) as IN by admit.
+    apply locales_of_cfg_Some in IN as [? IN].
+    2: { apply empty_state. }
+    apply from_locale_lookup in H.
+    simpl in H. eapply locale_step_other_same in STEP; eauto. 
+    2: { intros EQ. apply OTHER. apply Some_inj. apply EQ. }
+    apply from_locale_lookup. set_solver.
+  Admitted.
+
   Lemma bump_cti τ c''
     (OTHER: τ ≠ τi)
     (STEP: locale_step (trace_last etr) (Some τ) c''):
@@ -1376,11 +1398,13 @@ Section WaitFreePR.
   Proof using.
     clear WFST F.
     rewrite /ct_interp_tok /ct_interp.
-    iIntros "(%&?&[(? & %) | (%&%&%&->&%)])".
-    { iExists _. iFrame. iLeft. eauto. }
-    iExists _. iFrame. iRight.
-    do 3 iExists _. iPureIntro. split; eauto.
-    apply bump_inside_call; eauto.
+    iIntros "(%&?&[(? & -> & #?) | (%&%&%&->&%)])".
+    - iExists _. iFrame. iLeft. iFrame.
+      iSplit; [done| ].
+      by iApply bump_ssv_other. 
+    - iExists _. iFrame. iRight.
+      do 3 iExists _. iPureIntro. split; eauto.
+      apply bump_inside_call; eauto.
   Qed.
 
   Lemma bump_cti_cond τ c''
