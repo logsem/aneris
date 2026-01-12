@@ -59,29 +59,30 @@ Section WaitFreePR.
   Let τi := tpctx_tid tc. 
 
   Context (s': stuckness).
-  Context `(WFST: WaitFreeSpecToken m).
+  Context `(WFST: WaitFreeSpecToken ms).
+  Context (m: val) (MSm: m ∈ dom ms).
   Let F := wfst_F _ WFST. 
   
   Open Scope WFR_scope. 
 
-  Lemma get_call_wp {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} {UT: UnitToken Σ}
+  Lemma get_call_wp {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} {MT: MethodToken Σ}
     (a: val) π:
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
     (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ WFST) -∗
-    cp_mul π0 d0 F -∗ th_phase_frag τi π (1 / 2)%Qp -∗ unit_tok -∗
+    cp_mul π0 d0 F -∗ th_phase_frag τi π (1 / 2)%Qp -∗ method_tok m -∗
     WP m a @ τi {{ _, ⌜ True ⌝ }}.
-  Proof using.
+  Proof using MSm.
     simpl. iIntros "#INV CPS PH TOK".
-    pose proof (@wfst_spec _ WFST _ EM Σ OHE) as SPEC. 
-    iApply (SPEC with "[-]").
-    2: { by iIntros "!> **". } 
+    pose proof (@wfst_spec _ WFST _ EM Σ OHE) as SPEC.
+    iPoseProof (SPEC MT with "[$]") as "SPECS".
+    iDestruct (big_sepS_elem_of_acc with "[$]") as "[SPEC _]"; eauto.
+    rewrite /method_spec_token. 
+    iApply ("SPEC" $! τi π _ a with "[-]").
+    2: { by iIntros "!> **". }
     iSplitL "CPS"; [| by iFrame].
     iApply (cp_mul_weaken with "[$]"); [| done].
     apply phase_le_init.
   Qed.
-
-  (* Definition obls_sim_rel_wfree extr omtr := *)
-  (*   obls_sim_rel extr omtr /\ no_extra_obls (trace_last extr) (trace_last omtr). *)
 
   Definition wfree_trace_inv `{Hinv : @IEMGS _ _ HeapLangEM EM Σ}
     (extr: execution_trace heap_lang) (omtr: auxiliary_trace M): iProp Σ :=
@@ -95,11 +96,11 @@ Section WaitFreePR.
   Class PrWfreeTok Σ := {
       pwt_Hinv :: @IEMGS _ _ HeapLangEM EM Σ;
       pwt_CT :: CallTracker Σ;
-      pwt_UT :: UnitToken Σ;
+      pwt_UT :: MethodToken Σ;
   }.
 
   Definition ct_interp_tok `{PWT: PrWfreeTok Σ} (etr: execution_trace heap_lang): iProp Σ
-    := ct_interp m τi unit_tok etr.
+    := ct_interp m τi (method_tok m) etr.
 
   Definition cti_cond `{PWT: PrWfreeTok Σ} (etr: execution_trace heap_lang): iProp Σ
     :=
@@ -328,7 +329,7 @@ Section WaitFreePR.
     let Ps := adequacy_utils.posts_of (trace_last etr).1 Φs in
     (* pr_pr_wfree s etr Φs -∗ |~~| Ps ∗ (Ps -∗ pr_pr_wfree s etr Φs). *)
     pr_pr_wfree s etr Φs -∗ state_interp etr mtr ={⊤}=∗ Ps ∗ state_interp etr mtr ∗ (Ps -∗ pr_pr_wfree s etr Φs). 
-  Proof using.
+  Proof using MSm.
     simpl.
     set (Ps := adequacy_utils.posts_of (trace_last etr).1 Φs). simpl.
     iUnfold pr_pr_wfree.
@@ -428,6 +429,7 @@ Section WaitFreePR.
     wptp_from_gen (thread_pr s N) tp0 tp Φs -∗
     wptp_from_gen (thread_pr s (S N)) tp0 tp Φs.
   Proof using.
+    clear MSm. 
     iIntros "WPS". iApply (big_sepL2_impl with "[$]").
     iModIntro. iIntros (i pfi Φi PFith Φith).
     rewrite /thread_pr.
@@ -538,7 +540,7 @@ Section WaitFreePR.
   Lemma extract_token τ c''
     (FIT : fits_inf_call ic m ai (etr :tr[ τ ]: c''))
     (H : trace_length etr = ii):
-    ct_interp_tok (etr :tr[ τ ]: c'') -∗ unit_tok.
+    ct_interp_tok (etr :tr[ τ ]: c'') -∗ method_tok m.
   Proof using.
     rewrite /ct_interp_tok /ct_interp.
     iIntros "(%&?&[($ & %) | (%&%&%&%CONTRA)])".
@@ -568,7 +570,7 @@ Section WaitFreePR.
     ∃ (δ' : M) (ℓ : mlabel M),
       state_interp etr' (mtr :tr[ ℓ ]: δ') ∗
       pr_pr_wfree s etr' (Φs ++ newposts c.1 c'.1).
-  Proof using VALID FIN.
+  Proof using VALID FIN MSm.
     iIntros "TI #INV PR".
     rewrite /pr_pr_wfree. 
     iDestruct "PR" as "(WPS & CPS & PH & OB & CTI & %S'_LE)".
@@ -888,7 +890,7 @@ Section WaitFreePR.
     ∃ (δ' : M) (ℓ : mlabel M),
       state_interp etr' (mtr :tr[ ℓ ]: δ') ∗
       pr_pr_wfree s etr' (Φs ++ newposts c.1 c'.1).
-  Proof using VALID FIN.
+  Proof using VALID FIN MSm.
     iIntros "TI #INV PR".
     rewrite /pr_pr_wfree. 
     iDestruct "PR" as "(WPS & CPS & PH & OB & CTI & %S'_LE)".
@@ -1265,7 +1267,7 @@ Section WaitFreePR.
       state_interp etr' (mtr :tr[ ℓ ]: δ') ∗
       wfree_trace_inv etr' (mtr :tr[ ℓ ]: δ') ∗
       pr_pr_wfree s etr' (Φs ++ newposts c.1 c'.1).
-  Proof using VALID FIN.
+  Proof using VALID FIN MSm.
     iIntros "? #INV ?".
     
     iAssert (|={⊤,∅}=> |={∅}▷=>^(S (trace_length etr)) |={∅,⊤}=> 
