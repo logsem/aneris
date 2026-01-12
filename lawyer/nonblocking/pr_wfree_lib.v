@@ -71,6 +71,10 @@ Section WaitFreePR.
     ([∗ set] τ ∈ locales_of_cfg c ∖ {[ τi ]}, obls τ ∅) ∗
     obls_τi' c. 
 
+  Definition call_progresses s' (etr: execution_trace heap_lang) := 
+    s' = NotStuck -> ii < trace_length etr -> 
+    not_stuck_tid τi (trace_last etr).
+
   (* TODO: refactor *)
   Lemma same_phase_no_fork {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
     etr mtr

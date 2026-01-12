@@ -51,16 +51,11 @@ Section WaitFreePR.
     apply phase_le_init.
   Qed.
 
-  (* TODO: add this to tokens version *)
-  Definition call_progresses (etr: execution_trace heap_lang) := 
-    s' = NotStuck -> ii < trace_length etr -> 
-    not_stuck_tid τi (trace_last etr).
-
   Definition wfree_trace_inv `{Hinv : @IEMGS _ _ HeapLangEM EM Σ}
     (extr: execution_trace heap_lang) (omtr: auxiliary_trace M): iProp Σ :=
     ⌜ no_extra_obls ic (trace_last extr) (trace_last omtr) /\
       from_option (fun e => to_val e = None) True (from_locale (trace_last extr).1 τi) /\
-      call_progresses extr ⌝ ∗
+      call_progresses ic s' extr ⌝ ∗
     (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ _ _ WFS). 
   
   Context (ai: val) (Pai: Pred ai).
