@@ -6,7 +6,7 @@ From trillium.prelude Require Import classical.
 From fairness Require Import fairness locales_helpers utils.
 From lawyer Require Import program_logic sub_action_em action_model.
 From lawyer.examples Require Import orders_lib obls_tactics.
-From lawyer.nonblocking Require Import trace_context om_wfree_inst pr_wfree wfree_traces wptp_gen pwp calls.
+From lawyer.nonblocking Require Import trace_context om_wfree_inst pr_wfree_lib pr_wfree wfree_traces wptp_gen pwp calls.
 From lawyer.nonblocking.logrel Require Import fundamental. 
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am obls_termination.
 From heap_lang Require Import lang simulation_adequacy.
@@ -216,7 +216,7 @@ Section WFAdequacy.
   Qed.
 
   Lemma obls_τi_enabled c δ
-    (NOOBS': pr_wfree.no_extra_obls ic c δ)
+    (NOOBS': no_extra_obls ic c δ)
     (NVAL: from_option (λ e : expr, to_val e = None) True (from_locale c.1 τi))
     (TH_OWN: locales_of_cfg c = dom (ps_obls δ))
     (τ : nat)
