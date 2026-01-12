@@ -100,7 +100,7 @@ Section SpecLifting.
     (* (NOFORKS: no_forks e) *)
     :
     (let _ := IEMGS_into_Looping (@pwt_Hinv _ PWT) si_add_none in
-     WP e @τ {{ _, unit_tok }}) -∗
+     WP e @τ {{ _, method_tok m }}) -∗
     ct_frag (Some e) -∗
     (let _ := IEMGS_into_Looping (@pwt_Hinv _ PWT) (@ct_interp_tok mock_tctx m _ PWT) in WP e @τ {{ _, ct_frag None }}).
   Proof using.
@@ -211,15 +211,9 @@ Section SpecLifting.
       simpl. by apply under_ctx_spec.
   Qed.
 
-  (* Lemma lift_spec `{Hinv : @IEMGS heap_lang M LG EM Σ} (a: val): *)
-  (*   (let _ := IEMGS_into_Looping (@pwt_Hinv _ PWT) si_add_none in *)
-  (*    {{{ unit_tok }}} App m a @ τ {{{ v, RET v; unit_tok}}} ) ⊢ *)
-  (*   (let _ := IEMGS_into_Looping (@pwt_Hinv _ PWT) (@ct_interp_tok mock_tctx m _ PWT) in *)
-  (*    {{{ ct_frag None }}} App m a @ τ {{{ v, RET v; ct_frag None }}} ). *)
-  (* Proof using. *)
   Lemma lift_spec `{Hinv : @IEMGS heap_lang M LG EM Σ} (a: val):
     (let _ := IEMGS_into_Looping (@pwt_Hinv _ PWT) si_add_none in
-     □ (unit_tok -∗ WP (App m a) @ τ {{ v, unit_tok}} )) ⊢
+     □ (method_tok m -∗ WP (App m a) @ τ {{ v, method_tok m }} )) ⊢
     (let _ := IEMGS_into_Looping (@pwt_Hinv _ PWT) (@ct_interp_tok mock_tctx m _ PWT) in
      □ (ct_frag None -∗ WP (App m a) @ τ {{ v, ct_frag None }} )).
   Proof using.
@@ -231,7 +225,7 @@ Section SpecLifting.
 
     iIntros (extr atr K tp1 tp2 σ1 Hvalid Hζ Hextr) "(PHYS & CTI)".
 
-    iAssert (ct_frag None ∗ ct_auth None ∗ unit_tok)%I with "[NO CTI]" as "(FRAG & AUTH & TOK)".
+    iAssert (ct_frag None ∗ ct_auth None ∗ method_tok m)%I with "[NO CTI]" as "(FRAG & AUTH & TOK)".
     { rewrite /ct_interp_tok /ct_interp. iDestruct "CTI" as "(%&AUTH & X)".
       iDestruct (ct_auth_frag_agree with "[$] [$]") as %EQ. 
       iDestruct "X" as "[(?&?) | (%&%&%&->&?)]". 
