@@ -2,14 +2,86 @@ From iris.proofmode Require Import tactics.
 From trillium.traces Require Import inftraces trace_lookup exec_traces trace_len. 
 From fairness Require Import fairness locales_helpers.
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am obls_termination obligations_wf.
-From lawyer.nonblocking Require Import trace_context wptp_gen pwp wfree_traces calls pwp_ext pr_wfree_tokens om_wfree_inst_tokens.
+From lawyer.nonblocking Require Import trace_context wptp_gen pwp wfree_traces calls pwp_ext pr_wfree_tokens om_wfree_inst_tokens op_eval_helpers.
+From lawyer.nonblocking.logrel Require Import valid_client.
 From trillium.program_logic Require Import execution_model weakestpre adequacy_utils adequacy_cond simulation_adequacy_em_cond. 
-From lawyer Require Import action_model sub_action_em.
-From lawyer Require Import program_logic.  
+From lawyer Require Import action_model sub_action_em program_logic.  
 From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From heap_lang Require Import sswp_logic lang locales_helpers_hl.
 
 (* TODO: reorganize imports *)
+
+(* (* TODO: move *) *)
+(* Lemma no_forks_fill_item e Ki *)
+(*   (NOFORKS: no_forks (fill_item Ki e)): *)
+(*   no_forks e.  *)
+(* Proof using. destruct Ki; simpl; set_solver. Qed.  *)
+
+(* Lemma no_forks_fill e K *)
+(*   (NOFORKS: no_forks (fill K e)): *)
+(*   no_forks e.  *)
+(* Proof using. *)
+(*   revert NOFORKS. pattern K. apply rev_ind; clear K. *)
+(*   { done. } *)
+(*   simpl. intros. *)
+(*   rewrite -calls.fill_app /= in NOFORKS. *)
+(*   apply H. eapply no_forks_fill_item; eauto. *)
+(* Qed. *)
+
+(* Lemma no_forks_fill_item_replace e e' Ki *)
+(*   (NOFORKS: no_forks (fill_item Ki e)) *)
+(*   (NOFORKS': no_forks e'): *)
+(*   no_forks (fill_item Ki e'). *)
+(* Proof using. destruct Ki; simpl; set_solver. Qed.  *)
+
+(* Lemma no_forks_fill_replace e e' K *)
+(*   (NOFORKS: no_forks (fill K e)) *)
+(*   (NOFORKS': no_forks e'): *)
+(*   no_forks (fill K e'). *)
+(* Proof using. *)
+(*   revert NOFORKS. pattern K. apply rev_ind; clear K. *)
+(*   { done. } *)
+(*   simpl. intros. *)
+(*   rewrite -calls.fill_app /= in NOFORKS. rewrite -calls.fill_app /=. *)
+(*   eapply no_forks_fill_item_replace; eauto. *)
+(*   apply H. eapply no_forks_fill_item; eauto. *)
+(* Qed. *)
+
+(* Lemma no_forks_subst s v e *)
+(*   (NOFORKS: no_forks e) *)
+(*   (NOFORKS': val_nf v): *)
+(*   no_forks (subst s v e).  *)
+(* Proof using. *)
+(*   induction e; try set_solver. *)
+(*   - simpl. destruct decide; done. *)
+(*   - simpl. destruct decide; try done. *)
+(*     apply IHe. eauto. *)
+(* Qed. *)
+
+(* (* TODO: move *) *)
+(* Lemma no_forks_prim_step e σ e' σ' efs *)
+(*   (PSTEP: prim_step e σ e' σ' efs) *)
+(*   (NOFORKS: no_forks e): *)
+(*   efs = [] /\ no_forks e'. *)
+(* Proof using. *)
+(*   inversion PSTEP. simpl in *. subst. *)
+(*   pose proof NOFORKS as NOFORKS'%no_forks_fill. *)
+(*   inversion H1; subst; eauto. *)
+(*   14: by inversion NOFORKS'. *)
+(*   all: try by (split; [done | ]; eapply no_forks_fill_replace; eauto; simpl in *; tauto).  *)
+(*   - split; [done | ]. *)
+(*     inversion NOFORKS'. simpl in H.  *)
+(*     destruct x, f; simpl; eapply no_forks_fill_replace; eauto. *)
+(*     all: apply no_forks_subst; try done. *)
+(*     by apply no_forks_subst.  *)
+(*   - split; [done | eapply no_forks_fill_replace; eauto]. *)
+(*     simpl in NOFORKS'. *)
+(*     by inv_unop_eval H.  *)
+(*   - split; [done | eapply no_forks_fill_replace; eauto]. *)
+(*     by inv_binop_eval H.  *)
+(*   - split; [done | eapply no_forks_fill_replace; eauto]. *)
+(*     simpl in NOFORKS'. simpl. tauto.  *)
+
 
 Close Scope Z. 
 
@@ -24,7 +96,9 @@ Section SpecLifting.
   Let mock_tctx := TraceCtx 99 (TpoolCtx ectx_emp τ). 
 
   Lemma lift_call e
-    (NVAL: to_val e = None):
+    (NVAL: to_val e = None)
+    (* (NOFORKS: no_forks e) *)
+    :
     (let _ := IEMGS_into_Looping (@pwt_Hinv _ PWT) si_add_none in
      WP e @τ {{ _, unit_tok }}) -∗
     ct_frag (Some e) -∗
