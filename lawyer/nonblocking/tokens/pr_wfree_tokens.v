@@ -12,6 +12,36 @@ From heap_lang Require Import lang.
 Close Scope Z.
 
 
+(* TODO: move *)
+Definition has_no_forks (etr: execution_trace heap_lang) :=
+  forall i c c', etr !! i = Some c -> etr !! (S i) = Some c' ->
+            locales_of_cfg c' = locales_of_cfg c.
+
+(* TODO: move *)
+Lemma has_no_step_fork etr
+  (NOFORKS: has_no_forks etr):
+  forall i c c', etr !! i = Some c -> etr !! (S i) = Some c' ->
+            step_fork c c' = None.
+Proof using.
+  intros. ospecialize * (NOFORKS i _ _); eauto.
+  rewrite /step_fork. apply gset_pick_None.
+  set_solver.
+Qed.
+
+(* TODO: move *)
+Lemma has_no_step_fork_last etr τ c
+  (NOFORKS: has_no_forks (etr :tr[Some τ]: c)):
+  step_fork (trace_last etr) c = None.
+Proof using.
+  pose proof (trace_length_at_least etr) as LEN.
+  apply Nat.le_sum in LEN as [d LEN]. 
+  eapply has_no_step_fork; [eauto | ..].
+  - apply ft_lookup_old. eapply trace_lookup_last.
+    rewrite LEN. simpl. reflexivity. 
+  - apply trace_lookup_last. simpl in *. lia.
+Qed.
+
+
 Section WaitFreePR.
 
   Let OP := om_hl_OP (OP_HL := OP_HL_WF). 
@@ -529,13 +559,15 @@ Section WaitFreePR.
   Lemma wptp_wfree_take_step_τi
     (EQ_TID: oτ = Some τi)
     (STEP: locale_step c oτ c')
-    (FIT: fits_inf_call ic m ai (etr :tr[ oτ ]: c')):
+    (etr' := etr :tr[ oτ ]: c')
+    (FIT: fits_inf_call ic m ai etr')
+    (NOFORKS: has_no_forks etr'):
     state_interp etr mtr -∗ wfree_trace_inv etr mtr -∗
     pr_pr_wfree s etr Φs 
     ={⊤,∅}=∗ |={∅}▷=>^(S (trace_length etr)) |={∅,⊤}=>
     ∃ (δ' : M) (ℓ : mlabel M),
-      state_interp (etr :tr[ oτ ]: c') (mtr :tr[ ℓ ]: δ') ∗
-      pr_pr_wfree s (etr :tr[ oτ ]: c') (Φs ++ newposts c.1 c'.1).
+      state_interp etr' (mtr :tr[ ℓ ]: δ') ∗
+      pr_pr_wfree s etr' (Φs ++ newposts c.1 c'.1).
   Proof using VALID FIN.
     iIntros "TI #INV PR".
     rewrite /pr_pr_wfree. 
@@ -635,12 +667,12 @@ Section WaitFreePR.
              rewrite newelems_app_drop.
              2: { rewrite !length_app. simpl. lia. }
              rewrite EQ_TID' in STEP. 
+             
              apply step_fork_hl in STEP as [[? ->] | (?&->&?)].
              { simpl. set_solver. }
-
              (** in case of tokens, there must be no forks, at least for τi *)
-             (* TODO: try to unify the proof with no-tokens case *)
-             admit. }
+             rewrite -FIN in H.
+             erewrite has_no_step_fork_last in H; done. }
           
         rewrite EQ_Φs. iApply wptp_from_gen_app. iSplitL "WPS1".
         { iApply (wptp_wfree_upd_other with "[$]").
@@ -789,7 +821,7 @@ Section WaitFreePR.
       iAssert (@state_interp _ M _ _ (etr :tr[ Some τi ]: (t1 ++ fill Ki x :: t2, σ')) _)%I with "[HEAP MSI]" as "TI".
       { simpl. by iFrame. }
 
-      rewrite -{6}(app_nil_r (t1 ++ e' :: t2)).
+      rewrite -{4}(app_nil_r (t1 ++ e' :: t2)).
       rewrite /newposts. rewrite newelems_app_drop.
       2: { rewrite !length_app. simpl. lia. }
       simpl. rewrite app_nil_r. 
@@ -807,10 +839,15 @@ Section WaitFreePR.
 
       subst e'.
       rewrite EQ_TID'. do 2 iExists _.
-      iFrame. iModIntro.
+      iFrame.
+      subst etr'.
+      fold tc τi Ki.
+      rewrite !app_nil_r. 
+      iFrame. 
+      iModIntro.
       iFrame (S'_LE).
-      iIntros (?). simpl in *. lia.  
-  Admitted.
+      iIntros (?). simpl in *. lia.
+  Qed.
 
   Lemma bump_cti τ c''
     (OTHER: τ ≠ τi)
@@ -842,13 +879,15 @@ Section WaitFreePR.
   Lemma wptp_wfree_take_step'_other
     (STEP: locale_step c oτ c')
     (OTHER: oτ ≠ Some τi)
-    (FIT: fits_inf_call ic m ai (etr :tr[ oτ ]: c')):
+    (etr' := etr :tr[ oτ ]: c')
+    (FIT: fits_inf_call ic m ai etr')
+    (NOFORKS: has_no_forks etr'):
     state_interp etr mtr -∗ wfree_trace_inv etr mtr -∗
     pr_pr_wfree s etr Φs 
     ={⊤,∅}=∗ |={∅}▷=>^(S (trace_length etr)) |={∅,⊤}=>
     ∃ (δ' : M) (ℓ : mlabel M),
-      state_interp (etr :tr[ oτ ]: c') (mtr :tr[ ℓ ]: δ') ∗
-      pr_pr_wfree s (etr :tr[ oτ ]: c') (Φs ++ newposts c.1 c'.1).
+      state_interp etr' (mtr :tr[ ℓ ]: δ') ∗
+      pr_pr_wfree s etr' (Φs ++ newposts c.1 c'.1).
   Proof using VALID FIN.
     iIntros "TI #INV PR".
     rewrite /pr_pr_wfree. 
@@ -930,9 +969,10 @@ Section WaitFreePR.
              replace (locale_of (t1 ++ e' :: t2) x) with (locale_of (t1 ++ e :: t2) x).
              2: { rewrite /locale_of. rewrite !length_app. simpl. lia. }
              destruct decide as [-> | ?]; try done.
+
              (** the case when the target thread is forked off *)
-             (* TODO: just prohibit all forking if tokens are used *)
-             admit. }
+             rewrite -FIN in H. 
+             erewrite has_no_step_fork_last in H; done. }
           
         rewrite EQ_Φs. iApply wptp_from_gen_app. iFrame "WPS1". 
 
@@ -949,7 +989,7 @@ Section WaitFreePR.
       
       destruct (decide (sf = Some τi)) as [-> | NO].
       * (** again, the case with the target thread forked off *)
-        admit. 
+        erewrite has_no_step_fork_last in Heqsf; done.
       * subst c.        
         rewrite decide_False.
         2: { rewrite -FIN. by rewrite -Heqsf. } 
@@ -1046,10 +1086,14 @@ Section WaitFreePR.
              destruct NONEW. rewrite locales_of_list_from_indexes.
              apply elem_of_lookup_imap.
             eexists (τi - length (t1 ++ e' :: t2)), _. split; [lia| done]. }
+           
            clear fic_call.
            iSplitL.
            2: { iIntros (?). simpl in *. lia. }
 
+           simpl.
+           rewrite /wptp_wfree. simpl.
+           rewrite app_comm_cons app_assoc. 
            iApply wptp_from_gen_app. iSplitR "WPS'".
            2: { simpl. iApply (wptp_wfree_upd_other with "[$]"). done. }
 
@@ -1155,7 +1199,9 @@ Section WaitFreePR.
       rewrite app_comm_cons app_assoc.
       iSplitL.
       2: { iIntros (?). simpl in *. lia. }
- 
+
+      rewrite /wptp_wfree. simpl.
+      rewrite app_comm_cons app_assoc.
       iApply wptp_from_gen_app. iSplitR "WPS'".
       2: { simpl.
            replace (newposts (t1 ++ e :: t2) ((t1 ++ e' :: t2) ++ efs)) with
@@ -1202,28 +1248,30 @@ Section WaitFreePR.
       erewrite (proj2 (leb_eq_equiv _ _ _ _)).
       { by iIntros "$". }
       simpl in *. lia. 
-  Admitted.
+  Qed.
   
   (* our PR instance in fact implies the not-stuck property *)
   (* TODO: ? move this property to definition of PR? *)
   Lemma wptp_wfree_take_step 
     (STEP: locale_step c oτ c')
-    (FIT: fits_inf_call ic m ai (etr :tr[ oτ ]: c')):
+    (etr' := etr :tr[ oτ ]: c')
+    (FIT: fits_inf_call ic m ai etr')
+    (NOFORKS: has_no_forks etr'):
     state_interp etr mtr -∗ wfree_trace_inv etr mtr -∗
     pr_pr_wfree s etr Φs 
     ={⊤,∅}=∗ |={∅}▷=>^(S (trace_length etr)) |={∅,⊤}=>
     ⌜∀ e2: expr, s = NotStuck → e2 ∈ c'.1 → not_stuck e2 c'.2⌝ ∗
     ∃ (δ' : M) (ℓ : mlabel M),
-      state_interp (etr :tr[ oτ ]: c') (mtr :tr[ ℓ ]: δ') ∗
-      wfree_trace_inv (etr :tr[ oτ ]: c') (mtr :tr[ ℓ ]: δ') ∗
-      pr_pr_wfree s (etr :tr[ oτ ]: c') (Φs ++ newposts c.1 c'.1).
+      state_interp etr' (mtr :tr[ ℓ ]: δ') ∗
+      wfree_trace_inv etr' (mtr :tr[ ℓ ]: δ') ∗
+      pr_pr_wfree s etr' (Φs ++ newposts c.1 c'.1).
   Proof using VALID FIN.
     iIntros "? #INV ?".
     
     iAssert (|={⊤,∅}=> |={∅}▷=>^(S (trace_length etr)) |={∅,⊤}=> 
     ∃ (δ' : M) (ℓ : mlabel M),
-      state_interp (etr :tr[ oτ ]: c') (mtr :tr[ ℓ ]: δ') ∗
-      pr_pr_wfree s (etr :tr[ oτ ]: c') (Φs ++ newposts c.1 c'.1))%I with "[-]" as "X".
+      state_interp etr' (mtr :tr[ ℓ ]: δ') ∗
+      pr_pr_wfree s etr' (Φs ++ newposts c.1 c'.1))%I with "[-]" as "X".
     { destruct (decide (oτ = Some τi)).
       - by iApply (wptp_wfree_take_step_τi with "[$] [$] [$]"). 
       - by iApply (wptp_wfree_take_step'_other with "[$] [$] [$]"). } 
@@ -1243,6 +1291,7 @@ Section WaitFreePR.
   Qed.
 
   End TakeStep.
+  
 
   Program Definition PR_wfree {Σ} {PWT: PrWfreeTok Σ}:
     @ProgressResource heap_lang M Σ (@iem_invGS _ _ _ _ _ (@pwt_Hinv _ PWT))
@@ -1253,18 +1302,21 @@ Section WaitFreePR.
          let _ := IEM_irisG HeapLangEM EM in
          ⌜ True ⌝%I: iProp Σ) (* because upon forks we only obtain pwp .. { True } *)
 
-      (fits_inf_call ic m ai) :=
+      (fun etr => fits_inf_call ic m ai etr /\ has_no_forks etr) :=
     {| pr_pr := pr_pr_wfree |}.
   Next Obligation.
-    apply @wptp_wfree_posts.
+    intros. simpl in *. 
+    apply @wptp_wfree_posts. tauto.
   Qed.
   Next Obligation.
-    apply @wptp_wfree_not_stuck.
+    intros. simpl in *. 
+    eapply @wptp_wfree_not_stuck; eauto. tauto. 
   Qed.
   Final Obligation.
     intros ??? etr Φs c oτ c' mtr VALID FIN STEP.
     iIntros "_ TI #INV PR %FIT". (* cwp is not needed*)
     iApply (wptp_wfree_take_step with "[$] [$] [$]"); eauto.
+    all: tauto.
   Qed.
 
 End WaitFreePR.
