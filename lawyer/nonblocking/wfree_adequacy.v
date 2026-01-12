@@ -15,141 +15,19 @@ From heap_lang Require Import lang simulation_adequacy.
 Close Scope Z.
 
 
-Section WFAdequacy.
+Section Lib.
+  Open Scope WFR_scope. 
 
-  Let OP := LocaleOP (OPRE := OPP_WF) (Locale := locale heap_lang). 
-  Existing Instance OP.
-  Let OM := ObligationsModel.
-
-  Let M := AM2M ObligationsAM.
-  Let ASEM := ObligationsASEM.
-  Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} _ _ => ⌜ True ⌝%I).
-
+  Context (F: nat).
   Context (ic: @trace_ctx heap_lang).
   Let ii := tctx_index ic.
   Let tpc := tctx_tpctx ic. 
   Let Ki := tpctx_ctx tpc.
   Let τi := tpctx_tid tpc. 
-  Context (m ai: val).
-
-  Context (s': stuckness).
-  
-  Definition obls_sim_rel_wfree extr omtr :=
-    obls_sim_rel extr omtr /\ no_extra_obls ic (trace_last extr) (trace_last omtr) /\
-    call_progresses ic s' extr. 
-
-  Let fic := fits_inf_call ic m ai.
-
-  Definition obls_st_rel_wfree c δ := 
-    obls_st_rel c δ /\ no_extra_obls ic c δ. 
-
-  Definition obls_om_traces_match_wfree: extrace heap_lang -> trace (mstate M) (mlabel M) -> Prop :=
-    obls_om_traces_match_gen obls_st_rel_wfree. 
-
-  Theorem om_simulation_adequacy_model_trace_multiple_waitfree Σ
-        `{hPre: @heapGpreS Σ M EM} (s: stuckness)
-        (es: list expr) σ1 (s1: mstate M) p
-        (INIT: em_is_init_st (es, σ1) s1 (ExecutionModel := EM))
-        (extr : extrace heap_lang)
-        (Hvex : extrace_valid extr)
-        (Hexfirst : trfirst extr = (es, σ1))
-    :
-    PR_premise_multiple obls_sim_rel_wfree (fits_inf_call ic m ai) Σ s es σ1 s1 (p: @em_init_param _ _ EM) ->
-    (∃ omtr, obls_om_traces_match_wfree extr omtr ∧ trfirst omtr = s1 /\
-              int_ref_inf obls_sim_rel_wfree extr omtr
-    ) \/
-    (exists k, ¬ (fits_inf_call ic m ai) (trace_take_fwd k extr)).
-  Proof using.
-    intros PREM.
-
-    destruct (decide (1 <= length es)).
-    2: { 
-      (* TODO: make a lemma *)
-         assert (length es = 0) by lia.
-         assert (es = []) as -> by (destruct es; simpl in H; lia || done).
-         assert (extr = tr_singl ([], σ1)) as ->.
-         { destruct extr; simpl in Hexfirst; subst. 
-           { done. }
-           apply extrace_valid_alt, trace_valid_cons_inv, proj2 in Hvex.
-           inversion Hvex; subst; try done.
-           inversion H0. clear -H4.
-           apply (@f_equal _ _ length) in H4.
-           rewrite !length_app /= in H4. lia. }
-
-         destruct (decide (fits_inf_call ic m ai ({tr[ ([], σ1) ]}))) as [FITS | ].
-         2: { right. exists 0. by rewrite trace_take_fwd_0_first. }
-         
-         assert (obls_st_rel_wfree ([], σ1) s1) as PROP. 
-         { red. 
-           rewrite /obls_st_rel /no_extra_obls.
-           rewrite /obls_fairness_preservation.om_live_tids /has_obls.
-           simpl in INIT. red in INIT.
-           rewrite /locales_of_cfg in INIT. rewrite list_to_set_nil in INIT.
-           apply proj1, eq_sym, dom_empty_inv_L in INIT.
-           rewrite INIT.
-           split; try set_solver. }
-
-         left. exists (tr_singl s1).
-
-         split.
-         2: { split; [done| ].
-              apply int_ref_int_singleton.
-              red.
-              repeat split; try by apply PROP.
-              red. simpl. intros _ TI0.
-              assert (tctx_index ic = 0) by lia.
-              destruct FITS as [CALL _ _ _].
-              rewrite H0 /= in CALL.
-              rewrite /call_at /= in CALL.
-              by edestruct no_expr_in_empty_pool. }
-
-         red. by apply trace_match_singl. }
-
-    unshelve epose proof (@PR_strong_simulation_adequacy_traces_multiple _ _ EM 
-                            HeapLangEM obls_sim_rel_wfree (fits_inf_call ic m ai)
-                            _ _ _ _ _ 
-                            s es σ1 s1 p
-                extr
-                Hvex
-                ltac:(done)
-                obls_ves_wrapper
-                obls_st_rel_wfree
-                (fun oτ '(_, τ') => oτ = τ')
-                _ _ _ _ _ _ _
-                PREM
-      ) as SIM.
-    { apply fits_inf_call_prev. }
-    { simpl. intros ????[??]? STEP.
-      red in STEP. simpl in STEP. destruct STEP as [STEP ->].
-      destruct o; [| done].
-      simpl in STEP. red in STEP. apply STEP. }
-    { simpl. intros ????[??]? STEP.
-      red in STEP. simpl in STEP. destruct STEP as [STEP ->].
-      destruct o; [| done].
-      simpl in STEP. red in STEP.
-      constructor. apply STEP. }
-    { simpl. intros ?? SIM.
-      split; apply SIM. }
-    { simpl. intros ?? SIM. apply SIM. }
-    { done. }
-    { eapply adequacy_utils.rel_finitary_impl; [| apply obls_sim_rel_FB].
-      2, 3: by apply _.
-      intros ?? X. apply X. }
-    { done. }
-
-    done.
-  Qed.
-
-  Open Scope WFR_scope. 
-
-  Context (P: val -> Prop) (Pai: P ai).
-  Context (SPEC: WaitFreeSpec s' P m).
-  Let F := wfs_F _ _ _ SPEC.
 
   Definition init_om_wfree_state
-    (* (F: nat) (TI: nat) (d0 d1: Degree) (τi: locale Λ) (l0: Level) (ii: nat) *)
     (c: cfg heap_lang): ProgressState :=
-    let CPS := (2 * (F ai) + ii) *: {[+ d0 +]} ⊎ {[+ d1 +]} in
+    let CPS := (2 * F + ii) *: {[+ d0 +]} ⊎ {[+ d1 +]} in
     let δ0 := init_om_state c CPS 0 in
     let s0 := (0: SignalId) in
     let obls' := if (decide (τi ∈ locales_of_cfg c))
@@ -241,13 +119,12 @@ Section WFAdequacy.
   (** for simplicity, we forget about the specific phases *)
   Lemma init_wfree_resources_weak `{!ObligationsGS Σ} c:
     obls_init_resource (init_om_wfree_state c) () -∗
-    (cp_mul π0 d0 (2 * (F ai)) ∗ cp_mul π0 d0 ii ∗ cp π0 d1) ∗
+    (cp_mul π0 d0 (2 * F) ∗ cp_mul π0 d0 ii ∗ cp π0 d1) ∗
     (⌜ τi ∈ locales_of_cfg c ⌝ →
      ∃ s, obls τi {[ s ]} ∗ sgn s l0 (Some false) ∗ ep s π0 d0) ∗
     ([∗ set] τ ∈ locales_of_cfg c ∖ {[ τi ]}, obls τ ∅) ∗
     ([∗ set] τ ∈ locales_of_cfg c, ∃ π, th_phase_eq τ π).  
   Proof using.
-    clear dependent Pai. 
     iIntros "INIT". 
     rewrite /obls_init_resource /init_om_wfree_state. simpl.
     rewrite union_empty_r_L map_union_empty. 
@@ -281,115 +158,6 @@ Section WFAdequacy.
     iApply big_sepM_dom. iApply (big_sepM_impl with "[$]"). set_solver.  
   Qed.
 
-  Lemma init_pwp {Σ} {hG :heap1GS Σ} {iG: invGS_gen HasNoLc Σ} τ e0
-    (VALID: valid_client e0):
-    let _ := irisG_looping HeapLangEM si_add_none (lG := hG) in 
-    wfs_mod_inv _ _ _ SPEC ⊢ pwp MaybeStuck ⊤ τ (subst "m" m e0) (λ _, True).
-  Proof using SPEC.
-    simpl. opose proof * (fundamental e0) as FTLR. 
-    { done. }
-    iIntros "#INV". 
-    rewrite /logrel in FTLR.
-    rewrite /interp_expr in FTLR.
-    rewrite -subst_env_singleton.
-    iApply wp_wand; [iApply FTLR| ].
-    - rewrite -insert_empty. iApply interp_env_cons; [done| ].
-      iSplitL; [| by iApply interp_env_nil].
-      destruct SPEC. by iApply wfs_safety_spec. 
-    - by iIntros "**".
-  Qed. 
-
-  Lemma init_wptp_wfree_pwps `{Hinv: @IEMGS _ _ HeapLangEM EM Σ} tp0 tp N
-    (NO: τi ∉ locales_of_list_from tp0 tp)
-    (SUBST: Forall (λ e, ∃ e0, e = subst "m" m e0 /\ valid_client e0) tp):
-    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ _ _ SPEC)
-   ⊢ wptp_from_gen (thread_pr ic s' MaybeStuck N) tp0 tp
-      (map (λ (_ : nat) (_ : val), ⌜ True ⌝%I)
-         (adequacy_utils.locales_of_list_from tp0 tp)).
-  Proof using SPEC ai.
-    clear Pai. 
-    iIntros "#INV". 
-    iInduction tp as [|e tp] "IH" forall (tp0 NO).
-    { simpl. iApply wptp_from_gen_nil. }
-    rewrite adequacy_utils.locales_of_list_from_cons. 
-    rewrite map_cons. iApply wptp_from_gen_cons. iSplitR.
-    2: { simpl. iApply "IH".
-         - iPureIntro. by inversion SUBST. 
-         - iPureIntro. set_solver. }
-    rewrite /thread_pr. rewrite decide_False.
-    2: { intros EQ. apply NO. rewrite locales_of_list_from_locales.
-         rewrite /τi EQ. set_solver. }
-    inversion SUBST as [| ?? (? & -> & ?)]. subst. 
-    by iApply init_pwp.
-  Qed.
-
-  Definition tpool_init_restr (tp: list expr) :=
-    Forall (fun e => exists e0, e = subst "m" m e0 /\ valid_client e0) tp /\
-    (ii = 0 -> exists e, from_locale tp τi = Some e /\ under_ctx Ki e = Some (m ai)) /\
-    (forall e, from_locale tp τi = Some e -> to_val e = None). 
-
-  Lemma init_wptp_wfree `{Hinv: @IEMGS _ _ HeapLangEM EM Σ} c
-    (ETR0: tpool_init_restr c.1):
-    let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
-    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ _ _ SPEC) -∗
-    (⌜ ii = 0 ⌝ → ∃ π, cp_mul π0 d0 (F ai) ∗ th_phase_frag τi π (/2)%Qp) -∗
-    wptp_wfree ic s' MaybeStuck {tr[ c ]}
-      (map (λ _ _, True) (adequacy_utils.locales_of_list c.1)).
-  Proof using Pai.
-    simpl. iIntros "#INV T".
-    rewrite /wptp_wfree. simpl. 
-    destruct (thread_pool_split c.1 τi) as (tp1 & tp2 & tp' & EQ & TP' & NO1 & NO2).
-    rewrite EQ. rewrite !locales_of_list_from_app'. rewrite !map_app /=.
-    destruct ETR0 as (TP & II0 & NVAL0).
-    rewrite EQ in TP.
-    iApply wptp_from_gen_app. iSplitR.
-    { iApply init_wptp_wfree_pwps.
-      - done. 
-      - by apply Forall_app, proj1 in TP.
-      - done. }
-    simpl. iApply wptp_from_gen_app. iSplitL.
-    2: { iApply init_wptp_wfree_pwps.
-         - done. 
-         - by do 2 (apply Forall_app, proj2 in TP).
-         - done. }
-
-    destruct TP' as [-> | (e & -> & LOC)].
-    { simpl. iApply wptp_from_gen_nil. }
-    simpl. iApply wptp_gen_singleton.
-    rewrite /thread_pr. rewrite decide_True; [| done].
-    rewrite /wp_tc.
-    destruct ii eqn:TI.
-    2: { rewrite leb_correct; [| lia].
-         apply Forall_app, proj2 in TP.
-         apply Forall_app, proj1 in TP.
-         inversion TP as [| ?? (? & -> & ?)]. subst.
-         by iApply init_pwp. }
-    rewrite leb_correct_conv; [| lia].
-    iDestruct ("T" with "[//]") as (π) "[CPS PH]".
-    rewrite half_inv2. 
-    iPoseProof (get_call_wp _ _ SPEC ai with "[$] [$] [$]") as "WP".
-    { done. }
-    destruct (II0 eq_refl) as (e_ & IN & CTX).
-    rewrite LOC EQ /= in IN.
-    rewrite /from_locale in IN. rewrite from_locale_from_locale_of in IN.
-    inversion IN. subst e_.
-    rewrite CTX. simpl.
-    iApply (wp_stuck_mono with "[$]"). done.
-  Qed.
-
-  Lemma tp_init_in tp τ
-    (IN: τ ∈ locales_of_list tp)
-    (ETR0: tpool_init_restr tp):
-    exists e0, from_locale tp τ = Some (subst "m" m e0).
-  Proof using.
-    clear -IN ETR0. 
-    destruct ETR0 as [TP _].
-    apply elem_of_locales_of_list_from_from_locale_from in IN as (e & IN).
-    rewrite /from_locale IN.
-    apply Forall_forall with (x := e) in TP; [set_solver| ].
-    eapply from_locale_from_elem_of; eauto.
-  Qed.
-
   (* TODO: move *)
   Lemma RecV_App_not_stuck (mm a: val) c e τ K
     (M_FUN: ∃ f x b, mm = (rec: f x := b)%V)
@@ -408,144 +176,20 @@ Section WFAdequacy.
     simpl. by apply BetaS.
   Qed.
 
-  Lemma PR_premise_wfree `{hPre: @heapGpreS Σ M EM} c
-    (ETR0: tpool_init_restr c.1)
-    (MOD_INIT: wfs_is_init_st _ _ m SPEC c)
-    (M_FUN: exists f x b, m = RecV f x b)
-    :
-  PR_premise_multiple obls_sim_rel_wfree (fits_inf_call ic m ai)
-    Σ MaybeStuck c.1 c.2
-    (init_om_wfree_state c) ((): @em_init_param _ _ EM).
-  Proof using Pai.
-    red. iIntros (Hinv) "(PHYS & MOD)". simpl.
-    iMod (@wfs_init_mod _ _ _ SPEC with "[PHYS]") as "#INV".
-    2: { iFrame. }
-    { by rewrite -surjective_pairing. } 
-         
-    iModIntro.
-    iExists (wfree_trace_inv ic s' SPEC).
-    
-    iExists (PR_wfree ic s' SPEC _ Pai). simpl.
+  Context (s': stuckness).
 
-    do 2 rewrite bi.sep_assoc. iSplitL.
-    2: { rewrite /adequacy_cond.rel_always_holds_with_trace_inv.
+  Definition obls_sim_rel_wfree extr omtr :=
+    obls_sim_rel extr omtr /\ no_extra_obls ic (trace_last extr) (trace_last omtr) /\
+    call_progresses ic s' extr. 
 
-         iIntros (extr omtr [tp σ] EXTRA FIN NSTUCK).
-         iClear "INV".
-         simpl. iIntros "(%VALID_STEP & HEAP & MSI & [%TH_OWN %OBLS]) POSTS #INV".
-         red in EXTRA. destruct EXTRA as (VALID & EX0 & OM0 & CONT_SIM). 
-         iApply fupd_mask_intro_discard; [done| ].
+  Definition obls_st_rel_wfree c δ := 
+    obls_st_rel c δ /\ no_extra_obls ic c δ. 
 
-         rewrite /wfree_trace_inv. iDestruct "INV" as "((%NOOBS' & %NVAL & %PROGRESS) & _)".
-         iPureIntro. 
-
-         rewrite /obls_sim_rel_wfree. split; [|done].
-
-         destruct extr.
-         { simpl in VALID_STEP.
-           inversion VALID. subst.
-           red in EX0, OM0. simpl in EX0, OM0. subst.
-           rewrite /obls_sim_rel_wfree /obls_sim_rel /obls_sim_rel_gen.
-           simpl.
-
-           split; [done| ]. simpl. red.
-           red. simpl. eapply @obls_τi_enabled; eauto. }
-         
-         simpl in VALID_STEP. inversion VALID. subst. simpl in *.
-         rewrite /obls_sim_rel.
-         red. split. 
-         { simpl. by destruct a. }
-         simpl. rewrite /obls_st_rel.
-         red. simpl.
-         eapply @obls_τi_enabled; eauto. }
-
-    rewrite -surjective_pairing. 
-    iSplitL.
-    2: { rewrite /wfree_trace_inv. iFrame "INV". 
-         iPureIntro. repeat split.
-         - simpl. red. rewrite /init_om_wfree_state. simpl.
-           intros τ NEMPTY. destruct decide.
-           2: { rewrite lookup_gset_to_gmap option_guard_decide in NEMPTY.
-                destruct decide; simpl in NEMPTY; done. }
-           destruct lookup eqn:L; try done. 
-           apply lookup_insert_Some in L. destruct L as [| [? L]]; [set_solver| ].
-           apply lookup_gset_to_gmap_Some in L. set_solver.
-         - simpl.
-           destruct (from_locale c.1 τi) eqn:IN; rewrite IN; [| done].
-           destruct ETR0 as (_&_&NVAL0).
-           by apply NVAL0 in IN.
-         - red. simpl.
-           intros _ TI0.
-           destruct ETR0 as (?&CALL0&?).
-           destruct (CALL0 ltac:(lia)) as (?&?&?).           
-           eapply RecV_App_not_stuck; eauto. }
-    
-    iSplitR.
-    { simpl. iApply hl_config_wp. }
-    rewrite /pr_pr_wfree. simpl.
-
-    iDestruct (init_wfree_resources_weak with "[$]") as "(CPS & OB' & OBLS & PHS)".
-    iFrame.
-    rewrite -{2}(difference_union_intersection_L (locales_of_cfg c) {[ τi ]}).    
-    rewrite big_sepS_union.
-    2: { set_solver. }
-    iDestruct "PHS" as "[$ PH]".
-    #[local] Arguments Nat.leb _ _ : simpl nomatch.    
-    rewrite /extra_fuel. simpl.
-    iDestruct "CPS" as "(CPS_PRE & CPS0 & CP1)".
-    iDestruct (cp_mul_split with "CPS_PRE") as "[CPS_PRE CPS_PRE']". rewrite Nat.add_0_r.
-    rewrite Nat.sub_0_r. fold ii.
-    rewrite bi.sep_comm. rewrite -bi.sep_assoc. iSplitL "CPS0 CPS_PRE".
-    { destruct leb; [| done]. iFrame. }
-    rewrite /obls_τi'.
-
-    rewrite -bi.sep_assoc. 
-    iAssert (_%I ∗ (⌜ ii = 0 ⌝ →
-                    let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
-                    ∃ π, th_phase_frag τi π (/ 2)%Qp))%I with "[PH]" as "[X PHτi]".
-    2: iSplitL "X"; [by iApply "X"| ].
-    { destruct (decide (τi ∈ locales_of_cfg c)).
-      2: { iSplitL.
-           - by iIntros (?).
-           - iIntros (II0). destruct ETR0 as (?&IN&?).
-             destruct (IN II0) as (?&E&?). destruct n.
-             eapply locales_of_cfg_Some; eauto.
-             Unshelve. apply c. }
-      rewrite intersection_comm_L subseteq_intersection_1_L.
-      2: set_solver.
-      rewrite big_sepS_singleton.
-      fold τi.
-      destruct ii eqn:II.
-      - rewrite leb_correct_conv; [| lia].
-        setoid_rewrite th_phase_frag_halve at 1. iDestruct "PH" as (?) "(PH&?)".
-        rewrite half_inv2. 
-        iSplitL "PH"; iIntros (?); iExists _; iFrame.
-      - iSplitL.
-        2: { iIntros (?). lia. }
-        iIntros (?). iFrame. }
-    
-    iSplitR "PHτi CPS_PRE'".
-    { iSplitL.
-      2: by destruct s'. 
-      destruct decide.
-      - iSpecialize ("OB'" with "[//]"). iFrame.
-      - iFrame. }
-
-    iApply (init_wptp_wfree with "[$] [$]"). done. 
-  Qed.
-
-  Definition wfreeΣ: gFunctors := iemΣ HeapLangEM EM. 
-
-  Instance wfree_pre: @heapGpreS wfreeΣ M EM.
-  Proof. 
-    unshelve esplit. 
-  Qed. 
-
-  Local Lemma tc_helper:
+  Lemma tc_helper:
     tctx_tpctx ic = {| tpctx_ctx := Ki; tpctx_tid := τi |}.
   Proof using. clear. by destruct ic as [? []]. Qed.
 
-  Local Lemma ic_helper:
+  Lemma ic_helper:
     ic = {| tctx_tpctx := tpc; tctx_index := ii |}.
   Proof using. clear.  by destruct ic. Qed.
 
@@ -567,16 +211,10 @@ Section WFAdequacy.
       extr omtr)
   (NORET : ¬ ∃ j : nat, has_return_at extr ic j)
   (IITH : is_Some (extr S!! ii))
-  (* (PROGRESS: *)
-  (*   forall j, ii <= j ->  *)
-  (*   from_option (not_stuck_tid τi) True (extr S!! j) *)
-  (* ) *)
   (PROGRESS: exists N, ii <= N /\ is_Some (extr S!! N) /\ ∀ j, N ≤ j → from_option (not_stuck_tid τi) True (extr S!! j))
     :
   ∀ τ, obls_trace_fair τ omtr.
   Proof using.
-    clear m SPEC F fic.
-    clear dependent ai.
     intros. destruct (decide (τ = τi)) as [-> | NEQ].
     2: { red. apply fair_by_equiv. red. intros n OB.
          destruct (omtr S!! n) eqn:NTH; rewrite NTH in OB; [| done].
@@ -642,8 +280,8 @@ Section WFAdequacy.
   Qed.
 
   (* TODO: ? move, generalize *)
-  Instance under_ctx_ex_dec (extr: extrace heap_lang):
-    Decision (∃ e, from_locale (trfirst extr).1 τi = Some e ∧ under_ctx Ki e = Some (m ai)).
+  Global Instance under_ctx_ex_dec (extr: extrace heap_lang) e':
+    Decision (∃ e, from_locale (trfirst extr).1 τi = Some e ∧ under_ctx Ki e = Some e').
   Proof using.
     clear. 
     apply ex_fin_dec with
@@ -677,14 +315,10 @@ Section WFAdequacy.
     set_solver.
   Qed.
 
-  (* TODO: find existinc *)
-  Instance stuckness_eqdec: EqDecision stuckness.
-  Proof using. red. intros [] []; (by left) || (by right). Qed. 
+  (* TODO: find existing *)
+  Global Instance stuckness_eqdec: EqDecision stuckness.
+  Proof using. red. intros [] []; (by left) || (by right). Qed.
 
-  (* TODO: use this def above *)
-  Definition never_stuck_ea (etr: extrace heap_lang) '(TraceCtx i (TpoolCtx K τ)) :=
-    ∃ N, i ≤ N ∧ is_Some (etr S!! N)
-      ∧ ∀ j, N ≤ j → from_option (not_stuck_tid τ) True (etr S!! j).
 
   Lemma not_all_ex_not_iff: ∀ (A : Type) (P : A → Prop),
       ¬ (∀ x : A, P x) <-> ∃ x : A, ¬ P x.
@@ -707,206 +341,6 @@ Section WFAdequacy.
     split.
     - apply Classical_Prop.imply_to_and.
     - tauto.
-  Qed. 
-
-  (* Lemma not_gets_stuck_ae_equiv etr tc: *)
-  (*   (¬ gets_stuck_ae etr tc) <-> never_stuck_ea etr tc. *)
-  (* Proof using. *)
-  (*   destruct tc as [? [??]].  *)
-  (*   rewrite /gets_stuck_ae /never_stuck_ea. *)
-  (*   split. *)
-  (*   -  *)
-  (*     rewrite not_all_ex_not_iff. intros (N & NS).   *)
-  (*     rewrite not_impl_and_not_iff.  *)
-  (*     do 2 rewrite (and_comm (is_Some (etr S!! x)) _). *)
-  (*     rewrite and_assoc.  *)
-  (*     do 2 rewrite (and_comm _ (is_Some (etr S!! x))). *)
-
-  (*     apply traces.utils_logic.iff_and_pre. intros. *)
-  (*   rewrite not_ex_all_not_iff. *)
-  (*   split. *)
-  (*   - intros. *)
-  (*     destruct (decide (tctx_index <= x)). *)
-  (*     2: { specialize (H0 x). *)
-  (*          eapply @not_and_l in H0. *)
-  (*          2: { rewrite /ge; solve_decision. } *)
-  (*          destruct H0 as [? | X]; [lia| ]. *)
-  (*          apply not_and_l in X. *)
-  (*          destruct X as [? | X]; [done| ]. *)
-           
-           
-
-  (* TODO: rename *)
-  Lemma simple_om_simulation_adequacy_terminate_multiple_waitfree_impl extr
-    (MOD_INIT : wfs_is_init_st s' _ m SPEC (trfirst extr))
-    (VALID : extrace_valid extr)
-    (FAIR : fair_call extr tpc ii)
-    (INIT_TP : tpool_init_restr (trfirst extr).1)
-    (CALL: from_option (fun c => call_at tpc c m ai (APP := App)) False (extr S!! ii))
-    (M_FUN: exists f x b, m = RecV f x b):
-    terminating_trace extr /\ int_ref_inf_one (call_progresses ic s') extr ∨
-    (∃ k, ¬ fits_inf_call ic m ai (trace_take_fwd k extr)) \/
-    (s' = MaybeStuck /\ gets_stuck_ae extr ic). 
-  Proof using Pai.
-    opose proof (om_simulation_adequacy_model_trace_multiple_waitfree
-                wfreeΣ _ (trfirst extr).1 _ _ _ _ _ VALID _ _) as ADEQ.
-    { apply init_om_wfree_is_init. }
-    { apply surjective_pairing. }     
-    { rewrite -surjective_pairing. 
-      eapply PR_premise_wfree; eauto. }
-    
-    destruct ADEQ as [(mtr & MATCH & OM0 & IREF) | RET].
-    2: { right. left. done. } 
-
-    opose proof (obls_matching_traces_OM _ _ _ _ MATCH _) as (omtr & MATCH'' & SR & OM_WF & FIRST'').
-    { intros ?? X. apply X. }
-    { eapply obls_init_wf. rewrite OM0. apply init_om_wfree_is_init. }
-
-    destruct (Classical_Prop.classic (∃ j, has_return_at extr ic j)) as [[j RET]| NORET].
-    { red in RET. rewrite ic_helper in RET.
-      destruct RET as (r & cj & ? & JTH & RET).
-      right. left. exists j. intros [_ NVALS _]. 
-      specialize (NVALS _ H).
-
-      eapply trace_take_fwd_lookup_Some' in JTH.
-      2: reflexivity.
-      rewrite JTH /= in NVALS.
-      edestruct not_return_nval; eauto. }
-
-    assert (int_ref_inf_one (call_progresses ic s') extr) as IREF1.
-    { eapply int_ref_inf_proj_one. eapply int_ref_inf_impl; eauto.
-      by intros ?? (?&?&?). }
-
-    destruct (extr S!! ii) as [ci | ] eqn:IITH.
-    2: { left.
-         pose proof (trace_has_len extr) as [??]. 
-         eapply state_lookup_dom_neg in IITH; eauto.
-         split; [| done].
-         eapply terminating_trace_equiv; eauto.
-         destruct x; try done. }
-
-    add_case (exists N, ii <= N /\ is_Some (extr S!! N) /\ ∀ j, N ≤ j → from_option (not_stuck_tid τi) True (extr S!! j)) IF_NS. 
-    { intros NS. 
-    
-      assert (forall τ, obls_trace_fair τ omtr) as OM_FAIR.
-      { eapply om_trace_fair; eauto. }
-
-      left. split; [| done]. 
-      pose proof (traces_match_valid2 _ _ _ _ _ _ MATCH'') as OM_VALID.
-      pose proof (obls_fair_trace_terminate _ OM_VALID OM_FAIR) as OM_TERM.
-      
-      eapply (traces_match_preserves_termination _ _ _ _ _ _ MATCH'').
-      apply OM_TERM; eauto.
-      + apply unit_WF.
-      + apply fin_wf. }
-
-    destruct (decide (s' = MaybeStuck)) as [S'|S']. 
-    2: { apply IF_NS. 
-
-         exists ii. split; [lia| ]. split; [done| ]. 
-         intros.
-         destruct (extr S!! j) eqn:ITH; [| done]. simpl.
-         clear -IREF H ITH S'.
-         red in IREF.
-         specialize (IREF j). red in IREF. do 2 apply proj2 in IREF.
-         red in IREF.
-         
-         (* TODO: make a lemma *)
-         pose proof (trace_has_len extr) as [? LEN].
-         pose proof ITH as LT%mk_is_Some. eapply state_lookup_dom in LT; eauto.
-         assert (trace_length (trace_take_fwd j extr) = S j).
-         { apply Nat.le_antisymm.
-           1: by apply trace_take_fwd_length_bound.
-           opose proof * (trace_take_fwd_length j extr); eauto.
-           destruct x; try lia.
-           rewrite H0.
-           simpl in LT. lia. }
-         rewrite H0 in IREF. ospecialize * IREF; try (done || lia).
-         { clear -S'. by destruct s'. }
-         symmetry in H0. apply trace_lookup_last in H0.
-         eapply trace_take_fwd_lookup_Some' in ITH; [| reflexivity].
-         set_solver. }
-    
-    destruct (Classical_Prop.classic (gets_stuck_ae extr ic)) as [| NS]. 
-    { do 2 right. tauto. }
-    apply IF_NS.
-
-    rewrite /gets_stuck_ae in NS.
-    rewrite not_all_ex_not_iff in NS. destruct NS as (N & NS).
-    apply not_impl_and_not_iff in NS as ([? NTH] & NS).
-    exists (max ii N). split; [lia| ].
-    split.
-    { pose proof (Nat.max_spec_le ii N) as [[? MAX] | [? MAX]]; rewrite MAX; eauto. }
-    intros. destruct (extr S!! j) eqn:JTH; [| done]. simpl.
-    rewrite not_ex_all_not_iff in NS.
-    specialize (NS j). rewrite /ge in NS. rewrite !not_and_l in NS.
-    destruct NS as [? | [? | NS]].
-    { lia. }
-    { set_solver. }
-    rewrite /gets_stuck_at /= in NS.
-    rewrite ic_helper /tpc tc_helper in NS.
-    rewrite JTH in NS.
-    destruct (decide (not_stuck_tid τi c)); [done| ]. destruct NS.
-    eexists. repeat split.
-    { lia. }
-    apply stuck_tid_neg. split; eauto.
-    opose proof * from_locale_trace.
-    { done. }
-    { apply IITH. }
-    { simpl in CALL.
-      move CALL at bottom. do 2 red in CALL.
-      rewrite /tpc tc_helper /= in CALL.
-      apply mk_is_Some in CALL. apply CALL. }
-    { etrans; [| apply H]. lia. }
-    by rewrite JTH in H0.
-  Qed.
-  
-  Theorem simple_om_simulation_adequacy_terminate_multiple_waitfree extr
-        (ETR0: valid_init_tpool m (trfirst extr).1)
-        (MOD_INIT: wfs_is_init_st _ _ _ SPEC (trfirst extr))
-        (CALL: from_option (fun c => call_at tpc c m ai (APP := App)) False (extr S!! ii))
-    :
-    extrace_valid extr -> 
-    fair_call extr tpc ii ->
-    (exists f x b, m = RecV f x b) ->
-    terminating_trace extr /\ int_ref_inf_one (call_progresses ic s') extr \/ 
-    (exists k, ¬ fits_inf_call ic m ai (trace_take_fwd k extr)) \/
-    (s' = MaybeStuck /\ gets_stuck_ae extr ic). 
-  Proof.
-    intros VALID FAIR M_FUN. 
-
-    destruct (decide (ii = 0 → ∃ e,
-                    from_locale (trfirst extr).1 τi = Some e ∧ under_ctx Ki e = Some (m ai))) as [II0| ].
-    2: { pose proof tc_helper. 
-         clear -n H.
-         right. left. 
-         apply Classical_Prop.imply_to_and in n as (II & NO0).
-         exists 0. intros FITS. apply NO0.
-         destruct FITS.
-         fold ii in fic_call.
-         rewrite trace_take_fwd_0_first in fic_call.
-         rewrite II /= in fic_call.
-         red in fic_call. simpl in fic_call. eauto.
-         red in fic_call. rewrite H in fic_call.
-         eexists. split; eauto. by rewrite under_ctx_fill. }
-
-    destruct (@decide (∀ e, from_locale (trfirst extr).1 τi = Some e → to_val e = None)) as [E0| ].
-    { destruct (from_locale (trfirst extr).1 τi) eqn:E.
-      2: { left. set_solver. }
-      destruct (to_val e) eqn:V.
-      { right. set_solver. }
-      left. set_solver. }
-    2: { apply not_forall_exists_not in n as [e VAL].
-         apply Classical_Prop.imply_to_and in VAL as [E VAL].
-         right. left. exists 0. intros FITS. apply VAL.
-         destruct FITS. 
-         specialize (fic_never_val 0). rewrite trace_take_fwd_0_first /= in fic_never_val.
-         rewrite E in fic_never_val. done. }
-
-    assert (tpool_init_restr (trfirst extr).1) as INIT_TP.
-    { repeat split; eauto. }
-
-    by apply simple_om_simulation_adequacy_terminate_multiple_waitfree_impl.
   Qed.
 
   Lemma call_continues_or_returns tpc_ c1 c2 oτ
@@ -954,7 +388,7 @@ Section WFAdequacy.
     :
     exists k r ck, i < k <= j /\ etr S!! k = Some ck /\ return_at tpc_ ck r. 
   Proof using.
-    clear dependent ic. clear dependent m. 
+    clear dependent ic. 
     apply Nat.le_sum in LE as [d ->].    
     generalize dependent i. generalize dependent ci.
     induction d.
@@ -981,100 +415,9 @@ Section WFAdequacy.
     forall j K, let tpc := TpoolCtx K τ in
            j < i ->
            from_option (fun c => exists a, call_at tpc c m a (APP := App)) False (tr S!! j) ->
-           exists r, j < r <= i /\ from_option (fun c => exists v, return_at tpc c v) False (tr S!! r).
+           exists r, j < r <= i /\ from_option (fun c => exists v, return_at tpc c v) False (tr S!! r). 
 
-  (* TODO: rename *)
-  Lemma obls_terminates_impl_multiple_waitfree
-    (extr : extrace heap_lang)
-    (ETR0: valid_init_tpool m (trfirst extr).1)
-    (MOD_INIT: wfs_is_init_st _ _ _ SPEC (trfirst extr))
-    (VALID: extrace_valid extr)
-    (* (FAIR: fair_ex τi extr) *)
-    (FAIR: fair_call extr tpc ii)
-    (MAIN: previous_calls_return_tr extr ii τi m)
-    (CALL: from_option (fun c => call_at tpc c m ai (APP := App)) False (extr S!! ii))
-    (M_FUN: exists f x b, m = RecV f x b)
-    :
-    terminating_trace extr /\ int_ref_inf_one (call_progresses ic s') extr
-    \/ has_return extr ic \/
-    (s' = MaybeStuck /\ gets_stuck_ae extr ic). 
-  Proof.
-    opose proof * (simple_om_simulation_adequacy_terminate_multiple_waitfree) as ADEQ; eauto.
-
-    destruct ADEQ as [| [[n NFIT] | STUCK]]; [tauto| | tauto]. 
-    right. left. red. simpl in *.
-    (* rewrite /fits_inf_call in NFIT. *)
-    destruct (extr S!! ii) as [ci | ] eqn:ITH; rewrite ITH /= in CALL; [| done].
-    pose proof (FIC ic m ai (trace_take_fwd n extr)) as X.
-    rewrite !curry_uncurry_prop in X. apply Classical_Prop.imply_to_or in X.
-    destruct X as [NFIT' | ?]; [| done]. clear NFIT. rename NFIT' into NFIT.
-    apply Classical_Prop.not_and_or in NFIT as [X | NFIT].
-    1: apply Classical_Prop.not_and_or in X as [X | NFIT].
-    1: apply Classical_Prop.not_and_or in X as [NFIT | NFIT].
-    - destruct (trace_take_fwd n extr !! tctx_index ic) eqn:II; rewrite II /= // in NFIT.
-      destruct NFIT.
-      apply trace_take_fwd_lookup_Some in II.
-      fold ii in II. rewrite II in ITH. inversion ITH. 
-      eauto. 
-    - apply not_forall_exists_not in NFIT. destruct NFIT as [r NFIT].
-      apply Classical_Prop.imply_to_and in NFIT as [GE NFIT].
-      destruct (trace_take_fwd n extr !! r) eqn:RR; rewrite RR /= // in NFIT.
-      
-      eapply call_returns_if_not_continues in NFIT; eauto.
-      3: by apply trace_take_fwd_lookup_Some in RR.
-      2: { eapply call_nval_at; eauto. done. }
-      rename r into b. 
-      destruct NFIT as (k & r & ck & RANGE & KTH & RETk).
-      rewrite ic_helper.
-      exists k, r, ck. split; eauto. lia.
-    - apply not_forall_exists_not in NFIT. destruct NFIT as [j NFIT].
-      destruct (trace_take_fwd n extr !! j) eqn:JJ; rewrite JJ /= // in NFIT.
-      destruct (from_locale c.1 τi) eqn:EE; rewrite EE /= // in NFIT.
-
-      apply trace_take_fwd_lookup_Some in JJ. 
-
-      destruct (Nat.le_gt_cases j ii) as [LE | GT].
-      + destruct (to_val e) eqn:V; [| done].
-        apply of_to_val in V. rewrite -V in EE.
-        eapply val_preserved_trace in LE; eauto.
-        rewrite ITH /= in LE.
-
-        (* TODO: lemma? *)
-        do 2 red in CALL. rewrite /tpc tc_helper in CALL.
-        rewrite LE in CALL. inversion CALL.
-        apply Some_inj in CALL. 
-        apply (@f_equal _ _ to_val) in CALL.
-        erewrite fill_not_val in CALL; done. 
-      + apply Nat.lt_le_incl in GT.
-        eapply call_returns_if_not_continues in GT; eauto.
-        2: { eapply call_nval_at; eauto. done. }
-        2: { intros NVAL. apply NFIT.
-             destruct NVAL as (?&EXPR&?).
-             do 2 red in EXPR. rewrite tc_helper in EXPR.
-             rewrite EE in EXPR. inversion_clear EXPR.
-             eapply fill_not_val; eauto. }
-        destruct GT as (k & r & ck & RANGE & KTH & RETk).
-        rewrite ic_helper.
-        exists k, r, ck. split; eauto. lia.
-    - apply Classical_Prop.imply_to_and in NFIT as [LONG NORET].
-      destruct NORET. red.
-      clear CALL. 
-      intros j K PREV CALL.
-      destruct (trace_take_fwd n extr !! j) eqn:JJ; rewrite JJ /= // in CALL.
-      pose proof (trace_take_fwd_length_bound n extr). 
-      (* apply trace_take_fwd_lookup_Some in JJ. *)
-      red in MAIN. eapply MAIN in PREV.
-      2: { apply trace_take_fwd_lookup_Some in JJ. rewrite JJ. eauto. }
-      destruct PREV as (r&PREV'&RET).
-      exists r. split; [done| ]. 
-      destruct (extr S!! r) eqn:RTH; [| done]. 
-      eapply (trace_take_fwd_lookup_Some' _ n) in RTH; eauto.
-      2: { lia. }
-      by rewrite RTH.       
-  Qed.
-     
-End WFAdequacy.
-
+End Lib.
 
 Lemma fair_call_extend etr Ki Kj τ i j ci
   (FAIR: fair_call etr (TpoolCtx Ki τ) i)
@@ -1218,8 +561,7 @@ Proof using.
     destruct RETj as (rj & ? & ? & ?&?&?&RETj).
     destruct NORETj. red.
     exists rj. red. eauto.  
-Qed. 
-
+Qed.
 
 Definition always_returns_main s P m tr :=
   forall tc a ci, let '(TraceCtx i tpc) := tc in
@@ -1289,6 +631,643 @@ Proof using.
   destruct NORET. red.
   exists rj. red. eauto.
 Qed.
+
+
+Section WFAdequacy.
+
+  Let OP := LocaleOP (OPRE := OPP_WF) (Locale := locale heap_lang). 
+  Existing Instance OP.
+  Let OM := ObligationsModel.
+
+  Let M := AM2M ObligationsAM.
+  Let ASEM := ObligationsASEM.
+  Let EM := TopAM_EM ASEM (fun {Σ} {aGS: asem_GS Σ} _ _ => ⌜ True ⌝%I).
+
+  Context (ic: @trace_ctx heap_lang).
+  Let ii := tctx_index ic.
+  Let tpc := tctx_tpctx ic. 
+  Let Ki := tpctx_ctx tpc.
+  Let τi := tpctx_tid tpc. 
+  Context (m ai: val).
+
+  Context (s': stuckness).
+  
+  Let fic := fits_inf_call ic m ai.
+
+  Definition obls_om_traces_match_wfree: extrace heap_lang -> trace (mstate M) (mlabel M) -> Prop :=
+    obls_om_traces_match_gen (obls_st_rel_wfree ic). 
+
+  Theorem om_simulation_adequacy_model_trace_multiple_waitfree Σ
+        `{hPre: @heapGpreS Σ M EM} (s: stuckness)
+        (es: list expr) σ1 (s1: mstate M) p
+        (INIT: em_is_init_st (es, σ1) s1 (ExecutionModel := EM))
+        (extr : extrace heap_lang)
+        (Hvex : extrace_valid extr)
+        (Hexfirst : trfirst extr = (es, σ1))
+    :
+    PR_premise_multiple (obls_sim_rel_wfree ic s') (fits_inf_call ic m ai) Σ s es σ1 s1 (p: @em_init_param _ _ EM) ->
+    (∃ omtr, obls_om_traces_match_wfree extr omtr ∧ trfirst omtr = s1 /\
+              int_ref_inf (obls_sim_rel_wfree ic s') extr omtr
+    ) \/
+    (exists k, ¬ (fits_inf_call ic m ai) (trace_take_fwd k extr)).
+  Proof using.
+    intros PREM.
+
+    destruct (decide (1 <= length es)).
+    2: { 
+      (* TODO: make a lemma *)
+         assert (length es = 0) by lia.
+         assert (es = []) as -> by (destruct es; simpl in H; lia || done).
+         assert (extr = tr_singl ([], σ1)) as ->.
+         { destruct extr; simpl in Hexfirst; subst. 
+           { done. }
+           apply extrace_valid_alt, trace_valid_cons_inv, proj2 in Hvex.
+           inversion Hvex; subst; try done.
+           inversion H0. clear -H4.
+           apply (@f_equal _ _ length) in H4.
+           rewrite !length_app /= in H4. lia. }
+
+         destruct (decide (fits_inf_call ic m ai ({tr[ ([], σ1) ]}))) as [FITS | ].
+         2: { right. exists 0. by rewrite trace_take_fwd_0_first. }
+         
+         assert (obls_st_rel_wfree ic ([], σ1) s1) as PROP. 
+         { red. 
+           rewrite /obls_st_rel /no_extra_obls.
+           rewrite /obls_fairness_preservation.om_live_tids /has_obls.
+           simpl in INIT. red in INIT.
+           rewrite /locales_of_cfg in INIT. rewrite list_to_set_nil in INIT.
+           apply proj1, eq_sym, dom_empty_inv_L in INIT.
+           rewrite INIT.
+           split; try set_solver. }
+
+         left. exists (tr_singl s1).
+
+         split.
+         2: { split; [done| ].
+              apply int_ref_int_singleton.
+              red.
+              repeat split; try by apply PROP.
+              red. simpl. intros _ TI0.
+              assert (tctx_index ic = 0) by lia.
+              destruct FITS as [CALL _ _ _].
+              rewrite H0 /= in CALL.
+              rewrite /call_at /= in CALL.
+              by edestruct no_expr_in_empty_pool. }
+
+         red. by apply trace_match_singl. }
+
+    unshelve epose proof (@PR_strong_simulation_adequacy_traces_multiple _ _ EM 
+                            HeapLangEM (obls_sim_rel_wfree ic s') (fits_inf_call ic m ai)
+                            _ _ _ _ _ 
+                            s es σ1 s1 p
+                extr
+                Hvex
+                ltac:(done)
+                obls_ves_wrapper
+                (obls_st_rel_wfree ic)
+                (fun oτ '(_, τ') => oτ = τ')
+                _ _ _ _ _ _ _
+                PREM
+      ) as SIM.
+    { apply fits_inf_call_prev. }
+    { simpl. intros ????[??]? STEP.
+      red in STEP. simpl in STEP. destruct STEP as [STEP ->].
+      destruct o; [| done].
+      simpl in STEP. red in STEP. apply STEP. }
+    { simpl. intros ????[??]? STEP.
+      red in STEP. simpl in STEP. destruct STEP as [STEP ->].
+      destruct o; [| done].
+      simpl in STEP. red in STEP.
+      constructor. apply STEP. }
+    { simpl. intros ?? SIM.
+      split; apply SIM. }
+    { simpl. intros ?? SIM. apply SIM. }
+    { done. }
+    { eapply adequacy_utils.rel_finitary_impl; [| apply obls_sim_rel_FB].
+      2, 3: by apply _.
+      intros ?? X. apply X. }
+    { done. }
+
+    done.
+  Qed.
+
+  Open Scope WFR_scope. 
+
+  Context (P: val -> Prop) (Pai: P ai).
+  Context (SPEC: WaitFreeSpec s' P m).
+  Let F := wfs_F _ _ _ SPEC.
+
+  Lemma init_pwp {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ} τ e0
+    (VALID: valid_client e0):
+    let _ := irisG_looping HeapLangEM si_add_none (lG := hG) in 
+    wfs_mod_inv _ _ _ SPEC ⊢ pwp MaybeStuck ⊤ τ (subst "m" m e0) (λ _, True).
+  Proof using SPEC.
+    simpl. opose proof * (fundamental e0) as FTLR. 
+    { done. }
+    iIntros "#INV". 
+    rewrite /logrel in FTLR.
+    rewrite /interp_expr in FTLR.
+    rewrite -subst_env_singleton.
+    iApply wp_wand; [iApply FTLR| ].
+    - rewrite -insert_empty. iApply interp_env_cons; [done| ].
+      iSplitL; [| by iApply interp_env_nil].
+      destruct SPEC. by iApply wfs_safety_spec. 
+    - by iIntros "**".
+  Qed. 
+
+  Lemma init_wptp_wfree_pwps `{Hinv: @IEMGS _ _ HeapLangEM EM Σ} tp0 tp N
+    (NO: τi ∉ locales_of_list_from tp0 tp)
+    (SUBST: Forall (λ e, ∃ e0, e = subst "m" m e0 /\ valid_client e0) tp):
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ _ _ SPEC)
+   ⊢ wptp_from_gen (thread_pr ic s' MaybeStuck N) tp0 tp
+      (map (λ (_ : nat) (_ : val), ⌜ True ⌝%I)
+         (adequacy_utils.locales_of_list_from tp0 tp)).
+  Proof using SPEC ai.
+    clear Pai. 
+    iIntros "#INV". 
+    iInduction tp as [|e tp] "IH" forall (tp0 NO).
+    { simpl. iApply wptp_from_gen_nil. }
+    rewrite adequacy_utils.locales_of_list_from_cons. 
+    rewrite map_cons. iApply wptp_from_gen_cons. iSplitR.
+    2: { simpl. iApply "IH".
+         - iPureIntro. by inversion SUBST. 
+         - iPureIntro. set_solver. }
+    rewrite /thread_pr. rewrite decide_False.
+    2: { intros EQ. apply NO. rewrite locales_of_list_from_locales.
+         rewrite /τi EQ. set_solver. }
+    inversion SUBST as [| ?? (? & -> & ?)]. subst. 
+    by iApply init_pwp.
+  Qed.
+
+  Definition tpool_init_restr (tp: list expr) :=
+    Forall (fun e => exists e0, e = subst "m" m e0 /\ valid_client e0) tp /\
+    (ii = 0 -> exists e, from_locale tp τi = Some e /\ under_ctx Ki e = Some (m ai)) /\
+    (forall e, from_locale tp τi = Some e -> to_val e = None). 
+
+  Lemma init_wptp_wfree `{Hinv: @IEMGS _ _ HeapLangEM EM Σ} c
+    (ETR0: tpool_init_restr c.1):
+    let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ _ _ SPEC) -∗
+    (⌜ ii = 0 ⌝ → ∃ π, cp_mul π0 d0 (F ai) ∗ th_phase_frag τi π (/2)%Qp) -∗
+    wptp_wfree ic s' MaybeStuck {tr[ c ]}
+      (map (λ _ _, True) (adequacy_utils.locales_of_list c.1)).
+  Proof using Pai.
+    simpl. iIntros "#INV T".
+    rewrite /wptp_wfree. simpl. 
+    destruct (thread_pool_split c.1 τi) as (tp1 & tp2 & tp' & EQ & TP' & NO1 & NO2).
+    rewrite EQ. rewrite !locales_of_list_from_app'. rewrite !map_app /=.
+    destruct ETR0 as (TP & II0 & NVAL0).
+    rewrite EQ in TP.
+    iApply wptp_from_gen_app. iSplitR.
+    { iApply init_wptp_wfree_pwps.
+      - done. 
+      - by apply Forall_app, proj1 in TP.
+      - done. }
+    simpl. iApply wptp_from_gen_app. iSplitL.
+    2: { iApply init_wptp_wfree_pwps.
+         - done. 
+         - by do 2 (apply Forall_app, proj2 in TP).
+         - done. }
+
+    destruct TP' as [-> | (e & -> & LOC)].
+    { simpl. iApply wptp_from_gen_nil. }
+    simpl. iApply wptp_gen_singleton.
+    rewrite /thread_pr. rewrite decide_True; [| done].
+    rewrite /wp_tc.
+    destruct ii eqn:TI.
+    2: { rewrite leb_correct; [| lia].
+         apply Forall_app, proj2 in TP.
+         apply Forall_app, proj1 in TP.
+         inversion TP as [| ?? (? & -> & ?)]. subst.
+         by iApply init_pwp. }
+    rewrite leb_correct_conv; [| lia].
+    iDestruct ("T" with "[//]") as (π) "[CPS PH]".
+    rewrite half_inv2. 
+    iPoseProof (get_call_wp _ _ SPEC ai with "[$] [$] [$]") as "WP".
+    { done. }
+    destruct (II0 eq_refl) as (e_ & IN & CTX).
+    rewrite LOC EQ /= in IN.
+    rewrite /from_locale in IN. rewrite from_locale_from_locale_of in IN.
+    inversion IN. subst e_.
+    rewrite CTX. simpl.
+    iApply (wp_stuck_mono with "[$]"). done.
+  Qed.
+
+  Lemma tp_init_in tp τ
+    (IN: τ ∈ locales_of_list tp)
+    (ETR0: tpool_init_restr tp):
+    exists e0, from_locale tp τ = Some (subst "m" m e0).
+  Proof using.
+    clear -IN ETR0. 
+    destruct ETR0 as [TP _].
+    apply elem_of_locales_of_list_from_from_locale_from in IN as (e & IN).
+    rewrite /from_locale IN.
+    apply Forall_forall with (x := e) in TP; [set_solver| ].
+    eapply from_locale_from_elem_of; eauto.
+  Qed.
+
+  Lemma PR_premise_wfree `{hPre: @heapGpreS Σ M EM} c
+    (ETR0: tpool_init_restr c.1)
+    (MOD_INIT: wfs_is_init_st _ _ m SPEC c)
+    (M_FUN: exists f x b, m = RecV f x b)
+    :
+  PR_premise_multiple (obls_sim_rel_wfree ic s') (fits_inf_call ic m ai)
+    Σ MaybeStuck c.1 c.2
+    (init_om_wfree_state (F ai) ic c) ((): @em_init_param _ _ EM).
+  Proof using Pai.
+    red. iIntros (Hinv) "(PHYS & MOD)". simpl.
+    iMod (@wfs_init_mod _ _ _ SPEC with "[PHYS]") as "#INV".
+    2: { iFrame. }
+    { by rewrite -surjective_pairing. } 
+         
+    iModIntro.
+    iExists (wfree_trace_inv ic s' SPEC).
+    
+    iExists (PR_wfree ic s' SPEC _ Pai). simpl.
+
+    do 2 rewrite bi.sep_assoc. iSplitL.
+    2: { rewrite /adequacy_cond.rel_always_holds_with_trace_inv.
+
+         iIntros (extr omtr [tp σ] EXTRA FIN NSTUCK).
+         iClear "INV".
+         simpl. iIntros "(%VALID_STEP & HEAP & MSI & [%TH_OWN %OBLS]) POSTS #INV".
+         red in EXTRA. destruct EXTRA as (VALID & EX0 & OM0 & CONT_SIM). 
+         iApply fupd_mask_intro_discard; [done| ].
+
+         rewrite /wfree_trace_inv. iDestruct "INV" as "((%NOOBS' & %NVAL & %PROGRESS) & _)".
+         iPureIntro. 
+
+         rewrite /obls_sim_rel_wfree. split; [|done].
+
+         destruct extr.
+         { simpl in VALID_STEP.
+           inversion VALID. subst.
+           red in EX0, OM0. simpl in EX0, OM0. subst.
+           rewrite /obls_sim_rel_wfree /obls_sim_rel /obls_sim_rel_gen.
+           simpl.
+
+           split; [done| ]. simpl. red.
+           red. simpl. eapply @obls_τi_enabled; eauto. }
+         
+         simpl in VALID_STEP. inversion VALID. subst. simpl in *.
+         rewrite /obls_sim_rel.
+         red. split. 
+         { simpl. by destruct a. }
+         simpl. rewrite /obls_st_rel.
+         red. simpl.
+         eapply @obls_τi_enabled; eauto. }
+
+    rewrite -surjective_pairing. 
+    iSplitL.
+    2: { rewrite /wfree_trace_inv. iFrame "INV". 
+         iPureIntro. repeat split.
+         - simpl. red. rewrite /init_om_wfree_state. simpl.
+           intros τ NEMPTY. destruct decide.
+           2: { rewrite lookup_gset_to_gmap option_guard_decide in NEMPTY.
+                destruct decide; simpl in NEMPTY; done. }
+           destruct lookup eqn:L; try done. 
+           apply lookup_insert_Some in L. destruct L as [| [? L]]; [set_solver| ].
+           apply lookup_gset_to_gmap_Some in L. set_solver.
+         - simpl.
+           destruct (from_locale c.1 τi) eqn:IN; rewrite IN; [| done].
+           destruct ETR0 as (_&_&NVAL0).
+           by apply NVAL0 in IN.
+         - red. simpl.
+           intros _ TI0.
+           destruct ETR0 as (?&CALL0&?).
+           destruct (CALL0 ltac:(lia)) as (?&?&?).           
+           eapply RecV_App_not_stuck; eauto. }
+    
+    iSplitR.
+    { simpl. iApply hl_config_wp. }
+    rewrite /pr_pr_wfree. simpl.
+
+    iDestruct (init_wfree_resources_weak with "[$]") as "(CPS & OB' & OBLS & PHS)".
+    iFrame.
+    rewrite -{2}(difference_union_intersection_L (locales_of_cfg c) {[ τi ]}).    
+    rewrite big_sepS_union.
+    2: { set_solver. }
+    iDestruct "PHS" as "[$ PH]".
+    #[local] Arguments Nat.leb _ _ : simpl nomatch.    
+    rewrite /extra_fuel. simpl.
+    iDestruct "CPS" as "(CPS_PRE & CPS0 & CP1)".
+    iDestruct (cp_mul_split with "CPS_PRE") as "[CPS_PRE CPS_PRE']". rewrite Nat.add_0_r.
+    rewrite Nat.sub_0_r. fold ii.
+    rewrite bi.sep_comm. rewrite -bi.sep_assoc. iSplitL "CPS0 CPS_PRE".
+    { destruct leb; [| done]. iFrame. }
+    rewrite /obls_τi'.
+
+    rewrite -bi.sep_assoc. 
+    iAssert (_%I ∗ (⌜ ii = 0 ⌝ →
+                    let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
+                    ∃ π, th_phase_frag τi π (/ 2)%Qp))%I with "[PH]" as "[X PHτi]".
+    2: iSplitL "X"; [by iApply "X"| ].
+    { destruct (decide (τi ∈ locales_of_cfg c)).
+      2: { iSplitL.
+           - by iIntros (?).
+           - iIntros (II0). destruct ETR0 as (?&IN&?).
+             destruct (IN II0) as (?&E&?). destruct n.
+             eapply locales_of_cfg_Some; eauto.
+             Unshelve. apply c. }
+      rewrite intersection_comm_L subseteq_intersection_1_L.
+      2: set_solver.
+      rewrite big_sepS_singleton.
+      fold τi.
+      destruct ii eqn:II.
+      - rewrite leb_correct_conv; [| lia].
+        setoid_rewrite th_phase_frag_halve at 1. iDestruct "PH" as (?) "(PH&?)".
+        rewrite half_inv2. 
+        iSplitL "PH"; iIntros (?); iExists _; iFrame.
+      - iSplitL.
+        2: { iIntros (?). lia. }
+        iIntros (?). iFrame. }
+    
+    iSplitR "PHτi CPS_PRE'".
+    { iSplitL.
+      2: by destruct s'. 
+      destruct decide.
+      - iSpecialize ("OB'" with "[//]"). iFrame.
+      - iFrame. }
+
+    iApply (init_wptp_wfree with "[$] [$]"). done. 
+  Qed.
+
+  Definition wfreeΣ: gFunctors := iemΣ HeapLangEM EM. 
+
+  Instance wfree_pre: @heapGpreS wfreeΣ M EM.
+  Proof. 
+    unshelve esplit. 
+  Qed. 
+
+  (* TODO: use this def above *)
+  Definition never_stuck_ea (etr: extrace heap_lang) '(TraceCtx i (TpoolCtx K τ)) :=
+    ∃ N, i ≤ N ∧ is_Some (etr S!! N)
+      ∧ ∀ j, N ≤ j → from_option (not_stuck_tid τ) True (etr S!! j).
+
+  (* TODO: rename *)
+  Lemma simple_om_simulation_adequacy_terminate_multiple_waitfree_impl extr
+    (MOD_INIT : wfs_is_init_st s' _ m SPEC (trfirst extr))
+    (VALID : extrace_valid extr)
+    (FAIR : fair_call extr tpc ii)
+    (INIT_TP : tpool_init_restr (trfirst extr).1)
+    (CALL: from_option (fun c => call_at tpc c m ai (APP := App)) False (extr S!! ii))
+    (M_FUN: exists f x b, m = RecV f x b):
+    terminating_trace extr /\ int_ref_inf_one (call_progresses ic s') extr ∨
+    (∃ k, ¬ fits_inf_call ic m ai (trace_take_fwd k extr)) \/
+    (s' = MaybeStuck /\ gets_stuck_ae extr ic). 
+  Proof using Pai.
+    opose proof (om_simulation_adequacy_model_trace_multiple_waitfree
+                wfreeΣ _ (trfirst extr).1 _ _ _ _ _ VALID _ _) as ADEQ.
+    { apply init_om_wfree_is_init. }
+    { apply surjective_pairing. }     
+    { rewrite -surjective_pairing. 
+      eapply PR_premise_wfree; eauto. }
+    
+    destruct ADEQ as [(mtr & MATCH & OM0 & IREF) | RET].
+    2: { right. left. done. } 
+
+    opose proof (obls_matching_traces_OM _ _ _ _ MATCH _) as (omtr & MATCH'' & SR & OM_WF & FIRST'').
+    { intros ?? X. apply X. }
+    { eapply obls_init_wf. rewrite OM0. apply init_om_wfree_is_init. }
+
+    destruct (Classical_Prop.classic (∃ j, has_return_at extr ic j)) as [[j RET]| NORET].
+    { red in RET. rewrite (ic_helper ic) in RET.
+      destruct RET as (r & cj & ? & JTH & RET).
+      right. left. exists j. intros [_ NVALS _]. 
+      specialize (NVALS _ H).
+
+      eapply trace_take_fwd_lookup_Some' in JTH.
+      2: reflexivity.
+      rewrite JTH /= in NVALS.
+      edestruct not_return_nval; eauto. }
+
+    assert (int_ref_inf_one (call_progresses ic s') extr) as IREF1.
+    { eapply int_ref_inf_proj_one. eapply int_ref_inf_impl; eauto.
+      by intros ?? (?&?&?). }
+
+    destruct (extr S!! ii) as [ci | ] eqn:IITH.
+    2: { left.
+         pose proof (trace_has_len extr) as [??]. 
+         eapply state_lookup_dom_neg in IITH; eauto.
+         split; [| done].
+         eapply terminating_trace_equiv; eauto.
+         destruct x; try done. }
+
+    add_case (exists N, ii <= N /\ is_Some (extr S!! N) /\ ∀ j, N ≤ j → from_option (not_stuck_tid τi) True (extr S!! j)) IF_NS. 
+    { intros NS. 
+    
+      assert (forall τ, obls_trace_fair τ omtr) as OM_FAIR.
+      { eapply om_trace_fair; eauto. }
+
+      left. split; [| done]. 
+      pose proof (traces_match_valid2 _ _ _ _ _ _ MATCH'') as OM_VALID.
+      pose proof (obls_fair_trace_terminate _ OM_VALID OM_FAIR) as OM_TERM.
+      
+      eapply (traces_match_preserves_termination _ _ _ _ _ _ MATCH'').
+      apply OM_TERM; eauto.
+      + apply unit_WF.
+      + apply fin_wf. }
+
+    destruct (decide (s' = MaybeStuck)) as [S'|S']. 
+    2: { apply IF_NS. 
+
+         exists ii. split; [lia| ]. split; [done| ]. 
+         intros.
+         destruct (extr S!! j) eqn:ITH; [| done]. simpl.
+         clear -IREF H ITH S'.
+         red in IREF.
+         specialize (IREF j). red in IREF. do 2 apply proj2 in IREF.
+         red in IREF.
+         
+         (* TODO: make a lemma *)
+         pose proof (trace_has_len extr) as [? LEN].
+         pose proof ITH as LT%mk_is_Some. eapply state_lookup_dom in LT; eauto.
+         assert (trace_length (trace_take_fwd j extr) = S j).
+         { apply Nat.le_antisymm.
+           1: by apply trace_take_fwd_length_bound.
+           opose proof * (trace_take_fwd_length j extr); eauto.
+           destruct x; try lia.
+           rewrite H0.
+           simpl in LT. lia. }
+         rewrite H0 in IREF. ospecialize * IREF; try (done || lia).
+         { clear -S'. by destruct s'. }
+         symmetry in H0. apply trace_lookup_last in H0.
+         eapply trace_take_fwd_lookup_Some' in ITH; [| reflexivity].
+         set_solver. }
+    
+    destruct (Classical_Prop.classic (gets_stuck_ae extr ic)) as [| NS]. 
+    { do 2 right. tauto. }
+    apply IF_NS.
+
+    rewrite /gets_stuck_ae in NS.
+    rewrite not_all_ex_not_iff in NS. destruct NS as (N & NS).
+    apply not_impl_and_not_iff in NS as ([? NTH] & NS).
+    exists (max ii N). split; [lia| ].
+    split.
+    { pose proof (Nat.max_spec_le ii N) as [[? MAX] | [? MAX]]; rewrite MAX; eauto. }
+    intros. destruct (extr S!! j) eqn:JTH; [| done]. simpl.
+    rewrite not_ex_all_not_iff in NS.
+    specialize (NS j). rewrite /ge in NS. rewrite !not_and_l in NS.
+    destruct NS as [? | [? | NS]].
+    { lia. }
+    { set_solver. }
+    rewrite /gets_stuck_at /= in NS.
+    rewrite (ic_helper ic) /tpc (tc_helper ic) in NS.
+    rewrite JTH in NS.
+    destruct (decide (not_stuck_tid τi c)); [done| ]. destruct NS.
+    eexists. repeat split.
+    { lia. }
+    apply stuck_tid_neg. split; eauto.
+    opose proof * from_locale_trace.
+    { done. }
+    { apply IITH. }
+    { simpl in CALL.
+      move CALL at bottom. do 2 red in CALL.
+      rewrite /tpc tc_helper /= in CALL.
+      apply mk_is_Some in CALL. apply CALL. }
+    { etrans; [| apply H]. lia. }
+    by rewrite JTH in H0.
+  Qed.
+  
+  Theorem simple_om_simulation_adequacy_terminate_multiple_waitfree extr
+        (ETR0: valid_init_tpool m (trfirst extr).1)
+        (MOD_INIT: wfs_is_init_st _ _ _ SPEC (trfirst extr))
+        (CALL: from_option (fun c => call_at tpc c m ai (APP := App)) False (extr S!! ii))
+    :
+    extrace_valid extr -> 
+    fair_call extr tpc ii ->
+    (exists f x b, m = RecV f x b) ->
+    terminating_trace extr /\ int_ref_inf_one (call_progresses ic s') extr \/ 
+    (exists k, ¬ fits_inf_call ic m ai (trace_take_fwd k extr)) \/
+    (s' = MaybeStuck /\ gets_stuck_ae extr ic). 
+  Proof.
+    intros VALID FAIR M_FUN. 
+
+    destruct (decide (ii = 0 → ∃ e,
+                    from_locale (trfirst extr).1 τi = Some e ∧ under_ctx Ki e = Some (m ai))) as [II0| ].
+    2: { pose proof tc_helper. 
+         clear -n H.
+         right. left. 
+         apply Classical_Prop.imply_to_and in n as (II & NO0).
+         exists 0. intros FITS. apply NO0.
+         destruct FITS.
+         fold ii in fic_call.
+         rewrite trace_take_fwd_0_first in fic_call.
+         rewrite II /= in fic_call.
+         red in fic_call. simpl in fic_call. eauto.
+         red in fic_call. rewrite H in fic_call.
+         eexists. split; eauto. by rewrite under_ctx_fill. }
+
+    destruct (@decide (∀ e, from_locale (trfirst extr).1 τi = Some e → to_val e = None)) as [E0| ].
+    { destruct (from_locale (trfirst extr).1 τi) eqn:E.
+      2: { left. set_solver. }
+      destruct (to_val e) eqn:V.
+      { right. set_solver. }
+      left. set_solver. }
+    2: { apply not_forall_exists_not in n as [e VAL].
+         apply Classical_Prop.imply_to_and in VAL as [E VAL].
+         right. left. exists 0. intros FITS. apply VAL.
+         destruct FITS. 
+         specialize (fic_never_val 0). rewrite trace_take_fwd_0_first /= in fic_never_val.
+         rewrite E in fic_never_val. done. }
+
+    assert (tpool_init_restr (trfirst extr).1) as INIT_TP.
+    { repeat split; eauto. }
+
+    by apply simple_om_simulation_adequacy_terminate_multiple_waitfree_impl.
+  Qed.
+
+  (* TODO: rename *)
+  Lemma obls_terminates_impl_multiple_waitfree
+    (extr : extrace heap_lang)
+    (ETR0: valid_init_tpool m (trfirst extr).1)
+    (MOD_INIT: wfs_is_init_st _ _ _ SPEC (trfirst extr))
+    (VALID: extrace_valid extr)
+    (* (FAIR: fair_ex τi extr) *)
+    (FAIR: fair_call extr tpc ii)
+    (MAIN: previous_calls_return_tr extr ii τi m)
+    (CALL: from_option (fun c => call_at tpc c m ai (APP := App)) False (extr S!! ii))
+    (M_FUN: exists f x b, m = RecV f x b)
+    :
+    terminating_trace extr /\ int_ref_inf_one (call_progresses ic s') extr
+    \/ has_return extr ic \/
+    (s' = MaybeStuck /\ gets_stuck_ae extr ic). 
+  Proof.
+    opose proof * (simple_om_simulation_adequacy_terminate_multiple_waitfree) as ADEQ; eauto.
+
+    destruct ADEQ as [| [[n NFIT] | STUCK]]; [tauto| | tauto]. 
+    right. left. red. simpl in *.
+    (* rewrite /fits_inf_call in NFIT. *)
+    destruct (extr S!! ii) as [ci | ] eqn:ITH; rewrite ITH /= in CALL; [| done].
+    pose proof (FIC ic m ai (trace_take_fwd n extr)) as X.
+    rewrite !curry_uncurry_prop in X. apply Classical_Prop.imply_to_or in X.
+    destruct X as [NFIT' | ?]; [| done]. clear NFIT. rename NFIT' into NFIT.
+    apply Classical_Prop.not_and_or in NFIT as [X | NFIT].
+    1: apply Classical_Prop.not_and_or in X as [X | NFIT].
+    1: apply Classical_Prop.not_and_or in X as [NFIT | NFIT].
+    - destruct (trace_take_fwd n extr !! tctx_index ic) eqn:II; rewrite II /= // in NFIT.
+      destruct NFIT.
+      apply trace_take_fwd_lookup_Some in II.
+      fold ii in II. rewrite II in ITH. inversion ITH. 
+      eauto. 
+    - apply not_forall_exists_not in NFIT. destruct NFIT as [r NFIT].
+      apply Classical_Prop.imply_to_and in NFIT as [GE NFIT].
+      destruct (trace_take_fwd n extr !! r) eqn:RR; rewrite RR /= // in NFIT.
+      
+      eapply call_returns_if_not_continues in NFIT; eauto.
+      3: by apply trace_take_fwd_lookup_Some in RR.
+      2: { eapply call_nval_at; eauto. done. }
+      rename r into b. 
+      destruct NFIT as (k & r & ck & RANGE & KTH & RETk).
+      rewrite (ic_helper ic).
+      exists k, r, ck. split; eauto. lia.
+    - apply not_forall_exists_not in NFIT. destruct NFIT as [j NFIT].
+      destruct (trace_take_fwd n extr !! j) eqn:JJ; rewrite JJ /= // in NFIT.
+      destruct (from_locale c.1 τi) eqn:EE; rewrite EE /= // in NFIT.
+
+      apply trace_take_fwd_lookup_Some in JJ. 
+
+      destruct (Nat.le_gt_cases j ii) as [LE | GT].
+      + destruct (to_val e) eqn:V; [| done].
+        apply of_to_val in V. rewrite -V in EE.
+        eapply val_preserved_trace in LE; eauto.
+        rewrite ITH /= in LE.
+
+        (* TODO: lemma? *)
+        do 2 red in CALL. rewrite /tpc tc_helper in CALL.
+        rewrite LE in CALL. inversion CALL.
+        apply Some_inj in CALL. 
+        apply (@f_equal _ _ to_val) in CALL.
+        erewrite fill_not_val in CALL; done. 
+      + apply Nat.lt_le_incl in GT.
+        eapply call_returns_if_not_continues in GT; eauto.
+        2: { eapply call_nval_at; eauto. done. }
+        2: { intros NVAL. apply NFIT.
+             destruct NVAL as (?&EXPR&?).
+             do 2 red in EXPR. rewrite tc_helper in EXPR.
+             rewrite EE in EXPR. inversion_clear EXPR.
+             eapply fill_not_val; eauto. }
+        destruct GT as (k & r & ck & RANGE & KTH & RETk).
+        rewrite (ic_helper ic).
+        exists k, r, ck. split; eauto. lia.
+    - apply Classical_Prop.imply_to_and in NFIT as [LONG NORET].
+      destruct NORET. red.
+      clear CALL. 
+      intros j K PREV CALL.
+      destruct (trace_take_fwd n extr !! j) eqn:JJ; rewrite JJ /= // in CALL.
+      pose proof (trace_take_fwd_length_bound n extr). 
+      (* apply trace_take_fwd_lookup_Some in JJ. *)
+      red in MAIN. eapply MAIN in PREV.
+      2: { apply trace_take_fwd_lookup_Some in JJ. rewrite JJ. eauto. }
+      destruct PREV as (r&PREV'&RET).
+      exists r. split; [done| ]. 
+      destruct (extr S!! r) eqn:RTH; [| done]. 
+      eapply (trace_take_fwd_lookup_Some' _ n) in RTH; eauto.
+      2: { lia. }
+      by rewrite RTH.       
+  Qed.
+     
+End WFAdequacy.
 
 
 Theorem wfree_is_wait_free s' m
