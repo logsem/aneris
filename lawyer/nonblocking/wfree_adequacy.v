@@ -188,13 +188,13 @@ Section WFAdequacy.
     by iApply init_pwp.
   Qed.
 
-  Definition tpool_init_restr (tp: list expr) :=
+  Definition is_init_tpool (tp: list expr) :=
     Forall (fun e => exists e0, e = subst "m" m e0 /\ valid_client e0) tp /\
     (ii = 0 -> exists e, from_locale tp τi = Some e /\ under_ctx Ki e = Some (m ai)) /\
     (forall e, from_locale tp τi = Some e -> to_val e = None). 
 
   Lemma init_wptp_wfree `{Hinv: @IEMGS _ _ HeapLangEM EM Σ} c
-    (ETR0: tpool_init_restr c.1):
+    (ETR0: is_init_tpool c.1):
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
     (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ _ _ SPEC) -∗
     (⌜ ii = 0 ⌝ → ∃ π, cp_mul π0 d0 (F ai) ∗ th_phase_frag τi π (/2)%Qp) -∗
@@ -244,7 +244,7 @@ Section WFAdequacy.
 
   Lemma tp_init_in tp τ
     (IN: τ ∈ locales_of_list tp)
-    (ETR0: tpool_init_restr tp):
+    (ETR0: is_init_tpool tp):
     exists e0, from_locale tp τ = Some (subst "m" m e0).
   Proof using.
     clear -IN ETR0. 
@@ -295,7 +295,7 @@ Section WFAdequacy.
   Qed.
     
   Lemma init_wfree_inv  {Σ} {Hinv : IEMGS HeapLangEM EM Σ} c
-    (ETR0: tpool_init_restr c.1)
+    (ETR0: is_init_tpool c.1)
     (MOD_INIT: wfs_is_init_st s' P m SPEC c)
     (M_FUN: ∃ (f x : binder) (b : expr), m = (rec: f x := b)%V):
   @wfs_mod_inv s' P m SPEC Σ
@@ -327,7 +327,7 @@ Section WFAdequacy.
 
   Lemma init_pr_pr_wfree {Σ} {Hinv: IEMGS HeapLangEM EM Σ}
     c
-    (ETR0: tpool_init_restr c.1):
+    (ETR0: is_init_tpool c.1):
   @wfs_mod_inv s' _ _ SPEC Σ (@iem_phys heap_lang _ HeapLangEM EM Σ Hinv) _ -∗
   @obls_init_resource _ _ _ _ _ _
             (@iem_fairnessGS heap_lang _ HeapLangEM EM Σ Hinv)
@@ -389,7 +389,7 @@ Section WFAdequacy.
   Qed.
 
   Lemma PR_premise_wfree `{hPre: @heapGpreS Σ M EM} c
-    (ETR0: tpool_init_restr c.1)
+    (ETR0: is_init_tpool c.1)
     (MOD_INIT: wfs_is_init_st _ _ m SPEC c)
     (M_FUN: exists f x b, m = RecV f x b)
     :
@@ -436,7 +436,7 @@ Section WFAdequacy.
     (MOD_INIT : wfs_is_init_st s' _ m SPEC (trfirst extr))
     (VALID : extrace_valid extr)
     (FAIR : fair_call extr tpc ii)
-    (INIT_TP : tpool_init_restr (trfirst extr).1)
+    (INIT_TP : is_init_tpool (trfirst extr).1)
     (CALL: from_option (fun c => call_at tpc c m ai (APP := App)) False (extr S!! ii))
     (M_FUN: exists f x b, m = RecV f x b):
     terminating_trace extr /\ int_ref_inf_one (call_progresses ic s') extr ∨
@@ -579,7 +579,7 @@ Section WFAdequacy.
          specialize (fic_never_val 0). rewrite trace_take_fwd_0_first /= in fic_never_val.
          rewrite E in fic_never_val. done. }
 
-    assert (tpool_init_restr (trfirst extr).1) as INIT_TP.
+    assert (is_init_tpool (trfirst extr).1) as INIT_TP.
     { repeat split; eauto. }
 
     by apply simple_om_simulation_adequacy_terminate_multiple_waitfree_impl.
