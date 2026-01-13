@@ -51,24 +51,6 @@ Section WFAdequacy.
     (ii = 0 -> exists e, from_locale tp τi = Some e /\ under_ctx Ki e = Some (m ai)) /\
     (forall e, from_locale tp τi = Some e -> to_val e = None).
 
-  Definition obls_om_traces_match_wfree: extrace heap_lang -> trace (mstate M) (mlabel M) -> Prop :=
-    obls_om_traces_match_gen (obls_st_rel_wfree ic). 
-
-  Theorem om_simulation_adequacy_model_trace_multiple_waitfree Σ
-        `{hPre: @heapGpreS Σ M EM} (s: stuckness)
-        (es: list expr) σ1 (s1: mstate M) p
-        (INIT: em_is_init_st (es, σ1) s1 (ExecutionModel := EM))
-        (extr : extrace heap_lang)
-        (Hvex : extrace_valid extr)
-        (Hexfirst : trfirst extr = (es, σ1))
-    :
-    PR_premise_multiple (obls_sim_rel_wfree ic s') (fits_inf_call ic m ai) Σ s es σ1 s1 (p: @em_init_param _ _ EM) ->
-    (∃ omtr, obls_om_traces_match_wfree extr omtr ∧ trfirst omtr = s1 /\
-              int_ref_inf (obls_sim_rel_wfree ic s') extr omtr
-    ) \/
-    (exists k, ¬ (fits_inf_call ic m ai) (trace_take_fwd k extr)).
-  Proof using. Admitted. 
-
   Definition wfreeΣ: gFunctors := iemΣ HeapLangEM EM. 
 
   Instance wfree_pre: @heapGpreS wfreeΣ M EM.
@@ -100,7 +82,8 @@ Section WFAdequacy.
   Proof using.
     clear MSm.
     opose proof (om_simulation_adequacy_model_trace_multiple_waitfree
-                wfreeΣ _ (trfirst extr).1 _ _ _ _ _ VALID _ _) as ADEQ.
+                   ic s'
+                wfreeΣ _ (trfirst extr).1 _ _ _ _ _ _ _ VALID _ _) as ADEQ.
     { apply init_om_wfree_is_init. }
     { apply surjective_pairing. }     
     { rewrite -surjective_pairing. 
