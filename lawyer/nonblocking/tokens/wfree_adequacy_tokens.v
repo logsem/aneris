@@ -6,10 +6,10 @@ From trillium.prelude Require Import classical.
 From fairness Require Import fairness locales_helpers utils.
 From lawyer Require Import program_logic sub_action_em action_model.
 From lawyer.examples Require Import orders_lib obls_tactics.
-From lawyer.nonblocking Require Import trace_context om_wfree_inst pr_wfree_lib (* pr_wfree *) wfree_traces wptp_gen pwp calls wfree_adequacy_lib.
+From lawyer.nonblocking Require Import trace_context om_wfree_inst pr_wfree_lib (* pr_wfree *) wfree_traces wptp_gen pwp calls wfree_adequacy_lib pwp_ext.
 (* From lawyer.nonblocking.logrel Require Import fundamental.  *)
 From lawyer.nonblocking.logrel Require Import valid_client.
-From lawyer.nonblocking.tokens Require Import om_wfree_inst_tokens.
+From lawyer.nonblocking.tokens Require Import om_wfree_inst_tokens pr_wfree_tokens.
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am obls_termination.
 From heap_lang Require Import lang simulation_adequacy.
 
@@ -58,15 +58,122 @@ Section WFAdequacy.
     unshelve esplit. 
   Qed. 
 
-  Lemma PR_premise_wfree `{hPre: @heapGpreS Σ M EM} c
+  (* TODO: move *)
+  Lemma ct_init `{CallTrackerPre Σ}:
+    ⊢ |==> ∃ (CT: CallTracker Σ), ct_auth None ∗ ct_frag None.
+  Proof using.
+    From iris.algebra Require Import excl_auth.
+    iMod (own_alloc (● (Some $ Excl $ None) ⋅ ◯ _:  excl_authUR (option expr))) as "(%γ & ? & ?)".
+    { by apply auth_both_valid_2. }
+    iExists {| ct_γ := γ |}. by iFrame.
+  Qed.
+
+  (* TODO: move to lib and remove duplicate? *)
+  Lemma rah_wfree_inv {Σ} {Hinv : IEMGS HeapLangEM EM Σ}
+    c:
+  ⊢ adequacy_cond.rel_always_holds_with_trace_inv MaybeStuck
+    (wfree_trace_inv ic s' SPEC)
+    (map (λ (_ : nat) (_ : val), True) (adequacy_utils.locales_of_list c.1))
+    (obls_sim_rel_wfree ic s') c (init_om_wfree_state F ic c).
+  Proof using.
+    rewrite /adequacy_cond.rel_always_holds_with_trace_inv.
+    
+    iIntros (extr omtr [tp σ] EXTRA FIN NSTUCK).
+    
+    simpl. iIntros "(%VALID_STEP & HEAP & MSI & [%TH_OWN %OBLS]) POSTS #INV".
+    red in EXTRA. destruct EXTRA as (VALID & EX0 & OM0 & CONT_SIM). 
+    iApply fupd_mask_intro_discard; [done| ].
+    
+    rewrite /wfree_trace_inv. iDestruct "INV" as "((%NOOBS' & %NVAL & %PROGRESS) & _)".
+    iPureIntro. 
+    
+    rewrite /obls_sim_rel_wfree. split; [|done].
+    
+    destruct extr.
+    { simpl in VALID_STEP.
+      inversion VALID. subst.
+      red in EX0, OM0. simpl in EX0, OM0. subst.
+      rewrite /obls_sim_rel_wfree /obls_sim_rel /obls_sim_rel_gen.
+      simpl.
+      
+      split; [done| ]. simpl. red.
+      red. simpl. eapply @obls_τi_enabled; eauto. }
+    
+    simpl in VALID_STEP. inversion VALID. subst. simpl in *.
+    rewrite /obls_sim_rel.
+    red. split. 
+    { simpl. by destruct a. }
+    simpl. rewrite /obls_st_rel.
+    red. simpl.
+    eapply @obls_τi_enabled; eauto.
+  Qed.
+
+  (* TODO: unify with non-tokens version if invariants are unified *)
+  Lemma init_wfree_inv  {Σ} {Hinv : IEMGS HeapLangEM EM Σ} c
+    (ETR0: is_init_tpool c.1)
+    (MOD_INIT: wfst_is_init_st _ SPEC c)
+    (M_FUN: is_fun m):
+  @wfst_mod_inv _ SPEC Σ
+            (@iem_phys heap_lang _ HeapLangEM EM Σ Hinv)
+            (@iris_invGS heap_lang _ Σ (@IEM_irisG heap_lang _ HeapLangEM EM Σ Hinv)) -∗
+  wfree_trace_inv ic s' SPEC {tr[ c ]}{tr[ init_om_wfree_state F ic c ]}.
+  Proof using.
+    clear MSm.
+    iIntros "#INV". 
+    rewrite /wfree_trace_inv. iFrame "INV". 
+    iPureIntro. repeat split.
+    - simpl. red. rewrite /init_om_wfree_state. simpl.
+      intros τ NEMPTY. destruct decide.
+      2: { rewrite lookup_gset_to_gmap option_guard_decide in NEMPTY.
+           destruct decide; simpl in NEMPTY; done. }
+      destruct lookup eqn:L; try done. 
+      apply lookup_insert_Some in L. destruct L as [| [? L]]; [set_solver| ].
+      apply lookup_gset_to_gmap_Some in L. set_solver.
+    - simpl.
+      destruct (from_locale c.1 τi) eqn:IN; rewrite IN; [| done].
+      destruct ETR0 as (_&_&NVAL0).
+      by apply NVAL0 in IN.
+    - red. simpl.
+      intros _ TI0.
+      destruct ETR0 as (?&CALL0&?).
+      destruct (CALL0 ltac:(lia)) as (?&?&?).           
+      eapply RecV_App_not_stuck; eauto.
+  Qed.
+
+  Lemma PR_premise_wfree `{hPre: @heapGpreS Σ M EM} 
+    {MTPre: MethodTokenPre Σ} {CTPre: CallTrackerPre Σ} c
     (ETR0: is_init_tpool c.1)
     (MOD_INIT: wfst_is_init_st _ SPEC c)
     (M_FUN: is_fun m)
     :
-  PR_premise_multiple (obls_sim_rel_wfree ic s') (fits_inf_call ic m ai)
+  PR_premise_multiple
+    (obls_sim_rel_wfree ic s')
+    (λ etr, fits_inf_call ic m ai etr ∧ has_no_forks etr)
     Σ MaybeStuck c.1 c.2
     (init_om_wfree_state F ic c) ((): @em_init_param _ _ EM).
-  Proof using. Admitted.
+  Proof using. 
+    red. iIntros (Hinv) "(PHYS & MOD)". simpl.
+    iMod (@wfst_init_mod _ SPEC with "[PHYS]") as "[#INV (%MT & TOKS)]".
+    2: { iFrame. }
+    { by rewrite -surjective_pairing. }
+         
+    iMod ct_init as "(%CT & CTA & CTF)".
+    set (PWT := {| pwt_UT := MT; pwt_CT := CT |}).
+
+    iModIntro.
+    iExists (wfree_trace_inv ic s' SPEC).    
+    iExists (PR_wfree_tokens ic s' SPEC m MSm ai). 
+
+    iSplitR.
+    { simpl. iApply hl_config_wp. }
+    iSplitL. 
+    {
+      (* by iApply init_pr_pr_wfree.  *)
+      admit. }
+    iSplitR.
+    { rewrite -surjective_pairing. by iApply init_wfree_inv. }
+    by iApply rah_wfree_inv.
+  Qed.
 
   (* TODO: rename *)
   Lemma simple_om_simulation_adequacy_terminate_multiple_waitfree_impl extr

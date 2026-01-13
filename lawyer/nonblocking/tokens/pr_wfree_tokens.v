@@ -84,6 +84,7 @@ Section WaitFreePR.
     apply phase_le_init.
   Qed.
 
+  (* TODO: rename or unify with non-token version *)
   Definition wfree_trace_inv `{Hinv : @IEMGS _ _ HeapLangEM EM Σ}
     (extr: execution_trace heap_lang) (omtr: auxiliary_trace M): iProp Σ :=
     ⌜ no_extra_obls ic (trace_last extr) (trace_last omtr) /\
@@ -1295,7 +1296,7 @@ Section WaitFreePR.
   End TakeStep.
   
 
-  Program Definition PR_wfree {Σ} {PWT: PrWfreeTok Σ}:
+  Program Definition PR_wfree_tokens {Σ} {PWT: PrWfreeTok Σ}:
     @ProgressResource heap_lang M Σ (@iem_invGS _ _ _ _ _ (@pwt_Hinv _ PWT))
       state_interp wfree_trace_inv
 
