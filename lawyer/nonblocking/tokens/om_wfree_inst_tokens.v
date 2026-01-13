@@ -32,6 +32,7 @@ Definition method_spec_token {M} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_
     {{{ v, RET v; th_phase_frag τ π q ∗ method_tok m }}}.
 
 
+(** TODO: add the stuckness bit? *)
 Record WaitFreeSpecToken (ms: methods_restr) := {
   wfst_is_init_st: cfg heap_lang -> Prop;
   (** for wait-free modules, we expect that invariant doesn't contain OM resources *)
