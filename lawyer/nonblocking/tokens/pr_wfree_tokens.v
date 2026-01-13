@@ -3,7 +3,7 @@ From trillium.traces Require Import inftraces trace_lookup exec_traces trace_len
 From fairness Require Import fairness locales_helpers.
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am obls_termination obligations_wf.
 From lawyer.nonblocking Require Import trace_context om_wfree_inst wptp_gen pwp wfree_traces calls pr_wfree_lib.
-From lawyer.nonblocking.tokens Require Import pwp_ext om_wfree_inst_tokens.
+From lawyer.nonblocking.tokens Require Import pwp_ext om_wfree_inst_tokens tokens_ra.
 From trillium.program_logic Require Import execution_model weakestpre adequacy_utils adequacy_cond simulation_adequacy_em_cond. 
 From lawyer Require Import action_model sub_action_em.
 From heap_lang Require Import lang.
@@ -59,13 +59,13 @@ Section WaitFreePR.
   Let τi := tpctx_tid tc. 
 
   Context (s': stuckness).
-  Context `(WFST: WaitFreeSpecToken ms).
-  Context (m: val) (MSm: m ∈ dom ms).
+  Context `(WFST: WaitFreeSpecToken MS).
+  Context (m: val) (MSm: m ∈ MS).
   Let F := wfst_F _ WFST. 
   
   Open Scope WFR_scope. 
 
-  Lemma get_call_wp {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} {MT: MethodToken Σ}
+  Lemma get_call_wp {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} {MT: MethodToken MS Σ}
     (a: val) π:
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
     (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ WFST) -∗
@@ -76,6 +76,7 @@ Section WaitFreePR.
     pose proof (@wfst_spec _ WFST _ EM Σ OHE) as SPEC.
     iPoseProof (SPEC MT with "[$]") as "SPECS".
     iDestruct (big_sepS_elem_of_acc with "[$]") as "[SPEC _]"; eauto.
+    { by apply gmultiset_elem_of_dom. }
     rewrite /method_spec_token. 
     iApply ("SPEC" $! τi π _ a with "[-]").
     2: { by iIntros "!> **". }
@@ -97,7 +98,7 @@ Section WaitFreePR.
   Class PrWfreeTok Σ := {
       pwt_Hinv :: @IEMGS _ _ HeapLangEM EM Σ;
       pwt_CT :: CallTracker Σ;
-      pwt_UT :: MethodToken Σ;
+      pwt_UT :: MethodToken MS Σ;
   }.
 
   Definition ct_interp_tok `{PWT: PrWfreeTok Σ} (etr: execution_trace heap_lang): iProp Σ

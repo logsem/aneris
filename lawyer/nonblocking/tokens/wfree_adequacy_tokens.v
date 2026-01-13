@@ -9,10 +9,9 @@ From lawyer.examples Require Import orders_lib obls_tactics.
 From lawyer.nonblocking Require Import trace_context om_wfree_inst pr_wfree_lib (* pr_wfree *) wfree_traces wptp_gen pwp calls wfree_adequacy_lib pwp_ext.
 (* From lawyer.nonblocking.logrel Require Import fundamental.  *)
 From lawyer.nonblocking.logrel Require Import valid_client.
-From lawyer.nonblocking.tokens Require Import om_wfree_inst_tokens pr_wfree_tokens.
+From lawyer.nonblocking.tokens Require Import om_wfree_inst_tokens pr_wfree_tokens tokens_ra.
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am obls_termination.
 From heap_lang Require Import lang simulation_adequacy.
-
 
 Close Scope Z. 
 
@@ -38,16 +37,23 @@ Section WFAdequacy.
 
   Context (s': stuckness).
   
-  Context `(SPEC: WaitFreeSpecToken ms).
-  Context (m: val) (MSm: m ∈ dom ms). 
+  Context `(SPEC: WaitFreeSpecToken MS).
+  Context (m: val) (* (MSm: m ∈ MS) *)
+  .
+  (* Local Definition m: val := default #()  *)
+  
   Let F := wfst_F _ SPEC.
   
   Context ((* m *) ai: val).
 
   Let fic := fits_inf_call ic m ai.
 
+  (* TODO: unify with non-tokens version *)
   Definition is_init_tpool (tp: list expr) :=
-    Forall (fun e => exists e0, e = subst "m" m e0 /\ valid_client e0) tp /\
+    valid_init_tpool_restr tp MS /\
+    (** the operation under consideration is determined by the thread id,
+        acccording to how the operations are assigned in valid_init_tpool_restr *)
+    elements MS !! τi = Some m /\ 
     (ii = 0 -> exists e, from_locale tp τi = Some e /\ under_ctx Ki e = Some (m ai)) /\
     (forall e, from_locale tp τi = Some e -> to_val e = None).
 
@@ -118,7 +124,7 @@ Section WFAdequacy.
             (@iris_invGS heap_lang _ Σ (@IEM_irisG heap_lang _ HeapLangEM EM Σ Hinv)) -∗
   wfree_trace_inv ic s' SPEC {tr[ c ]}{tr[ init_om_wfree_state F ic c ]}.
   Proof using.
-    clear MSm.
+    (* clear MSm. *)
     iIntros "#INV". 
     rewrite /wfree_trace_inv. iFrame "INV". 
     iPureIntro. repeat split.
@@ -135,9 +141,205 @@ Section WFAdequacy.
       by apply NVAL0 in IN.
     - red. simpl.
       intros _ TI0.
-      destruct ETR0 as (?&CALL0&?).
+      destruct ETR0 as (?&?&CALL0&?).
       destruct (CALL0 ltac:(lia)) as (?&?&?).           
       eapply RecV_App_not_stuck; eauto.
+  Qed.
+
+  Open Scope WFR_scope. 
+
+  Local Lemma locale_in_helper R (tks: list val) (tp: list expr) τ e
+    (TP: Forall2 R tks tp)
+    (IN: tks !! τ = Some e):
+    τ ∈ locales_of_list tp.
+  Proof using.
+    clear -TP IN. 
+    rewrite locales_of_list_indexes.
+    apply Forall2_length in TP.
+    rewrite indexes_seq. apply elem_of_seq.
+    apply lookup_lt_Some in IN. lia.
+  Qed.
+
+  (* TODO: move *)
+  Lemma gmultiset_disj_union_difference_r `{Countable K} (X Y Z: gmultiset K):
+    Z ⊆ Y -> (X ⊎ Y) ∖ Z = X ⊎ Y ∖ Z.
+  Proof using. clear. multiset_solver. Qed.
+
+  Lemma init_wptp_wfree {Σ} {PWT: @PrWfreeTok MS Σ} c
+    (ETR0: is_init_tpool c.1):
+    let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ (@pwt_Hinv _ _ PWT) in
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ SPEC) -∗
+    (⌜ ii = 0 ⌝ → ∃ π, cp_mul π0 d0 F ∗ th_phase_frag τi π (/2)%Qp) -∗
+    methods_toks (MS ∖ {[+ m +]}) -∗
+    (⌜ ii = 0 ⌝ → method_tok m) -∗
+    ct_frag None -∗
+    wptp_wfree ic s' m MaybeStuck {tr[ c ]}
+      (map (λ _ _, True) (adequacy_utils.locales_of_list c.1)).
+  Proof using.
+    simpl. iIntros "#INV T TOKS TOKm CTF".
+    rewrite /wptp_wfree. simpl.
+    destruct (thread_pool_split c.1 τi) as (tp1 & tp2 & tp' & EQ & TP' & NO1 & NO2).
+    rewrite EQ. rewrite !locales_of_list_from_app'. rewrite !map_app /=.
+    destruct ETR0 as (TP & M_TI & II0 & NVAL0).
+    rewrite EQ in TP.
+
+    red in TP. apply List.Forall2_app_inv_r in TP as (tks1 & tks2 & TP1 & TP2 & EQ_MS).
+
+    rewrite EQ_MS in M_TI. apply lookup_app_Some in M_TI as [IN1 | [LEN1 M_TI]].
+    { destruct NO1. by eapply locale_in_helper. }
+
+    destruct TP' as [-> | (e & -> & LOC)].
+    { destruct NO2. rewrite app_nil_r.
+      rewrite locales_of_list_from_indexes.
+      apply elem_of_lookup_imap.
+      apply Nat.le_sum in LEN1 as [d ->].
+      apply Forall2_length in TP1. rewrite TP1.
+      simpl in *. apply Forall2_length in TP2.
+      rewrite Nat.add_sub' in M_TI.
+      apply lookup_lt_Some in M_TI. rewrite TP2 in M_TI.
+      apply lookup_lt_is_Some_2 in M_TI as [??].
+      eauto. }
+    simpl in TP2.
+    apply Forall2_cons_inv_r in TP2 as (m_ & tks2_ & MTI & TP2 & ->).
+    assert (m_ = m) as ->.
+    { apply Forall2_length in TP1. rewrite TP1 in M_TI.
+      rewrite LOC Nat.sub_diag /= in M_TI. congruence. }
+    clear M_TI.
+
+    iEval (rewrite -{3}(list_to_set_disj_elements MS)) in "TOKS".
+    rewrite EQ_MS list_to_set_disj_app.
+    rewrite gmultiset_disj_union_difference_r.
+    2: multiset_solver.
+    iDestruct (methods_toks_split with "TOKS") as "[TOKS1 TOKS]". 
+   
+    iApply wptp_from_gen_app. iSplitL "TOKS1".
+    {
+      (* iApply init_wptp_wfree_pwps. *)
+      (* - done. *)
+      (* - by apply Forall_app, proj1 in TP. *)
+      (* - done. *)
+      admit. 
+    }
+
+    simpl. rewrite gmultiset_cancel_l2.
+    iApply wptp_from_gen_cons. iSplitR "TOKS".
+    2: {
+         (* iApply init_wptp_wfree_pwps. *)
+         (* - done. *)
+         (* - by do 2 (apply Forall_app, proj2 in TP). *)
+         (* - done. *)
+      admit. 
+    }
+       
+    rewrite /thread_pr. rewrite decide_True; [| done].
+    rewrite /wp_tc.
+    destruct ii eqn:TI.
+    2: {
+         (* rewrite leb_correct; [| lia]. *)
+         (* apply Forall_app, proj2 in TP. *)
+         (* apply Forall_app, proj1 in TP. *)
+         (* inversion TP as [| ?? (? & -> & ?)]. subst. *)
+         (* by iApply init_pwp. *)
+      (** get pwp_ext with SI extended with ct_frag token *)
+      admit. 
+    }
+
+    (** get Trillium wp immediately *)
+    rewrite leb_correct_conv; [| lia].
+    iDestruct ("T" with "[//]") as (π) "[CPS PH]".
+    iSpecialize ("TOKm" with "[//]"). 
+    rewrite half_inv2.
+    unshelve iPoseProof (get_call_wp ic SPEC m _ ai with "[$] [$] [$] [$]") as "WP".
+    { apply gmultiset_elem_of_elements. rewrite EQ_MS. set_solver. }
+    destruct (II0 eq_refl) as (e_ & IN & CTX).
+    rewrite LOC EQ /= in IN.
+    rewrite /from_locale in IN. rewrite from_locale_from_locale_of in IN.
+    inversion IN. subst e_.
+    rewrite CTX. simpl.
+    iApply (wp_stuck_mono with "[$]"). done.
+  Admitted.
+
+  Lemma init_pr_pr_wfree {Σ} {PWT: @PrWfreeTok MS Σ}
+    c
+    (ETR0: is_init_tpool c.1):
+  (* @wfst_mod_inv _ SPEC Σ (@pwt_Hinv _ PWT) _ -∗ *)
+  (* wfst_mod_inv _ SPEC -∗ *)
+  (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ SPEC) -∗
+  @obls_init_resource _ _ _ _ _ _
+            (@iem_fairnessGS heap_lang _ HeapLangEM EM Σ (@pwt_Hinv _ _ PWT))
+            (init_om_wfree_state F ic c) () -∗
+  methods_toks MS -∗
+  ct_auth None -∗ ct_frag None -∗
+  pr_pr_wfree ic s' SPEC m MaybeStuck {tr[ c ]}
+    (map (λ _ _, True) (adequacy_utils.locales_of_list c.1)).
+  Proof using.
+    iIntros "#INV MOD TOKS CTA CTF".
+    rewrite /pr_pr_wfree. simpl.
+
+    iDestruct (init_wfree_resources_weak with "[$]") as "(CPS & OB' & OBLS & PHS)".
+    iFrame.
+    
+    rewrite -{2}(difference_union_intersection_L (locales_of_cfg c) {[ τi ]}).    
+    rewrite big_sepS_union.
+    2: { set_solver. }
+    iDestruct "PHS" as "[$ PH]".
+    #[local] Arguments Nat.leb _ _ : simpl nomatch.
+    rewrite /extra_fuel. simpl.
+    iDestruct "CPS" as "(CPS_PRE & CPS0 & CP1)".
+    iDestruct (cp_mul_split with "CPS_PRE") as "[CPS_PRE CPS_PRE']". rewrite Nat.add_0_r.
+    rewrite Nat.sub_0_r. fold ii.
+    rewrite bi.sep_comm. rewrite -bi.sep_assoc. iSplitL "CPS0 CPS_PRE".
+    { destruct leb; [| done]. iFrame. }
+    rewrite /obls_τi'.
+
+    rewrite -bi.sep_assoc. 
+    iAssert (_%I ∗ (⌜ ii = 0 ⌝ →
+                    let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ (@pwt_Hinv _ _ PWT) in
+                    ∃ π, th_phase_frag τi π (/ 2)%Qp))%I with "[PH]" as "[X PHτi]".
+    2: iSplitL "X"; [by iApply "X"| ].
+    { destruct (decide (τi ∈ locales_of_cfg c)).
+      2: { iSplitL.
+           - by iIntros (?).
+           - iIntros (II0). destruct ETR0 as (?&?&IN&?).
+             destruct (IN II0) as (?&E&?). destruct n.
+             eapply locales_of_cfg_Some; eauto.
+             Unshelve. apply c. }
+      rewrite intersection_comm_L subseteq_intersection_1_L.
+      2: set_solver.
+      rewrite big_sepS_singleton.
+      fold τi.
+      destruct ii eqn:II.
+      - rewrite leb_correct_conv; [| lia].
+        setoid_rewrite th_phase_frag_halve at 1. iDestruct "PH" as (?) "(PH&?)".
+        rewrite half_inv2. 
+        iSplitL "PH"; iIntros (?); iExists _; iFrame.
+      - iSplitL.
+        2: { iIntros (?). lia. }
+        iIntros (?). iFrame. }
+
+    (* rewrite {5}(gmultiset_disj_union_difference' _ MS).  *)
+    (* Set Printing Implicit. *)
+
+    assert (m ∈ MS) as MSm.
+    { destruct ETR0 as (?&IN&?&?).
+      apply gmultiset_elem_of_elements. eapply elem_of_list_lookup; eauto. } 
+    iEval (rewrite {3}(gmultiset_disj_union_difference' _ _ MSm)) in "TOKS".
+    iDestruct (methods_toks_split with "TOKS") as "[TOK TOKS]". 
+
+    foobar. need to only spend method_tok if i>0
+    iSplitR "PHτi CPS_PRE' CTF TOKS".
+    { rewrite bi.sep_assoc. 
+      iSplitL.
+      2: by destruct s'.
+      iSplitR "CTA TOK". 
+      { destruct decide.
+        - iSpecialize ("OB'" with "[//]"). iFrame.
+        - iFrame. }
+      rewrite /cti_cond. iIntros "%SHORT".
+      iFrame. 
+      iLeft. by iFrame. }
+    
+    iApply (init_wptp_wfree with "[$] [$] [$]"). done.
   Qed.
 
   Lemma PR_premise_wfree `{hPre: @heapGpreS Σ M EM} 
@@ -167,7 +369,7 @@ Section WFAdequacy.
     iSplitR.
     { simpl. iApply hl_config_wp. }
     iSplitL. 
-    {
+    { 
       (* by iApply init_pr_pr_wfree.  *)
       admit. }
     iSplitR.
@@ -284,7 +486,7 @@ Section WFAdequacy.
   Qed.
 
   Theorem simple_om_simulation_adequacy_terminate_multiple_waitfree extr
-        (ETR0: valid_init_tpool_restr (trfirst extr).1 ms)
+        (ETR0: valid_init_tpool_restr (trfirst extr).1 MS)
         (MOD_INIT: wfst_is_init_st _ SPEC (trfirst extr))
         (CALL: from_option (fun c => call_at tpc c m ai (APP := App)) False (extr S!! ii))
     :
@@ -337,7 +539,7 @@ Section WFAdequacy.
   (* TODO: rename *)
   Lemma obls_terminates_impl_multiple_waitfree
     (extr : extrace heap_lang)
-    (ETR0: valid_init_tpool_restr (trfirst extr).1 ms)
+    (ETR0: valid_init_tpool_restr (trfirst extr).1 MS)
     (MOD_INIT: wfst_is_init_st _ SPEC (trfirst extr))
     (VALID: extrace_valid extr)
     (FAIR: fair_call extr tpc ii)
@@ -360,11 +562,11 @@ Section WFAdequacy.
     
 End WFAdequacy.
 
-Theorem wfree_token_is_wait_free_restr ms
-  (SPEC: WaitFreeSpecToken ms)
-  (FUNS: map_Forall (const ∘ is_fun) ms)
+Theorem wfree_token_is_wait_free_restr MS
+  (SPEC: WaitFreeSpecToken MS)
+  (FUNS: map_Forall (const ∘ is_fun) MS)
   :
-  wait_free_restr ms (wfst_is_init_st _ SPEC) (* s' *) NotStuck any_arg.
+  wait_free_restr MS (wfst_is_init_st _ SPEC) (* s' *) NotStuck any_arg.
 Proof using.
   red. intros etr ETR0 MOD_INIT VALID. intros m IN.
   
