@@ -281,15 +281,15 @@ End CallInTrace.
 
 Section RestrWFree.
 
-  Definition valid_init_tpool_restr (tp: list expr) (ms: gmap val nat) :=
-    (** e.g.: {m1: 2, m2: 1} -> [m1, m1, m2] *)
-    let ms' := flat_map (fun '(m, k) => repeat m k) $ map_to_list ms in
+  Definition valid_init_tpool_restr (tp: list expr) (ms: gmultiset val) :=
+    (* let ms' := flat_map (fun '(m, k) => repeat m k) $ map_to_list ms in *)
+    let ms' := elements ms in 
     (* TODO: allow "smaller" thread pools too *)
     (* TODO: move "no fork" condition outside? *)
     Forall2 (fun m e => valid_op_client m e /\ no_forks e) ms' tp. 
 
   (** TODO: account for multiple m's in unrestricted wait-freedom too *)
-  Definition wait_free_restr (ms: gmap val nat) (is_init_st: cfg heap_lang -> Prop)
+  Definition wait_free_restr (ms: gmultiset val) (is_init_st: cfg heap_lang -> Prop)
     s P := forall etr,
       valid_init_tpool_restr (trfirst etr).1 ms ->
       is_init_st (trfirst etr) ->

@@ -85,7 +85,7 @@ Section WFAdequacy.
   Qed.
 
   Definition is_init_tpool (tp: list expr) :=
-    Forall (fun e => exists e0, e = subst "m" m e0 /\ valid_client e0) tp /\
+    valid_init_tpool m tp /\
     (ii = 0 -> exists e, from_locale tp τi = Some e /\ under_ctx Ki e = Some (m ai)) /\
     (forall e, from_locale tp τi = Some e -> to_val e = None). 
 
@@ -147,7 +147,9 @@ Section WFAdequacy.
     destruct ETR0 as [TP _].
     apply elem_of_locales_of_list_from_from_locale_from in IN as (e & IN).
     rewrite /from_locale IN.
-    apply Forall_forall with (x := e) in TP; [set_solver| ].
+    red in TP. 
+    apply Forall_forall with (x := e) in TP.
+    { red in TP. set_solver. }
     eapply from_locale_from_elem_of; eauto.
   Qed.
 
