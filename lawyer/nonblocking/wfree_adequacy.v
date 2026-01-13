@@ -36,110 +36,6 @@ Section WFAdequacy.
   
   Let fic := fits_inf_call ic m ai.
 
-  Definition obls_om_traces_match_wfree: extrace heap_lang -> trace (mstate M) (mlabel M) -> Prop :=
-    obls_om_traces_match_gen (obls_st_rel_wfree ic).
-
-  Lemma obls_st_rel_wfree_empty σ (s: mstate OM)
-    (INIT: obls_is_init_st ([], σ) s):
-    obls_st_rel_wfree ic ([], σ) s.
-  Proof using.
-    red. 
-    rewrite /obls_st_rel /no_extra_obls.
-    rewrite /obls_fairness_preservation.om_live_tids /has_obls.
-    simpl in INIT. red in INIT.
-    rewrite /locales_of_cfg in INIT. rewrite list_to_set_nil in INIT.
-    apply proj1, eq_sym, dom_empty_inv_L in INIT.
-    rewrite INIT.
-    split; try set_solver.
-  Qed.    
-
-  Lemma int_ref_int_empty σ s
-    (FITS : fits_inf_call ic m ai {tr[ ([], σ) ]})
-    (PROP : obls_st_rel_wfree ic ([], σ) s):
-    int_ref_inf (obls_sim_rel_wfree ic s') ⟨ ([], σ) ⟩ ⟨ s ⟩.
-  Proof using. 
-    apply int_ref_int_singleton.
-    repeat split; try by apply PROP.
-    red. simpl. intros _ TI0.
-    assert (tctx_index ic = 0) by lia.
-    destruct FITS as [CALL _ _ _].
-    rewrite H /= in CALL.
-    rewrite /call_at /= in CALL.
-    by edestruct no_expr_in_empty_pool.
-  Qed.    
-
-  Theorem om_simulation_adequacy_model_trace_multiple_waitfree Σ
-        `{hPre: @heapGpreS Σ M EM} (s: stuckness)
-        (es: list expr) σ1 (s1: mstate M) p
-        (INIT: em_is_init_st (es, σ1) s1 (ExecutionModel := EM))
-        (extr : extrace heap_lang)
-        (Hvex : extrace_valid extr)
-        (Hexfirst : trfirst extr = (es, σ1))
-    :
-    PR_premise_multiple (obls_sim_rel_wfree ic s') (fits_inf_call ic m ai) Σ s es σ1 s1 (p: @em_init_param _ _ EM) ->
-    (∃ omtr, obls_om_traces_match_wfree extr omtr ∧ trfirst omtr = s1 /\
-              int_ref_inf (obls_sim_rel_wfree ic s') extr omtr
-    ) \/
-    (exists k, ¬ (fits_inf_call ic m ai) (trace_take_fwd k extr)).
-  Proof using.
-
-    (* Set Printing Implicit. *)
-    intros PREM.
-
-    destruct (decide (1 <= length es)).
-    2: { clear PREM.
-         
-      (* TODO: make a lemma *)
-         assert (length es = 0) by lia.
-         assert (es = []) as -> by (destruct es; simpl in H; lia || done).
-         opose proof * extrace_valid_empty as ->; eauto.
-
-         destruct (decide (fits_inf_call ic m ai ({tr[ ([], σ1) ]}))) as [FITS | ].
-         2: { right. exists 0. by rewrite trace_take_fwd_0_first. }
-         
-         assert (obls_st_rel_wfree ic ([], σ1) s1) as PROP by (by apply obls_st_rel_wfree_empty).
-
-         left. exists (tr_singl s1).
-         clear s. 
-         split.
-         2: { split; [done| ]. by apply int_ref_int_empty. }
-         red. by apply trace_match_singl. }
-
-    unshelve epose proof (@PR_strong_simulation_adequacy_traces_multiple _ _ EM 
-                            HeapLangEM (obls_sim_rel_wfree ic s') (fits_inf_call ic m ai)
-                            _ _ _ _ _ 
-                            s es σ1 s1 p
-                extr
-                Hvex
-                ltac:(done)
-                obls_ves_wrapper
-                (obls_st_rel_wfree ic)
-                (fun oτ '(_, τ') => oτ = τ')
-                _ _ _ _ _ _ _
-                PREM
-      ) as SIM.
-    { apply fits_inf_call_prev. }
-    { simpl. intros ????[??]? STEP.
-      red in STEP. simpl in STEP. destruct STEP as [STEP ->].
-      destruct o; [| done].
-      simpl in STEP. red in STEP. apply STEP. }
-    { simpl. intros ????[??]? STEP.
-      red in STEP. simpl in STEP. destruct STEP as [STEP ->].
-      destruct o; [| done].
-      simpl in STEP. red in STEP.
-      constructor. apply STEP. }
-    { simpl. intros ?? SIM.
-      split; apply SIM. }
-    { simpl. intros ?? SIM. apply SIM. }
-    { done. }
-    { eapply adequacy_utils.rel_finitary_impl; [| apply obls_sim_rel_FB].
-      2, 3: by apply _.
-      intros ?? X. apply X. }
-    { done. }
-
-    done.
-  Qed.
-
   Open Scope WFR_scope. 
 
   Context (P: val -> Prop) (Pai: P ai).
@@ -444,7 +340,8 @@ Section WFAdequacy.
     (s' = MaybeStuck /\ gets_stuck_ae extr ic). 
   Proof using Pai.
     opose proof (om_simulation_adequacy_model_trace_multiple_waitfree
-                wfreeΣ _ (trfirst extr).1 _ _ _ _ _ VALID _ _) as ADEQ.
+                   ic s'
+                wfreeΣ _ (trfirst extr).1 _ _ _ _ _ _ _ VALID _ _) as ADEQ.
     { apply init_om_wfree_is_init. }
     { apply surjective_pairing. }     
     { rewrite -surjective_pairing. 
