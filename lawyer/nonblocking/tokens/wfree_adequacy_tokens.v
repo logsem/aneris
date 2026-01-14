@@ -262,8 +262,6 @@ Section WFAdequacy.
   Lemma init_pr_pr_wfree {Σ} {PWT: @PrWfreeTok MS Σ}
     c
     (ETR0: is_init_tpool c.1):
-  (* @wfst_mod_inv _ SPEC Σ (@pwt_Hinv _ PWT) _ -∗ *)
-  (* wfst_mod_inv _ SPEC -∗ *)
   (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ SPEC) -∗
   @obls_init_resource _ _ _ _ _ _
             (@iem_fairnessGS heap_lang _ HeapLangEM EM Σ (@pwt_Hinv _ _ PWT))
@@ -317,29 +315,31 @@ Section WFAdequacy.
         2: { iIntros (?). lia. }
         iIntros (?). iFrame. }
 
-    (* rewrite {5}(gmultiset_disj_union_difference' _ MS).  *)
-    (* Set Printing Implicit. *)
-
     assert (m ∈ MS) as MSm.
     { destruct ETR0 as (?&IN&?&?).
       apply gmultiset_elem_of_elements. eapply elem_of_list_lookup; eauto. } 
     iEval (rewrite {3}(gmultiset_disj_union_difference' _ _ MSm)) in "TOKS".
-    iDestruct (methods_toks_split with "TOKS") as "[TOK TOKS]". 
+    iDestruct (methods_toks_split with "TOKS") as "[TOK TOKS]".
 
-    foobar. need to only spend method_tok if i>0
-    iSplitR "PHτi CPS_PRE' CTF TOKS".
-    { rewrite bi.sep_assoc. 
-      iSplitL.
-      2: by destruct s'.
-      iSplitR "CTA TOK". 
-      { destruct decide.
-        - iSpecialize ("OB'" with "[//]"). iFrame.
-        - iFrame. }
-      rewrite /cti_cond. iIntros "%SHORT".
-      iFrame. 
-      iLeft. by iFrame. }
+    rewrite bi.sep_comm !bi.sep_assoc. iSplit.
+    2: by destruct s'.
     
-    iApply (init_wptp_wfree with "[$] [$] [$]"). done.
+    iAssert (cti_cond ic m {tr[ c ]} ∗ (⌜ ii = 0 ⌝ → method_tok m))%I with "[CTA TOK]" as "[$ TOK]". 
+    { rewrite /cti_cond /=.
+      fold ii. destruct ii eqn:II.
+      - iSplitR; [| by iFrame]. iIntros (?). lia.
+      - iSplitL; [| iIntros (?); lia].
+        iIntros "%SHORT".
+        iFrame. iLeft. by iFrame. }
+
+    iSplitL "TOK CTF TOKS PHτi CPS_PRE'". 
+    { iApply (init_wptp_wfree with "[$] [PHτi CPS_PRE'] [$] [$] [$]").
+      { done. }
+      iFrame. }
+      
+    destruct decide.
+    - iSpecialize ("OB'" with "[//]"). iFrame.
+    - iFrame.
   Qed.
 
   Lemma PR_premise_wfree `{hPre: @heapGpreS Σ M EM} 
