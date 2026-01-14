@@ -17,6 +17,33 @@ Definition method_spec_token {M} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_
       App m a @ τ
     {{{ v, RET v; th_phase_frag τ π q ∗ method_tok m }}}.
 
+Inductive is_ground_lit : base_lit -> Prop := 
+| ground_int n : is_ground_lit (LitInt n)
+| ground_bool b : is_ground_lit (LitBool b)
+| ground_unit : is_ground_lit (LitUnit)
+.
+
+Inductive is_ground_val : val -> Prop :=
+| ground_lit l (GL: is_ground_lit l) : is_ground_val (LitV l)
+| ground_pair v1 v2 (GV1: is_ground_val v1) (GV2: is_ground_val v2):
+  is_ground_val (PairV v1 v2)
+| ground_inj_l v (GV: is_ground_val v): is_ground_val (InjLV v)
+| ground_inj_r v (GV: is_ground_val v): is_ground_val (InjRV v)
+.
+
+
+Definition token_safety_spec `{invGS_gen HasNoLc Σ, MethodToken MS Σ}
+  {hG: heap1GS Σ}
+  m: iProp Σ :=
+  (* interp (method_tok m) si_add_none m *)
+  (** The spec above might be provable, but our approach requires more restrictive one below.
+      See the comment in op_spec_lifting *)
+  □ ∀ τ v, method_tok m -∗
+      let _ := @irisG_looping _ HeapLangEM _ _ hG si_add_none in
+      pwp MaybeStuck ⊤ τ 
+        (App (of_val m) (of_val v)) 
+        (fun v => ⌜ is_ground_val v ⌝ ∗ method_tok m).
+
 
 (** TODO: add the stuckness bit? *)
 Record WaitFreeSpecToken (MS: gmultiset val) := {
@@ -38,5 +65,5 @@ Record WaitFreeSpecToken (MS: gmultiset val) := {
     
   wfst_safety_spec:
     ∀ {Σ : gFunctors} `{heap1GS Σ, invGS_gen HasNoLc Σ, MethodToken MS Σ},
-      wfst_mod_inv ⊢ [∗ set] m ∈ dom MS, interp (method_tok m) si_add_none m;
+      wfst_mod_inv ⊢ [∗ set] m ∈ dom MS, token_safety_spec m;
 }.

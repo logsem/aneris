@@ -176,9 +176,12 @@ Section WFAdequacy.
     simpl.
 
     red in VALID_CL. destruct VALID_CL as (e0 & -> & VALID_CL). 
-    opose proof * (fundamental _ _ _ e0) as FTLR; eauto. 
-    { apply cti_interp_tok_add_pres. }  
+    opose proof * (fundamental _ _ _ e0) as FTLR; eauto.
+    { apply (cti_interp_tok_add_pres m τi). }  
     { admit. }
+    Unshelve.
+    2, 3: by apply PWT.
+    2: exact (method_tok m).
 
     iStartProof. 
     iPoseProof (FTLR) as "FF".
@@ -200,17 +203,29 @@ Section WFAdequacy.
     iEval (rewrite EQ). rewrite interp_unfold /=.
 
     iIntros (τ a).
-    iPoseProof (lift_spec m τ MaybeStuck ⊤ a with "[]") as "LIFT".
+    iPoseProof (lift_spec m ic MaybeStuck ⊤ a
+                  ⌜ True ⌝ (bi_pure ∘ is_ground_val)
+                 with "[]") as "LIFT". 
     { pose proof (@wfst_safety_spec _ SPEC) as SAFE.
       iPoseProof (SAFE with "[$]") as "SAFE".
       iDestruct (big_sepS_elem_of_acc _ (dom MS) m with "[$]") as "[#SPEC _]".
       { admit. }
-      rewrite {3}EQ. rewrite interp_unfold /=.
-      iModIntro. iIntros "TOK P".
+      rewrite {3}EQ. 
+      iModIntro. iIntros "TOK _".
       rewrite -EQ.
-      setoid_rewrite bi.sep_comm at 2. iApply ("SPEC" with "P TOK"). }
-
-    rewrite -EQ. setoid_rewrite bi.sep_comm at 2.
+      setoid_rewrite bi.sep_comm at 2. iApply ("SPEC" with "TOK"). }
+    rewrite -EQ. iIntros "!> #LRa CTF".
+    (** we assume that the method doesn't use LR for its argument *)
+    iClear "LRa".
+    iSpecialize ("LIFT" with "[$] [//]").
+    rewrite /pwp. iApply (@wp_wand with "[LIFT]").
+    { replace (tpctx_tid (tctx_tpctx ic)) with τ by admit.  
+      iClear "INV".
+      Unset Printing Notations.
+      Set Printing Implicit.
+      iApply "LIFT". 
+      clear. 
+      Set Printing All. 
       
       
       

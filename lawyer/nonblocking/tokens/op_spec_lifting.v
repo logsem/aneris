@@ -91,10 +91,11 @@ Section SpecLifting.
 
   Context {M: Model} {EM: ExecutionModel heap_lang M}.
 
-  Context (m: val) (τ: locale heap_lang). 
+  Context (m: val). 
 
   (* TODO: ct_interp_tok doesn't need an entire trace_ctx *)
-  Let mock_tctx := TraceCtx 99 (TpoolCtx ectx_emp τ).
+  Context (ic: @trace_ctx heap_lang).
+  Let τ := tpctx_tid $ tctx_tpctx ic.   
 
   Context (s: stuckness). 
 
@@ -106,7 +107,7 @@ Section SpecLifting.
     (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) si_add_none in
      WP e @ s ; τ ; E {{ v, method_tok m ∗ Q v }}) -∗
     ct_frag (Some e) -∗
-    (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) (@ct_interp_tok mock_tctx _ m _ PWT) in WP e @ s ; τ ; E {{ v, ct_frag None ∗ Q v }}).
+    (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) (@ct_interp_tok ic _ m _ PWT) in WP e @ s ; τ ; E {{ v, ct_frag None ∗ Q v }}).
   Proof using.
     simpl. 
     iIntros "WP MRK".
@@ -220,19 +221,20 @@ Section SpecLifting.
       to "cti_interp-based pwp_ext".
       interp_arrow is a triple that takes an argument in LR and returns result in LR.
       However, the two triples would operate with different LRs (since state interpretations are different), and it's not clear how to convert between the two.
+      Therefore, we'd only use this lifting lemma for stronger specs that ignore the input predicate P and ensure, via pure Q, that the result is a ground value (for which we can manually establish LR).
    *)
   (* Lemma lift_spec `{Hinv : @IEMGS heap_lang M LG EM Σ} E (a: val) *)
   (*   (P: iProp Σ) (Q: val -> iProp Σ): *)
   (*   (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) si_add_none in *)
   (*    □ (method_tok m -∗ P -∗ WP (App m a) @ s ; τ ; E {{ v, method_tok m ∗ Q v }} )) ⊢ *)
-  (*   (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) (@ct_interp_tok mock_tctx _ m _ PWT) in *)
+  (*   (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) (@ct_interp_tok ic _ m _ PWT) in *)
   (*    □ (ct_frag None -∗ P -∗ WP (App m a) @ s ; τ ; E {{ v, ct_frag None ∗ Q v }} )). *)
 
   Lemma lift_spec `{Hinv : @IEMGS heap_lang M LG EM Σ} E (a: val)
     (P: iProp Σ) (Q: val -> iProp Σ):
     (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) si_add_none in
      □ (method_tok m -∗ P -∗ WP (App m a) @ s ; τ ; E {{ v, method_tok m ∗ Q v }} )) ⊢
-    (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) (@ct_interp_tok mock_tctx _ m _ PWT) in
+    (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) (@ct_interp_tok ic _ m _ PWT) in
      □ (ct_frag None -∗ P -∗ WP (App m a) @ s ; τ ; E {{ v, ct_frag None ∗ Q v }} )).
 
   Proof using.
