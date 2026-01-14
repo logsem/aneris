@@ -176,7 +176,7 @@ Section WFAdequacy.
     simpl.
 
     red in VALID_CL. destruct VALID_CL as (e0 & -> & VALID_CL). 
-    opose proof * (fundamental _ _ _ e0) as FTLR; eauto.
+    opose proof * (fundamental _ _ _ τi e0) as FTLR; eauto.
     { apply (cti_interp_tok_add_pres m τi). }  
     { admit. }
     Unshelve.
@@ -192,24 +192,25 @@ Section WFAdequacy.
     iIntros "#INV CTF".
     rewrite /pwp_ext.
 
-    iSpecialize ("FF" $! {["m" := m]} τi with "[] [$]").
+    iSpecialize ("FF" $! {["m" := m]} with "[] [$]").
     2: iApply (@wp_wand with "FF"); set_solver.
 
     rewrite -insert_empty. iApply interp_env_cons; [done| ].
     iSplitL; [| by iApply interp_env_nil].
-    change (tpctx_tid (tctx_tpctx ic)) with τi.
 
     red in M_FUN. destruct M_FUN as (?&?&?&EQ).
     iEval (rewrite EQ). rewrite interp_unfold /=.
 
-    iIntros (τ a).
+    iIntros (a).
     iPoseProof (lift_spec m ic MaybeStuck ⊤ a
                   ⌜ True ⌝ (bi_pure ∘ is_ground_val)
                  with "[]") as "LIFT". 
     { pose proof (@wfst_safety_spec _ SPEC) as SAFE.
       iPoseProof (SAFE with "[$]") as "SAFE".
       iDestruct (big_sepS_elem_of_acc _ (dom MS) m with "[$]") as "[#SPEC _]".
-      { admit. }
+      { apply gmultiset_elem_of_dom.
+        apply gmultiset_elem_of_elements.
+        eapply elem_of_list_lookup_2; eauto. }
       rewrite {3}EQ. 
       iModIntro. iIntros "TOK _".
       rewrite -EQ.
@@ -218,22 +219,17 @@ Section WFAdequacy.
     (** we assume that the method doesn't use LR for its argument *)
     iClear "LRa".
     iSpecialize ("LIFT" with "[$] [//]").
-    rewrite /pwp. iApply (@wp_wand with "[LIFT]").
-    { replace (tpctx_tid (tctx_tpctx ic)) with τ by admit.  
-      iClear "INV".
-      Unset Printing Notations.
-      Set Printing Implicit.
-      iApply "LIFT". 
-      clear. 
-      Set Printing All. 
-      
-      
-      
-
+    rewrite /pwp. iApply (@wp_wand with "LIFT").
+    iIntros (v) "(CTF & %Gv)". iFrame.
+    by iApply ground_val_interp.
+    Unshelve.
+    4: apply PWT. 
+  Admitted.
     
 
   Lemma init_wptp_wfree {Σ} {PWT: @PrWfreeTok MS Σ} c
-    (ETR0: is_init_tpool c.1):
+    (ETR0: is_init_tpool c.1)
+    (M_FUN: is_fun m):
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ (@pwt_Hinv _ _ PWT) in
     (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ SPEC) -∗
     (⌜ ii = 0 ⌝ → ∃ π, cp_mul π0 d0 F ∗ th_phase_frag τi π (/2)%Qp) -∗
@@ -301,15 +297,12 @@ Section WFAdequacy.
     rewrite /thread_pr. rewrite decide_True; [| done].
     rewrite /wp_tc.
     destruct ii eqn:TI.
-    2: { 
-         rewrite leb_correct; [| lia].
-         (* apply Forall_app, proj2 in TP. *)
-         (* apply Forall_app, proj1 in TP. *)
-         (* inversion TP as [| ?? (? & -> & ?)]. subst. *)
-         (* by iApply init_pwp. *)
-      (** get pwp_ext with SI extended with ct_frag token *)
-      admit. 
-    }
+    2: { rewrite leb_correct; [| lia].
+         iApply init_τi_pwp_ext; try done.
+         1, 2: by apply MTI.
+         rewrite EQ_MS LOC /locale_of.
+         apply Forall2_length in TP1. rewrite -TP1.
+         rewrite list_lookup_middle; done. }
 
     (** get Trillium wp immediately *)
     rewrite leb_correct_conv; [| lia].

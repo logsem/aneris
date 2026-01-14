@@ -3,7 +3,7 @@ From lawyer.examples Require Import orders_lib.
 From lawyer.obligations Require Import env_helpers obligations_model.
 From lawyer.nonblocking Require Import om_wfree_inst.
 From lawyer.nonblocking.tokens Require Import logrel_tok tokens_ra.
-
+From lawyer.nonblocking.logrel Require Import valid_client.
 
 From trillium.program_logic Require Import weakestpre. 
 From heap_lang Require Import heap_lang_defs lang notation.
@@ -16,20 +16,6 @@ Definition method_spec_token {M} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_
     {{{ cp_mul π d_wfr0 F ∗ th_phase_frag τ π q ∗ method_tok m }}}
       App m a @ τ
     {{{ v, RET v; th_phase_frag τ π q ∗ method_tok m }}}.
-
-Inductive is_ground_lit : base_lit -> Prop := 
-| ground_int n : is_ground_lit (LitInt n)
-| ground_bool b : is_ground_lit (LitBool b)
-| ground_unit : is_ground_lit (LitUnit)
-.
-
-Inductive is_ground_val : val -> Prop :=
-| ground_lit l (GL: is_ground_lit l) : is_ground_val (LitV l)
-| ground_pair v1 v2 (GV1: is_ground_val v1) (GV2: is_ground_val v2):
-  is_ground_val (PairV v1 v2)
-| ground_inj_l v (GV: is_ground_val v): is_ground_val (InjLV v)
-| ground_inj_r v (GV: is_ground_val v): is_ground_val (InjRV v)
-.
 
 
 Definition token_safety_spec `{invGS_gen HasNoLc Σ, MethodToken MS Σ}

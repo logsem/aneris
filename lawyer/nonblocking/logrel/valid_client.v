@@ -62,3 +62,18 @@ with val_nf (v: val) : Prop :=
 
 Scheme expr_ind_mut := Induction for expr Sort Prop
 with val_ind_mut := Induction for val Sort Prop.
+
+
+Inductive is_ground_lit : base_lit -> Prop := 
+  | ground_int n : is_ground_lit (LitInt n)
+  | ground_bool b : is_ground_lit (LitBool b)
+  | ground_unit : is_ground_lit (LitUnit)
+.
+  
+Inductive is_ground_val : val -> Prop :=
+  | ground_lit l (GL: is_ground_lit l) : is_ground_val (LitV l)
+  | ground_pair v1 v2 (GV1: is_ground_val v1) (GV2: is_ground_val v2):
+    is_ground_val (PairV v1 v2)
+  | ground_inj_l v (GV: is_ground_val v): is_ground_val (InjLV v)
+  | ground_inj_r v (GV: is_ground_val v): is_ground_val (InjRV v)
+.
