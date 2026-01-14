@@ -227,6 +227,108 @@ Section WFAdequacy.
   Admitted.
     
 
+  (* --------------------------------------∗ *)
+  (* wptp_from_gen (thread_pr ic s' m MaybeStuck 1) (tp1 ++ [e]) tp2 *)
+  (*   (map (λ (_ : nat) (_ : val), True) *)
+  (*      (adequacy_utils.locales_of_list_from (tp1 ++ [e]) tp2)) *)
+
+  (* TODO: move, replace existing one *)
+  Lemma tok_pres_empty' `{invGS_gen HasNoLc Σ, heap1GS Σ} (P: iProp Σ):
+    tok_add_pres P (fun _ => emp%I).
+  Proof using. clear. red. set_solver. Qed.
+
+  Lemma init_pwp {Σ} {PWT: @PrWfreeTok MS Σ}
+    τ e0 m'
+    (VALID: valid_client e0)
+    (NOFORKS: no_forks e0)
+    (M'_IN: m' ∈ MS)
+    (M'_FUN: is_fun m'):
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ SPEC) -∗ 
+    method_tok m' -∗ 
+    pwp0 MaybeStuck ⊤ τ (subst "m" m' e0) (λ _, method_tok m').
+  Proof using SPEC.
+    simpl. 
+    
+    opose proof * (fundamental _ _ _ τ e0) as FTLR; eauto.
+    { eapply (tok_pres_empty' (method_tok m')). }
+    Unshelve.
+    3, 4, 6: by apply PWT.
+
+    iIntros "#INV TOK".
+    rewrite /pwp0.
+
+    rewrite /logrel in FTLR.
+    rewrite /interp_expr in FTLR.
+    
+    iPoseProof (FTLR) as "FF".
+    rewrite /logrel /interp_expr. 
+    iSpecialize ("FF" $! {["m" := m']} with "[] [$]").
+    2: { iApply (@wp_wand with "FF").
+         iIntros (?) "[??]". iFrame. }
+
+    rewrite -insert_empty. iApply interp_env_cons; [done| ].
+    iSplitL; [| by iApply interp_env_nil].      
+    (* destruct SPEC. by iApply wfs_safety_spec.  *)
+    pose proof (@wfst_safety_spec _ SPEC) as SAFE.
+    iPoseProof (SAFE with "[$]") as "SAFE".
+    iDestruct (big_sepS_elem_of_acc _ (dom MS) m' with "[$]") as "[#SPEC _]".
+    { by apply gmultiset_elem_of_dom. }
+
+    red in M'_FUN. destruct M'_FUN as (?&?&?&EQ).
+    iEval (rewrite {2}EQ). rewrite interp_unfold /=.
+    iIntros "!> %v LRv TOK".
+    iSpecialize ("SPEC" $! τ v with "TOK"). 
+    rewrite -EQ.
+    (** we assume that the method doesn't use LR for its argument *)
+    iClear "LRv".
+    iApply (@wp_wand with "SPEC").
+    iIntros (?) "(%Gv & TOK)". iFrame.
+    by iApply ground_val_interp.
+  Qed.
+
+  Lemma init_wptp_wfree_pwps {Σ} {PWT: @PrWfreeTok MS Σ} tp0 tp tks N
+    (NO: τi ∉ locales_of_list_from tp0 tp)
+    (TP: Forall2 (λ m e, valid_op_client m e ∧ no_forks e) tks tp)
+    (TKS_MS: forall tk, tk ∈ tks -> tk ∈ MS)
+    (TKS_FUN: forall tk, tk ∈ tks -> is_fun tk):
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ SPEC) -∗
+    methods_toks (list_to_set_disj tks) -∗
+   wptp_from_gen (thread_pr ic s' m MaybeStuck N) tp0 tp
+      (map (λ (_ : nat) (_ : val), ⌜ True ⌝%I)
+         (adequacy_utils.locales_of_list_from tp0 tp)).
+  Proof using.
+    iIntros "#INV TOKS".
+    iInduction tp as [|e tp] "IH" forall (tp0 NO tks TP TKS_MS TKS_FUN).
+    { simpl. iApply wptp_from_gen_nil. }
+    rewrite adequacy_utils.locales_of_list_from_cons.
+    apply Forall2_cons_inv_r in TP as (tk & tks_ & (VALID & NOFORKS) & TP & ->).
+    rename tks_ into tks.
+    rewrite list_to_set_disj_cons. iDestruct (methods_toks_split with "TOKS") as "[TOK TOKS]".  
+    rewrite map_cons. iApply wptp_from_gen_cons. iSplitR "TOKS".
+    2: { simpl. iApply ("IH" with "[] [] [] [] [$]"). 
+         - iPureIntro.
+           rewrite locales_of_list_from_cons in NO. set_solver. 
+         - done.
+         - iPureIntro. intros. apply TKS_MS. set_solver.           
+         - iPureIntro. intros. apply TKS_FUN. set_solver. }
+    rewrite /thread_pr. rewrite decide_False.
+    2: { intros EQ. apply NO. rewrite locales_of_list_from_locales.
+         rewrite /τi EQ. set_solver. }
+    iClear "IH".
+    red in VALID. destruct VALID as (?& EQ &?).
+    rewrite {2}EQ.
+
+    iApply (@wp_wand with "[TOK]"). 
+    { iApply (init_pwp with "[$]"); try done.
+      { admit. }
+      { apply TKS_MS. set_solver. } 
+      { apply TKS_FUN. set_solver. } }
+    set_solver. 
+  Admitted.
+
+  (* TODO: move, remove similar for m *)
+  Context (MS_FUNS: forall m', m' ∈ MS -> is_fun m').
+
   Lemma init_wptp_wfree {Σ} {PWT: @PrWfreeTok MS Σ} c
     (ETR0: is_init_tpool c.1)
     (M_FUN: is_fun m):
@@ -238,7 +340,7 @@ Section WFAdequacy.
     ct_frag None -∗
     wptp_wfree ic s' m MaybeStuck {tr[ c ]}
       (map (λ _ _, True) (adequacy_utils.locales_of_list c.1)).
-  Proof using.
+  Proof using MS_FUNS.
     simpl. iIntros "#INV T TOKS TOKm CTF".
     rewrite /wptp_wfree. simpl.
     destruct (thread_pool_split c.1 τi) as (tp1 & tp2 & tp' & EQ & TP' & NO1 & NO2).
@@ -276,23 +378,17 @@ Section WFAdequacy.
     iDestruct (methods_toks_split with "TOKS") as "[TOKS1 TOKS]". 
    
     iApply wptp_from_gen_app. iSplitL "TOKS1".
-    {
-      (* iApply init_wptp_wfree_pwps. *)
-      (* - done. *)
-      (* - by apply Forall_app, proj1 in TP. *)
-      (* - done. *)
-      admit. 
-    }
+    { iApply init_wptp_wfree_pwps; try done.
+      - intros. apply gmultiset_elem_of_elements. rewrite EQ_MS. set_solver.
+      - intros. apply MS_FUNS.
+        apply gmultiset_elem_of_elements. rewrite EQ_MS. set_solver. }
 
     simpl. rewrite gmultiset_cancel_l2.
     iApply wptp_from_gen_cons. iSplitR "TOKS".
-    2: {
-         (* iApply init_wptp_wfree_pwps. *)
-         (* - done. *)
-         (* - by do 2 (apply Forall_app, proj2 in TP). *)
-         (* - done. *)
-      admit. 
-    }
+    2: { iApply init_wptp_wfree_pwps; try done.
+         - intros. apply gmultiset_elem_of_elements. rewrite EQ_MS. set_solver.
+         - intros. apply MS_FUNS.
+           apply gmultiset_elem_of_elements. rewrite EQ_MS. set_solver. }
        
     rewrite /thread_pr. rewrite decide_True; [| done].
     rewrite /wp_tc.
@@ -317,7 +413,7 @@ Section WFAdequacy.
     inversion IN. subst e_.
     rewrite CTX. simpl.
     iApply (wp_stuck_mono with "[$]"). done.
-  Admitted.
+  Qed.
 
   Lemma init_pr_pr_wfree {Σ} {PWT: @PrWfreeTok MS Σ}
     c
@@ -331,7 +427,7 @@ Section WFAdequacy.
   ct_auth None -∗ ct_frag None -∗
   pr_pr_wfree ic s' SPEC m MaybeStuck {tr[ c ]}
     (map (λ _ _, True) (adequacy_utils.locales_of_list c.1)).
-  Proof using.
+  Proof using MS_FUNS.
     iIntros "#INV MOD TOKS CTA CTF".
     rewrite /pr_pr_wfree. simpl.
 
@@ -414,7 +510,7 @@ Section WFAdequacy.
     (λ etr, fits_inf_call ic m ai etr ∧ has_no_forks etr)
     Σ MaybeStuck c.1 c.2
     (init_om_wfree_state F ic c) ((): @em_init_param _ _ EM).
-  Proof using. 
+  Proof using MS_FUNS. 
     red. iIntros (Hinv) "(PHYS & MOD)". simpl.
     iMod (@wfst_init_mod _ SPEC with "[PHYS]") as "[#INV (%MT & TOKS)]".
     2: { iFrame. }
