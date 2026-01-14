@@ -50,8 +50,10 @@ End CallTracker.
 
 
 Section PwpExtra.
-  Context (LG: LangEM heap_lang).
-  Context `{invGS_gen HasNoLc Σ} {lGS: lgem_GS Σ} {ctGS: CallTracker Σ}.
+  Context
+    (* ;`{invGS_gen HasNoLc Σ} *)
+    {Σ}
+    {ctGS: CallTracker Σ}.
 
   Context (m: val) (τ: locale heap_lang).
 
@@ -162,6 +164,15 @@ Section PwpExtra.
   (*     state_interp etr mtr := (phys_SI LG etr mtr (lG := lG) ∗ ct_interp etr)%I; *)
   (*     fork_post := fun _ _ => (⌜ True ⌝)%I; *)
   (* |}. *)
+
+  Lemma cti_interp_tok_add_pres `{invGS_gen HasNoLc Σ, heap1GS Σ}:
+    tok_add_pres (ct_frag None) ct_interp.
+  Proof using.
+    red. iIntros (???) "CTF CTI". iModIntro. 
+    rewrite /ct_interp. iDestruct "CTI" as "(% & ? & [(?&->) | (%&%&%&[-> %])])".
+    - iFrame. iLeft. by iFrame.
+    - by iDestruct (ct_auth_frag_agree with "[$] [$]") as %?.
+  Qed.
   
 End PwpExtra.
 

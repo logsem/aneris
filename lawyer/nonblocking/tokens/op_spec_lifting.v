@@ -2,7 +2,8 @@ From iris.proofmode Require Import tactics.
 From trillium.traces Require Import inftraces trace_lookup exec_traces trace_len. 
 From fairness Require Import fairness locales_helpers.
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am obls_termination obligations_wf.
-From lawyer.nonblocking Require Import trace_context wptp_gen pwp wfree_traces calls pwp_ext pr_wfree_tokens om_wfree_inst_tokens op_eval_helpers.
+From lawyer.nonblocking Require Import trace_context wptp_gen pwp wfree_traces calls op_eval_helpers.
+From lawyer.nonblocking.tokens Require Import pwp_ext pr_wfree_tokens om_wfree_inst_tokens tokens_ra.
 From lawyer.nonblocking.logrel Require Import valid_client.
 From trillium.program_logic Require Import execution_model weakestpre adequacy_utils adequacy_cond simulation_adequacy_em_cond. 
 From lawyer Require Import action_model sub_action_em program_logic.  
@@ -86,23 +87,26 @@ From heap_lang Require Import sswp_logic lang locales_helpers_hl.
 Close Scope Z. 
 
 Section SpecLifting.
-  Context `{PWT: PrWfreeTok Σ}.
+  Context `{PWT: PrWfreeTok MS Σ}.
 
   Context {M: Model} {EM: ExecutionModel heap_lang M}.
 
   Context (m: val) (τ: locale heap_lang). 
 
   (* TODO: ct_interp_tok doesn't need an entire trace_ctx *)
-  Let mock_tctx := TraceCtx 99 (TpoolCtx ectx_emp τ). 
+  Let mock_tctx := TraceCtx 99 (TpoolCtx ectx_emp τ).
 
-  Lemma lift_call e
+  Context (s: stuckness). 
+
+  Lemma lift_call E e
     (NVAL: to_val e = None)
+    (Q: val -> iProp Σ)
     (* (NOFORKS: no_forks e) *)
     :
-    (let _ := IEMGS_into_Looping (@pwt_Hinv _ PWT) si_add_none in
-     WP e @τ {{ _, method_tok m }}) -∗
+    (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) si_add_none in
+     WP e @ s ; τ ; E {{ v, method_tok m ∗ Q v }}) -∗
     ct_frag (Some e) -∗
-    (let _ := IEMGS_into_Looping (@pwt_Hinv _ PWT) (@ct_interp_tok mock_tctx m _ PWT) in WP e @τ {{ _, ct_frag None }}).
+    (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) (@ct_interp_tok mock_tctx _ m _ PWT) in WP e @ s ; τ ; E {{ v, ct_frag None ∗ Q v }}).
   Proof using.
     simpl. 
     iIntros "WP MRK".
@@ -144,7 +148,7 @@ Section SpecLifting.
     destruct (to_val e2) eqn:V2.
     { apply of_to_val in V2 as <-. 
       iPoseProof (wp_value_inv with "WP") as "POST".
-      iMod (pre_step_elim with "[PHYS ADD] POST") as "((PHYS & ADD) & TOK)".
+      iMod (pre_step_elim with "[PHYS ADD] POST") as "((PHYS & ADD) & (TOK & Q))".
       { iFrame. }
       iMod (ct_auth_frag_update _ _ None with "[$] [$]") as "[??]".      
       iModIntro. do 2 iExists _. iFrame.
@@ -161,7 +165,7 @@ Section SpecLifting.
     2: { iFrame. iApply ("IH" with "[//] [$] [$]"). }
     
     iRight. iPureIntro. simpl. 
-    exists e2, K, s. split; [done| ].
+    exists e2, K, s0. split; [done| ].
     eapply inside_call_extend; eauto.
     Unshelve. all: exact tt.
   Admitted.
@@ -211,14 +215,29 @@ Section SpecLifting.
       simpl. by apply under_ctx_spec.
   Qed.
 
-  Lemma lift_spec `{Hinv : @IEMGS heap_lang M LG EM Σ} (a: val):
-    (let _ := IEMGS_into_Looping (@pwt_Hinv _ PWT) si_add_none in
-     □ (method_tok m -∗ WP (App m a) @ τ {{ v, method_tok m }} )) ⊢
-    (let _ := IEMGS_into_Looping (@pwt_Hinv _ PWT) (@ct_interp_tok mock_tctx m _ PWT) in
-     □ (ct_frag None -∗ WP (App m a) @ τ {{ v, ct_frag None }} )).
+  (** The original intention was to lift the entire interp_arrow 
+      from "simple pwp_ext" (without extended state interpretation)
+      to "cti_interp-based pwp_ext".
+      interp_arrow is a triple that takes an argument in LR and returns result in LR.
+      However, the two triples would operate with different LRs (since state interpretations are different), and it's not clear how to convert between the two.
+   *)
+  (* Lemma lift_spec `{Hinv : @IEMGS heap_lang M LG EM Σ} E (a: val) *)
+  (*   (P: iProp Σ) (Q: val -> iProp Σ): *)
+  (*   (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) si_add_none in *)
+  (*    □ (method_tok m -∗ P -∗ WP (App m a) @ s ; τ ; E {{ v, method_tok m ∗ Q v }} )) ⊢ *)
+  (*   (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) (@ct_interp_tok mock_tctx _ m _ PWT) in *)
+  (*    □ (ct_frag None -∗ P -∗ WP (App m a) @ s ; τ ; E {{ v, ct_frag None ∗ Q v }} )). *)
+
+  Lemma lift_spec `{Hinv : @IEMGS heap_lang M LG EM Σ} E (a: val)
+    (P: iProp Σ) (Q: val -> iProp Σ):
+    (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) si_add_none in
+     □ (method_tok m -∗ P -∗ WP (App m a) @ s ; τ ; E {{ v, method_tok m ∗ Q v }} )) ⊢
+    (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) (@ct_interp_tok mock_tctx _ m _ PWT) in
+     □ (ct_frag None -∗ P -∗ WP (App m a) @ s ; τ ; E {{ v, ct_frag None ∗ Q v }} )).
+
   Proof using.
     simpl. iIntros "#WP".
-    iIntros "!> NO".
+    iIntros "!> NO P".
 
     repeat rewrite wp_unfold.
     rewrite /wp_pre. simpl.
@@ -232,7 +251,7 @@ Section SpecLifting.
       { subst. iFrame. }
       congruence. }
 
-    iSpecialize ("WP" with "TOK").
+    iSpecialize ("WP" with "TOK P").
     iMod ("WP" $! _ looping_trace K with "[//] [] [] [PHYS]") as "[RED WP]".
     1, 2: done.
     { iFrame. }
@@ -250,7 +269,7 @@ Section SpecLifting.
     destruct (to_val e2) eqn:V2.
     { apply of_to_val in V2 as <-. 
       iPoseProof (wp_value_inv with "WP") as "POST".
-      iMod (pre_step_elim with "[PHYS ADD] POST") as "((PHYS & ADD) & TOK)".
+      iMod (pre_step_elim with "[PHYS ADD] POST") as "((PHYS & ADD) & (TOK & Q))".
       { iFrame. }
       iModIntro. do 2 iExists _. iFrame.
       assert (efs = []) as -> by admit. repeat rewrite big_sepL_nil.
@@ -263,7 +282,7 @@ Section SpecLifting.
     iModIntro. do 2 iExists _. iFrame.
     assert (efs = []) as -> by admit. repeat rewrite big_sepL_nil.
     iSplitR.
-    2: { iFrame. by iApply (lift_call with "[$] [$]"). }  
+    2: { iFrame. by iApply (lift_call with "[$] [$]"). }
     
     iRight. iPureIntro. simpl. 
     exists e2, K, (trace_length extr - 1). split; [done| ].

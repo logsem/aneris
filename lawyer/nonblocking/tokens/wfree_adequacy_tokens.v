@@ -9,7 +9,7 @@ From lawyer.examples Require Import orders_lib obls_tactics.
 From lawyer.nonblocking Require Import trace_context om_wfree_inst pr_wfree_lib (* pr_wfree *) wfree_traces wptp_gen pwp calls wfree_adequacy_lib pwp_ext.
 (* From lawyer.nonblocking.logrel Require Import fundamental.  *)
 From lawyer.nonblocking.logrel Require Import valid_client.
-From lawyer.nonblocking.tokens Require Import om_wfree_inst_tokens pr_wfree_tokens tokens_ra.
+From lawyer.nonblocking.tokens Require Import om_wfree_inst_tokens pr_wfree_tokens tokens_ra fundamental_tok op_spec_lifting.
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am obls_termination.
 From heap_lang Require Import lang simulation_adequacy.
 
@@ -165,6 +165,58 @@ Section WFAdequacy.
     Z ⊆ Y -> (X ⊎ Y) ∖ Z = X ⊎ Y ∖ Z.
   Proof using. clear. multiset_solver. Qed.
 
+  Lemma init_τi_pwp_ext {Σ} {PWT: @PrWfreeTok MS Σ} e
+    (VALID_CL: valid_op_client m e)
+    (NOFORKS: no_forks e)
+    (TI: elements MS !! τi = Some m)
+    (M_FUN: is_fun m):
+    ⊢ □ ( (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ SPEC) -∗
+         ct_frag None -∗ pwp_ext ic m MaybeStuck ⊤ τi e (λ _, True)).
+  Proof using.
+    simpl.
+
+    red in VALID_CL. destruct VALID_CL as (e0 & -> & VALID_CL). 
+    opose proof * (fundamental _ _ _ e0) as FTLR; eauto. 
+    { apply cti_interp_tok_add_pres. }  
+    { admit. }
+
+    iStartProof. 
+    iPoseProof (FTLR) as "FF".
+    rewrite /logrel /interp_expr. 
+    rewrite -subst_env_singleton.
+
+    iModIntro. 
+    iIntros "#INV CTF".
+    rewrite /pwp_ext.
+
+    iSpecialize ("FF" $! {["m" := m]} τi with "[] [$]").
+    2: iApply (@wp_wand with "FF"); set_solver.
+
+    rewrite -insert_empty. iApply interp_env_cons; [done| ].
+    iSplitL; [| by iApply interp_env_nil].
+    change (tpctx_tid (tctx_tpctx ic)) with τi.
+
+    red in M_FUN. destruct M_FUN as (?&?&?&EQ).
+    iEval (rewrite EQ). rewrite interp_unfold /=.
+
+    iIntros (τ a).
+    iPoseProof (lift_spec m τ MaybeStuck ⊤ a with "[]") as "LIFT".
+    { pose proof (@wfst_safety_spec _ SPEC) as SAFE.
+      iPoseProof (SAFE with "[$]") as "SAFE".
+      iDestruct (big_sepS_elem_of_acc _ (dom MS) m with "[$]") as "[#SPEC _]".
+      { admit. }
+      rewrite {3}EQ. rewrite interp_unfold /=.
+      iModIntro. iIntros "TOK P".
+      rewrite -EQ.
+      setoid_rewrite bi.sep_comm at 2. iApply ("SPEC" with "P TOK"). }
+
+    rewrite -EQ. setoid_rewrite bi.sep_comm at 2.
+      
+      
+      
+
+    
+
   Lemma init_wptp_wfree {Σ} {PWT: @PrWfreeTok MS Σ} c
     (ETR0: is_init_tpool c.1):
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ (@pwt_Hinv _ _ PWT) in
@@ -234,8 +286,8 @@ Section WFAdequacy.
     rewrite /thread_pr. rewrite decide_True; [| done].
     rewrite /wp_tc.
     destruct ii eqn:TI.
-    2: {
-         (* rewrite leb_correct; [| lia]. *)
+    2: { 
+         rewrite leb_correct; [| lia].
          (* apply Forall_app, proj2 in TP. *)
          (* apply Forall_app, proj1 in TP. *)
          (* inversion TP as [| ?? (? & -> & ?)]. subst. *)
