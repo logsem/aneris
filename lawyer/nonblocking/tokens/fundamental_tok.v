@@ -54,7 +54,8 @@ Section typed_interp.
   Context (tok: iProp Σ).
   Context (si_add: execution_trace heap_lang -> iProp Σ).
   Context (PRES: tok_add_pres tok si_add).
-  Local Notation interp' := (interp tok si_add). 
+  Context (τ: locale heap_lang).
+  Local Notation interp' := (interp tok si_add τ). 
 
   Ltac inv_binop_eval H :=
     apply bin_op_eval_inv in H as
@@ -86,7 +87,7 @@ Section typed_interp.
     apply un_op_eval_inv in H as
         [(-> & ? & -> & ->) | [(-> & ? & -> & ->)| (-> & ? & -> & ->)]]. 
 
-  Local Notation logrel' := (logrel tok si_add).
+  Local Notation logrel' := (logrel tok si_add τ).
 
   (* Goal Inhabited (trillium.program_logic.language.state heap_lang). *)
   (*   apply _. *)
@@ -98,7 +99,7 @@ Section typed_interp.
 
   Lemma logrel_var x : ⊢ logrel' (Var x).
   Proof.
-    iIntros "!#" (vs τ) "Henv".
+    iIntros "!#" (vs) "Henv".
     rewrite subst_env_var /interp_expr.
     iIntros "$". 
     destruct (vs !! x) eqn:XTH; rewrite XTH; simpl. 
@@ -107,13 +108,13 @@ Section typed_interp.
     - solve_stuck_case. 
   Qed.
 
-  Local Notation interp_expr' := (interp_expr tok si_add). 
+  Local Notation interp_expr' := (interp_expr tok si_add τ).
 
-  Lemma wp_app_val_val f a τ:
+  Lemma wp_app_val_val f a:
     pers_pred_car interp' f -∗ ▷ pers_pred_car interp' a -∗
     (* tok -∗ *)
     (* pwp MaybeStuck ⊤ τ (App (Val f) (Val a)) (fun v => pers_pred_car interp' v ∗ tok). *)
-    interp_expr' τ (App (Val f) (Val a)). 
+    interp_expr' (App (Val f) (Val a)). 
   Proof using All.
     iIntros "Hv1 Hv2 T". rewrite /interp_expr. 
     destruct (@decide (exists b s e, f = RecV b s e)) as [FUN| ]. 
@@ -128,7 +129,7 @@ Section typed_interp.
     
   Lemma logrel_app e1 e2 : logrel' e1 -∗ logrel' e2 -∗ logrel' (App e1 e2).
   Proof using All.
-    iIntros "#IH1 #IH2 !#" (vs τ) "#Henv T"; rewrite /interp_expr /=.
+    iIntros "#IH1 #IH2 !#" (vs) "#Henv T"; rewrite /interp_expr /=.
     rewrite subst_env_arg2; [| done]. 
     iApply (wp_bind [AppRCtx _]).
     iApply (wp_wand with "[T]").
@@ -141,28 +142,28 @@ Section typed_interp.
     by iApply wp_app_val_val. 
   Qed.
 
-  Local Notation interp_env' := (interp_env tok si_add).
+  Local Notation interp_env' := (interp_env tok si_add τ).
 
   Lemma logrel_App_RecV_env (b x : binder) (f: expr) (vs': gmap string val)
     (NOb : ∀ s : string, b = BNamed s → s ∉ dom vs')
     (NOx : ∀ s : string, x = BNamed s → s ∉ dom vs'):
-  □ (∀ (vs0 : gmap string val) (τ0 : nat),
+  □ (∀ (vs0 : gmap string val),
            interp_env' vs0 -∗
            (* tok -∗ *)
            (* pwp MaybeStuck ⊤ τ0 (subst_env vs0 f) (fun v => pers_pred_car interp' v ∗ tok) *)
-           interp_expr' τ0 (subst_env vs0 f)
+           interp_expr' (subst_env vs0 f)
     ) -∗
     interp_env' vs' -∗
-  □ ∀ (τ0 : nat) (v : val),
+  □ ∀ (v : val),
       ▷ pers_pred_car interp' v -∗
       (* tok -∗ *)
       (* pwp MaybeStuck ⊤ τ0 (App (Val (RecV b x (subst_env vs' f))) (Val v)) *)
       (*     (fun v => pers_pred_car interp' v ∗ tok). *)
-      interp_expr' τ0 (App (Val (RecV b x (subst_env vs' f))) (Val v)). 
+      interp_expr' (App (Val (RecV b x (subst_env vs' f))) (Val v)). 
   Proof using All.
     iIntros "#IH #Henv".
     iLöb as "IHrec".
-    iModIntro. iIntros (τ' v) "#ARG TOK".
+    iModIntro. iIntros (v) "#ARG TOK".
     iApply (sswp_pwp_pres with "[-TOK] TOK").
     1, 2: done. 
     iApply sswp_pure_step; [done| ].
@@ -203,7 +204,7 @@ Section typed_interp.
 
   Lemma logrel_rec b x f : logrel' f -∗ logrel' (Rec b x f).
   Proof using All.
-    iIntros "#IH !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    iIntros "#IH !#" (vs) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_rec.
     iApply (sswp_pwp_pres with "[] TOK").
     1, 2: done. 
@@ -224,7 +225,7 @@ Section typed_interp.
   Lemma interp_RecV b x f : logrel' f -∗ interp' (RecV b x f).
   Proof using All.
     iIntros "#IHf". iEval (rewrite interp_unfold). simpl.
-    iModIntro. iIntros (τ' v) "#IHv TOK".
+    iModIntro. iIntros (v) "#IHv TOK".
     iPoseProof (logrel_App_RecV_env _ _ _ ∅) as "LR".
     3: { rewrite subst_env_empty. iApply ("LR" with "[$] [] [$] [$]").
          iApply interp_env_nil. }
@@ -234,7 +235,7 @@ Section typed_interp.
   Lemma logrel_unop op e:
     logrel' e -∗ logrel' (UnOp op e).
   Proof using All.
-    iIntros "#IH !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    iIntros "#IH !#" (vs) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_arg1; [| done]. 
 
     iApply (wp_bind [UnOpCtx _]).
@@ -256,7 +257,7 @@ Section typed_interp.
     (VALID: valid_bin_op op):
     logrel' e1 -∗ logrel' e2 -∗ logrel' (BinOp op e1 e2).
   Proof using All.
-    iIntros "#IH1 #IH2 !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    iIntros "#IH1 #IH2 !#" (vs) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_arg2; [| done]. 
     rewrite {3}/pwp.
 
@@ -281,7 +282,7 @@ Section typed_interp.
 
   Lemma logrel_pair e1 e2 : logrel' e1 -∗ logrel' e2 -∗ logrel' (Pair e1 e2).
   Proof using All.
-    iIntros "#IH1 #IH2 !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    iIntros "#IH1 #IH2 !#" (vs) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_arg2; [| done]. 
 
     iApply (wp_bind [PairRCtx _]).
@@ -304,7 +305,7 @@ Section typed_interp.
 
   Lemma logrel_fst e : logrel' e -∗ logrel' (Fst e).
   Proof using All.
-    iIntros "#IH !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    iIntros "#IH !#" (vs) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_arg1; [| done].  
     iApply (wp_bind [FstCtx]).
     iApply (wp_wand with "[TOK]"); first by iApply "IH".
@@ -329,7 +330,7 @@ Section typed_interp.
 
   Lemma logrel_snd e : logrel' e -∗ logrel' (Snd e).
   Proof using All.
-    iIntros "#IH !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    iIntros "#IH !#" (vs) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_arg1; [| done]. 
     iApply (wp_bind [SndCtx]).
     iApply (wp_wand with "[TOK]"); first by iApply "IH".
@@ -353,7 +354,7 @@ Section typed_interp.
 
   Lemma logrel_injl e : logrel' e -∗ logrel' (InjL e).
   Proof using All.
-    iIntros "#IH !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    iIntros "#IH !#" (vs) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_arg1; [| done]. 
     iApply (wp_bind [InjLCtx]).
     iApply (wp_wand with "[TOK]"); first by iApply "IH".
@@ -371,7 +372,7 @@ Section typed_interp.
 
   Lemma logrel_injr e : logrel' e -∗ logrel' (InjR e).
   Proof using All.
-    iIntros "#IH !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    iIntros "#IH !#" (vs) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_arg1; [| done]. 
     iApply (wp_bind [InjRCtx]).
     iApply (wp_wand with "[TOK]"); first by iApply "IH".
@@ -389,7 +390,7 @@ Section typed_interp.
 
   Lemma logrel_case e0 e1 e2 : logrel' e0 -∗ logrel' e1 -∗ logrel' e2 -∗ logrel' (Case e0 e1 e2).
   Proof using All.
-    iIntros "#IH0 #IH1 #IH2 !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    iIntros "#IH0 #IH1 #IH2 !#" (vs) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_arg3; [| done]. 
     iApply (wp_bind [CaseCtx _ _]).
     iApply (wp_wand with "[TOK]"); first by iApply "IH0".
@@ -479,7 +480,7 @@ Section typed_interp.
 
   Lemma logrel_if e0 e1 e2 : logrel' e0 -∗ logrel' e1 -∗ logrel' e2 -∗ logrel' (If e0 e1 e2).
   Proof using All.
-    iIntros "#IH0 #IH1 #IH2 !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    iIntros "#IH0 #IH1 #IH2 !#" (vs) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_arg3; [| done]. 
     iApply (wp_bind [IfCtx _ _]).
     iApply (wp_wand with "[TOK]"); first by iApply "IH0".
@@ -527,7 +528,7 @@ Section typed_interp.
 
   Lemma logrel_alloc en ea : logrel' en -∗ logrel' ea -∗ logrel' (AllocN en ea).
   Proof using All.
-    iIntros "#IHn #IHa !>" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    iIntros "#IHn #IHa !>" (vs) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_arg2; [| done]. 
     iApply (wp_bind [AllocNRCtx _]).
     iApply (wp_wand with "[TOK]"); [by iApply "IHa"| ]. 
@@ -580,7 +581,7 @@ Section typed_interp.
 
   Lemma logrel_free e : logrel' e -∗ logrel' (Free e).
   Proof using All.
-    iIntros "#IH !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    iIntros "#IH !#" (vs) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_arg1; [| done]. 
     iApply (wp_bind [FreeCtx]).
     iApply (wp_wand with "[TOK]"); first by iApply "IH".
@@ -606,7 +607,7 @@ Section typed_interp.
 
   Lemma logrel_load e : logrel' e -∗ logrel' (Load e).
   Proof using All.
-    iIntros "#IH !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    iIntros "#IH !#" (vs) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_arg1; [| done]. 
     iApply (wp_bind [LoadCtx]).
     iApply (wp_wand with "[TOK]"); first by iApply "IH".
@@ -632,7 +633,7 @@ Section typed_interp.
 
   Lemma logrel_store el ev : logrel' el -∗ logrel' ev -∗ logrel' (Store el ev).
   Proof using All.
-    iIntros "#IHl #IHv !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    iIntros "#IHl #IHv !#" (vs) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_arg2; [| done].
     iApply (wp_bind [StoreRCtx _]).
     iApply (wp_wand with "[TOK]"); first by iApply "IHv".
@@ -661,7 +662,7 @@ Section typed_interp.
 
   Lemma logrel_CmpXchg el es ef : logrel' el -∗ logrel' es -∗ logrel' ef -∗ logrel' (CmpXchg el es ef).
   Proof using All.
-    iIntros "#IHl #IHs #IHf !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    iIntros "#IHl #IHs #IHf !#" (vs) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_arg3; [| done]. 
     iApply (wp_bind [CmpXchgRCtx _ _]).
     iApply (wp_wand with "[TOK]"); first by iApply "IHf".
@@ -708,7 +709,7 @@ Section typed_interp.
 
   Lemma logrel_FAA el ea : logrel' el -∗ logrel' ea -∗ logrel' (FAA el ea).
   Proof using All.
-    iIntros "#IHl #IHa !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    iIntros "#IHl #IHa !#" (vs) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite subst_env_arg2; [| done]. 
     iApply (wp_bind [FaaRCtx _]).
     iApply (wp_wand with "[TOK]"); [by iApply "IHa"| ]. 
@@ -748,7 +749,7 @@ Section typed_interp.
 
   Lemma logrel_ChooseNat: ⊢ logrel' ChooseNat.
   Proof using All.
-    iIntros "!#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=.
+    iIntros "!#" (vs) "#Henv TOK"; rewrite /interp_expr /=.
     rewrite (subst_env_arg1 (fun _ => ChooseNat) _ (Val $ LitV $ LitUnit)); [| done].
     iApply (sswp_pwp_pres with "[-TOK] TOK").
     1, 2: done. 
@@ -763,7 +764,7 @@ Section typed_interp.
   Proof using All.
     pattern e. apply expr_ind_mut with (P0 := fun v => valid_val v -> val_nf v → ⊢ interp' v).
     all: intros; simpl in *. 
-    - iIntros "!#" (vs τ) "#Henv".
+    - iIntros "!#" (vs) "#Henv".
       rewrite (subst_env_arg1 (fun _ => Val v) _ (Val $ LitV $ LitUnit)); [| done].
       rewrite /interp_expr. iIntros "$". 
       iApply wp_value.
@@ -815,5 +816,29 @@ Section typed_interp.
   Qed.
 
   (* Print Assumptions fundamental. *)
+
+  Lemma ground_lit_interp l:
+    is_ground_lit l -> ⊢ interp' (LitV l).
+  Proof using iG.
+    clear. 
+    induction l; intros.
+    all: rewrite interp_unfold /=; try done.
+    by inversion H.
+  Qed.
+
+  Lemma ground_val_interp v:
+    is_ground_val v -> ⊢ interp' v.
+  Proof using iG.
+    clear -iG.
+    induction v; intros GV.
+    all: inversion GV; try done; subst.
+    - by apply ground_lit_interp.
+    - rewrite interp_unfold /=.
+      iExists _, _. iSplit; [done| set_solver]. 
+    - rewrite interp_unfold /=.
+      iLeft. iExists _. iSplit; [done| set_solver]. 
+    - rewrite interp_unfold /=.
+      iRight. iExists _. iSplit; [done| set_solver].
+  Qed.
 
 End typed_interp.

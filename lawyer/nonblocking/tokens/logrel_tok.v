@@ -24,6 +24,10 @@ Section logrel.
   Context (tok: iProp Σ).
   Context (si_add: execution_trace heap_lang -> iProp Σ).
 
+  (** For lifting lemma, it is necessary to fix the thread id.
+      This is possible, since with tokens there are no forks. *)
+  Context (τ: locale heap_lang).
+
   Program Definition interp_prod : D -n> D :=
     λne ii, PersPred (λ w, ▷ ∃ w1 w2, ⌜w = PairV w1 w2⌝ ∧ ii w1 ∧ ii w2)%I.
   Next Obligation.
@@ -40,7 +44,7 @@ Section logrel.
   Proof. solve_contractive. Qed.
 
   Program Definition interp_arrow : D -n> D :=
-    λne ii, PersPred (λ w, □ ∀ τ v, ▷ ii v -∗ tok -∗
+    λne ii, PersPred (λ w, □ ∀ v, ▷ ii v -∗ tok -∗
       let _ := irisG_looping HeapLangEM si_add (lG := hG) in
       pwp MaybeStuck ⊤ τ (App (of_val w) (of_val v)) (fun v => ii v ∗ tok) )%I.
   Solve Obligations with solve_proper.
@@ -50,9 +54,8 @@ Section logrel.
     rewrite /interp_arrow /=.
     f_equiv.
     f_equiv; intros v.
-    f_equiv.
-    red. intros a. f_equiv; [solve_contractive| ].
-    f_equiv. 
+    f_equiv; [solve_contractive| ..]. 
+    f_equiv.    
     apply wp_contractive; first apply _.
     destruct n.
     { simpl in *. constructor. lia. }
@@ -115,7 +118,7 @@ Section logrel.
   Lemma interp_unfold : interp ≡ interp_one interp.
   Proof. rewrite /interp; apply fixpoint_unfold. Qed.
 
-  Definition interp_expr (τ: locale heap_lang) (e: expr heap_lang) : iProp Σ :=
+  Definition interp_expr (e: expr heap_lang) : iProp Σ :=
     let _ := irisG_looping HeapLangEM si_add (lG := hG) in
     tok -∗ pwp MaybeStuck ⊤ τ e (fun v => interp v ∗ tok)%I.
 
@@ -149,7 +152,7 @@ Section logrel.
   Qed.    
 
   Definition logrel (e : expr heap_lang) : iProp Σ :=
-    □ ∀ vs τ, interp_env vs -∗ interp_expr τ (subst_env vs e).
+    □ ∀ vs, interp_env vs -∗ interp_expr (subst_env vs e).
 
 End logrel.
 
