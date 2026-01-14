@@ -321,7 +321,8 @@ Section WFAdequacy.
 
   Lemma init_pr_pr_wfree {Σ} {PWT: @PrWfreeTok MS Σ}
     c
-    (ETR0: is_init_tpool c.1):
+    (ETR0: is_init_tpool c.1)
+    (M_FUN: is_fun m):
   (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ SPEC) -∗
   @obls_init_resource _ _ _ _ _ _
             (@iem_fairnessGS heap_lang _ HeapLangEM EM Σ (@pwt_Hinv _ _ PWT))
@@ -394,7 +395,7 @@ Section WFAdequacy.
 
     iSplitL "TOK CTF TOKS PHτi CPS_PRE'". 
     { iApply (init_wptp_wfree with "[$] [PHτi CPS_PRE'] [$] [$] [$]").
-      { done. }
+      1, 2: done.
       iFrame. }
       
     destruct decide.
@@ -423,15 +424,19 @@ Section WFAdequacy.
     set (PWT := {| pwt_UT := MT; pwt_CT := CT |}).
 
     iModIntro.
-    iExists (wfree_trace_inv ic s' SPEC).    
+    iExists (wfree_trace_inv ic s' SPEC).
+
+    assert (m ∈ MS) as MSm.
+    { destruct ETR0 as (?&IN&?&?).
+      apply gmultiset_elem_of_elements. eapply elem_of_list_lookup; eauto. }    
     iExists (PR_wfree_tokens ic s' SPEC m MSm ai). 
 
     iSplitR.
     { simpl. iApply hl_config_wp. }
-    iSplitL. 
-    { 
-      (* by iApply init_pr_pr_wfree.  *)
-      admit. }
+    iSplitL.
+    { rewrite -surjective_pairing.
+      Set Printing Coercions. simpl. 
+      iApply (init_pr_pr_wfree with "[$] [$] [$] [$]"); done. }
     iSplitR.
     { rewrite -surjective_pairing. by iApply init_wfree_inv. }
     by iApply rah_wfree_inv.
@@ -449,13 +454,14 @@ Section WFAdequacy.
     (∃ k, ¬ fits_inf_call ic m ai (trace_take_fwd k extr)) \/
     (s' = MaybeStuck /\ gets_stuck_ae extr ic). 
   Proof using.
-    clear MSm.
     opose proof (om_simulation_adequacy_model_trace_multiple_waitfree
                    ic s'
                 wfreeΣ _ (trfirst extr).1 _ _ _ _ _ _ _ VALID _ _) as ADEQ.
     { apply init_om_wfree_is_init. }
     { apply surjective_pairing. }     
-    { rewrite -surjective_pairing. 
+    { rewrite -surjective_pairing.
+      (* "no forks" should not be a restriction on trace,
+         but rather a consequence of PR used (pwps that prohibit forks) *)
       eapply PR_premise_wfree; eauto. }
     
     destruct ADEQ as [(mtr & MATCH & OM0 & IREF) | RET].
