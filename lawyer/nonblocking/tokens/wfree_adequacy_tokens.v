@@ -57,12 +57,35 @@ Section WFAdequacy.
     (ii = 0 -> exists e, from_locale tp τi = Some e /\ under_ctx Ki e = Some (m ai)) /\
     (forall e, from_locale tp τi = Some e -> to_val e = None).
 
-  Definition wfreeΣ: gFunctors := iemΣ HeapLangEM EM. 
+  From iris.algebra Require Import excl_auth.
 
-  Instance wfree_pre: @heapGpreS wfreeΣ M EM.
-  Proof. 
-    unshelve esplit. 
-  Qed. 
+  (* TODO: move gfunctors for tokens and call tracker *)
+  Definition wfreeΣ: gFunctors := 
+    #[iemΣ HeapLangEM EM; (* TODO: add gfunctor for tokens*)
+      GFunctor $ excl_authUR (option expr)]. 
+
+  Instance wfree_heap_pre: @heapGpreS wfreeΣ M EM.
+  Proof. unshelve esplit. Qed. 
+  (* Instance wfree_mt_pre: MethodTokenPre wfreeΣ. *)
+  Instance wfree_CT_sub: subG (GFunctor $ excl_authUR (option expr)) wfreeΣ.
+  Proof using. apply _. Qed. 
+
+  Instance wfree_CT_pre: CallTrackerPre wfreeΣ.
+  Proof using.
+    (* TODO: prove automatically *)
+    clear. 
+    econstructor. rewrite /wfreeΣ.
+    unshelve econstructor.
+    { simpl. rewrite /gid. simpl.
+      apply (@Fin.of_nat_lt 13). lia. }
+    done.
+  Qed.     
+    
+(* solve_inG.  eapply subG_inG. apply _.  *)
+(* apply _.  *)
+(*                rewrite /wfreeΣ. simpl. *)
+               
+(*                apply subG_inG.  *)
 
   (* TODO: move *)
   Lemma ct_init `{CallTrackerPre Σ}:
@@ -170,13 +193,13 @@ Section WFAdequacy.
     (TI: elements MS !! τi = Some m)
     (M_FUN: is_fun m):
     ⊢ □ ( (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ SPEC) -∗
-         ct_frag None -∗ pwp_ext ic m MaybeStuck ⊤ τi e (λ _, True)).
+         ct_frag None -∗ pwp_ext ic m MaybeStuck CannotFork ⊤ τi e (λ _, True)).
   Proof using.
     simpl.
 
     red in VALID_CL. destruct VALID_CL as (e0 & -> & VALID_CL & NO_FORKS). 
     opose proof * (fundamental _ _ _ τi e0) as FTLR; eauto.
-    { apply (cti_interp_tok_add_pres m τi). }  
+    { apply (cti_interp_tok_add_pres m τi). }
     Unshelve.
     2, 3: by apply PWT.
     2: exact (method_tok m).
@@ -222,7 +245,7 @@ Section WFAdequacy.
     by iApply ground_val_interp.
     Unshelve.
     4: apply PWT. 
-  Qed.    
+  Qed.
 
   (* TODO: move, replace existing one *)
   Lemma tok_pres_empty' `{invGS_gen HasNoLc Σ, heap1GS Σ} (P: iProp Σ):
@@ -237,7 +260,7 @@ Section WFAdequacy.
     (M'_FUN: is_fun m'):
     (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ SPEC) -∗ 
     method_tok m' -∗ 
-    pwp0 MaybeStuck ⊤ τ (subst "m" m' e0) (λ _, method_tok m').
+    pwp0 MaybeStuck CannotFork ⊤ τ (subst "m" m' e0) (λ _, method_tok m').
   Proof using SPEC.
     simpl. 
     
@@ -285,7 +308,7 @@ Section WFAdequacy.
     (TKS_FUN: forall tk, tk ∈ tks -> is_fun tk):
     (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ SPEC) -∗
     methods_toks (list_to_set_disj tks) -∗
-   wptp_from_gen (thread_pr ic s' m MaybeStuck N) tp0 tp
+   wptp_from_gen (thread_pr ic s' m MaybeStuck CannotFork N) tp0 tp
       (map (λ (_ : nat) (_ : val), ⌜ True ⌝%I)
          (adequacy_utils.locales_of_list_from tp0 tp)).
   Proof using.
@@ -328,7 +351,7 @@ Section WFAdequacy.
     methods_toks (MS ∖ {[+ m +]}) -∗
     (⌜ ii = 0 ⌝ → method_tok m) -∗
     ct_frag None -∗
-    wptp_wfree ic s' m MaybeStuck {tr[ c ]}
+    wptp_wfree ic s' m MaybeStuck CannotFork {tr[ c ]}
       (map (λ _ _, True) (adequacy_utils.locales_of_list c.1)).
   Proof using MS_FUNS.
     simpl. iIntros "#INV T TOKS TOKm CTF".
@@ -414,7 +437,7 @@ Section WFAdequacy.
             (init_om_wfree_state F ic c) () -∗
   methods_toks MS -∗
   ct_auth None -∗ ct_frag None -∗
-  pr_pr_wfree ic s' SPEC m MaybeStuck {tr[ c ]}
+  pr_pr_wfree ic s' SPEC m MaybeStuck CannotFork {tr[ c ]}
     (map (λ _ _, True) (adequacy_utils.locales_of_list c.1)).
   Proof using MS_FUNS.
     iIntros "#INV MOD TOKS CTA CTF".
@@ -467,8 +490,8 @@ Section WFAdequacy.
     iEval (rewrite {3}(gmultiset_disj_union_difference' _ _ MSm)) in "TOKS".
     iDestruct (methods_toks_split with "TOKS") as "[TOK TOKS]".
 
-    rewrite bi.sep_comm !bi.sep_assoc. iSplit.
-    2: by destruct s'.
+    rewrite bi.sep_comm !bi.sep_assoc. iSplit; [| done].
+    iSplit; [| by destruct s'].
     
     iAssert (cti_cond ic m {tr[ c ]} ∗ (⌜ ii = 0 ⌝ → method_tok m))%I with "[CTA TOK]" as "[$ TOK]". 
     { rewrite /cti_cond /=.
@@ -496,8 +519,8 @@ Section WFAdequacy.
     :
   PR_premise_multiple
     (obls_sim_rel_wfree ic s')
-    (λ etr, fits_inf_call ic m ai etr ∧ has_no_forks etr)
-    Σ MaybeStuck c.1 c.2
+    (fits_inf_call ic m ai)
+    Σ MaybeStuck CannotFork c.1 c.2
     (init_om_wfree_state F ic c) ((): @em_init_param _ _ EM).
   Proof using MS_FUNS. 
     red. iIntros (Hinv) "(PHYS & MOD)". simpl.
@@ -538,15 +561,13 @@ Section WFAdequacy.
     terminating_trace extr /\ int_ref_inf_one (call_progresses ic s') extr ∨
     (∃ k, ¬ fits_inf_call ic m ai (trace_take_fwd k extr)) \/
     (s' = MaybeStuck /\ gets_stuck_ae extr ic). 
-  Proof using.
+  Proof using MS_FUNS.
     opose proof (om_simulation_adequacy_model_trace_multiple_waitfree
-                   ic s'
-                wfreeΣ _ (trfirst extr).1 _ _ _ _ _ _ _ VALID _ _) as ADEQ.
+                   ic s' 
+                wfreeΣ _ _ (trfirst extr).1 _ _ _ _ _ _ _ VALID _ _) as ADEQ.
     { apply init_om_wfree_is_init. }
     { apply surjective_pairing. }     
     { rewrite -surjective_pairing.
-      (* "no forks" should not be a restriction on trace,
-         but rather a consequence of PR used (pwps that prohibit forks) *)
       eapply PR_premise_wfree; eauto. }
     
     destruct ADEQ as [(mtr & MATCH & OM0 & IREF) | RET].
@@ -634,10 +655,15 @@ Section WFAdequacy.
       apply mk_is_Some in CALL. apply CALL. }
     { etrans; [| apply H]. lia. }
     by rewrite JTH in H0.
+
+    Unshelve.
+    set_solver. 
   Qed.
 
   Theorem simple_om_simulation_adequacy_terminate_multiple_waitfree extr
         (ETR0: valid_init_tpool_restr (trfirst extr).1 MS)
+        (* (ETR0: is_init_tpool (trfirst extr).1) *)
+        (TI: elements MS !! τi = Some m)
         (MOD_INIT: wfst_is_init_st _ SPEC (trfirst extr))
         (CALL: from_option (fun c => call_at tpc c m ai (APP := App)) False (extr S!! ii))
     :
@@ -678,19 +704,15 @@ Section WFAdequacy.
          specialize (fic_never_val 0). rewrite trace_take_fwd_0_first /= in fic_never_val.
          rewrite E in fic_never_val. done. }
 
-    assert (is_init_tpool (trfirst extr).1) as INIT_TP.
-    { repeat split; eauto.
-      red in ETR0.
-      (* should follow from ETR0 *)
-      admit. }
-
-    by apply simple_om_simulation_adequacy_terminate_multiple_waitfree_impl.
-  Admitted.
+    apply simple_om_simulation_adequacy_terminate_multiple_waitfree_impl; eauto.
+    repeat split; eauto.     
+  Qed.
 
   (* TODO: rename *)
   Lemma obls_terminates_impl_multiple_waitfree
     (extr : extrace heap_lang)
     (ETR0: valid_init_tpool_restr (trfirst extr).1 MS)
+    (TI: elements MS !! τi = Some m)
     (MOD_INIT: wfst_is_init_st _ SPEC (trfirst extr))
     (VALID: extrace_valid extr)
     (FAIR: fair_call extr tpc ii)
@@ -715,28 +737,31 @@ End WFAdequacy.
 
 Theorem wfree_token_is_wait_free_restr MS
   (SPEC: WaitFreeSpecToken MS)
-  (FUNS: map_Forall (const ∘ is_fun) MS)
+  (FUNS: set_Forall is_fun (dom MS))
   :
   wait_free_restr MS (wfst_is_init_st _ SPEC) (* s' *) NotStuck any_arg.
 Proof using.
-  red. intros etr ETR0 MOD_INIT VALID. intros m IN.
-  
-  apply main_returns_reduction; try done.
-  { (* TODO: prove above separately? *)
-    apply elem_of_dom in IN as [??]. eapply FUNS; eauto. }
-  
-  red. intros [i tpc] a ci FAIR ITH MAIN CALL _.
+  red. intros etr ETR0 MOD_INIT VALID. intros τ m TI.
 
-  opose proof * (obls_terminates_impl_multiple_waitfree (TraceCtx i tpc)
+  assert (is_fun m) as M_FUN. 
+  { apply FUNS. apply gmultiset_elem_of_dom, gmultiset_elem_of_elements.
+    eapply elem_of_list_lookup; eauto. }
+
+  apply main_returns_reduction; try done.
+  
+  red. intros i K a ci FAIR ITH MAIN CALL _.
+  
+  opose proof * (obls_terminates_impl_multiple_waitfree (TraceCtx i (TpoolCtx K τ))
                    NotStuck
                 ) as ADEQ.
-  3: by apply MOD_INIT. 
+  4: by apply MOD_INIT. 
   all: eauto.
-  { simpl. by rewrite ITH. }
-  { apply elem_of_dom in IN as [??]. eapply FUNS; eauto. }
+  { simpl. intros. apply FUNS. by apply gmultiset_elem_of_dom. }
+  { simpl. Unshelve. 2: exact a.
+    by rewrite ITH. }  
     
   destruct ADEQ as [[TERM PROGRESS]| [? | ?]].
-  2, 3: tauto. 
+  2, 3: tauto.
 
   pose proof (trace_has_len etr) as [? LEN].
   eapply terminating_trace_equiv in TERM as [len EQ]; eauto. subst.
@@ -748,7 +773,7 @@ Proof using.
     eapply mk_is_Some, state_lookup_dom in DOM; eauto. simpl in DOM.
     lia. }
 
-  add_case (not_stuck_tid (tpctx_tid tpc) c) IF_NS.
+  add_case (not_stuck_tid τ c) IF_NS.
   { intros NS.
     left.
     edestruct @Classical_Prop.classic as [RET | NORET]; [by apply RET| ].
@@ -756,11 +781,9 @@ Proof using.
     clear PROGRESS.
         
     pose proof DOM as EE. eapply from_locale_trace in EE; eauto.
-    2: { eapply locales_of_cfg_Some. eapply expr_at_in_locales.
-         erewrite <- surjective_pairing. eauto. }
     rewrite LAST /= in EE. destruct EE as [e EE].
     
-    destruct (decide (nval_at tpc c)) as [NVAL | VAL]. 
+    destruct (decide (nval_at (TpoolCtx K τ) c)) as [NVAL | VAL]. 
     + clear ITH CALL MOD_INIT VALID ETR0 SPEC MAIN.
       eapply has_return_fin_trace; eauto. 
     + eapply call_returns_if_not_continues in DOM; eauto.

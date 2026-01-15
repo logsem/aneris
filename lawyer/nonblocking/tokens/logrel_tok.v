@@ -46,7 +46,7 @@ Section logrel.
   Program Definition interp_arrow : D -n> D :=
     λne ii, PersPred (λ w, □ ∀ v, ▷ ii v -∗ tok -∗
       let _ := irisG_looping HeapLangEM si_add (lG := hG) in
-      pwp MaybeStuck ⊤ τ (App (of_val w) (of_val v)) (fun v => ii v ∗ tok) )%I.
+      pwp MaybeStuck CannotFork ⊤ τ (App (of_val w) (of_val v)) (fun v => ii v ∗ tok) )%I.
   Solve Obligations with solve_proper.
   Instance interp_arrow_contractive : Contractive interp_arrow.
   Proof.
@@ -120,7 +120,7 @@ Section logrel.
 
   Definition interp_expr (e: expr heap_lang) : iProp Σ :=
     let _ := irisG_looping HeapLangEM si_add (lG := hG) in
-    tok -∗ pwp MaybeStuck ⊤ τ e (fun v => interp v ∗ tok)%I.
+    tok -∗ pwp MaybeStuck CannotFork ⊤ τ e (fun v => interp v ∗ tok)%I.
 
   Definition interp_env (vs : gmap string (val heap_lang)) : iProp Σ :=
     [∗ map] _ ↦ v ∈ vs, interp v.

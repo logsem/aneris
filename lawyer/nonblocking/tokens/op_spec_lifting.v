@@ -105,9 +105,9 @@ Section SpecLifting.
     (* (NOFORKS: no_forks e) *)
     :
     (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) si_add_none in
-     WP e @ s ; τ ; E {{ v, method_tok m ∗ Q v }}) -∗
+     WP e @ CannotFork; s ; τ ; E {{ v, method_tok m ∗ Q v }}) -∗
     ct_frag (Some e) -∗
-    (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) (@ct_interp_tok ic _ m _ PWT) in WP e @ s ; τ ; E {{ v, ct_frag None ∗ Q v }}).
+    (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) (@ct_interp_tok ic _ m _ PWT) in WP e @ CannotFork; s ; τ ; E {{ v, ct_frag None ∗ Q v }}).
   Proof using.
     simpl. 
     iIntros "WP MRK".
@@ -144,7 +144,8 @@ Section SpecLifting.
     iMod "WP". iModIntro.
 
     iApply (@step_fupdN_wand with "WP"). iIntros "ST".
-    iMod "ST" as "(%&%& (PHYS & ADD) & WP & WPS)".
+    iMod "ST" as "(%&%& (PHYS & ADD) & WP & WPS & %FF)".
+    specialize (FF eq_refl). subst efs. 
 
     destruct (to_val e2) eqn:V2.
     { apply of_to_val in V2 as <-. 
@@ -153,7 +154,7 @@ Section SpecLifting.
       { iFrame. }
       iMod (ct_auth_frag_update _ _ None with "[$] [$]") as "[??]".      
       iModIntro. do 2 iExists _. iFrame.
-      assert (efs = []) as -> by admit. repeat rewrite big_sepL_nil.
+      repeat rewrite big_sepL_nil.
       iSplitL "TOK".
       { iLeft. by iFrame. }
       iSplit; [| done]. by iApply @wp_value.
@@ -161,15 +162,16 @@ Section SpecLifting.
 
     iMod (ct_auth_frag_update _ _ (Some e2) with "[$] [$]") as "[AUTH FRAG]". 
     iModIntro. do 2 iExists _. iFrame.
-    assert (efs = []) as -> by admit. repeat rewrite big_sepL_nil.
+    repeat rewrite big_sepL_nil.
     iSplitR.
-    2: { iFrame. iApply ("IH" with "[//] [$] [$]"). }
+    2: { iFrame. iSplit; [| done]. 
+         iApply ("IH" with "[//] [$] [$]"). }
     
     iRight. iPureIntro. simpl. 
     exists e2, K, s0. split; [done| ].
     eapply inside_call_extend; eauto.
     Unshelve. all: exact tt.
-  Admitted.
+  Qed.
 
   Lemma start_call extr tp1 tp2 K σ1 (a: val)
     (Hζ : locale_of tp1 (fill K (m a)) = τ)
@@ -233,10 +235,9 @@ Section SpecLifting.
   Lemma lift_spec `{Hinv : @IEMGS heap_lang M LG EM Σ} E (a: val)
     (P: iProp Σ) (Q: val -> iProp Σ):
     (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) si_add_none in
-     □ (method_tok m -∗ P -∗ WP (App m a) @ s ; τ ; E {{ v, method_tok m ∗ Q v }} )) ⊢
+     □ (method_tok m -∗ P -∗ WP (App m a) @ CannotFork; s ; τ ; E {{ v, method_tok m ∗ Q v }} )) ⊢
     (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) (@ct_interp_tok ic _ m _ PWT) in
-     □ (ct_frag None -∗ P -∗ WP (App m a) @ s ; τ ; E {{ v, ct_frag None ∗ Q v }} )).
-
+     □ (ct_frag None -∗ P -∗ WP (App m a) @ CannotFork; s ; τ ; E {{ v, ct_frag None ∗ Q v }} )).
   Proof using.
     simpl. iIntros "#WP".
     iIntros "!> NO P".
@@ -266,7 +267,8 @@ Section SpecLifting.
     iMod "WP". iModIntro.
 
     iApply (@step_fupdN_wand with "WP"). iIntros "ST".
-    iMod "ST" as "(%&%& (PHYS & ADD) & WP & WPS)".
+    iMod "ST" as "(%&%& (PHYS & ADD) & WP & WPS & %FF)".
+    specialize (FF eq_refl). subst efs. 
 
     destruct (to_val e2) eqn:V2.
     { apply of_to_val in V2 as <-. 
@@ -274,7 +276,7 @@ Section SpecLifting.
       iMod (pre_step_elim with "[PHYS ADD] POST") as "((PHYS & ADD) & (TOK & Q))".
       { iFrame. }
       iModIntro. do 2 iExists _. iFrame.
-      assert (efs = []) as -> by admit. repeat rewrite big_sepL_nil.
+      repeat rewrite big_sepL_nil.
       iSplitL "TOK".
       { iLeft. by iFrame. }
       iSplit; [| done]. by iApply @wp_value.
@@ -282,14 +284,15 @@ Section SpecLifting.
 
     iMod (ct_auth_frag_update _ _ (Some e2) with "[$] [$]") as "[AUTH FRAG]". 
     iModIntro. do 2 iExists _. iFrame.
-    assert (efs = []) as -> by admit. repeat rewrite big_sepL_nil.
+    repeat rewrite big_sepL_nil.
     iSplitR.
-    2: { iFrame. by iApply (lift_call with "[$] [$]"). }
+    2: { iFrame. iSplit; [| done]. 
+         by iApply (lift_call with "[$] [$]"). }
     
     iRight. iPureIntro. simpl. 
     exists e2, K, (trace_length extr - 1). split; [done| ].
     eapply start_call; eauto. 
     Unshelve. all: exact tt.
-  Admitted. 
+  Qed. 
 
 End SpecLifting. 

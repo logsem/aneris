@@ -26,8 +26,7 @@ Section CallInTrace.
     exists cj, i <= j /\ tr S!! j = Some cj /\ stuck_tid τ cj.
 
   Definition gets_stuck_once tr tc := exists j, gets_stuck_at tr tc j.
-  (* TODO: write a comment *)
-  (* so far this stronger condition is necessary to prove main call reduction *)
+  (** this stronger condition is necessary to prove main call reduction *)
   Definition gets_stuck_ae tr tc :=
     forall N, is_Some (tr S!! N) -> exists j, j >= N /\ is_Some (tr S!! j) /\ gets_stuck_at tr tc j.
 
@@ -56,10 +55,13 @@ Section CallInTrace.
     exists d cd, tr S!! (k + d) = Some cd /\
             fairness_sat locale_enabled_safe tid_match τ cd (tr L!! (k + d)). 
 
-  (* TODO: rename *)
-  Definition always_returns (s: stuckness) (P: val -> Prop) tr :=    
-    forall tc a ci, let '(TraceCtx i tpc) := tc in
-      (* fair_ex (tpctx_tid tpc) tr -> *)
+  (** In the end we want to quantify over all threads,
+      but making it an explicit parameter here allows to reuse this def
+      for restricted wait-freedom *)
+  Definition always_returns (s: stuckness) (P: val -> Prop) (τ: locale heap_lang) tr :=    
+    forall i K a ci,
+      let tpc := TpoolCtx K τ in
+      let tc := TraceCtx i tpc in
       fair_call tr tpc i ->
       tr S!! i = Some ci ->
       call_at tpc ci m a (APP := App) ->
@@ -73,7 +75,7 @@ Section CallInTrace.
       valid_init_tpool (trfirst etr).1 ->
       is_init_st (trfirst etr) ->
       extrace_valid etr ->
-      always_returns s P etr.
+      forall τ, always_returns s P τ etr.
 
   Lemma no_return_before_equiv_nvals tr tpc c i k
     (VALID: extrace_valid tr)
@@ -202,8 +204,10 @@ Section CallInTrace.
     eauto.
   Qed.
 
-  Definition always_returns_strong s P tr :=
-    forall tc a ci, let '(TraceCtx i tpc) := tc in
+  Definition always_returns_strong s P τ tr :=
+    forall i K a ci,
+      let tpc := TpoolCtx K τ in
+      let tc := TraceCtx i tpc in
       fair_call_strong tr tpc i ->
       tr S!! i = Some ci ->
       call_at tpc ci m a (APP := App) ->
@@ -214,17 +218,17 @@ Section CallInTrace.
       valid_init_tpool (trfirst etr).1 ->
       is_init_st (trfirst etr) ->
       extrace_valid etr ->
-      always_returns_strong s P etr.
+      forall τ, always_returns_strong s P τ etr.
 
   Lemma wait_free_equiv C s P:
     wait_free C s P <-> wait_free_strong C s P.
   Proof using.
     rewrite /wait_free /wait_free_strong.
     repeat (apply forall_proper; intros).
-    destruct x3 as [? [??]]. 
+    (* destruct x3 as [? [??]].  *)
     split; intros RET **; apply RET; auto.
     all: eapply fair_call_strenghten; eauto;
-      rewrite H0; simpl; exists x4; eauto.
+      rewrite H0 /=; exists x6; eauto.
   Qed.
 
   Global Instance no_return_before_dec etr κ i j: Decision (no_return_before etr κ i j).
@@ -258,14 +262,14 @@ Section CallInTrace.
 
   Definition any_arg: val -> Prop := fun _ => True. 
 
-  Lemma always_returns_impl etr s1 s2 P1 P2
+  Lemma always_returns_impl etr s1 s2 P1 P2 τ
     (S12: stuckness_le s1 s2)
     (P21: forall v, P2 v -> P1 v):
-    always_returns s1 P1 etr -> always_returns s2 P2 etr.
+    always_returns s1 P1 τ etr -> always_returns s2 P2 τ etr.
   Proof using.
     rewrite /always_returns. simpl.
-    intros AR [i tpc] **.
-    ospecialize * (AR (trace_context.TraceCtx i tpc)); eauto.
+    intros AR i K **.
+    ospecialize * (AR i K); eauto.
     destruct AR as [| (->&?)]; [by left| ].
     destruct s2; try done. by right.
   Qed.
@@ -276,7 +280,7 @@ Section CallInTrace.
     (P21: forall v, P2 v -> P1 v):
     wait_free C1 s1 P1 -> wait_free C2 s2 P2.
   Proof using.
-    rewrite /wait_free. simpl. intros WF ? INIT ??.
+    rewrite /wait_free. simpl. intros WF ? INIT ?? ?.
     eapply always_returns_impl; eauto.
   Qed.
   
@@ -285,20 +289,17 @@ End CallInTrace.
 
 Section RestrWFree.
 
-  Definition valid_init_tpool_restr (tp: list expr) (ms: gmultiset val) :=
-    (* let ms' := flat_map (fun '(m, k) => repeat m k) $ map_to_list ms in *)
-    let ms' := elements ms in 
+  Definition valid_init_tpool_restr (tp: list expr) (MS: gmultiset val) :=
     (* TODO: allow "smaller" thread pools too *)
-    (* TODO: move "no fork" condition outside? *)
-    Forall2 (valid_op_client no_forks) ms' tp. 
+    Forall2 (valid_op_client no_forks) (elements MS) tp.
 
   (** TODO: account for multiple m's in unrestricted wait-freedom too *)
-  Definition wait_free_restr (ms: gmultiset val) (is_init_st: cfg heap_lang -> Prop)
+  Definition wait_free_restr (MS: gmultiset val) (is_init_st: cfg heap_lang -> Prop)
     s P := forall etr,
-      valid_init_tpool_restr (trfirst etr).1 ms ->
+      valid_init_tpool_restr (trfirst etr).1 MS ->
       is_init_st (trfirst etr) ->
       extrace_valid etr ->
-      forall m, m ∈ dom ms -> always_returns m s P etr.
+      forall τ m, elements MS !! τ = Some m -> always_returns m s P τ etr.
 
 End RestrWFree.
 

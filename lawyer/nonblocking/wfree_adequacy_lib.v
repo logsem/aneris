@@ -776,8 +776,10 @@ Proof using.
     exists rj. red. eauto.  
 Qed.
 
-Definition always_returns_main s P m tr :=
-  forall tc a ci, let '(TraceCtx i tpc) := tc in
+Definition always_returns_main s P τ m tr :=
+  forall i K a ci, 
+      let tpc := TpoolCtx K τ in
+      let tc := TraceCtx i tpc in
       fair_call tr tpc i ->
       tr S!! i = Some ci ->
       previous_calls_return_tr tr i (tpctx_tid tpc) m ->
@@ -789,13 +791,13 @@ Definition always_returns_main s P m tr :=
     The call argument at index i satisfying P doesn't imply the same for argument at a previous call at some index j.
     However in fact, this reduction is only really needed for proving restricted wait-freedom, and the corresponding case studies we consider do not restrict their argument.
     So in theory it might be possible to allow argument restriction for full wait-freedom and avoid it for restricted wait-freedom. *)
-Lemma main_returns_reduction s' m etr
+Lemma main_returns_reduction s' m τ etr
   (VALID: extrace_valid etr)
   (M_FUN: exists f x b, m = RecV f x b):
-  always_returns_main s' any_arg m etr -> always_returns m s' any_arg etr.
+  always_returns_main s' any_arg τ m etr -> always_returns m s' any_arg τ etr.
 Proof using.
   rewrite /always_returns_main /always_returns. 
-  intros MAIN_RET. intros [i [K τ]] a ci FAIR ITH CALL _.
+  intros MAIN_RET. intros i K a ci FAIR ITH CALL _.
 
   odestruct (@Classical_Prop.classic _) as [RET | NORET]; [by apply RET| ].
   apply Classical_Prop.not_or_and in NORET as (NORET & ?). 
@@ -803,7 +805,7 @@ Proof using.
   opose proof * find_main_call as X; eauto.
 
   destruct X as (j & K' & a' & c' & ?&?&?&?&PREV&NVALj).
-  ospecialize * (MAIN_RET (TraceCtx j (TpoolCtx K' τ))).
+  ospecialize * (MAIN_RET j K').
   1-4: by eauto.
   { done. }
 

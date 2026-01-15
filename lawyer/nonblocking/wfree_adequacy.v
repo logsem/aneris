@@ -516,15 +516,17 @@ Theorem wfree_is_wait_free s' m
   (M_FUN: exists f x b, m = RecV f x b):
   wait_free m (wfs_is_init_st _ _ _ SPEC) s' any_arg.
 Proof using.
-  red. intros etr ETR0 MOD_INIT VALID.
+  red. intros etr ETR0 MOD_INIT VALID τ.
   apply main_returns_reduction; try done. 
-  red. intros [i tpc] a ci FAIR ITH MAIN CALL _.
+  red. intros i K a ci FAIR ITH MAIN CALL _.
 
-  opose proof * (obls_terminates_impl_multiple_waitfree (TraceCtx i tpc)) as ADEQ.
+  (* set (tpc := ).  *)
+  opose proof * (obls_terminates_impl_multiple_waitfree (TraceCtx i (TpoolCtx K τ))) as ADEQ.
   3: by apply MOD_INIT. 
   all: eauto.
   { done. }
-  { simpl. by rewrite ITH. }
+  { simpl. rewrite ITH /=.
+    apply CALL. }
   
   destruct ADEQ as [[TERM PROGRESS]| [? | ?]].
   2, 3: tauto. 
@@ -539,7 +541,7 @@ Proof using.
     eapply mk_is_Some, state_lookup_dom in DOM; eauto. simpl in DOM.
     lia. }
 
-  add_case (not_stuck_tid (tpctx_tid tpc) c) IF_NS.
+  add_case (not_stuck_tid τ c) IF_NS.
   { intros NS.
     left.
     edestruct @Classical_Prop.classic as [RET | NORET]; [by apply RET| ].
@@ -547,11 +549,11 @@ Proof using.
     clear PROGRESS.
         
     pose proof DOM as EE. eapply from_locale_trace in EE; eauto.
-    2: { eapply locales_of_cfg_Some. eapply expr_at_in_locales.
-         erewrite <- surjective_pairing. eauto. }
+    (* 2: { eapply locales_of_cfg_Some. eapply expr_at_in_locales. *)
+    (*      erewrite <- surjective_pairing. eauto. } *)
     rewrite LAST /= in EE. destruct EE as [e EE].
     
-    destruct (decide (nval_at tpc c)) as [NVAL | VAL]. 
+    destruct (decide (nval_at (TpoolCtx K τ) c)) as [NVAL | VAL]. 
     + clear ITH CALL MOD_INIT VALID ETR0 SPEC MAIN.
       eapply has_return_fin_trace; eauto. 
     + eapply call_returns_if_not_continues in DOM; eauto.
@@ -560,14 +562,14 @@ Proof using.
       red. exists k, r, ck. split; eauto. lia. }
   
   destruct s'.
-  2: { destruct (decide (not_stuck_tid (tpctx_tid tpc) c)).
+  2: { destruct (decide (not_stuck_tid τ c)).
        { by apply IF_NS. }
        right. split; auto.         
        red. intros N [? NTH].
        exists (len - 1). repeat split; eauto.
        { red. eapply mk_is_Some, state_lookup_dom in NTH; eauto.
          simpl in NTH. lia. }
-       red. destruct tpc.
+       red. 
        eexists. repeat split; eauto.
        apply stuck_tid_neg. split; auto.
        eapply from_locale_trace in DOM; eauto.

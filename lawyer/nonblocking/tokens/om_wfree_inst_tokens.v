@@ -14,7 +14,7 @@ Definition method_spec_token {M} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_
     F (m: val): iProp Σ := 
   ∀ τ π q (a: val),
     {{{ cp_mul π d_wfr0 F ∗ th_phase_frag τ π q ∗ method_tok m }}}
-      App m a @ τ
+      App m a @ τ; CannotFork; NotStuck; ⊤
     {{{ v, RET v; th_phase_frag τ π q ∗ method_tok m }}}.
 
 
@@ -26,7 +26,7 @@ Definition token_safety_spec `{invGS_gen HasNoLc Σ, MethodToken MS Σ}
       See the comment in op_spec_lifting *)
   □ ∀ τ v, method_tok m -∗
       let _ := @irisG_looping _ HeapLangEM _ _ hG si_add_none in
-      pwp MaybeStuck ⊤ τ 
+      pwp MaybeStuck CannotFork ⊤ τ 
         (App (of_val m) (of_val v)) 
         (fun v => ⌜ is_ground_val v ⌝ ∗ method_tok m).
 
