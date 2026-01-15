@@ -9,6 +9,12 @@ Close Scope Z.
 
 
 Section CallInTrace.
+
+  (** parameterized with additional restriction on client
+      to unify with token version *)
+  Definition valid_op_client (P: expr -> Prop) (m: val) e :=
+    exists e0, e = subst "m" m e0 /\ valid_client e0 /\ P e0.
+
   Context (m: val).
   
   Definition has_return_at (tr: extrace heap_lang) '(TraceCtx i tpc as tc) j :=
@@ -60,9 +66,7 @@ Section CallInTrace.
       P a -> 
       has_return tr tc \/ s = MaybeStuck /\ gets_stuck_ae tr tc. 
 
-  Definition valid_op_client e := exists e0, e = subst "m" m e0 /\ valid_client e0.
-
-  Definition valid_init_tpool (tp: list expr) := Forall valid_op_client tp. 
+  Definition valid_init_tpool (tp: list expr) := Forall (valid_op_client (fun _ => True) m) tp.
   
   Definition wait_free (is_init_st: cfg heap_lang -> Prop)
     (s: stuckness) (P: val -> Prop) := forall etr,
@@ -286,7 +290,7 @@ Section RestrWFree.
     let ms' := elements ms in 
     (* TODO: allow "smaller" thread pools too *)
     (* TODO: move "no fork" condition outside? *)
-    Forall2 (fun m e => valid_op_client m e /\ no_forks e) ms' tp. 
+    Forall2 (valid_op_client no_forks) ms' tp. 
 
   (** TODO: account for multiple m's in unrestricted wait-freedom too *)
   Definition wait_free_restr (ms: gmultiset val) (is_init_st: cfg heap_lang -> Prop)

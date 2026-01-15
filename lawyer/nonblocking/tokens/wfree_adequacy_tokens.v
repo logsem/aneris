@@ -166,8 +166,7 @@ Section WFAdequacy.
   Proof using. clear. multiset_solver. Qed.
 
   Lemma init_τi_pwp_ext {Σ} {PWT: @PrWfreeTok MS Σ} e
-    (VALID_CL: valid_op_client m e)
-    (NOFORKS: no_forks e)
+    (VALID_CL: valid_op_client no_forks m e)
     (TI: elements MS !! τi = Some m)
     (M_FUN: is_fun m):
     ⊢ □ ( (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ SPEC) -∗
@@ -175,10 +174,9 @@ Section WFAdequacy.
   Proof using.
     simpl.
 
-    red in VALID_CL. destruct VALID_CL as (e0 & -> & VALID_CL). 
+    red in VALID_CL. destruct VALID_CL as (e0 & -> & VALID_CL & NO_FORKS). 
     opose proof * (fundamental _ _ _ τi e0) as FTLR; eauto.
     { apply (cti_interp_tok_add_pres m τi). }  
-    { admit. }
     Unshelve.
     2, 3: by apply PWT.
     2: exact (method_tok m).
@@ -224,13 +222,7 @@ Section WFAdequacy.
     by iApply ground_val_interp.
     Unshelve.
     4: apply PWT. 
-  Admitted.
-    
-
-  (* --------------------------------------∗ *)
-  (* wptp_from_gen (thread_pr ic s' m MaybeStuck 1) (tp1 ++ [e]) tp2 *)
-  (*   (map (λ (_ : nat) (_ : val), True) *)
-  (*      (adequacy_utils.locales_of_list_from (tp1 ++ [e]) tp2)) *)
+  Qed.    
 
   (* TODO: move, replace existing one *)
   Lemma tok_pres_empty' `{invGS_gen HasNoLc Σ, heap1GS Σ} (P: iProp Σ):
@@ -288,7 +280,7 @@ Section WFAdequacy.
 
   Lemma init_wptp_wfree_pwps {Σ} {PWT: @PrWfreeTok MS Σ} tp0 tp tks N
     (NO: τi ∉ locales_of_list_from tp0 tp)
-    (TP: Forall2 (λ m e, valid_op_client m e ∧ no_forks e) tks tp)
+    (TP: Forall2 (valid_op_client no_forks) tks tp)
     (TKS_MS: forall tk, tk ∈ tks -> tk ∈ MS)
     (TKS_FUN: forall tk, tk ∈ tks -> is_fun tk):
     (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ SPEC) -∗
@@ -301,7 +293,8 @@ Section WFAdequacy.
     iInduction tp as [|e tp] "IH" forall (tp0 NO tks TP TKS_MS TKS_FUN).
     { simpl. iApply wptp_from_gen_nil. }
     rewrite adequacy_utils.locales_of_list_from_cons.
-    apply Forall2_cons_inv_r in TP as (tk & tks_ & (VALID & NOFORKS) & TP & ->).
+    apply Forall2_cons_inv_r in TP as (tk & tks_ & X & TP & ->).
+    red in X. destruct X as (e0 & -> & VALID & NOFORKS). 
     rename tks_ into tks.
     rewrite list_to_set_disj_cons. iDestruct (methods_toks_split with "TOKS") as "[TOK TOKS]".  
     rewrite map_cons. iApply wptp_from_gen_cons. iSplitR "TOKS".
@@ -315,16 +308,13 @@ Section WFAdequacy.
     2: { intros EQ. apply NO. rewrite locales_of_list_from_locales.
          rewrite /τi EQ. set_solver. }
     iClear "IH".
-    red in VALID. destruct VALID as (?& EQ &?).
-    rewrite {2}EQ.
-
+    
     iApply (@wp_wand with "[TOK]"). 
     { iApply (init_pwp with "[$]"); try done.
-      { admit. }
-      { apply TKS_MS. set_solver. } 
-      { apply TKS_FUN. set_solver. } }
+      - apply TKS_MS. set_solver. 
+      - apply TKS_FUN. set_solver. }
     set_solver. 
-  Admitted.
+  Qed.
 
   (* TODO: move, remove similar for m *)
   Context (MS_FUNS: forall m', m' ∈ MS -> is_fun m').
@@ -395,7 +385,6 @@ Section WFAdequacy.
     destruct ii eqn:TI.
     2: { rewrite leb_correct; [| lia].
          iApply init_τi_pwp_ext; try done.
-         1, 2: by apply MTI.
          rewrite EQ_MS LOC /locale_of.
          apply Forall2_length in TP1. rewrite -TP1.
          rewrite list_lookup_middle; done. }

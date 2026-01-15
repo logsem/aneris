@@ -62,7 +62,7 @@ Section WFAdequacy.
 
   Lemma init_wptp_wfree_pwps `{Hinv: @IEMGS _ _ HeapLangEM EM Σ} tp0 tp N
     (NO: τi ∉ locales_of_list_from tp0 tp)
-    (SUBST: Forall (λ e, ∃ e0, e = subst "m" m e0 /\ valid_client e0) tp):
+    (SUBST: valid_init_tpool m tp):
     (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ _ _ SPEC)
    ⊢ wptp_from_gen (thread_pr ic s' MaybeStuck N) tp0 tp
       (map (λ (_ : nat) (_ : val), ⌜ True ⌝%I)
@@ -80,7 +80,7 @@ Section WFAdequacy.
     rewrite /thread_pr. rewrite decide_False.
     2: { intros EQ. apply NO. rewrite locales_of_list_from_locales.
          rewrite /τi EQ. set_solver. }
-    inversion SUBST as [| ?? (? & -> & ?)]. subst. 
+    inversion SUBST as [| ? ? (? & -> & ? & ?)]. subst. 
     by iApply init_pwp.
   Qed.
 
@@ -123,7 +123,7 @@ Section WFAdequacy.
     2: { rewrite leb_correct; [| lia].
          apply Forall_app, proj2 in TP.
          apply Forall_app, proj1 in TP.
-         inversion TP as [| ?? (? & -> & ?)]. subst.
+         inversion TP as [| ?? (? & -> & ? & ?)]. subst.
          by iApply init_pwp. }
     rewrite leb_correct_conv; [| lia].
     iDestruct ("T" with "[//]") as (π) "[CPS PH]".
