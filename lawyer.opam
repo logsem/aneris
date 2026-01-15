@@ -7,6 +7,6 @@ homepage: "-"
 bug-reports: "-"
 license: "MIT"
 depends: [
-  "trillium" { (= "2.2.1") }
+  "trillium" { (= "2.3.0") }
   "coq-paco" { (= "4.2.3") }
 ]
