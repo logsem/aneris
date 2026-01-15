@@ -22,7 +22,7 @@ Section adequacy.
 
   (* TODO: remove? *)
   Theorem strong_simulation_adequacy_traces_multiple_HL Σ
-    `{hPre: @heapGpreS Σ M EM} (s: stuckness) 
+    `{hPre: @heapGpreS Σ M EM} (s: stuckness) f
     (es: list expr) σ1 (s1: M)
     (R: execution_trace heap_lang → auxiliary_trace M → Prop)
     (p: em_init_param)
@@ -47,7 +47,7 @@ Section adequacy.
     length es ≥ 1 ->
     rel_finitary R →
     em_is_init_st (es, σ1) s1 ->
-    (wp_premise_multiple R Σ s es σ1 s1 p) ->
+    (wp_premise_multiple R Σ s f es σ1 s1 p) ->
     ∃ (mtr : trace (mstate M) (mlabel M)), 
       traces_match lbl_rel state_rel locale_step (@mtrans M) extr mtr /\
       trfirst mtr = s1. 
@@ -58,7 +58,7 @@ Section adequacy.
 
   (* TODO: remove? *)
   Theorem strong_simulation_adequacy_traces_HL Σ
-    `{hPre: @heapGpreS Σ M EM} (s: stuckness)
+    `{hPre: @heapGpreS Σ M EM} (s: stuckness) f
     (e1 : expr) σ1 (s1: M)
     (R: execution_trace heap_lang → auxiliary_trace M → Prop)
     (p: em_init_param)
@@ -83,7 +83,7 @@ Section adequacy.
     :
     rel_finitary R →
     em_is_init_st ([e1], σ1) s1 ->
-    (wp_premise R Σ s e1 σ1 s1 p) ->
+    (wp_premise R Σ s f e1 σ1 s1 p) ->
     ∃ (mtr : trace (mstate M) (mlabel M)),
       traces_match lbl_rel state_rel locale_step (@mtrans M) extr mtr /\
       trfirst mtr = s1.

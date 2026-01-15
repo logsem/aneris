@@ -59,7 +59,7 @@ Section OblsAdequacy.
   Theorem om_simulation_adequacy_model_trace_multiple Σ
         `{hPre: @heapGpreS Σ M EM}
         SR
-        (s: stuckness)
+        (s: stuckness) f
         (es: list expr) σ1 (s1: mstate M) p
         (INIT: em_is_init_st (es, σ1) s1 (ExecutionModel := EM))
         (extr : heap_lang_extrace)
@@ -67,14 +67,14 @@ Section OblsAdequacy.
         (Hexfirst : trfirst extr = (es, σ1))
         (LEN: length es ≥ 1)
         (FB: rel_finitary (obls_sim_rel_gen SR)):
-    wp_premise_multiple (obls_sim_rel_gen SR) Σ s es σ1 s1 (p: @em_init_param _ _ EM) ->
+    wp_premise_multiple (obls_sim_rel_gen SR) Σ s f es σ1 s1 (p: @em_init_param _ _ EM) ->
     ∃ (omtr: trace (mstate M) (mlabel M)),
       obls_om_traces_match_gen SR extr omtr ∧
       trfirst omtr = s1.
   Proof using FIN_LVL FIN_DEG.
     intros PREM.
 
-    unshelve epose proof (@strong_simulation_adequacy_traces_multiple_HL _ _ _ hPre s es σ1
+    unshelve epose proof (@strong_simulation_adequacy_traces_multiple_HL _ _ _ hPre s f es σ1
                 s1
                 (obls_sim_rel_gen SR)
                 p
@@ -106,14 +106,14 @@ Section OblsAdequacy.
   Theorem om_simulation_adequacy_model_trace Σ
         `{hPre: @heapGpreS Σ M EM}
         SR
-        (s: stuckness)
+        (s: stuckness) f
         (e1: expr) σ1 (s1: mstate M) p
         (INIT: em_is_init_st ([e1], σ1) s1 (ExecutionModel := EM))
         (extr : heap_lang_extrace)
         (Hvex : extrace_valid extr)
         (Hexfirst : trfirst extr = ([e1], σ1))
         (FB: rel_finitary (obls_sim_rel_gen SR)):
-    wp_premise (obls_sim_rel_gen SR) Σ s e1 σ1 s1 (p: @em_init_param _ _ EM) ->
+    wp_premise (obls_sim_rel_gen SR) Σ s f e1 σ1 s1 (p: @em_init_param _ _ EM) ->
     ∃ (omtr: trace (mstate M) (mlabel M)),
       (obls_om_traces_match_gen SR) extr omtr ∧
       trfirst omtr = s1.
@@ -256,20 +256,20 @@ Section OblsAdequacy.
   Qed. 
 
   Theorem simple_om_simulation_adequacy_terminate_multiple Σ
-        `{hPre: @heapGpreS Σ M EM} (s: stuckness)
+        `{hPre: @heapGpreS Σ M EM} (s: stuckness) f
         es σ1 (s1: mstate M) p
         (INIT: em_is_init_st (es, σ1) s1 (ExecutionModel := EM))
         (extr : heap_lang_extrace)
         (Hexfirst : trfirst extr = (es, σ1))
         (LEN: length es ≥ 1):
-    wp_premise_multiple obls_sim_rel Σ s es σ1 s1 (p: @em_init_param _ _ EM) ->
+    wp_premise_multiple obls_sim_rel Σ s f es σ1 s1 (p: @em_init_param _ _ EM) ->
     extrace_fairly_terminating extr.
   Proof.
     rewrite /extrace_fairly_terminating.
     intros Hwp VALID FAIR.
 
     odestruct (om_simulation_adequacy_model_trace_multiple
-                Σ _ _ es _ s1 _ INIT _ VALID Hexfirst LEN _ Hwp) as (omtr&MATCH&OM0).
+                Σ _ _ _ es _ s1 _ INIT _ VALID Hexfirst LEN _ Hwp) as (omtr&MATCH&OM0).
     { apply obls_sim_rel_FB. }
 
     eapply obls_matching_traces_termination; eauto.
@@ -278,12 +278,12 @@ Section OblsAdequacy.
   Qed.
 
   Theorem simple_om_simulation_adequacy_terminate Σ
-        `{hPre: @heapGpreS Σ M EM} (s: stuckness)
+        `{hPre: @heapGpreS Σ M EM} (s: stuckness) f
         (e1: expr) σ1 (s1: mstate M) p
         (INIT: em_is_init_st ([e1], σ1) s1 (ExecutionModel := EM))
         (extr : heap_lang_extrace)
         (Hexfirst : trfirst extr = ([e1], σ1)):
-    wp_premise obls_sim_rel Σ s e1 σ1 s1 (p: @em_init_param _ _ EM) ->
+    wp_premise obls_sim_rel Σ s f e1 σ1 s1 (p: @em_init_param _ _ EM) ->
     extrace_fairly_terminating extr.
   Proof.
     intros. eapply simple_om_simulation_adequacy_terminate_multiple; last first.
@@ -456,6 +456,7 @@ Section OblsAdequacy.
 
   Lemma obls_match_impl_multiple Σ
     {HEAP: @heapGpreS Σ M EM}
+    f
     (extr : heap_lang_extrace) (es: list expr) (σ: state)
     (* (cps_degs: gmultiset Degree) (eb: nat) *)
     (* (s1 := init_om_state (trfirst extr) cps_degs eb (OP := OP)) *)
@@ -469,7 +470,7 @@ Section OblsAdequacy.
                                         (let _: heap1GS Σ := (iem_phys HeapLangEM EM) in hl_phys_init_resource (trfirst extr)) ∗
                                      (@em_init_resource heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) δ tt))%I -∗
             let Φs := map (fun τ v => @em_thread_post heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) τ v) (seq 0 (length es)) in
-              wptp NotStuck es Φs)
+              wptp NotStuck f es Φs)
     (VALID: extrace_valid extr)
     :
     ∃ omtr, exec_OM_traces_match extr omtr ∧ om_tr_wf omtr /\ trfirst omtr = δ. 
@@ -516,6 +517,7 @@ Section OblsAdequacy.
 
   Lemma obls_terminates_impl_multiple Σ
     {HEAP: @heapGpreS Σ M EM}
+    f
     (extr : heap_lang_extrace) (es: list expr) (σ: state)
     (* (cps_degs: gmultiset Degree) (eb: nat)     *)
     (* (s1 := init_om_state (trfirst extr) cps_degs eb (OP := OP)) *)
@@ -528,12 +530,12 @@ Section OblsAdequacy.
                                      (@em_init_resource heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) δ tt))%I
             ={⊤}=∗
             let Φs := map (fun τ v => @em_thread_post heap_lang M EM Σ (@heap_fairnessGS Σ M EM HEAP) τ v) (seq 0 (length es)) in
-              wptp NotStuck es Φs)
+              wptp NotStuck f es Φs)
     :
     extrace_fairly_terminating extr.
   Proof.
     unshelve epose proof (simple_om_simulation_adequacy_terminate_multiple Σ NotStuck
-                  _ _ _ _
+                  _ _ _ _ _
                   _ _ Hexfirst) as FAIR_TERM; eauto.
     { exact tt. }
     

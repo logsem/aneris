@@ -486,7 +486,7 @@ Section Ticketlock.
     (* TODO: ??? worked fine when get_ticket was inlined into tl_acquire:
        wp_bind (Snd _)%E. *)
     assert (FAA (Snd lk) #1 = fill_item (FaaLCtx #(LitInt 1)) (Snd lk)) as CTX by done.
-    iApply (wp_bind [(FaaLCtx #1)] s ⊤ τ (Snd lk) (Λ := heap_lang)). simpl.
+    iApply (wp_bind [(FaaLCtx #1)] _ s ⊤ τ (Snd lk) (Λ := heap_lang)). simpl.
     
     iApply wp_atomic.
     iMod (fupd_mask_subseteq _) as "CLOS'"; [| iInv "INV" as "inv" "CLOS"]; [set_solver| ].
@@ -876,7 +876,7 @@ Section Ticketlock.
     BOU_burn_cp.
     
     assert (FAA (Fst lk) #1 = fill_item (FaaLCtx #(LitInt 1)) (Fst lk)) as CTX by done.
-    iApply (wp_bind [(FaaLCtx #1)] NotStuck ⊤ τ (Fst lk) (Λ := heap_lang)). simpl.
+    iApply (wp_bind [(FaaLCtx #1)] _ NotStuck ⊤ τ (Fst lk) (Λ := heap_lang)). simpl.
     iApply wp_atomic.
     iMod (fupd_mask_subseteq _) as "CLOS'"; [| iInv "INV" as "inv" "CLOS"]; [set_solver| ].
     iModIntro. rewrite {1}/tl_inv_inner.

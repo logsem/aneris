@@ -8,10 +8,10 @@ From heap_lang Require Export heap_lang_defs tactics notation sswp_logic locales
 Close Scope Z. 
 
 Lemma tac_wp_bind `{irisG heap_lang M Σ}
-  K Δ s τ E Φ e f :
-  f = (λ e, fill K e) → (* as an eta expanded hypothesis so that we can `simpl` it *)
-  envs_entails Δ (WP e @ s; τ; E {{ v, WP f (Val v) @ s; τ; E {{ Φ }} }})%I →
-  envs_entails Δ (WP fill K e @ s; τ; E {{ Φ }}).
+  K Δ s f τ E Φ e F :
+  F = (λ e, fill K e) → (* as an eta expanded hypothesis so that we can `simpl` it *)
+  envs_entails Δ (WP e @ f; s; τ; E {{ v, WP F (Val v) @ f; s; τ; E {{ Φ }} }})%I →
+  envs_entails Δ (WP fill K e @ f; s; τ; E {{ Φ }}).
 Proof. rewrite envs_entails_unseal=> -> ->. by apply: wp_bind. Qed.
 
 Ltac wp_bind_core K :=
@@ -23,7 +23,7 @@ Ltac wp_bind_core K :=
 Tactic Notation "wp_bind" open_constr(efoc) :=
   iStartProof;
   lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ?locale ?e ?Q) =>
+  | |- envs_entails _ (wp ?s ?f ?E ?locale ?e ?Q) =>
       first [ reshape_expr e ltac:(fun K e' => unify e' efoc; wp_bind_core K)
             | fail 1 "wp_bind: cannot find" efoc "in" e ]
   | _ => fail "wp_bind: not a 'wp'"
@@ -129,12 +129,12 @@ Section ProgramLogic.
       iMod "P". iModIntro. iExists _, _. iFrame.
     Qed.
 
-    Lemma sswp_MU_wp_fupd s E E' ζ e Φ
+    Lemma sswp_MU_wp_fupd s f E E' ζ e Φ
       (NVAL: language.to_val e = None)
       :
-      let sswp_post := λ e', (▷ MU E' ζ (|={E',E}=> WP e' @ s; ζ; E {{ Φ }}))%I in
+      let sswp_post := λ e', (▷ MU E' ζ (|={E',E}=> WP e' @ f; s; ζ; E {{ Φ }}))%I in
       (|={E,E'}=> sswp s E' e sswp_post (hGS := iem_phys HeapLangEM EM))%I -∗
-      WP e @ s; ζ; E {{ Φ }}.
+      WP e @ f; s; ζ; E {{ Φ }}.
     Proof.
       simpl. rewrite wp_unfold /wp_pre.
       iIntros "Hsswp". rewrite NVAL. 
@@ -182,7 +182,8 @@ Section ProgramLogic.
                apply locales_equiv_from_middle. done. }
         simpl. subst. iFrame. }
       iMod "CLOS'" as "_". iMod "HMU" as (??) "[Hσ Hwp]". iMod "Hwp". iModIntro.
-      iExists _, _. rewrite right_id_L. by iFrame.
+      iExists _, _. rewrite right_id_L. iFrame.
+      rewrite big_opL_nil. set_solver. 
     Qed.
 
     Lemma MU_wand E ζ (P Q : iProp Σ) :
@@ -203,20 +204,20 @@ Section ProgramLogic.
       iExists _, _. iFrame. by iApply "HPQ".
     Qed.
     
-    Lemma sswp_MU_wp s E ζ e (Φ : val → iProp Σ)
+    Lemma sswp_MU_wp s f E ζ e (Φ : val → iProp Σ)
       (NVAL: language.to_val e = None):
-      sswp s E e (λ e', MU E ζ (WP e' @ s; ζ;  E {{ Φ }})) (hGS := iem_phys HeapLangEM EM) -∗
-        WP e @ s; ζ; E {{ Φ }}.
+      sswp s E e (λ e', MU E ζ (WP e' @ f; s; ζ;  E {{ Φ }})) (hGS := iem_phys HeapLangEM EM) -∗
+        WP e @ f; s; ζ; E {{ Φ }}.
     Proof.
       iIntros "Hsswp". iApply sswp_MU_wp_fupd; auto. iModIntro.
       iApply (sswp_wand with "[] Hsswp").
       iIntros (?) "HMU". iApply (MU_wand with "[] HMU"). by iIntros "$ !>".
     Qed.
-    
+
     Lemma sswp_MUf_wp s E τ (Φ: val -> iProp Σ) e
       :
-      (∀ τ', ▷ MU__f E τ τ' ((WP e @ s; τ'; ⊤ {{ fun r => fork_post (irisG := iG) τ' r }}) ∗ Φ #())) -∗
-      WP (Fork e) @ s; τ; E {{ Φ }}.
+      (∀ τ', ▷ MU__f E τ τ' ((WP e @ CanFork; s; τ'; ⊤ {{ fun r => fork_post (irisG := iG) τ' r }}) ∗ Φ #())) -∗
+      WP (Fork e) @ CanFork; s; τ; E {{ Φ }}.
     Proof using.
       iIntros "MU".
       iApply wp_lift_atomic_head_step; [done|].
@@ -262,8 +263,8 @@ Section ProgramLogic.
       iFrame.
       inversion STEP. subst. iModIntro. iExists _, _. iFrame.
       simpl. rewrite !app_nil_r. iSplitL; [| done].
-      rewrite /locale_of. rewrite (length_upd_middle (fill K (Fork e)) #()). 
-      iApply "WP'". 
+      rewrite /locale_of. rewrite (length_upd_middle (fill K (Fork e)) #()).
+      iFrame. 
     Qed. 
      
   End MU.
