@@ -51,7 +51,7 @@ Section ListMapPhys.
     interp f -∗ interp l -∗
       @pwp _ _ 
       (@irisG_looping heap_lang HeapLangEM Σ iG hG (@si_add_none heap_lang Σ))
-      trillium.bi.weakestpre.MaybeStuck ⊤ τ (hl_list_map_cur f l)
+      trillium.bi.weakestpre.MaybeStuck CanFork ⊤ τ (hl_list_map_cur f l)
       (@interp Σ iG hG).
   Proof using.
     iIntros "#IIf #IIl".
@@ -193,7 +193,7 @@ Section ListMapSpec.
     cp_mul π d (hl_map_fuel F l) -∗ 
     th_phase_frag τ π q -∗ 
     wait_free_method_gen NotStuck f d (fun _ => F) (fun v => ⌜ P v ⌝) (fun v => ⌜ Q v ⌝) -∗
-    WP hl_list_map_cur f l @τ {{ l', th_phase_frag τ π q ∗ ⌜is_hl_list Q l'⌝ }}.
+    WP hl_list_map_cur f l @ CannotFork; NotStuck; τ; ⊤ {{ l', th_phase_frag τ π q ∗ ⌜is_hl_list Q l'⌝ }}.
   Proof using. 
     iIntros "CPS PH #F_SPEC".
     iInduction LIST as [| ] "IH"; rewrite /hl_list_map_cur. 
@@ -219,7 +219,8 @@ Section ListMapSpec.
     pure_steps. wp_bind (Rec _ _ _)%E. pure_steps.
 
     wp_bind (Fst _)%E. pure_steps.
-    wp_bind (f _)%E. 
+    wp_bind (f _)%E.
+    rewrite /wait_free_method_gen. 
     iApply ("F_SPEC" with "[$CPSf $PH]").
     { done. }
     iIntros "!>" (v') "[PH %Qv']".
@@ -240,7 +241,7 @@ Section ListMapSpec.
     f F P Q :
     {{{ cp_mul π d (hl_map_fuel F l) ∗ th_phase_frag τ π q ∗
         ⌜ is_hl_list P l ⌝ ∗ wait_free_method_gen NotStuck f d (fun _ => F) (fun v => ⌜ P v ⌝) (fun v => ⌜ Q v ⌝) }}}
-      hl_list_map_cur f l @ τ
+      hl_list_map_cur f l @ CannotFork; NotStuck; τ; ⊤
     {{{ l', RET l'; th_phase_frag τ π q ∗ ⌜ is_hl_list Q l' ⌝ }}}.
   Proof using.
     iIntros (Φ) "(CPS & PH & %LIST & #SPEC) POST".
@@ -258,7 +259,7 @@ Section ListMapSpec.
     f F P Q :
     {{{ cp_mul π d (hl_map_unc_fuel F l) ∗ th_phase_frag τ π q ∗ 
         ⌜ is_hl_list P l ⌝ ∗ wait_free_method_gen NotStuck f d (fun _ => F) (fun v => ⌜ P v ⌝) (fun v => ⌜ Q v ⌝) }}}
-      hl_list_map (f, l)%V @ τ
+      hl_list_map (f, l)%V @ CannotFork; NotStuck; τ; ⊤
     {{{ l', RET l'; th_phase_frag τ π q ∗ ⌜ is_hl_list Q l' ⌝ }}}.
   Proof using.
     iIntros (Φ) "(CPS & PH & %LIST & #SPEC) POST".
@@ -281,7 +282,7 @@ Section ListMapSpec.
     cp_mul π d (hl_map_fuel F l) -∗
     th_phase_frag τ π q -∗
     wait_free_method_gen MaybeStuck f d (fun _ => F) (fun v => ⌜ True ⌝) (fun v => ⌜ True ⌝) -∗
-    WP hl_list_map_cur f l @ MaybeStuck; τ; ⊤  {{ l', th_phase_frag τ π q }}.
+    WP hl_list_map_cur f l @ CannotFork; MaybeStuck; τ; ⊤  {{ l', th_phase_frag τ π q }}.
   Proof using.
     iIntros "CPS PH #F_SPEC".
 
@@ -362,7 +363,7 @@ Section ListMapSpec.
     f F :
     {{{ cp_mul π d (hl_map_fuel F l) ∗ th_phase_frag τ π q ∗
         wait_free_method_gen MaybeStuck f d (fun _ => F) (fun _ => ⌜ True ⌝) (fun _ => ⌜ True ⌝) }}}
-      hl_list_map_cur f l @ MaybeStuck ; τ ; ⊤
+      hl_list_map_cur f l @ CannotFork; MaybeStuck ; τ ; ⊤
     {{{ l', RET l'; th_phase_frag τ π q }}}.
   Proof using.
     iIntros (Φ) "(CPS & PH & #SPEC) POST".

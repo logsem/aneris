@@ -61,7 +61,7 @@ Section Counter.
   Lemma counter_mock_spec τ π q (a: val):
     let _: heap1GS Σ := (iem_phys HeapLangEM EM) in
     {{{ cp_mul π d 5 ∗ th_phase_frag τ π q ∗ counter_inv }}}
-        incr l a @ τ
+        incr l a @ CannotFork; NotStuck; τ; ⊤
     {{{ (n: nat), RET #n; th_phase_frag τ π q }}}.
   Proof using.
     simpl. 
@@ -76,7 +76,7 @@ Section Counter.
     { iNext. replace (n + 1%nat) with (Z.of_nat (n + 1)); [| lia]. 
       iExists _. iFrame. }
     iModIntro. by iApply "POST".
-  Qed. 
+  Qed.
 
 End Counter.
 

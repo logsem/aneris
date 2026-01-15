@@ -45,7 +45,7 @@ Section WFAdequacy.
   Lemma init_pwp {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ} τ e0
     (VALID: valid_client e0):
     let _ := irisG_looping HeapLangEM si_add_none (lG := hG) in 
-    wfs_mod_inv _ _ _ SPEC ⊢ pwp MaybeStuck ⊤ τ (subst "m" m e0) (λ _, True).
+    wfs_mod_inv _ _ _ SPEC ⊢ pwp MaybeStuck CanFork ⊤ τ (subst "m" m e0) (λ _, True).
   Proof using SPEC.
     simpl. opose proof * (fundamental e0) as FTLR. 
     { done. }
@@ -64,7 +64,7 @@ Section WFAdequacy.
     (NO: τi ∉ locales_of_list_from tp0 tp)
     (SUBST: valid_init_tpool m tp):
     (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ _ _ SPEC)
-   ⊢ wptp_from_gen (thread_pr ic s' MaybeStuck N) tp0 tp
+   ⊢ wptp_from_gen (thread_pr ic s' MaybeStuck CanFork N) tp0 tp
       (map (λ (_ : nat) (_ : val), ⌜ True ⌝%I)
          (adequacy_utils.locales_of_list_from tp0 tp)).
   Proof using SPEC ai.
@@ -94,7 +94,7 @@ Section WFAdequacy.
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
     (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfs_mod_inv _ _ _ SPEC) -∗
     (⌜ ii = 0 ⌝ → ∃ π, cp_mul π0 d0 (F ai) ∗ th_phase_frag τi π (/2)%Qp) -∗
-    wptp_wfree ic s' MaybeStuck {tr[ c ]}
+    wptp_wfree ic s' MaybeStuck CanFork {tr[ c ]}
       (map (λ _ _, True) (adequacy_utils.locales_of_list c.1)).
   Proof using Pai.
     simpl. iIntros "#INV T".
@@ -230,7 +230,7 @@ Section WFAdequacy.
   @obls_init_resource _ _ _ _ _ _
             (@iem_fairnessGS heap_lang _ HeapLangEM EM Σ Hinv)
             (init_om_wfree_state (F ai) ic c) () -∗
-  pr_pr_wfree ic s' SPEC ai MaybeStuck {tr[ c ]}
+  pr_pr_wfree ic s' SPEC ai MaybeStuck CanFork {tr[ c ]}
     (map (λ _ _, True) (adequacy_utils.locales_of_list c.1)).
   Proof using Pai.
     iIntros "#INV MOD".
@@ -292,7 +292,7 @@ Section WFAdequacy.
     (M_FUN: exists f x b, m = RecV f x b)
     :
   PR_premise_multiple (obls_sim_rel_wfree ic s') (fits_inf_call ic m ai)
-    Σ MaybeStuck c.1 c.2
+    Σ MaybeStuck CanFork c.1 c.2
     (init_om_wfree_state (F ai) ic c) ((): @em_init_param _ _ EM).
   Proof using Pai.
     red. iIntros (Hinv) "(PHYS & MOD)". simpl.
@@ -342,8 +342,8 @@ Section WFAdequacy.
     (s' = MaybeStuck /\ gets_stuck_ae extr ic). 
   Proof using Pai.
     opose proof (om_simulation_adequacy_model_trace_multiple_waitfree
-                   ic s'
-                wfreeΣ _ (trfirst extr).1 _ _ _ _ _ _ _ VALID _ _) as ADEQ.
+                   ic s' 
+                wfreeΣ _ CanFork (trfirst extr).1 _ _ _ _ _ _ _ VALID _ _) as ADEQ.
     { apply init_om_wfree_is_init. }
     { apply surjective_pairing. }     
     { rewrite -surjective_pairing. 

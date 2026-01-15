@@ -70,11 +70,11 @@ Section typed_interp.
     (NOx : ∀ s : string, x = BNamed s → s ∉ dom vs'):
   □ (∀ (vs0 : gmap string val) (τ0 : nat),
            interp_env vs0 -∗
-           pwp MaybeStuck ⊤ τ0 (subst_env vs0 f) (pers_pred_car interp)) -∗
+           pwp MaybeStuck CanFork ⊤ τ0 (subst_env vs0 f) (pers_pred_car interp)) -∗
     interp_env vs' -∗
   □ ∀ (τ0 : nat) (v : val),
       ▷ pers_pred_car interp v
-      → pwp MaybeStuck ⊤ τ0 (App (Val (RecV b x (subst_env vs' f))) (Val v))
+      → pwp MaybeStuck CanFork ⊤ τ0 (App (Val (RecV b x (subst_env vs' f))) (Val v))
           (pers_pred_car interp).
   Proof using.
     iIntros "#IH #Henv".
@@ -145,9 +145,9 @@ Section typed_interp.
   Qed.
 
   Lemma pwp_fork s E τ e Φ:
-    (∀ τ', pwp s ⊤ τ' e (fun _ => ⌜ True ⌝)) -∗
+    (∀ τ', pwp s CanFork ⊤ τ' e (fun _ => ⌜ True ⌝)) -∗
     Φ (LitV $ LitUnit) -∗
-    pwp s E τ (Fork e) Φ.
+    pwp s CanFork E τ (Fork e) Φ.
   Proof using.
     rewrite /pwp wp_unfold /wp_pre.
     iIntros "FORK POST". simpl. 
@@ -177,7 +177,7 @@ Section typed_interp.
     rewrite Hextr. simpl. iFrame.
     iSplitL "POST".
     - by iApply wp_value.
-    - iSplitL; [| done]. iApply "FORK".
+    - do 2 (iSplitL; [| done]). iApply "FORK".
   Qed.
 
   Lemma logrel_unop op e:

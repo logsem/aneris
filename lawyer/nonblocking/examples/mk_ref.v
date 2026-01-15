@@ -34,7 +34,7 @@ Section SimpleExample.
 
   Lemma mk_ref_spec τ π q (a: val):
     {{{ cp_mul π d 5 ∗ th_phase_frag τ π q }}}
-        mk_ref a @ τ
+        mk_ref a @ CannotFork; NotStuck; τ ;  ⊤
     {{{ (l: loc), RET #l; l ↦ a ∗ th_phase_frag τ π q }}}.
   Proof using.
     iIntros (Φ) "(CPS & PH) POST". rewrite /mk_ref.
@@ -47,7 +47,6 @@ Section SimpleExample.
     wp_bind (Rec _ _ _)%E. pure_steps.
     iApply "POST". by iFrame.
   Qed.
-
 
 End SimpleExample.
 

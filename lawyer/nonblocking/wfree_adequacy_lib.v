@@ -557,7 +557,7 @@ Section Lib.
   From trillium.program_logic Require Import simulation_adequacy_em_cond.
 
   Theorem om_simulation_adequacy_model_trace_multiple_waitfree Σ
-        `{hPre: @heapGpreS Σ M EM} (s: stuckness)
+        `{hPre: @heapGpreS Σ M EM} (s: stuckness) f
         (es: list (expr heap_lang)) σ1 (s1: mstate M) p
         (* s' ic *)
         m ai
@@ -566,7 +566,7 @@ Section Lib.
         (Hvex : extrace_valid extr)
         (Hexfirst : trfirst extr = (es, σ1))
     :
-    PR_premise_multiple (obls_sim_rel_wfree ) (fits_inf_call ic m ai) Σ s es σ1 s1 (p: @em_init_param _ _ EM) ->
+    PR_premise_multiple (obls_sim_rel_wfree ) (fits_inf_call ic m ai) Σ s f es σ1 s1 (p: @em_init_param _ _ EM) ->
     (∃ omtr, obls_om_traces_match_wfree extr omtr ∧ trfirst omtr = s1 /\
               int_ref_inf (obls_sim_rel_wfree) extr omtr
     ) \/
@@ -598,7 +598,7 @@ Section Lib.
     unshelve epose proof (@PR_strong_simulation_adequacy_traces_multiple _ _ EM 
                             HeapLangEM (obls_sim_rel_wfree) (fits_inf_call ic m ai)
                             _ _ _ _ _ 
-                            s es σ1 s1 p
+                            s f es σ1 s1 p
                 extr
                 Hvex
                 ltac:(done)
