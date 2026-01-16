@@ -8,7 +8,7 @@ From lawyer.obligations Require Import obligations_model obligations_resources o
 From lawyer Require Import sub_action_em program_logic.
 From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From iris.base_logic.lib Require Import invariants.
-From lawyer.nonblocking.examples.queue Require Import simple_queue_utils simple_queue dequeue read_head.
+From lawyer.nonblocking.examples.queue Require Import simple_queue_utils simple_queue (* dequeue *) read_head.
 From heap_lang Require Import heap_lang_defs lang notation.
 
 
@@ -143,11 +143,26 @@ Section OtherMethods.
 
   Definition enqueue_fuel := 100.
 
+  Definition hn_interp_wip (hn: HistNode): iProp Σ := 
+    let '(l, (v, nxt)) := hn in
+    l ↦{1/2} v ∗ (l +ₗ 1) ↦ #nxt.
+
+  Lemma hn_interp_split hn:
+    hn_interp hn ⊣⊢ hn_interp_wip hn ∗ (hn.1 ↦{1/2} hn.2.1).
+  Proof using.
+    destruct hn as [? [??]]. simpl.
+    iSplit.
+    - iIntros "[[??] ?]". iFrame.
+    - iIntros "((?&?)&?)". iFrame.
+  Qed.
+
   Lemma start_enqueue l (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ queue_inv l ∗ read_head_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d 1 }}}
        !#(Tail q_sq) @ τ
-    {{{ (pt: loc), RET #pt; th_phase_frag τ π q ∗ rop_token ∗ 
+    {{{ (pt: loc), RET #pt; th_phase_frag τ π q ∗
+                              (* rop_token ∗  *)
+                              hn_interp_wip (pt, dummy_node) ∗
           ∃ t br rop, read_head_resources t br pt rop }}}.
   Proof using.
     simpl. iIntros (Φ) "([#QAT #INV] & TOK & PH & CPS) POST".
@@ -161,21 +176,45 @@ Section OtherMethods.
     iDestruct "RH" as "[(%pt_ & RH & RTOK) | TOK']".
     2: { by iDestruct (read_head_token_excl with "[$] [$]") as "?". }
     iDestruct (read_head_res_Tail_agree with "RH [$]") as %EQ.
-    inversion EQ. subst pt_. clear EQ. 
+    inversion EQ. subst pt_. clear EQ.
+
+    iDestruct ("CLOS'" with "[$] [$]") as "[HQ QI]".
+
+    iAssert (read_head_resources t br pt None ∗ hn_interp_wip (pt, dummy_node) ∗ queue_interp hq h t br fl)%I with "[RH QI RTOK]" as "(RH & TNI' & QI)".
+    { rewrite /queue_interp. iDestruct "QI" as "(%T_LEN & PQI & BR & FL)".
+      iFrame "BR FL". 
+      rewrite /phys_queue_interp. iDestruct "PQI" as "(Q & (%pt_ & TAIL & DUMMY & %LL & HEAD))".
+      iFrame "HEAD Q".
+      iDestruct (read_head_res_Tail_agree with "RH [$]") as %PT.
+      inversion PT. subst pt_. 
+      iFrame "RH TAIL". iFrame (T_LEN LL).
+      rewrite {1}/tail_interp. iDestruct "DUMMY" as "[TNI' | (% & ? & RTOK')]".
+      2: by iDestruct (rop_token_excl with "[$] [$]") as "?".
+      iDestruct (hn_interp_split with "TNI'") as "[TNI' TL]".
+      iFrame "TNI'".
+      rewrite /tail_interp. iRight. iFrame. }
       
-    iDestruct ("CLOS'" with "[$] [$]") as "(HQ & QI)".
     MU_by_burn_cp. iApply wp_value.
 
     iApply "POST". iFrame.
 
     iMod ("CLOS" with "[-]") as "_"; [| done].
     by iFrame.
-  Qed.    
+  Qed.
 
+  Lemma update_tail l (τ: locale heap_lang) (π: Phase) (q: Qp)
+    pt   t br rop   v nxt:
+
+    {{{ queue_inv l ∗ hn_interp_wip (pt, dummy_node) ∗ read_head_resources t br pt rop ∗
+        th_phase_frag τ π q ∗ cp_mul π d mk_node_fuel }}}
+       set_node #pt v #nxt @ τ
+    {{{ RET #(); th_phase_frag τ π q ∗ hn_interp_wip (pt, (v, nxt)) ∗ read_head_resources t br pt rop }}}.
+  Proof using. Admitted. 
+  
   Lemma enqueue_spec l (τ: locale heap_lang) (π: Phase) (q: Qp) (v: val):
     {{{ queue_inv l ∗ read_head_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d enqueue_fuel }}}
-       enqueue q_sq l v @ τ
+       enqueue q_sq v @ τ
     {{{ (v: val), RET v; th_phase_frag τ π q ∗ read_head_token }}}.
   Proof using.
     simpl. iIntros (Φ) "([#QAT #INV] & TOK & PH & CPS) POST".
@@ -192,14 +231,14 @@ Section OtherMethods.
     split_cps "CPS" 1.
     replace Tail with (simple_queue.Tail q_sq) by (by rewrite Q_SQ).
     iApply (start_enqueue with "[$QAT $INV $CPS' $PH $TOK]").
-    iIntros "!> %pt (PH & RTOK & (%t & %br & %rop & RH))".
+    iIntros "!> %pt (PH & TL & (%t & %br & %rop & RH))".
 
     wp_bind (Rec _ _ _)%E. do 3 pure_step_cases.
 
     wp_bind (set_node _ _ _)%E.
     split_cps "CPS" mk_node_fuel; [cbv; lia| ]. 
-    iApply (set_node_spec with "[$CPS' $PH NI]").
-    { 
+    iApply (update_tail with "[$QAT $INV $CPS' $PH $TL $RH]").
+    iIntros "!> (PH & TL & RH)". 
 
     
     wp_bind (Rec _ _ _)%E. pure_steps.

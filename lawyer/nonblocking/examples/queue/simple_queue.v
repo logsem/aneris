@@ -109,13 +109,24 @@ Section QueueResources.
         end
     end.
 
-  (** tail always points to a dummy node
-      which doesn NOT belong to the logical queue hq.
-      Upon enqueuing, this dummy note is updated and appended to hq.
+  Definition rop_token: iProp Σ := own q_γ_tok_rop (Excl ()).
+
+  (** Tail is always dummy node, except when it's being modified while enqueue.
+      In both cases, we need to ensure that pt is allocated.
+      To mark enqueueing, we require an exclusive rop_token
+        (which is otherwise used to track ongoing read_head operation,
+         but there is none since enqueue is mutually exclusive with read_head). *)
+  Definition tail_interp (pt: loc): iProp Σ :=
+    hn_interp (pt, dummy_node) ∨ ∃ v, pt ↦{1/2} #v ∗ rop_token. 
+
+  (** Tail always points to a node that doesn NOT belong to the logical queue hq.
+      That's because elements of hq are never updated,
+      whereas tail node is updated upon enqueue and then replaced by fresh tail node.
+      
    *)
   Definition phys_queue_interp (pq: HistQueue): iProp Σ :=
     ([∗ list] nd ∈ pq, hn_interp nd) ∗
-    ∃ (pt: loc), Tail q_sq ↦{1/2} #pt ∗ hn_interp (pt, dummy_node) ∗ ⌜ is_LL_into pq pt ⌝ ∗
+    ∃ (pt: loc), Tail q_sq ↦{1/2} #pt ∗ tail_interp pt ∗ ⌜ is_LL_into pq pt ⌝ ∗
     let ph: loc := (from_option (fun hn => hn.1) pt (pq !! 0)) in
     Head q_sq ↦{1/2} #ph
   . 
@@ -191,8 +202,6 @@ Section QueueResources.
     
   Definition cancel_witness (r: nat): iProp Σ :=
     ∃ r', ⌜ r < r' ⌝ ∗ @me_lb _ q_me_h r'.
-
-  Definition rop_token: iProp Σ := own q_γ_tok_rop (Excl ()).
 
   Definition safe_read (r: nat) (h br fl: nat) (od: option nat) rp: iProp Σ :=
     ⌜ r = h ⌝ ∗ (⌜ rp = rs_init ⌝ ∨ ⌜ r = br ⌝ ∗ ⌜ rp = rs_proc (Some rsp_going) ⌝ ∗ rop_token) ∨
@@ -377,6 +386,16 @@ Section QueueResources.
     done.
   Qed.
 
+  Lemma tail_interp_allocated pt:
+    tail_interp pt -∗ ∃ v, pt ↦{1/2} #v ∗ (pt ↦{1/2} #v -∗ tail_interp pt).
+  Proof using.
+    iIntros "TI". rewrite /tail_interp.
+    iDestruct "TI" as "[HNI | (% & PT & TOK)]".
+    - iDestruct "HNI" as "[[$ Y] Z]".
+      iIntros "X". iLeft. iFrame.
+    - iFrame. iIntros. iRight. iFrame.
+  Qed.
+
   Lemma access_queue_ends hq h t br fl:
     hq_auth hq -∗ queue_interp hq h t br fl -∗
       ∃ (ph pt: loc), Head q_sq ↦{1/2} #ph ∗ (Tail q_sq) ↦{1/2} #pt ∗
@@ -399,7 +418,8 @@ Section QueueResources.
       { erewrite lookup_drop. by erewrite Nat.add_0_r. }
       iAssert (⌜ ph ≠ pt ⌝)%I as %NEQ.
       { iIntros (<-). rewrite {1}/hn_interp.
-        iDestruct "DUMMY" as "[X _]". iDestruct "HNI" as "[Y _]".
+        iDestruct (tail_interp_allocated with "[$]") as "(% & TL & TL')". 
+        iDestruct "HNI" as "[Y _]".
         iDestruct (pointsto_valid_2 with "[$] [$]") as %V. set_solver. }
       iSplit; [iRight; done| ].
       iSpecialize ("CLOS" with "[$]"). 
