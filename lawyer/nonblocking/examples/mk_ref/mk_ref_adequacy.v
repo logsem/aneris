@@ -1,5 +1,6 @@
 From heap_lang Require Import lang.
-From lawyer.nonblocking Require Import mk_ref wfree_adequacy wfree_traces.
+From lawyer.nonblocking Require Import wfree_adequacy wfree_traces.
+From lawyer.nonblocking.examples.mk_ref Require Import mk_ref.
 
 Theorem mk_ref_is_wait_free: wait_free mk_ref (fun _ => True) NotStuck any_arg.
 Proof using.

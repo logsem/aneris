@@ -4,9 +4,9 @@ From iris.bi.lib Require Import fixpoint.
 From trillium.program_logic Require Export weakestpre adequacy ectx_lifting.
 From fairness Require Import utils.
 From lawyer.examples Require Import obls_tactics.
-From lawyer.nonblocking.examples Require Import simple_queue_utils.
 From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From iris.base_logic.lib Require Import invariants.
+From lawyer.nonblocking.examples.queue Require Import simple_queue_utils.
 From heap_lang Require Import heap_lang_defs lang notation.
 
 
@@ -342,7 +342,8 @@ Section QueueResources.
     dequeue_resources h fl ph od -∗ Head q_sq ↦{1 / 2} #ph' -∗ ⌜ ph' = ph ⌝.
   Proof using.
     simpl. rewrite /dequeue_resources. iIntros "(_&_&H'&?) H".
-    iDestruct (pointsto_agree with "[$] [$]") as %?. set_solver.
+    iDestruct (pointsto_agree with "[$] [$]") as %?.
+    set_solver.
   Qed.
     
   Lemma cancel_rop h t br fl h'

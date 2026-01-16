@@ -1,5 +1,7 @@
 From heap_lang Require Import lang notation.
-From lawyer.nonblocking Require Import counter list_map wfree_adequacy wfree_traces.
+From lawyer.nonblocking Require Import wfree_adequacy wfree_traces.
+From lawyer.nonblocking.examples.list_map Require Import list_map.
+From lawyer.nonblocking.examples.counter Require Import counter.
 
   
 

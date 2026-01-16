@@ -3,7 +3,7 @@ From iris.base_logic Require Import invariants.
 From lawyer Require Import program_logic sub_action_em action_model.
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_model.
 From heap_lang Require Import lang notation. 
-From lawyer.nonblocking Require Import wait_free_spec_defs. 
+From lawyer.nonblocking Require Import wait_free_spec_defs.
 
 
 Close Scope Z. 
