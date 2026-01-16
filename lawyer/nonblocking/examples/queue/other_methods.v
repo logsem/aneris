@@ -350,6 +350,15 @@ Section OtherMethods.
     apply not_elem_of_dom. by rewrite dom_fmap.
   Qed.
 
+  Lemma dangle_interp_extend od h hq nd:
+    dangle_interp od h hq -∗ dangle_interp od h (hq ++ [nd]).
+  Proof using.
+    rewrite /dangle_interp. iIntros "(?&[?|[-> X]])"; iFrame.
+    iRight. iSplit; [done| ].
+    destruct lookup eqn:X; try done. simpl.
+    erewrite @lookup_app_l_Some; eauto.
+  Qed.
+    
   Lemma update_tail l (τ: locale heap_lang) (π: Phase) (q: Qp)
     pn pt v    t br:
     {{{ queue_inv l ∗ hn_interp (pn, dummy_node) ∗ hn_interp_wip (pt, (v, pn)) ∗ 
@@ -417,9 +426,17 @@ Section OtherMethods.
       iFrame. iPureIntro.
       split; eapply lookup_app_l_Some; eauto. }
 
+    iMod (hq_auth_extend with "[$]") as "HQ".
+    iDestruct (dangle_interp_extend with "[$]") as "DANGLE".
 
-    
-  Admitted. 
+    iDestruct "RH'" as "[(%pt_ & RH' & RTOK) | TOK']".
+    { by iDestruct (rop_token_excl with "[$] [$]") as %?. }
+
+    iApply "POST". iFrame "PH RH ROP".
+    iMod ("CLOS" with "[-]") as "_"; [| done].
+    iFrame.
+    iPureIntro. red. red in ORDER0. lia.  
+  Qed.
 
   Lemma enqueue_spec l (τ: locale heap_lang) (π: Phase) (q: Qp) (v: val):
     {{{ queue_inv l ∗ read_head_token ∗ 
@@ -455,7 +472,7 @@ Section OtherMethods.
     iApply wp_fupd.
     split_cps "CPS" 1.
     iApply (update_tail with "[-POST CPS]").
-    { iFrame "#∗". Unshelve. 2: eapply (_, _). iFrame. }
+    { iFrame "#∗". }
 
     iIntros "!> (PH & RH & ROP)".
     iInv "INV" as "(%hq & %h & %t_ & %br_ & %fl & %rop_ & %od & %hist & inv)" "CLOS".
@@ -567,7 +584,11 @@ Section OtherMethods.
       iApply "POST". iFrame. }
 
     rewrite bool_decide_false; [| set_solver]. pure_steps.
-    split_cps "CPS" get_loc_fuel; [cbv; lia| ].  
+    split_cps "CPS" get_loc_fuel; [cbv; lia| ].
+
+    (* TODO: move *)
+    From lawyer.nonblocking.examples.queue Require Import dequeue.
+  
     iApply (get_head_val_spec with "[-POST CPS]").
     { iFrame "#∗". }
     iIntros "!> [PH DR]".
