@@ -117,7 +117,7 @@ Section QueueResources.
         (which is otherwise used to track ongoing read_head operation,
          but there is none since enqueue is mutually exclusive with read_head). *)
   Definition tail_interp (pt: loc): iProp Σ :=
-    hn_interp (pt, dummy_node) ∨ ∃ v, pt ↦{1/2} #v ∗ rop_token. 
+    hn_interp (pt, dummy_node) ∨ ∃ v, pt ↦{1/2} v ∗ rop_token. 
 
   (** Tail always points to a node that doesn NOT belong to the logical queue hq.
       That's because elements of hq are never updated,
@@ -387,7 +387,7 @@ Section QueueResources.
   Qed.
 
   Lemma tail_interp_allocated pt:
-    tail_interp pt -∗ ∃ v, pt ↦{1/2} #v ∗ (pt ↦{1/2} #v -∗ tail_interp pt).
+    tail_interp pt -∗ ∃ v, pt ↦{1/2} v ∗ (pt ↦{1/2} v -∗ tail_interp pt).
   Proof using.
     iIntros "TI". rewrite /tail_interp.
     iDestruct "TI" as "[HNI | (% & PT & TOK)]".
