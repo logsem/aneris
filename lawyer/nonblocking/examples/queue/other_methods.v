@@ -163,7 +163,7 @@ Section OtherMethods.
     {{{ (pt: loc), RET #pt; th_phase_frag τ π q ∗
                               (* rop_token ∗  *)
                               hn_interp_wip (pt, dummy_node) ∗
-          ∃ t br rop, read_head_resources t br pt rop }}}.
+          ∃ t br, read_head_resources t br pt None }}}.
   Proof using.
     simpl. iIntros (Φ) "([#QAT #INV] & TOK & PH & CPS) POST".
     iInv "INV" as "(%hq & %h & %t & %br & %fl & %rop & %od & %hist & inv)" "CLOS".
@@ -174,7 +174,7 @@ Section OtherMethods.
     iDestruct (access_queue_ends with "[$] [$]") as "(%ph & %pt & HEAD & TAIL & #HT & CLOS')".    
     iApply (wp_load with "TAIL"). iIntros "!> TAIL".
     iDestruct "RH" as "[(%pt_ & RH & RTOK) | TOK']".
-    2: { by iDestruct (read_head_token_excl with "[$] [$]") as "?". }
+    2: by iDestruct (read_head_token_excl with "[$] [$]") as "?".
     iDestruct (read_head_res_Tail_agree with "RH [$]") as %EQ.
     inversion EQ. subst pt_. clear EQ.
 
@@ -195,22 +195,86 @@ Section OtherMethods.
       rewrite /tail_interp. iRight. iFrame. }
       
     MU_by_burn_cp. iApply wp_value.
-
     iApply "POST". iFrame.
 
     iMod ("CLOS" with "[-]") as "_"; [| done].
     by iFrame.
   Qed.
 
-  Lemma update_tail l (τ: locale heap_lang) (π: Phase) (q: Qp)
-    pt   t br rop   v nxt:
+  Lemma setup_cur_tail l (τ: locale heap_lang) (π: Phase) (q: Qp)
+    pt   t br   v nxt:
 
-    {{{ queue_inv l ∗ hn_interp_wip (pt, dummy_node) ∗ read_head_resources t br pt rop ∗
+    {{{ queue_inv l ∗ hn_interp_wip (pt, dummy_node) ∗ read_head_resources t br pt None ∗
         th_phase_frag τ π q ∗ cp_mul π d mk_node_fuel }}}
        set_node #pt v #nxt @ τ
-    {{{ RET #(); th_phase_frag τ π q ∗ hn_interp_wip (pt, (v, nxt)) ∗ read_head_resources t br pt rop }}}.
+    {{{ RET #(); th_phase_frag τ π q ∗ hn_interp_wip (pt, (v, nxt)) ∗ read_head_resources t br pt None }}}.
+  Proof using.
+    simpl. iIntros (Φ) "([#QAT #INV] & TNI' & RH & PH & CPS) POST".
+    rewrite /set_node. pure_steps.
+
+    rewrite /set_val. pure_steps.
+    wp_bind (_ +ₗ _)%E.
+    iApply sswp_MU_wp; [done| ].
+    iApply sswp_pure_step.
+    { rewrite /bin_op_eval. erewrite decide_False; [| done]. reflexivity. }
+    MU_by_burn_cp. iApply wp_value. 
+    rewrite loc_add_0.
+
+    iInv "INV" as "(%hq & %h & %t_ & %br_ & %fl & %rop_ & %od & %hist & inv)" "CLOS".
+    iEval (rewrite /queue_inv_inner) in "inv".
+    iDestruct "inv" as ">(HQ & AUTHS & %ORDER0 & QI & DANGLE & OHV & RHI & RH' & DQ)".
+    iDestruct (read_head_resources_auth_agree with "RH [$]") as %[<- <-].
+    iDestruct (read_head_resources_rop_interp_agree with "RH [$]") as %<-.
+
+    iDestruct "TNI'" as "[TNI0 TNI1]". 
+    iAssert (pt ↦ #0 ∗ read_head_resources t br pt None ∗ ∀ (v': val), pt ↦ v' -∗ queue_interp hq h t br fl ∗ pt ↦{1 / 2} v')%I with "[TNI0 RH QI]" as "(TNI0 & RH & QI)".
+    { rewrite /queue_interp. iDestruct "QI" as "(%T_LEN & PQI & BR & FL)".
+      iFrame "BR FL". iFrame (T_LEN). 
+      rewrite {1}/phys_queue_interp. iDestruct "PQI" as "(Q & (%pt_ & TAIL & DUMMY & %LL & HEAD))".
+      iDestruct (read_head_res_Tail_agree with "RH [$]") as %EQ.
+      inversion EQ. subst pt_. 
+      iFrame "Q RH".
+      iDestruct "DUMMY" as "[[TNI0' ?] | (% & TNI0' & RTOK')]".
+      { by iDestruct (pointsto_ne with "TNI0' TNI0") as %?. }
+      iCombine "TNI0 TNI0'" as "foo".
+      rewrite frac_op Qp.half_half. iFrame.
+      iIntros (v') "[TNI0 TNI0']". iFrame. iSplit; [| done].
+      iRight. iFrame. }
+
+    iApply sswp_MU_wp; [done| ].
+    iApply (wp_store with "[$]"). iIntros "!> TNI0".
+    iDestruct ("QI" with "[$]") as "[QI TNI0]".
+    MU_by_burn_cp. iApply wp_value.
+
+    iMod ("CLOS" with "[-TNI1 POST TNI0 RH CPS PH]") as "_".
+    { by iFrame. }
+    iModIntro.
+
+    wp_bind (Rec _ _ _)%E. pure_steps.
+    rewrite /set_next. pure_steps.
+
+    wp_bind (_ +ₗ _)%E.
+    iApply sswp_MU_wp; [done| ].
+    iApply sswp_pure_step.
+    { rewrite /bin_op_eval. erewrite decide_False; [| done]. reflexivity. }
+    MU_by_burn_cp. iApply wp_value. 
+ 
+    iApply sswp_MU_wp; [done| ].
+    iApply (wp_store with "TNI1"). iIntros "!> NXT".
+    MU_by_burn_cp. iApply wp_value.
+
+    iApply "POST". iFrame.    
+  Qed.
+
+  Lemma update_tail l (τ: locale heap_lang) (π: Phase) (q: Qp)
+    pn pt nd    t br:
+    {{{ queue_inv l ∗ hn_interp (pn, dummy_node) ∗ hn_interp_wip (pt, nd) ∗ 
+        read_head_resources t br pt None ∗
+        th_phase_frag τ π q ∗ cp_mul π d 1 }}}
+      #(Tail q_sq) <- #pn @τ
+    {{{ RET #(); th_phase_frag τ π q ∗ read_head_resources (S t) br pn None ∗ rop_token }}}.
   Proof using. Admitted. 
-  
+
   Lemma enqueue_spec l (τ: locale heap_lang) (π: Phase) (q: Qp) (v: val):
     {{{ queue_inv l ∗ read_head_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d enqueue_fuel }}}
@@ -231,27 +295,35 @@ Section OtherMethods.
     split_cps "CPS" 1.
     replace Tail with (simple_queue.Tail q_sq) by (by rewrite Q_SQ).
     iApply (start_enqueue with "[$QAT $INV $CPS' $PH $TOK]").
-    iIntros "!> %pt (PH & TL & (%t & %br & %rop & RH))".
+    iIntros "!> %pt (PH & TL & (%t & %br & RH))".
 
     wp_bind (Rec _ _ _)%E. do 3 pure_step_cases.
 
     wp_bind (set_node _ _ _)%E.
     split_cps "CPS" mk_node_fuel; [cbv; lia| ]. 
-    iApply (update_tail with "[$QAT $INV $CPS' $PH $TL $RH]").
+    iApply (setup_cur_tail with "[$QAT $INV $CPS' $PH $TL $RH]").
     iIntros "!> (PH & TL & RH)". 
-
     
     wp_bind (Rec _ _ _)%E. pure_steps.
-    wp_bind (_ = _)%E.
-    iApply sswp_MU_wp; [done| ].
-    iApply sswp_pure_step.
-    { set_solver. }
-    MU_by_burn_cp. iApply wp_value.
+    (* rewrite Q_SQ /=.  *)
+    iApply wp_fupd.
+    split_cps "CPS" 1.
+    iApply (update_tail with "[-POST CPS]").
+    { iFrame "#∗". Unshelve. 2: eapply (_, _). iFrame. }
 
+    iIntros "!> (PH & RH & ROP)".
+    iInv "INV" as "(%hq & %h & %t_ & %br_ & %fl & %rop_ & %od & %hist & inv)" "CLOS".
+    iEval (rewrite /queue_inv_inner) in "inv".
+    iDestruct "inv" as ">(HQ & AUTHS & %ORDER0 & QI & DANGLE & OHV & RHI & RH' & DQ)".
+    iDestruct "RH'" as "[(%pt_ & RH' & RTOK) | TOK']".
+    { by iDestruct (rop_token_excl with "[$] [$]") as %?. }
 
-
-    
-
+    iApply "POST". iFrame.
+    iDestruct (read_head_resources_auth_agree with "RH [$]") as %[<- <-].
+    iDestruct (read_head_resources_rop_interp_agree with "RH [$]") as %<-.
+    iMod ("CLOS" with "[-]") as "_"; [| done].
+    iFrame. iFrame (ORDER0). iLeft. iFrame.
+  Qed.
       
 
   Definition read_head_dequeuer_fuel := 100.
