@@ -75,6 +75,12 @@ Section QueueResources.
   Context {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ}.
   
   Context {QL: QueueG Σ}.
+  Context (PE: val -> iProp Σ). (** predicate on elements of the queue*)
+  (** We need persistency due to read_head which doesn't return ownership
+      of the head element.
+      Non-persistent predicates would only make sense with logically atomic specs,
+      which we don't consider. *)
+  Context `{PE_PERS: forall v, Persistent (PE v)}. 
   
   Definition hn_interp (hn: HistNode): iProp Σ :=
     let '(l, (v, nxt)) := hn in
@@ -124,7 +130,6 @@ Section QueueResources.
     let ph: loc := (from_option (fun hn => hn.1) pt (pq !! 0)) in
     Head q_sq ↦{1/2} #ph
   . 
-      
   
   Definition queue_interp (hq: HistQueue) (h t br fl: nat): iProp Σ :=
     let pq := drop h hq in
@@ -278,7 +283,10 @@ Section QueueResources.
     rop_auth rop ∗
     rop_interp rop h br fl od ∗ read_hist_auth hist ∗
     ⌜ read_hist_wf hist rop h ⌝ ∗ old_rps hist rop
-  . 
+  .
+  
+  Definition queue_elems_interp (hq: HistQueue) (h: nat): iProp Σ := 
+    [∗ list] nd ∈ (drop h hq), PE nd.2.1. 
   
   Definition queue_inv_inner (hq: HistQueue) (h t br fl: nat)
     (rop od: option nat) (hist: read_hist): iProp Σ :=
@@ -286,7 +294,8 @@ Section QueueResources.
     queue_interp hq h t br fl ∗ dangle_interp od h hq ∗ ohv_interp ∗
     read_hist_interp hist rop h br fl od ∗ 
     ((∃ pt, read_head_resources t br pt None ∗ rop_token) ∨ read_head_token) ∗ 
-    ((∃ ph, dequeue_resources h fl ph None) ∨ dequeue_token)
+    ((∃ ph, dequeue_resources h fl ph None) ∨ dequeue_token) ∗
+    queue_elems_interp hq h
   .
   
   Definition queue_ns := nroot .@ "queue".
@@ -352,6 +361,7 @@ Section QueueResources.
   Lemma dequeue_res_head_agree h fl (ph ph': loc) od:
     dequeue_resources h fl ph od -∗ Head q_sq ↦{1 / 2} #ph' -∗ ⌜ ph' = ph ⌝.
   Proof using.
+    clear PE_PERS.
     simpl. rewrite /dequeue_resources. iIntros "(_&_&H'&?) H".
     iDestruct (pointsto_agree with "[$] [$]") as %?.
     set_solver.
@@ -360,6 +370,7 @@ Section QueueResources.
   Lemma read_head_res_Tail_agree t br pt rop pt':
     read_head_resources t br pt rop -∗ Tail q_sq ↦{1 / 2} #pt' -∗ ⌜ pt' = pt ⌝.
   Proof using.
+    clear PE_PERS. 
     simpl. rewrite /read_head_resources. iIntros "(_&_&T&?) T'".
     iDestruct (pointsto_agree with "[$] [$]") as %?. set_solver.
   Qed.
@@ -447,6 +458,7 @@ Section QueueResources.
         (⌜ h >= t /\ ph = pt ⌝ ∨ ⌜ h < t /\ ph ≠ pt ⌝ ∗ ∃ (nd: Node), ith_node h (ph, nd)) ∗
         (Head q_sq ↦{1/2} #ph -∗ (Tail q_sq) ↦{1/2} #pt -∗ hq_auth hq ∗ queue_interp hq h t br fl).
   Proof using.
+    clear PE PE_PERS. 
     simpl. iIntros "[AUTH #FRAGS] QI".
     rewrite /queue_interp. iDestruct "QI" as "(%T_LEN & PQI & BR & FL)".
     rewrite /phys_queue_interp. iDestruct "PQI" as "(Q & (%pt & TAIL & DUMMY & %LL & HEAD))".

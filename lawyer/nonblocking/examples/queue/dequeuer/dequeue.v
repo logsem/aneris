@@ -58,13 +58,14 @@ Section Dequeue.
   Context {QL: QueueG Σ}.
 
   Context (d: Degree).
+  Context (PE: val -> iProp Σ) {PERS_PE: forall v, Persistent (PE v)}. 
 
   Let hGS: heap1GS Σ := iem_phys _ EM.
   Existing Instance hGS.
 
   (* TODO: unify with the proof above *)
   Lemma get_head_next_spec Q τ π q h nd fl ph od:
-    {{{ queue_inv Q ∗ ith_node h (ph, nd) ∗ dequeue_resources h fl ph od ∗
+    {{{ queue_inv PE Q ∗ ith_node h (ph, nd) ∗ dequeue_resources h fl ph od ∗
         th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
       get_next #ph @τ
     {{{ RET #(nd.2); th_phase_frag τ π q ∗ dequeue_resources h fl ph od }}}.
@@ -79,7 +80,7 @@ Section Dequeue.
     MU_by_burn_cp. iApply wp_value.
     iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od' & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as ">(HQ & AUTHS & %ORDER & QI & DANGLE & OHV & RHI & RH & DQ)".
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & >OHV & >RHI & >RH & >DQ & EI)".
     iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[<- <-].
     iDestruct "DR" as "[HEAD FL]".
     iDestruct (hq_auth_lookup with "[$] [$]") as %HTH.
@@ -99,14 +100,14 @@ Section Dequeue.
   Qed.
 
   Lemma update_ohv_spec τ π q (v: val) l:
-    {{{ queue_inv l ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
+    {{{ queue_inv PE l ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
       #(OldHeadVal q_sq) <- v @τ
     {{{ RET #(); th_phase_frag τ π q }}}.
   Proof using.
     iIntros (Φ) "([#QAT #INV] & PH & CPS) POST".
     iInv "INV" as "(%hq & %h & %t & %br & %fl & %rop & %od & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as ">(HQ & AUTHS & %ORDER & QI & DANGLE & OHV & RHI & RH & DQ)".
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & >OHV & >RHI & >RH & >DQ & EI)".
     iDestruct "OHV" as "(% & OHV)". 
     iApply sswp_MU_wp; [done| ].
     iApply (wp_store with "[$]"). iIntros "!> ?".
@@ -117,7 +118,7 @@ Section Dequeue.
   Qed.
 
   Lemma dequeue_upd_head_spec l τ π q h ph vh (nxh: loc) fl:
-    {{{ queue_inv l ∗
+    {{{ queue_inv PE l ∗
         ith_node h (ph, (vh, nxh)) ∗ 
         th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel ∗
         dequeue_resources h fl ph None }}}
@@ -125,13 +126,13 @@ Section Dequeue.
     {{{ RET #(); th_phase_frag τ π q ∗ dequeue_resources (h + 1) fl nxh (Some h) ∗
                    ∃ i r b, ith_read i r (h + 1) ∗ ⌜ r <= h ⌝ ∗
                                br_lb b ∗
-                               (⌜ b < r ⌝ -∗ (ith_rp i rs_canceled ∨ ith_rp i rs_aborted ∨ ith_rp i (rs_proc (Some rsp_completed)))) }}}.
+                               (⌜ b < r ⌝ -∗ (ith_rp i rs_canceled ∨ ith_rp i rs_aborted ∨ ith_rp i (rs_proc (Some rsp_completed)))) ∗ PE vh }}}.
   Proof using.
     simpl.
     iIntros (Φ) "([#QAT #INV] & #HTH & PH & CPS & DR) POST".
     iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od_ & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as ">(HQ & AUTHS & %ORDER & QI & DANGLE & OHV & RHI & RH & DQ)".
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & >OHV & >RHI & >RH & >DQ & EI)".
     iDestruct "DQ" as "[(% & DR') | TOK]".
     { by iDestruct (dequeue_resources_excl with "[$] [$]") as "?". }
     iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[<- <-]. 
@@ -156,14 +157,14 @@ Section Dequeue.
     iApply (wp_store with "[$]"). iIntros "!> [HEAD HEAD']".
     MU_by_burn_cp. iApply wp_value.
     iApply "POST". iFrame "PH". 
-    iApply (dequeue_upd_head_post with " [$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$]"); eauto. 
+    iApply (dequeue_upd_head_post with "[$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$] [$]"); eauto. 
   Qed.
 
   Definition dequeue_fuel := 100.    
   
   Lemma check_BR_spec l τ π q h fl ph ndh i r b0
     (READ_BOUND: r <= h):
-    {{{ queue_inv l ∗
+    {{{ queue_inv PE l ∗
         ith_node h (ph, ndh) ∗
         dequeue_resources (h + 1) fl ndh.2 (Some h) ∗ 
         th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel ∗
@@ -180,7 +181,7 @@ Section Dequeue.
     iIntros (Φ) "([#QAT #INV] & #HTH & DR& PH & CPS & #READ & #BR0) POST".
     iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od_ & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as ">(HQ & AUTHS & %ORDER & QI & DANGLE & OHV & RHI & RH & DQ)".
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & >OHV & >RHI & >RH & >DQ & EI)".
     iDestruct "DQ" as "[(% & DR') | TOK]".
     { by iDestruct (dequeue_resources_excl with "[$] [$]") as "?". }
     iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[<- <-]. 
@@ -209,7 +210,7 @@ Section Dequeue.
   Qed.
 
   Lemma read_FL_spec τ π l h q fl nd od:
-  {{{ queue_inv l ∗ dequeue_resources h fl nd od ∗
+  {{{ queue_inv PE l ∗ dequeue_resources h fl nd od ∗
       cp π d ∗ th_phase_frag τ π q }}}
     ! #(FreeLater q_sq) @τ
   {{{ (pfl: loc), RET (#pfl);
@@ -219,7 +220,7 @@ Section Dequeue.
     iIntros (Φ) "([#QAT #INV] & DR & CPS & PH) POST".
     iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od_ & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as ">(HQ & AUTHS & %ORDER & QI & DANGLE & OHV & RHI & RH & DQ)".
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & >OHV & >RHI & >RH & >DQ & EI)".
     iDestruct "DQ" as "[(% & DR') | TOK]".
     { by iDestruct (dequeue_resources_excl with "[$] [$]") as "?". }
     iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[<- <-].
@@ -240,7 +241,7 @@ Section Dequeue.
   Lemma get_to_free_spec 
     l τ π q h fl (ph: loc) ndh i r b
     (READ_BOUND: r <= h):
-    {{{ queue_inv l ∗
+    {{{ queue_inv PE l ∗
         ith_node h (ph, ndh) ∗
         dequeue_resources (h + 1) fl ndh.2 (Some h) ∗ 
         th_phase_frag τ π q ∗ cp_mul π d (get_loc_fuel + get_loc_fuel + get_loc_fuel) ∗
@@ -251,7 +252,7 @@ Section Dequeue.
     {{{ (to_free: loc), RET #to_free;
         ∃ hn fl', hn_interp (to_free, hn) ∗ th_phase_frag τ π q ∗
                     dequeue_resources (h + 1) fl' ndh.2 None }}}.
-  Proof using.
+  Proof using PERS_PE.    
     simpl.
     iIntros (Φ) "([#QAT #INV] & #HTH & DR& PH & CPS & #READ & #BR0 & #NO_FL) POST".
     rewrite /get_to_free. destruct q_sq eqn:Q_SQ. 
@@ -294,7 +295,7 @@ Section Dequeue.
 
     iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od_ & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as ">(HQ & AUTHS & %ORDER & QI & DANGLE & OHV & RHI & RH & DQ)".
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & >OHV & >RHI & >RH & >DQ & EI)".
     iDestruct "DQ" as "[(% & DR') | TOK]".
     { by iDestruct (dequeue_resources_excl with "[$] [$]") as "?". }
     iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[<- <-]. 
@@ -375,11 +376,12 @@ Section Dequeue.
   Qed. 
   
   Lemma dequeue_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
-    {{{ queue_inv l ∗ dequeue_token ∗ 
+    {{{ queue_inv PE l ∗ dequeue_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d dequeue_fuel }}}
       dequeue q_sq l @ τ
-    {{{ (v: val), RET v; th_phase_frag τ π q ∗ dequeue_token }}}.
-  Proof using.
+    {{{ (v: val), RET v; th_phase_frag τ π q ∗ dequeue_token ∗
+                         (∀ v', ⌜ v = SOMEV v' ⌝ -∗ PE v') }}}.
+  Proof using PERS_PE.
     simpl. iIntros (Φ) "([#QAT #INV] & TOK & PH & CPS) POST".
     rewrite /dequeue. destruct q_sq eqn:Q_SQ.
     pure_steps.
@@ -387,7 +389,7 @@ Section Dequeue.
     wp_bind (! _)%E.
     iInv "INV" as "(%hq & %h & %t & %br & %fl & %rop & %od & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as ">(HQ & AUTHS & %ORDER & QI & DANGLE & OHV & RHI & RH & DQ)".
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & >OHV & >RHI & >RH & >DQ & EI)".
     
     iApply sswp_MU_wp; [done| ].
     iDestruct (access_queue_ends with "[$] [$]") as "(%ph & %pt & HEAD & TAIL & HT & CLOS')".
@@ -412,7 +414,7 @@ Section Dequeue.
     wp_bind (! _)%E.
     iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od_ & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as ">(HQ & AUTHS & %ORDER & QI & DANGLE & OHV & RHI & RH & DQ)".
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & >OHV & >RHI & >RH & >DQ & EI)".
     iApply sswp_MU_wp; [done| ].
     iDestruct (access_queue_ends with "[$] [$]") as "(%ph_ & %pt & HEAD & TAIL & #HT & CLOS')".
     replace Tail with (simple_queue.Tail q_sq) by (by rewrite Q_SQ).
@@ -448,7 +450,7 @@ Section Dequeue.
       iInv "INV" as "(%hq & %h_ & %t & %br' & %fl_ & %rop & %od_ & %hist & inv)" "CLOS".
       iEval (rewrite /queue_inv_inner) in "inv".
       clear ORDER. 
-      iDestruct "inv" as ">(HQ & AUTHS & %ORDER & QI & DANGLE & OHV & RHI & RH & DQ)".
+      iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & >OHV & >RHI & >RH & >DQ & EI)".
       iModIntro.
       iApply sswp_pure_step; [done| ].
       do 2 iNext. MU_by_burn_cp.
@@ -458,13 +460,14 @@ Section Dequeue.
       iMod ("CLOS" with "[-POST CPS PH TOK]") as "_".
       { by iFrame. }
       iModIntro. pure_steps.
-      iApply "POST". iFrame. }
+      iApply "POST". iFrame. by iIntros (??). }
 
     rewrite bool_decide_false; [| set_solver]. pure_steps.
     split_cps "CPS" get_loc_fuel; [cbv; lia| ].  
     iApply (get_head_val_spec with "[-POST CPS]").
+    { done. }
     { iFrame "#∗". }
-    iIntros "!> [PH DR]".
+    iIntros "!> (PH & DR & PEh)".
     wp_bind (Rec _ _ _)%E. pure_steps.
 
     destruct ndh as [vh nxh]. simpl.
@@ -476,21 +479,24 @@ Section Dequeue.
     wp_bind (Rec _ _ _)%E. pure_steps.
 
     split_cps "CPS" get_loc_fuel; [cbv; lia| ].
-    iApply (get_head_next_spec with "[-POST CPS]").
+    iApply (get_head_next_spec with "[-POST CPS PEh]").
     { iFrame "#∗". }
     iIntros "!> [PH DR]". simpl.
 
     wp_bind (_ <- _)%E.
     split_cps "CPS" get_loc_fuel; [cbv; lia| ].
     iApply (dequeue_upd_head_spec with "[$QAT $CPS' $PH $INV $HTH $DR]").
-    iIntros "!> (PH & DR & (%i & %r & %b & #ITHR & %BR & #TOKS))".
+    iIntros "!> (PH & DR & (%i & %r & %b & #ITHR & %BR & #BRB & #TOKS & PEv'))".
+    (** we have two PEs here: one from reading head, another from removing head.
+        Since PE is persistent, we can just drop one of them *)
+    iClear "PEv'". 
 
     wp_bind (Rec _ _ _)%E. do 3 pure_step_cases.
     fold (get_to_free (SQ Head Tail BeingRead FreeLater OldHeadVal)).
     rewrite -Q_SQ. 
     wp_bind (get_to_free _ _)%E.         
     split_cps "CPS" (3 * get_loc_fuel); [cbv; lia| ].
-    iApply (get_to_free_spec with "[-POST CPS]").
+    iApply (get_to_free_spec with "[-POST CPS PEh]").
     { apply BR. }
     { iFrame "#∗". }
     
@@ -504,12 +510,14 @@ Section Dequeue.
 
     wp_bind (Rec _ _ _)%E. do 2 pure_step_cases. 
     iClear "TOKS ITHR HTH". 
+
+    iClear "BRB". 
     clear dependent r t hfr to_free br ph b. 
 
     iApply sswp_MU_wp_fupd; [done| ]. 
     iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as ">(HQ & AUTHS & %ORDER & QI & DANGLE & OHV & RHI & RH & DQ)".
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & >OHV & >RHI & >RH & >DQ & EI)".
     iDestruct "DQ" as "[(% & DR') | TOK]".
     { by iDestruct (dequeue_resources_excl with "DR DR'") as "?". }
     iDestruct (dequeue_resources_auth_agree with "DR [$]") as %[<- <-].
@@ -517,11 +525,12 @@ Section Dequeue.
 
     iModIntro. iApply sswp_pure_step; [done| ]. 
     MU_by_burn_cp. simpl.
-    iMod ("CLOS" with "[-POST CPS PH TOK]") as "_".
+    iMod ("CLOS" with "[-POST CPS PH TOK PEh]") as "_".
     { by iFrame. }
  
     iModIntro. pure_steps.
     iApply "POST". iFrame.
+    iIntros (? [=->]). iFrame.
   Qed.
     
 End Dequeue.

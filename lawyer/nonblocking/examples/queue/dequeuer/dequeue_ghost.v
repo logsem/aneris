@@ -170,9 +170,22 @@ Section DequeueGhost.
       destruct LL as [-> ?]. by iFrame.
   Qed.
 
+  Lemma queue_elems_interp_shorten (PE: val -> iProp Σ) hq h:
+    queue_elems_interp PE hq h ⊣⊢ queue_elems_interp PE hq (h + 1) ∗ from_option (PE ∘ fst ∘ snd) True (hq !! h). 
+  Proof using.
+    rewrite /queue_elems_interp.
+    rewrite Nat.add_comm'  -skipn_skipn.
+    rewrite -{3}(Nat.add_0_r h). rewrite -lookup_drop.
+    remember (drop h hq) as l. rewrite -Heql. clear Heql. 
+    destruct l.
+    { simpl. iSplit; set_solver. }
+    simpl. rewrite drop_0. iSplit; iIntros "[$ $]".
+  Qed.
+
   Lemma dequeue_upd_head_post (τ : locale heap_lang)
     (h : nat) (ph : loc) (vh : val) (nxh : loc) (fl : nat)
     (hq : HistQueue) (t br : nat) (rop : option nat) (hist : read_hist)
+    PE
   (ORDER : hq_state_wf h t br fl)
   (HTH : hq !! h = Some (ph, (vh, nxh)))
   (NEMPTY : t ≠ h)
@@ -199,19 +212,21 @@ Section DequeueGhost.
   dequeue_token -∗
   (▷ (∃ (hq0 : HistQueue) (h0 t0 br0 fl0 : nat) 
                 (rop0 od : option nat) (hist0 : read_hist),
-                queue_inv_inner hq0 h0 t0 br0 fl0 rop0 od hist0) ={
+                queue_inv_inner PE hq0 h0 t0 br0 fl0 rop0 od hist0) ={
            ⊤ ∖ ↑queue_ns,⊤}=∗ emp) -∗
   Head q_sq ↦{1 / 2} #nxh -∗
   Head q_sq ↦{1 / 2} #nxh -∗
+  queue_elems_interp PE hq h -∗
   |={⊤ ∖ ↑queue_ns,⊤}=> 
     (@me_exact _ q_me_h (h + 1) ∗ @me_exact _ q_me_fl fl ∗ Head q_sq ↦{1 / 2} #nxh ∗
      dangle_frag (Some h)) ∗
     ∃ i r b : nat, ith_read i r (h + 1) ∗ ⌜r ≤ h⌝ ∗ br_lb b ∗
       (⌜b < r⌝ -∗
        ith_rp i rs_canceled
-       ∨ ith_rp i rs_aborted ∨ ith_rp i (rs_proc (Some rsp_completed))).
+       ∨ ith_rp i rs_aborted ∨ ith_rp i (rs_proc (Some rsp_completed))) ∗
+      PE vh.
   Proof using. 
-    iIntros "#HTH CH CFL DFRAG HQ AUTHS Q TAIL DUMMY BR FL DAUTH OHV RHI RH TOK CLOS HEAD HEAD'".
+    iIntros "#HTH CH CFL DFRAG HQ AUTHS Q TAIL DUMMY BR FL DAUTH OHV RHI RH TOK CLOS HEAD HEAD' EI".
 
     iMod (dangle_update _ _ (Some h) with "[$] [$]") as "[DAUTH DFRAG]".
 
@@ -229,7 +244,10 @@ Section DequeueGhost.
     { red. rewrite Nat.add_1_r. reflexivity. }
     
     iDestruct (take_snapshot with "[$]") as "#SHT".
-    iDestruct "SHT" as "(_&_&#BR_LB&_)". 
+    iDestruct "SHT" as "(_&_&#BR_LB&_)".
+
+    iDestruct (queue_elems_interp_shorten with "EI") as "[EI' PEv]".
+    rewrite HTH /=. iFrame "PEv". 
 
     rewrite /read_hist_interp. iDestruct "RHI" as "(ROPA & ROP & RHIST & %RH_WF & #OLDS)". 
     rewrite /rop_interp.
@@ -254,8 +272,8 @@ Section DequeueGhost.
         - iDestruct "FROM_BR" as "([-> ->] & -> & ?)". lia. } 
 
       iClear "HTH".
-      iMod ("CLOS" with "[-]") as "_"; [| done].
-      iFrame "QI AUTHS OHV HQ RH DAUTH TOK RHIST ROPA". iNext.
+      iMod ("CLOS" with "[-]") as "_"; [| done].      
+      iFrame "QI AUTHS OHV HQ RH DAUTH TOK RHIST ROPA EI'". iNext.
       rewrite Nat.add_sub. rewrite HTH /=. 
       
       iSplit.
@@ -322,7 +340,7 @@ Section DequeueGhost.
       destruct RH_WF as (SEQ &  BB). 
       Unshelve. 2: exact None. 
       rewrite bi.sep_assoc.
-      iFrame "ROPA". 
+      iFrame "ROPA EI'".
       rewrite /rop_interp. iSplit. 
       { iIntros (i_ [=]). }
       iSplitR.
@@ -358,6 +376,7 @@ Section DequeueGhost.
   Qed.
 
   Lemma get_to_free_post
+    PE
   (pbr : loc)
   (b b1 : nat)
   ph h fl ndh r i
@@ -403,16 +422,17 @@ Section DequeueGhost.
   dequeue_token -∗
   (▷ (∃ (hq0 : HistQueue) (h0 t0 br0 fl0 : nat)
                 (rop0 od : option nat) (hist0 : read_hist),
-                queue_inv_inner hq0 h0 t0 br0 fl0 rop0 od hist0) ={
+                queue_inv_inner PE hq0 h0 t0 br0 fl0 rop0 od hist0) ={
            ⊤ ∖ ↑queue_ns,⊤}=∗ emp) -∗
   simple_queue.FreeLater q_sq ↦ #ph -∗
+  queue_elems_interp PE hq (h + 1) -∗
   |={⊤ ∖ ↑queue_ns,⊤}=>
     ∃ (x : Node) (x0 : nat), (let '(v, nxt) := x in pfl ↦ v ∗ (pfl +ₗ 1) ↦ #nxt) ∗
       @me_exact _ q_me_h (h + 1) ∗ @me_exact _ q_me_fl x0 ∗ simple_queue.Head q_sq ↦{
       1 / 2} #ndh.2 ∗ dangle_frag None.
   Proof using.
     iIntros "#HTH #READ #BR0 #NO_FL #BR1 #BRTH1 #FLTH #PFL_NEQ_D".
-    iIntros "CH CFL HEAD' DFRAG HQ AUTHS PQI BR HNI_FL DAUTH HNI OHV RHI RH TOK CLOS FL".
+    iIntros "CH CFL HEAD' DFRAG HQ AUTHS PQI BR HNI_FL DAUTH HNI OHV RHI RH TOK CLOS FL EI".
 
     iDestruct "BR" as "(%nbr & %BRTH & BR)".
     iDestruct (br_lb_bound with "BR1 AUTHS") as %BR1.
@@ -441,9 +461,7 @@ Section DequeueGhost.
       iDestruct (hq_auth_lookup with "[$] BRTH1") as %BRTH1.
       
       iAssert (dequeue_resources (h + 1) h ndh.2 None)%I with "[CH CFL HEAD' DFRAG]" as "DR".
-      { iFrame.
-        Set Printing Implicit.
-      }
+      { iFrame. }
 
       iMod ("CLOS" with "[-DR HNI_FL]") as "_".
       { iFrame. iNext. iFrame "OLDS". iFrame (RH_WF).
@@ -520,6 +538,7 @@ Section DequeueGhost.
   Qed.
 
   Lemma check_BR_post
+          PE
   (h fl : nat) (ph : loc) (ndh : Node) (i r b0 : nat)
   (READ_BOUND : r ≤ h) (hq : HistQueue) (t br : nat)
   (rop : option nat) (hist : read_hist)
@@ -547,9 +566,10 @@ Section DequeueGhost.
   dequeue_token -∗
   (▷ (∃ (hq0 : HistQueue) (h0 t0 br0 fl0 : nat) 
                 (rop0 od : option nat) (hist0 : read_hist),
-                queue_inv_inner hq0 h0 t0 br0 fl0 rop0 od hist0) ={
+                queue_inv_inner PE hq0 h0 t0 br0 fl0 rop0 od hist0) ={
            ⊤ ∖ ↑queue_ns,⊤}=∗ emp) -∗
   BeingRead q_sq ↦ #(pbr, nbr)%core.1 -∗
+  queue_elems_interp PE hq (h + 1) -∗
   |={⊤ ∖ ↑queue_ns,⊤}=>
     dangle_frag (if decide ((pbr, nbr).1 = ph) then Some h else None) ∗
     (⌜(pbr, nbr).1 = ph⌝ ∨ ⌜(pbr, nbr).1 ≠ ph⌝ ∗
@@ -557,7 +577,7 @@ Section DequeueGhost.
     ∃ (b' : nat) (ndbr' : Node), br_lb b' ∗ ⌜b0 ≤ b'⌝ ∗
       ith_node b' ((pbr, nbr).1, ndbr').
   Proof using. 
-    iIntros "#READ #BR0 DFRAG HQ AUTHS PQI FL DAUTH HNI OHV RHI RH TOK CLOS BR".
+    iIntros "#READ #BR0 DFRAG HQ AUTHS PQI FL DAUTH HNI OHV RHI RH TOK CLOS BR EI".
     iDestruct (br_lb_bound with "BR0 AUTHS") as %BR0. 
     iDestruct (take_snapshot with "[$]") as "#SHT".
     iDestruct (hq_auth_get_ith with "HQ") as "#BRTH'".
@@ -630,6 +650,6 @@ Section DequeueGhost.
       + iFrame.
       + iDestruct "FROM_DANGLE" as "[(-> & -> & _) ?]". lia.
       + iFrame.
-  Qed. 
+  Qed.
 
 End DequeueGhost.

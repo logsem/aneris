@@ -26,17 +26,47 @@ Section RightUtils.
 
   Context (d: Degree).
 
+  Context (PE: val -> iProp Σ) {PERS_PE: forall v, Persistent (PE v)}. 
+
   Definition get_loc_fuel := 5.
 
   Let hGS: heap1GS Σ := iem_phys _ EM.
   Existing Instance hGS.
 
+  (* TODO: move or delete? *)
+  Lemma queue_elems_interp_get' hq h nd:
+    ith_node h nd -∗ 
+    queue_elems_interp PE hq h -∗
+    hq_auth hq -∗
+    PE nd.2.1.
+  Proof using.
+    iIntros "#ITH EI HQ". 
+    rewrite /queue_elems_interp.
+    iDestruct (hq_auth_lookup with "[$] [$]") as %HTH'.
+    iDestruct (big_sepL_lookup_acc with "[$]") as "[PEv ?]". 
+    { rewrite lookup_drop. erewrite Nat.add_0_r. eauto. }
+    done.
+  Qed.
+
+  (* TODO: move or delete? *)
+  Lemma queue_elems_interp_get hq h nd
+    (HTH: hq !! h = Some nd):
+    queue_elems_interp PE hq h -∗
+    PE nd.2.1.
+  Proof using.
+    iIntros "EI". 
+    rewrite /queue_elems_interp.
+    iDestruct (big_sepL_lookup_acc with "[$]") as "[PEv ?]". 
+    { rewrite lookup_drop. erewrite Nat.add_0_r. eauto. }
+    done.
+  Qed.
+
   Lemma get_head_val_spec Q τ π q h nd fl ph od:
-    {{{ queue_inv Q ∗ ith_node h (ph, nd) ∗ dequeue_resources h fl ph od ∗
+    {{{ queue_inv PE Q ∗ ith_node h (ph, nd) ∗ dequeue_resources h fl ph od ∗
         th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
       get_val #ph @τ
-    {{{ RET (nd.1); th_phase_frag τ π q ∗ dequeue_resources h fl ph od }}}.
-  Proof using.
+    {{{ RET (nd.1); th_phase_frag τ π q ∗ dequeue_resources h fl ph od ∗ PE nd.1 }}}.
+  Proof using PERS_PE.
     simpl. iIntros (Φ) "([#QAT #INV] & #HEADhn & DR & PH & CPS) POST".
     rewrite /get_val.
     destruct nd as [v nxt]. simpl.
@@ -47,7 +77,7 @@ Section RightUtils.
     MU_by_burn_cp. rewrite loc_add_0. iApply wp_value.
     iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od_ & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as ">(HQ & AUTHS & %ORDER & QI & DANGLE & OHV & RHI & RH & DQ)".
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & >OHV & >RHI & >RH & >DQ & #EI)".
     iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[<- <-].
     iDestruct "DR" as "[HEAD FL]".
     iDestruct (hq_auth_lookup with "[$] [$]") as %HTH.
@@ -60,9 +90,12 @@ Section RightUtils.
     iApply sswp_MU_wp; [done| ].
     iApply (wp_load with "VAL"). iIntros "!> VAL". 
     MU_by_burn_cp. iApply wp_value.
-    iDestruct ("CLOS'" with "[$VAL $NXT]") as "[??]".
-    iMod ("CLOS" with "[-POST PH HEAD FL]") as "_".
-    { by iFrame. }
+    iDestruct ("CLOS'" with "[$VAL $NXT]") as "[? HQ]".
+
+    iDestruct (queue_elems_interp_get with "[$]") as "PEv"; eauto. 
+      
+    iMod ("CLOS" with "[-POST PH HEAD FL PEv]") as "_".
+    { iFrame. by iFrame "EI". }
     iModIntro. iApply "POST". iFrame.
   Qed.
 
