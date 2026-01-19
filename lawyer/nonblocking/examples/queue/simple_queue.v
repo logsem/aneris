@@ -53,36 +53,22 @@ Class QueueG Σ := {
 Definition get_val: val := λ: "nd", ! ("nd" +ₗ #0).
 Definition get_next: val := λ: "nd", ! ("nd" +ₗ #1).
 
-Definition free_el: val :=
-  λ: "nd",
-    Free ("nd" +ₗ #0) ;;
-    Free ("nd" +ₗ #1)
-. 
+Definition set_val: val := λ: "nd" "v", ("nd" +ₗ #0) <- "v".
+Definition set_next: val := λ: "nd" "nxt", ("nd" +ₗ #1) <- "nxt".
 
-Definition get_to_free '(SQ _ _ BR FL _): val :=
-  λ: "ph",
-    if: ("ph" = !#BR)
-    then
-      let: "old_fl" := !#FL in
-      #FL <- "ph" ;;
-      "old_fl"
-    else "ph"
+Definition set_node: val := 
+  λ: "nd" "v" "nxt",
+      set_val "nd" "v" ;;
+      set_next "nd" "nxt"
 .
 
-Definition dequeue '(SQ H T BR FL OHV as sq): val :=
-  λ: "q",
-    let: "c" := !#H in
-    if: ("c" = !#T)
-    then NONE
-    else
-      let: "v" := get_val "c" in
-      #OHV <- "v" ;;
-      #H <- (get_next "c") ;;
-      let: "to_free" := get_to_free sq "c" in
-      free_el "to_free" ;;
-      (SOME "v")
+Definition mk_dummy_node: val :=
+  λ: <>,
+    (** dummy node has concrete field values, so we have to set them *)
+    let: "nd" := AllocN (Val $ LitV $ LitInt 2) #0 in
+    set_next "nd" #(Loc 0) ;;
+    "nd"
 .
-
 
 Section QueueResources. 
 
@@ -110,6 +96,14 @@ Section QueueResources.
     end.
 
   Definition rop_token: iProp Σ := own q_γ_tok_rop (Excl ()).
+
+  Lemma rop_token_excl: rop_token -∗ rop_token -∗ False.
+  Proof using.
+    rewrite /rop_token.
+    rewrite bi.wand_curry -!own_op.
+    iIntros "X". iDestruct (own_valid with "[$]") as %V.
+    done.
+  Qed.
 
   (** Tail is always dummy node, except when it's being modified while enqueue.
       In both cases, we need to ensure that pt is allocated.
@@ -169,6 +163,14 @@ Section QueueResources.
   
   Definition rop_auth (rop: option nat): iProp Σ := own q_γ_rop (●E rop).
   Definition rop_frag (rop: option nat): iProp Σ := own q_γ_rop (◯E rop).
+
+  Lemma rop_update rop1 rop2 rop':
+    rop_auth rop1 -∗ rop_frag rop2 ==∗ rop_auth rop' ∗ rop_frag rop'. 
+  Proof using.
+    simpl. rewrite /rop_auth /rop_frag.
+    rewrite bi.wand_curry -!own_op.
+    iApply own_update. apply excl_auth_update. 
+  Qed.
   
   Definition dangle_interp (od: option nat) (h: nat) (hq: HistQueue): iProp Σ :=
     dangle_auth od ∗ (⌜ od = None ⌝ ∨ ⌜ od = Some (h - 1) ⌝ ∗ from_option hn_interp (⌜ False ⌝)%I (hq !! (h - 1)))
@@ -355,6 +357,30 @@ Section QueueResources.
     set_solver.
   Qed.
     
+  Lemma read_head_res_Tail_agree t br pt rop pt':
+    read_head_resources t br pt rop -∗ Tail q_sq ↦{1 / 2} #pt' -∗ ⌜ pt' = pt ⌝.
+  Proof using.
+    simpl. rewrite /read_head_resources. iIntros "(_&_&T&?) T'".
+    iDestruct (pointsto_agree with "[$] [$]") as %?. set_solver.
+  Qed.
+
+  Lemma read_head_resources_excl t1 br1 pt1 rop1 t2 br2 pt2 rop2:
+    read_head_resources t1 br1 pt1 rop1 -∗ read_head_resources t2 br2 pt2 rop2 -∗ False.
+  Proof using.
+    simpl. rewrite /read_head_resources.
+    iIntros "(X&_) (Y&_)".
+    by iApply (me_exact_excl with "X [$]"). 
+  Qed.
+
+  Lemma read_head_resources_auth_agree t' br' pt' rop' h t br fl:
+    read_head_resources t' br' pt' rop' -∗ auths h t br fl -∗ ⌜ t' = t /\ br' = br ⌝.
+  Proof using.
+    simpl. iIntros "(T&BR&_) (?&T'&BR'&_)".
+    iDestruct (me_auth_exact with "T' T") as %?. 
+    iDestruct (me_auth_exact with "BR' BR") as %?.
+    done. 
+  Qed. 
+    
   Lemma cancel_rop h t br fl h'
     (LT: h' < h):
     auths h t br fl -∗ cancel_witness h'.
@@ -385,6 +411,25 @@ Section QueueResources.
     iCombine "P1 P2" as "P". iDestruct (pointsto_valid with "P") as %V.
     done.
   Qed.
+
+  Lemma read_head_resources_rop_interp_agree t' br' pt' rop' hist rop h br fl od:
+    read_head_resources t' br' pt' rop' -∗ read_hist_interp hist rop h br fl od -∗
+    ⌜ rop' = rop ⌝.
+  Proof using.
+    simpl. rewrite /read_hist_interp.  
+    iIntros "(T&BR&?&ROP) (ROP'&_)".
+    iCombine "ROP' ROP" as "R". 
+    iDestruct (own_valid with "R") as %V.
+    iPureIntro. symmetry. by apply excl_auth_agree_L.
+  Qed.
+    
+  Lemma read_head_token_excl:
+    read_head_token -∗ read_head_token -∗ False.
+  Proof using.
+    simpl. 
+    rewrite bi.wand_curry -own_op.
+    iIntros "X". by iDestruct (own_valid with "[$]") as %V.
+  Qed. 
 
   Lemma tail_interp_allocated pt:
     tail_interp pt -∗ ∃ v, pt ↦{1/2} v ∗ (pt ↦{1/2} v -∗ tail_interp pt).

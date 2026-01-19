@@ -44,50 +44,13 @@ Section ReadHead.
   (* TODO: move dequeue implementation to the corresponding file too *)
   Definition read_head: val := 
     λ: <>,
-       let: "ch" := !#(Head q_sq) in
-       let: "ct" := !#(Tail q_sq) in
-       if: "ch" = "ct" then NONE
-       else
-         #(BeingRead q_sq) <- "ch" ;;
-         SOME (get_head_val "ch")
+      let: "ch" := !#(Head q_sq) in
+      let: "ct" := !#(Tail q_sq) in
+      if: "ch" = "ct" then NONE
+      else
+        #(BeingRead q_sq) <- "ch" ;;
+        SOME (get_head_val "ch")
   .
-
-  (* TODO: move *)
-  Lemma read_head_resources_excl t1 br1 pt1 rop1 t2 br2 pt2 rop2:
-    read_head_resources t1 br1 pt1 rop1 -∗ read_head_resources t2 br2 pt2 rop2 -∗ False.
-  Proof using.
-    simpl. rewrite /read_head_resources.
-    iIntros "(X&_) (Y&_)".
-    by iApply (me_exact_excl with "X [$]"). 
-  Qed.
-
-  Lemma read_head_resources_auth_agree t' br' pt' rop' h t br fl:
-    read_head_resources t' br' pt' rop' -∗ auths h t br fl -∗ ⌜ t' = t /\ br' = br ⌝.
-  Proof using.
-    simpl. iIntros "(T&BR&_) (?&T'&BR'&_)".
-    iDestruct (me_auth_exact with "T' T") as %?. 
-    iDestruct (me_auth_exact with "BR' BR") as %?.
-    done. 
-  Qed. 
-    
-  Lemma read_head_resources_rop_interp_agree t' br' pt' rop' hist rop h br fl od:
-    read_head_resources t' br' pt' rop' -∗ read_hist_interp hist rop h br fl od -∗
-    ⌜ rop' = rop ⌝.
-  Proof using.
-    simpl. rewrite /read_hist_interp.  
-    iIntros "(T&BR&?&ROP) (ROP'&_)".
-    iCombine "ROP' ROP" as "R". 
-    iDestruct (own_valid with "R") as %V.
-    iPureIntro. symmetry. by apply excl_auth_agree_L.
-  Qed.
-    
-  Lemma read_head_token_excl:
-    read_head_token -∗ read_head_token -∗ False.
-  Proof using.
-    simpl. 
-    rewrite bi.wand_curry -own_op.
-    iIntros "X". by iDestruct (own_valid with "[$]") as %V.
-  Qed. 
 
   (* TODO: move, remove duplicates *)
   Lemma dom_max_set_fold n:
@@ -138,14 +101,6 @@ Section ReadHead.
       eapply BB in ITH; eauto. 
   Qed.
     
-  Lemma rop_update rop1 rop2 rop':
-    rop_auth rop1 -∗ rop_frag rop2 ==∗ rop_auth rop' ∗ rop_frag rop'. 
-  Proof using.
-    simpl. rewrite /rop_auth /rop_frag.
-    rewrite bi.wand_curry -!own_op.
-    iApply own_update. apply excl_auth_update. 
-  Qed.  
-
   Lemma start_rop hist rop_ h br pt fl od t:
   read_hist_interp hist rop_ h br fl od -∗ read_head_resources t br pt None ==∗
   ∃ i hist', read_hist_interp hist' (Some i) h br fl od ∗ read_head_resources t br pt (Some i) ∗ 
@@ -186,13 +141,6 @@ Section ReadHead.
     iIntros "LB (H&?&?&?)".
     iApply (me_auth_lb with "H LB").
   Qed.  
-
-  Lemma read_head_res_Tail_agree t br pt rop pt':
-    read_head_resources t br pt rop -∗ Tail q_sq ↦{1 / 2} #pt' -∗ ⌜ pt' = pt ⌝.
-  Proof using.
-    simpl. rewrite /read_head_resources. iIntros "(_&_&T&?) T'".
-    iDestruct (pointsto_agree with "[$] [$]") as %?. set_solver.
-  Qed.
 
   Lemma old_rps_extend hist n r rp
     (NTH: exists b, hist !! n = Some ((r, b), rp)):
@@ -329,10 +277,6 @@ Section ReadHead.
     (∀ i j ndi ndj, ⌜ i ≠ j /\ i ∈ range /\ j ∈ range ⌝ -∗
                       □ (ith_node i ndi -∗ ith_node j ndj -∗ ⌜ ndi.1 ≠ ndj.1 ⌝)).
 
-  Goal forall h t, Persistent (disj_range h t).
-    apply _.
-  Abort. 
-
   Lemma phys_queue_interp_disj_impl' (pq: HistQueue) i j p
     (LT : i < j)
     (ITH : exists nd, pq !! i = Some (p, nd))
@@ -340,9 +284,7 @@ Section ReadHead.
   ([∗ list] nd ∈ pq, hn_interp nd) -∗ False.
   Proof using.
     destruct ITH as [? ITH], JTH as [? JTH].
-    (* pose proof ITH as II%mk_is_Some%lookup_lt_is_Some.  *)
     pose proof JTH as JJ%mk_is_Some%lookup_lt_is_Some.
-    (* apply Nat.lt_exists_pred in JJ as (k & -> & LE).  *)
     apply Nat.lt_exists_pred in LT as (k & -> & LE).
     apply Nat.lt_exists_pred in JJ as (t & EQ & LE').
     erewrite <- (take_drop_middle _ (S k)); eauto.  
@@ -488,14 +430,6 @@ Section ReadHead.
     iApply "POST". iFrame.
     iMod ("CLOS" with "[-]") as "_".
     { by iFrame. }
-    done.
-  Qed.
-
-  Lemma rop_token_excl: rop_token -∗ rop_token -∗ False.
-  Proof using.
-    rewrite /rop_token.
-    rewrite bi.wand_curry -!own_op.
-    iIntros "X". iDestruct (own_valid with "[$]") as %V.
     done.
   Qed.
 
