@@ -33,34 +33,6 @@ Section RightUtils.
   Let hGS: heap1GS Σ := iem_phys _ EM.
   Existing Instance hGS.
 
-  (* TODO: move or delete? *)
-  Lemma queue_elems_interp_get' hq h nd:
-    ith_node h nd -∗ 
-    queue_elems_interp PE hq h -∗
-    hq_auth hq -∗
-    PE nd.2.1.
-  Proof using.
-    iIntros "#ITH EI HQ". 
-    rewrite /queue_elems_interp.
-    iDestruct (hq_auth_lookup with "[$] [$]") as %HTH'.
-    iDestruct (big_sepL_lookup_acc with "[$]") as "[PEv ?]". 
-    { rewrite lookup_drop. erewrite Nat.add_0_r. eauto. }
-    done.
-  Qed.
-
-  (* TODO: move or delete? *)
-  Lemma queue_elems_interp_get hq h nd
-    (HTH: hq !! h = Some nd):
-    queue_elems_interp PE hq h -∗
-    PE nd.2.1.
-  Proof using.
-    iIntros "EI". 
-    rewrite /queue_elems_interp.
-    iDestruct (big_sepL_lookup_acc with "[$]") as "[PEv ?]". 
-    { rewrite lookup_drop. erewrite Nat.add_0_r. eauto. }
-    done.
-  Qed.
-
   Lemma get_head_val_spec Q τ π q h nd fl ph od:
     {{{ queue_inv PE Q ∗ ith_node h (ph, nd) ∗ dequeue_resources h fl ph od ∗
         th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}

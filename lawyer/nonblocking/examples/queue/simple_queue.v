@@ -540,4 +540,16 @@ Section QueueResources.
     by iDestruct (hn_interp_ptr_excl with "[$] [$]") as "?".
   Qed.
 
+  Lemma queue_elems_interp_get hq h nd
+    (HTH: hq !! h = Some nd):
+    queue_elems_interp hq h -∗
+    PE nd.2.1.
+  Proof using.
+    iIntros "EI". 
+    rewrite /queue_elems_interp.
+    iDestruct (big_sepL_lookup_acc with "[$]") as "[PEv ?]". 
+    { rewrite lookup_drop. erewrite Nat.add_0_r. eauto. }
+    done.
+  Qed.
+
 End QueueResources.
