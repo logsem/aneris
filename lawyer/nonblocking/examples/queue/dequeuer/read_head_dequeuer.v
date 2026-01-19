@@ -35,6 +35,7 @@ Section ReadHeadDequeuer.
   .
 
   Context (d: Degree).
+  Context (PE: val -> iProp Σ) {PERS_PE: forall v, Persistent (PE v)}. 
 
   Let hGS: heap1GS Σ := iem_phys _ EM.
   Existing Instance hGS.
@@ -43,11 +44,12 @@ Section ReadHeadDequeuer.
   (* TODO: refactor, unify with the beginning of dequeue *)
   (* TODO: extract get_head_val_spec, remove import of dequeue.v *)
   Lemma read_head_dequeuer_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
-    {{{ queue_inv l ∗ dequeue_token ∗ 
+    {{{ queue_inv PE l ∗ dequeue_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d read_head_dequeuer_fuel }}}
        read_head_dequeuer #() @ τ
-    {{{ (v: val), RET v; th_phase_frag τ π q ∗ dequeue_token }}}.
-  Proof using.
+    {{{ (v: val), RET v; th_phase_frag τ π q ∗ dequeue_token ∗ 
+                         (∀ v', ⌜ v = SOMEV v' ⌝ -∗ PE v')}}}.
+  Proof using PERS_PE.
     simpl. iIntros (Φ) "([#QAT #INV] & TOK & PH & CPS) POST".
     rewrite /read_head_dequeuer. destruct q_sq eqn:Q_SQ.
     pure_steps.
@@ -55,7 +57,7 @@ Section ReadHeadDequeuer.
     wp_bind (! _)%E.
     iInv "INV" as "(%hq & %h & %t & %br & %fl & %rop & %od & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as ">(HQ & AUTHS & %ORDER & QI & DANGLE & OHV & RHI & RH & DQ)".
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & >OHV & >RHI & >RH & >DQ & EI)".
     
     iApply sswp_MU_wp; [done| ].
     iDestruct (access_queue_ends with "[$] [$]") as "(%ph & %pt & HEAD & TAIL & HT & CLOS')".
@@ -81,7 +83,7 @@ Section ReadHeadDequeuer.
     wp_bind (! _)%E.
     iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od_ & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as ">(HQ & AUTHS & %ORDER & QI & DANGLE & OHV & RHI & RH & DQ)".
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & >OHV & >RHI & >RH & >DQ & EI)".
     iApply sswp_MU_wp; [done| ].
     iDestruct (access_queue_ends with "[$] [$]") as "(%ph_ & %pt & HEAD & TAIL & #HT & CLOS')".
     replace Tail with (simple_queue.Tail q_sq) by (by rewrite Q_SQ).
@@ -120,7 +122,7 @@ Section ReadHeadDequeuer.
       iInv "INV" as "(%hq & %h_ & %t & %br' & %fl_ & %rop & %od_ & %hist & inv)" "CLOS".
       iEval (rewrite /queue_inv_inner) in "inv".
       clear ORDER. 
-      iDestruct "inv" as ">(HQ & AUTHS & %ORDER & QI & DANGLE & OHV & RHI & RH & DQ)".
+      iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & >OHV & >RHI & >RH & >DQ & EI)".
       iModIntro.
       iApply sswp_pure_step; [done| ].
       do 2 iNext. MU_by_burn_cp.
@@ -130,19 +132,23 @@ Section ReadHeadDequeuer.
       iMod ("CLOS" with "[-POST CPS PH TOK]") as "_".
       { by iFrame. }
       iModIntro. pure_steps.
-      iApply "POST". iFrame. }
+      iApply "POST". iFrame.
+      by iIntros (??). }
 
     rewrite bool_decide_false; [| set_solver]. pure_steps.
     split_cps "CPS" get_loc_fuel; [cbv; lia| ].
   
     iApply (get_head_val_spec with "[-POST CPS]").
+    { done. }
     { iFrame "#∗". }
-    iIntros "!> [PH DR]".
+    iIntros "!> (PH & DR & PEh)".
 
     iApply sswp_MU_wp_fupd; [done| ]. 
     iInv "INV" as "(%hq & %h_ & %t' & %br' & %fl_ & %rop & %od & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as ">(HQ & AUTHS & %ORDER' & QI & DANGLE & OHV & RHI & RH & DQ)".
+
+    clear ORDER. 
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & >OHV & >RHI & >RH & >DQ & EI)".
     iDestruct "DQ" as "[(% & DR') | TOK]".
     { by iDestruct (dequeue_resources_excl with "DR DR'") as "?". }
     (* iDestruct (dequeue_res_head_agree with "DR [$]") as %->.  *)
@@ -151,11 +157,12 @@ Section ReadHeadDequeuer.
 
     iModIntro. iApply sswp_pure_step; [done| ]. 
     MU_by_burn_cp. simpl.
-    iMod ("CLOS" with "[-POST CPS PH TOK]") as "_".
+    iMod ("CLOS" with "[-POST CPS PH TOK PEh]") as "_".
     { by iFrame. }
  
     iModIntro. pure_steps.
     iApply "POST". iFrame.
+    iIntros (? [=->]). iFrame.
   Qed.    
 
 End ReadHeadDequeuer.
