@@ -41,8 +41,7 @@ Section ReadHead.
       else !#(OldHeadVal q_sq)
   .
 
-  (* TODO: move dequeue implementation to the corresponding file too *)
-  Definition read_head: val := 
+  Definition read_head_enqueuer: val := 
     λ: <>,
       let: "ch" := !#(Head q_sq) in
       let: "ct" := !#(Tail q_sq) in
@@ -868,14 +867,14 @@ Section ReadHead.
     done.
   Qed.
 
-  Lemma read_head_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
+  Lemma read_head_enqueuer_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ queue_inv l ∗ read_head_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d read_head_fuel }}}
-       read_head #() @ τ
+       read_head_enqueuer #() @ τ
     {{{ (v: val), RET v; th_phase_frag τ π q ∗ read_head_token }}}.
   Proof using.
     simpl. iIntros (Φ) "([#QAT #INV] & TOK & PH & CPS) POST".
-    rewrite /read_head. destruct q_sq eqn:Q_SQ.
+    rewrite /read_head_enqueuer. destruct q_sq eqn:Q_SQ.
     pure_steps.
 
     wp_bind (! _)%E.

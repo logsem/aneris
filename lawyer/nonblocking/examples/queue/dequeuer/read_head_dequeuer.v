@@ -8,7 +8,8 @@ From lawyer.obligations Require Import obligations_model obligations_resources o
 From lawyer Require Import sub_action_em program_logic.
 From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From iris.base_logic.lib Require Import invariants.
-From lawyer.nonblocking.examples.queue Require Import simple_queue_utils simple_queue right_lib.
+From lawyer.nonblocking.examples.queue Require Import simple_queue_utils simple_queue.
+From lawyer.nonblocking.examples.queue.dequeuer Require Import dequeuer_lib.
 From heap_lang Require Import heap_lang_defs lang notation.
 
 
