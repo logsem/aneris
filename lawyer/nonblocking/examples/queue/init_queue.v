@@ -130,28 +130,17 @@ Section InitQueue.
                                  ∗ ith_rp 0 (rs_proc $ Some rsp_completed)
   .
   Proof using.
-    
-
-
-
-
-    iMod (let hist' := (((fun '(r, b, p) => (Some (to_agree r, MaxNat b), Some $ rs2cmra p)) <$> hist0): gmapUR _ _) in
-          let hist'' := (((fun '(r, b, p) => (Some (to_agree r, MaxNat b), None)) <$> hist0): gmapUR _ _) in
-          own_alloc (● hist' ⋅ ◯ hist'')) as "(%γ & HIST)".
-    { apply auth_both_valid_2.
-      - unfold hist0. rewrite map_fmap_singleton.
-        apply singleton_valid. done.
-      - unfold hist0. rewrite !map_fmap_singleton. simpl.
-        apply singleton_included. apply Some_included_total.
-        apply pair_included. split; [done| ].
-        apply option_included. tauto. }
-        
-    iModIntro. iExists {| rh_γ__map := γ |}.
-    iFrame. 
+    iMod (own_alloc (● ∅ ⋅ ◯ _)) as "(%γ & HIST)".
+    { apply auth_both_valid_2; done. }
+    set (RH :=  {| rh_γ__map := γ |}). iExists RH. 
+    iMod (@read_hist_alloc _ RH ∅ with "[HIST]") as "(x&y&z)".
+    2: { iFrame. }
+    { done. }
+    iModIntro. iFrame.
   Qed.
 
   Context `{QueuePreG Σ, heap1GS Σ, invGS_gen HasNoLc Σ, MethodTokenPre Σ}.
-  Context (PE: val -> iProp Σ). 
+  Context (PE: val -> iProp Σ) {PE_PERS: forall v, Persistent (PE v)}. 
 
   (* TODO: move/upstream *)
   Lemma bi_exist_pair {A B: Type} (P: A -> B -> iProp Σ):
@@ -173,9 +162,9 @@ Section InitQueue.
     PE v
     ={⊤}=∗
     ∃ qv (_: QueueG Σ), queue_inv PE qv ∗ read_head_token ∗ dequeue_token. 
-  Proof using.
+  Proof using PE_PERS.
     destruct sq eqn:SQ. simpl.
-    iIntros "(BR & FL & _) (H & T & _) OHV HNh HNfl PEv".
+    iIntros "(BR & FL & _) (H & T & _) OHV HNh HNfl #PEv".
 
     iAssert (|={⊤}=> ∃ (qv : val) (H3 : QueueG Σ), queue_at qv ∗
                (∃ hq (h t br fl : nat) (rop od : option nat) (hist : read_hist), 
@@ -189,7 +178,7 @@ Section InitQueue.
     iMod dangle_init as "(%γ_d & DAUTH & DFRAG)". 
     iMod rop_init as "(%γ_r & RAUTH & RFRAG)".
     iMod rop_token_init as "(%γ_rtok & RTOK)". 
-    iMod read_hist_init as "(%RHIST & HIST)".
+    iMod read_hist_init as "(%RHIST & HIST & #RP0)".
     iMod queue_methods_tokens_init as "(%MT & ETOK & DTOK)".
 
     iMod (auths_exacts_init [1; 1; 0; 0]) as "(%MES & AUTHS & EXS)".
@@ -224,12 +213,11 @@ Section InitQueue.
       iSplitL "DAUTH".
       { iFrame. by iLeft. }
 
-      iSplitL "OHV PEv".
-      { rewrite SQ /=. iFrame. }
+      iSplitL "OHV".
+      { rewrite SQ /=. iFrame "#∗". }
 
       iSplitL "HIST RAUTH".
-      { iDestruct (read_hist_update' with "HIST") as k
-        iFrame. iSplit; [| iSplit]. 
+      { iFrame. iSplit; [| iSplit]. 
         - by iIntros (? [=]).
         - iPureIntro. red.
           exists 0. split; [set_solver| ].
@@ -242,6 +230,24 @@ Section InitQueue.
             set_solver.
         - rewrite /old_rps. rewrite /hist0.
           simpl. rewrite big_sepM_singleton.
+          iFrame "#∗". iPureIntro.
+          red. tauto. }
+
+      iDestruct "EXS" as "(EX_H & EX_T & EX_BR & EX_FL)".
+      iSplitL "EX_BR EX_T RTOK RFRAG T".
+      { iLeft. rewrite SQ /=. iFrame. }
+      iSplitL "EX_H EX_FL H DFRAG".
+      { iLeft. rewrite SQ /=. iFrame. }
+
+      rewrite /queue_elems_interp.
+      subst hq0. rewrite big_sepL_singleton. simpl.
+      done. }
+
+    foobar. cleanup QueueG: change tokens, remove unused γs.
+        iFrame. iExists _. i rewrite /read_head_resources.
+        Set Printing Implicit. simpl. 
+        iFrame "EX_H". 
+      
           iExists
           
             
