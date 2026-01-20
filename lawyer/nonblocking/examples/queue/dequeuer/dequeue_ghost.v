@@ -223,8 +223,9 @@ Section DequeueGhost.
     ∃ i r b : nat, ith_read i r (h + 1) ∗ ⌜r ≤ h⌝ ∗ br_lb b ∗
       (⌜b < r⌝ -∗
        ith_rp i rs_canceled
-       ∨ ith_rp i rs_aborted ∨ ith_rp i (rs_proc (Some rsp_completed))) ∗
-      PE vh.
+       ∨ ith_rp i rs_aborted ∨ ith_rp i (rs_proc (Some rsp_completed)))
+      (* ∗ PE vh *) (** it is moved from queue_elems_interp to dangle_interp *)
+  .
   Proof using. 
     iIntros "#HTH CH CFL DFRAG HQ AUTHS Q TAIL DUMMY BR FL DAUTH OHV RHI RH TOK CLOS HEAD HEAD' EI".
 
@@ -247,7 +248,8 @@ Section DequeueGhost.
     iDestruct "SHT" as "(_&_&#BR_LB&_)".
 
     iDestruct (queue_elems_interp_shorten with "EI") as "[EI' PEv]".
-    rewrite HTH /=. iFrame "PEv". 
+    rewrite HTH /=.
+    (* iFrame "PEv".  *)
 
     rewrite /read_hist_interp. iDestruct "RHI" as "(ROPA & ROP & RHIST & %RH_WF & #OLDS)". 
     rewrite /rop_interp.
@@ -278,7 +280,7 @@ Section DequeueGhost.
       
       iSplit.
       { iPureIntro. red. red in ORDER. repeat split; try lia. }
-      iSplitL "HNI". 
+      iSplitL "HNI PEv". 
       { iRight. by iFrame. }
       rewrite DOM dom_max_set_fold in RH_WF'.
       iFrame "%". 
@@ -334,7 +336,7 @@ Section DequeueGhost.
       
       iSplit.
       { iPureIntro. red. red in ORDER. repeat split; try lia. }
-      iSplitL "HNI". 
+      iSplitL "HNI PEv".
       { iRight. by iFrame. }
       rewrite DOM dom_max_set_fold in RH_WF'.
       destruct RH_WF as (SEQ &  BB). 
@@ -377,18 +379,9 @@ Section DequeueGhost.
 
   Lemma get_to_free_post
     PE
-  (pbr : loc)
-  (b b1 : nat)
-  ph h fl ndh r i
-  (ndbr1 : Node)
-  (LEb : b ≤ b1)
+  (pbr : loc) (b b1 : nat) ph h fl ndh r i (ndbr1 : Node) (LEb : b ≤ b1)
+  pfl (ndfl : Node) (hq : HistQueue) (t br : nat) (rop : option nat) (hist : read_hist)
   (PTR_EQ : pbr = ph)
-  (pfl : loc)
-  (ndfl : Node)
-  (hq : HistQueue)
-  (t br : nat)
-  (rop : option nat)
-  (hist : read_hist)
   (ORDER : hq_state_wf (h + 1) t br fl)
   (HTH : hq !! h = Some (ph, ndh))
   (NEMPTY : t ≠ h)
@@ -537,17 +530,14 @@ Section DequeueGhost.
       by iFrame.
   Qed.
 
-  Lemma check_BR_post
-          PE
-  (h fl : nat) (ph : loc) (ndh : Node) (i r b0 : nat)
-  (READ_BOUND : r ≤ h) (hq : HistQueue) (t br : nat)
-  (rop : option nat) (hist : read_hist)
+  Lemma check_BR_post PE
+  (h fl : nat) (ph : loc) (ndh : Node) (i r b0 : nat) (hq : HistQueue)
+  (t br : nat) (rop : option nat) (hist : read_hist) (pbr : loc) (nbr : Node)
+  (READ_BOUND : r ≤ h)
   (ORDER : hq_state_wf (h + 1) t br fl)
   (HTH : hq !! h = Some (ph, ndh))
   (NEMPTY : t ≠ h)
   (T_LEN : t = length hq)
-  (pbr : loc)
-  (nbr : Node)
   (BRTH : hq !! br = Some (pbr, nbr)):    
   ith_read i r (h + 1) -∗
   br_lb b0 -∗
@@ -559,6 +549,7 @@ Section DequeueGhost.
            hn_interp nfl) -∗
   dangle_auth (Some h) -∗
   (let '(v, nxt) := ndh in ph ↦ v ∗ (ph +ₗ 1) ↦ #nxt) -∗
+  PE ndh.1 -∗
   ohv_interp -∗
   read_hist_interp hist rop (h + 1) br fl (Some h) -∗
   ((∃ pt : loc, read_head_resources t br pt None ∗ rop_token)
@@ -573,12 +564,12 @@ Section DequeueGhost.
   |={⊤ ∖ ↑queue_ns,⊤}=>
     dangle_frag (if decide ((pbr, nbr).1 = ph) then Some h else None) ∗
     (⌜(pbr, nbr).1 = ph⌝ ∨ ⌜(pbr, nbr).1 ≠ ph⌝ ∗
-     (let '(v, nxt) := ndh in ph ↦ v ∗ (ph +ₗ 1) ↦ #nxt)) ∗
+     (let '(v, nxt) := ndh in ph ↦ v ∗ (ph +ₗ 1) ↦ #nxt) ∗ PE ndh.1) ∗
     ∃ (b' : nat) (ndbr' : Node), br_lb b' ∗ ⌜b0 ≤ b'⌝ ∗
       ith_node b' ((pbr, nbr).1, ndbr').
-  Proof using. 
-    iIntros "#READ #BR0 DFRAG HQ AUTHS PQI FL DAUTH HNI OHV RHI RH TOK CLOS BR EI".
-    iDestruct (br_lb_bound with "BR0 AUTHS") as %BR0. 
+  Proof using.
+    iIntros "#READ #BR0 DFRAG HQ AUTHS PQI FL DAUTH HNI PEv OHV RHI RH TOK CLOS BR EI".
+    iDestruct (br_lb_bound with "BR0 AUTHS") as %BR0.
     iDestruct (take_snapshot with "[$]") as "#SHT".
     iDestruct (hq_auth_get_ith with "HQ") as "#BRTH'".
     { apply BRTH. }
@@ -605,6 +596,7 @@ Section DequeueGhost.
       iFrame.      
       iApply fupd_or. iRight. iFrame "HNI".
       rewrite -(bi.sep_True' ⌜ _ ≠ _ ⌝%I). iApply fupd_frame_l. iSplit; [done| ].
+      iFrame "PEv". 
       iMod ("CLOS" with "[-]") as "_"; [| done]. 
 
       rewrite /rop_interp.

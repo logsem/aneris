@@ -49,7 +49,7 @@ Section RightUtils.
     MU_by_burn_cp. rewrite loc_add_0. iApply wp_value.
     iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od_ & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & >OHV & >RHI & >RH & >DQ & #EI)".
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & DANGLE & >OHV & >RHI & >RH & >DQ & #EI)".
     iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[<- <-].
     iDestruct "DR" as "[HEAD FL]".
     iDestruct (hq_auth_lookup with "[$] [$]") as %HTH.

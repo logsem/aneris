@@ -178,7 +178,8 @@ Section QueueResources.
   Qed.
   
   Definition dangle_interp (od: option nat) (h: nat) (hq: HistQueue): iProp Σ :=
-    dangle_auth od ∗ (⌜ od = None ⌝ ∨ ⌜ od = Some (h - 1) ⌝ ∗ from_option hn_interp (⌜ False ⌝)%I (hq !! (h - 1)))
+    dangle_auth od ∗ (⌜ od = None ⌝ ∨ ⌜ od = Some (h - 1) ⌝ ∗
+            from_option (fun nd => (hn_interp nd ∗ PE nd.2.1)%I) (⌜ False ⌝)%I (hq !! (h - 1)))
   . 
   
   Definition auths (h t br fl: nat): iProp Σ :=
@@ -536,7 +537,7 @@ Section QueueResources.
     rewrite /dangle_interp.
     iDestruct "DI" as "(AUTH & [% | (_ & HNI)])".
     { done. }
-    rewrite  DTH. simpl.
+    rewrite DTH. simpl. iDestruct "HNI" as "[HNI PE]". 
     by iDestruct (hn_interp_ptr_excl with "[$] [$]") as "?".
   Qed.
 
