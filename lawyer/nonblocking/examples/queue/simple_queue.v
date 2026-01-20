@@ -18,13 +18,13 @@ Class QueuePreG Σ := {
   q_pre_hq :: HistQueuePreG Σ;
   q_pre_rh :: ReadHistPreG Σ;
   q_pre_rprot :: inG Σ (gmapUR nat read_state_cmra);
-  q_pre_dangle_rop :: inG Σ (excl_authUR (option nat));
+  q_pre_dangle_rop ::  inG Σ (excl_authUR (option nat));
 }.
 
 
 Record SimpleQueue := SQ {     
     Head: loc; Tail: loc; BeingRead: loc; 
-    FreeLater: loc; OldHeadVal: loc;
+    FreeLater: loc; OldqHeadVal: loc;
 }.
 
 Class QueueG Σ := {
