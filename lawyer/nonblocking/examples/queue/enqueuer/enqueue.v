@@ -138,8 +138,10 @@ Section Enqueue.
     - iIntros "((?&?)&?)". iFrame.
   Qed.
 
+  Context (PE: val -> iProp Σ) {PERS_PE: forall v, Persistent (PE v)}. 
+
   Lemma start_enqueue l (τ: locale heap_lang) (π: Phase) (q: Qp):
-    {{{ queue_inv l ∗ read_head_token ∗ 
+    {{{ queue_inv PE l ∗ read_head_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d 1 }}}
        !#(Tail q_sq) @ τ
     {{{ (pt: loc), RET #pt; th_phase_frag τ π q ∗
@@ -150,12 +152,12 @@ Section Enqueue.
     simpl. iIntros (Φ) "([#QAT #INV] & TOK & PH & CPS) POST".
     iInv "INV" as "(%hq & %h & %t & %br & %fl & %rop & %od & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as ">(HQ & AUTHS & %ORDER0 & QI & DANGLE & OHV & RHI & RH & DQ)".
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & OHV & >RHI & >RH' & >DQ & EI)".
     
     iApply sswp_MU_wp; [done| ].
     iDestruct (access_queue_ends with "[$] [$]") as "(%ph & %pt & HEAD & TAIL & #HT & CLOS')".    
     iApply (wp_load with "TAIL"). iIntros "!> TAIL".
-    iDestruct "RH" as "[(%pt_ & RH & RTOK) | TOK']".
+    iDestruct "RH'" as "[(%pt_ & RH & RTOK) | TOK']".
     2: by iDestruct (read_head_token_excl with "[$] [$]") as "?".
     iDestruct (read_head_res_Tail_agree with "RH [$]") as %EQ.
     inversion EQ. subst pt_. clear EQ.
@@ -186,7 +188,7 @@ Section Enqueue.
   Lemma setup_cur_tail l (τ: locale heap_lang) (π: Phase) (q: Qp)
     pt   t br   v nxt:
 
-    {{{ queue_inv l ∗ hn_interp_wip (pt, dummy_node) ∗ read_head_resources t br pt None ∗
+    {{{ queue_inv PE l ∗ hn_interp_wip (pt, dummy_node) ∗ read_head_resources t br pt None ∗
         th_phase_frag τ π q ∗ cp_mul π d mk_node_fuel }}}
        set_node #pt v #nxt @ τ
     {{{ RET #(); th_phase_frag τ π q ∗ hn_interp_wip (pt, (v, nxt)) ∗ read_head_resources t br pt None }}}.
@@ -204,7 +206,7 @@ Section Enqueue.
 
     iInv "INV" as "(%hq & %h & %t_ & %br_ & %fl & %rop_ & %od & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as ">(HQ & AUTHS & %ORDER0 & QI & DANGLE & OHV & RHI & RH' & DQ)".
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & OHV & >RHI & >RH' & >DQ & EI)".
     iDestruct (read_head_resources_auth_agree with "RH [$]") as %[<- <-].
     iDestruct (read_head_resources_rop_interp_agree with "RH [$]") as %<-.
 
@@ -248,14 +250,17 @@ Section Enqueue.
     iApply "POST". iFrame.    
   Qed.
 
+  (* TODO: move *)
   Definition is_LL_into_alt (hq: HistQueue) (pt: loc) := 
     (forall (i: nat) (nd nd': HistNode),
         hq !! i = Some nd -> hq !! (S i) = Some nd' -> nd.2.2 = nd'.1) /\
     from_option (fun nd => nd.2.2 = pt) True (last hq).
 
+  (* TODO: move *)
   Lemma is_LL_into_equiv hq pt:
     is_LL_into hq pt <-> is_LL_into_alt hq pt.
   Proof using.
+    clear dependent PE. 
     induction hq.
     { done. }
     destruct a as [? [??]]. simpl.
@@ -283,6 +288,7 @@ Section Enqueue.
       ospecialize (NEXT 0 _ _ _ _ ); eauto.
   Qed.
   
+  (* TODO: move *)
   Lemma is_LL_into_ext l p1 v p2
     (LL: is_LL_into l p1):
   is_LL_into (l ++ [(p1, (v, p2))]) p2.
@@ -303,11 +309,13 @@ Section Enqueue.
       rewrite lookup_app_l in H; eauto.
       2: lia.
       by rewrite H in FIN.
-  Qed.    
+  Qed.
 
+  (* TODO: move *)
   Lemma hq_auth_extend hq nd:
     hq_auth hq ==∗ hq_auth (hq ++ [nd]).
   Proof using.
+    clear dependent PE. 
     rewrite /hq_auth.
     iIntros "[AUTH FRAG]".
     rewrite big_sepL_app. iFrame "FRAG".
@@ -335,26 +343,36 @@ Section Enqueue.
   Lemma dangle_interp_extend od h hq nd:
     dangle_interp od h hq -∗ dangle_interp od h (hq ++ [nd]).
   Proof using.
+    clear dependent PE. 
     rewrite /dangle_interp. iIntros "(?&[?|[-> X]])"; iFrame.
     iRight. iSplit; [done| ].
     destruct lookup eqn:X; try done. simpl.
     erewrite @lookup_app_l_Some; eauto.
   Qed.
     
+  Lemma queue_elems_interp_extend hq nd:
+    queue_elems_interp PE hq -∗ PE nd.2.1 -∗
+    queue_elems_interp PE (hq ++ [nd]).
+  Proof using.
+    rewrite /queue_elems_interp.
+    rewrite big_sepL_app. rewrite big_sepL_singleton.
+    iIntros "$ $".
+  Qed.
+
   Lemma update_tail l (τ: locale heap_lang) (π: Phase) (q: Qp)
     pn pt v    t br:
-    {{{ queue_inv l ∗ hn_interp (pn, dummy_node) ∗ hn_interp_wip (pt, (v, pn)) ∗ 
-        read_head_resources t br pt None ∗
+    {{{ queue_inv PE l ∗ hn_interp (pn, dummy_node) ∗ hn_interp_wip (pt, (v, pn)) ∗ 
+        read_head_resources t br pt None ∗ PE v ∗ 
         th_phase_frag τ π q ∗ cp_mul π d 1 }}}
       #(Tail q_sq) <- #pn @τ
     {{{ RET #(); th_phase_frag τ π q ∗ read_head_resources (S t) br pn None ∗ rop_token }}}.
   Proof using.
-    simpl. iIntros (Φ) "([#QAT #INV] & DNI & TNI & RH & PH & CPS) POST".
+    simpl. iIntros (Φ) "([#QAT #INV] & DNI & TNI & RH & PEv & PH & CPS) POST".
     destruct q_sq eqn:Q_SQ. simpl.
 
     iInv "INV" as "(%hq & %h & %t_ & %br_ & %fl & %rop_ & %od & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as ">(HQ & AUTHS & %ORDER0 & QI & DANGLE & OHV & RHI & RH' & DQ)".
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & OHV & >RHI & >RH' & >DQ & EI)".
     iDestruct (read_head_resources_auth_agree with "RH [$]") as %[<- <-].
     iDestruct (read_head_resources_rop_interp_agree with "RH [$]") as %<-.
 
@@ -383,7 +401,7 @@ Section Enqueue.
     { rewrite /phys_queue_interp.
       rewrite skipn_app.    
       rewrite (proj2 (Nat.sub_0_le _ _)).
-      2: { red in ORDER0. lia. }
+      2: { red in ORDER. lia. }
       simpl. rewrite big_sepL_app big_sepL_singleton. iFrame "Q".
 
       iDestruct "TNI" as "[TNI0 TNI1]".
@@ -408,6 +426,8 @@ Section Enqueue.
       iFrame. iPureIntro.
       split; eapply lookup_app_l_Some; eauto. }
 
+    iDestruct (queue_elems_interp_extend _  (pt, (v, pn)) with "[$] [$]") as "EI'".
+
     iMod (hq_auth_extend with "[$]") as "HQ".
     iDestruct (dangle_interp_extend with "[$]") as "DANGLE".
 
@@ -417,16 +437,16 @@ Section Enqueue.
     iApply "POST". iFrame "PH RH ROP".
     iMod ("CLOS" with "[-]") as "_"; [| done].
     iFrame.
-    iPureIntro. red. red in ORDER0. lia.  
+    iPureIntro. red. red in ORDER. lia.  
   Qed.
 
   Lemma enqueue_spec l (τ: locale heap_lang) (π: Phase) (q: Qp) (v: val):
-    {{{ queue_inv l ∗ read_head_token ∗ 
+    {{{ queue_inv PE l ∗ read_head_token ∗ PE v ∗ 
         th_phase_frag τ π q ∗ cp_mul π d enqueue_fuel }}}
        enqueue q_sq v @ τ
     {{{ (v: val), RET v; th_phase_frag τ π q ∗ read_head_token }}}.
   Proof using.
-    simpl. iIntros (Φ) "([#QAT #INV] & TOK & PH & CPS) POST".
+    simpl. iIntros (Φ) "([#QAT #INV] & TOK & PEv & PH & CPS) POST".
     rewrite /enqueue. destruct q_sq eqn:Q_SQ.
     pure_steps.
 
@@ -459,7 +479,7 @@ Section Enqueue.
     iIntros "!> (PH & RH & ROP)".
     iInv "INV" as "(%hq & %h & %t_ & %br_ & %fl & %rop_ & %od & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as ">(HQ & AUTHS & %ORDER0 & QI & DANGLE & OHV & RHI & RH' & DQ)".
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & OHV & >RHI & >RH' & >DQ & EI)".
     iDestruct "RH'" as "[(%pt_ & RH' & RTOK) | TOK']".
     { by iDestruct (rop_token_excl with "[$] [$]") as %?. }
 
@@ -467,7 +487,7 @@ Section Enqueue.
     iDestruct (read_head_resources_auth_agree with "RH [$]") as %[<- <-].
     iDestruct (read_head_resources_rop_interp_agree with "RH [$]") as %<-.
     iMod ("CLOS" with "[-]") as "_"; [| done].
-    iFrame. iFrame (ORDER0). iLeft. iFrame.
+    iFrame. iFrame (ORDER). iLeft. iFrame.
   Qed.
 
 End Enqueue.

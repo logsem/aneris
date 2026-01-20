@@ -57,7 +57,7 @@ Section ReadHeadDequeuer.
     wp_bind (! _)%E.
     iInv "INV" as "(%hq & %h & %t & %br & %fl & %rop & %od & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & DANGLE & >OHV & >RHI & >RH & >DQ & EI)".
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & >OHV & >RHI & >RH & >DQ & EI)".
     
     iApply sswp_MU_wp; [done| ].
     iDestruct (access_queue_ends with "[$] [$]") as "(%ph & %pt & HEAD & TAIL & HT & CLOS')".
@@ -83,7 +83,7 @@ Section ReadHeadDequeuer.
     wp_bind (! _)%E.
     iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od_ & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & DANGLE & >OHV & >RHI & >RH & >DQ & EI)".
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & >OHV & >RHI & >RH & >DQ & EI)".
     iApply sswp_MU_wp; [done| ].
     iDestruct (access_queue_ends with "[$] [$]") as "(%ph_ & %pt & HEAD & TAIL & #HT & CLOS')".
     replace Tail with (simple_queue.Tail q_sq) by (by rewrite Q_SQ).
@@ -122,7 +122,7 @@ Section ReadHeadDequeuer.
       iInv "INV" as "(%hq & %h_ & %t & %br' & %fl_ & %rop & %od_ & %hist & inv)" "CLOS".
       iEval (rewrite /queue_inv_inner) in "inv".
       clear ORDER. 
-      iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & DANGLE & >OHV & >RHI & >RH & >DQ & EI)".
+      iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & >OHV & >RHI & >RH & >DQ & EI)".
       iModIntro.
       iApply sswp_pure_step; [done| ].
       do 2 iNext. MU_by_burn_cp.
@@ -148,15 +148,15 @@ Section ReadHeadDequeuer.
     iEval (rewrite /queue_inv_inner) in "inv".
 
     clear ORDER. 
-    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & DANGLE & >OHV & >RHI & >RH & >DQ & EI)".
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & >OHV & >RHI & >RH & >DQ & EI)".
     iDestruct "DQ" as "[(% & DR') | TOK]".
     { by iDestruct (dequeue_resources_excl with "DR DR'") as "?". }
     (* iDestruct (dequeue_res_head_agree with "DR [$]") as %->.  *)
     iDestruct (dequeue_resources_auth_agree with "DR [$]") as %[<- <-].
+    iDestruct (dequeue_resources_dangle_agree with "DR [$]") as %->.
 
     iModIntro. iApply sswp_pure_step; [done| ]. 
     MU_by_burn_cp. simpl.
-    iDestruct (dequeue_resources_dangle_agree with "DR [$]") as %->.
     iMod ("CLOS" with "[-POST CPS PH TOK PEh]") as "_".
     { by iFrame. }
  

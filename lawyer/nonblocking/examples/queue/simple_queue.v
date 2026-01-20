@@ -176,11 +176,12 @@ Section QueueResources.
     rewrite bi.wand_curry -!own_op.
     iApply own_update. apply excl_auth_update. 
   Qed.
-  
+
+  (** PE for dangling node can be retrieved from historical queue *)
   Definition dangle_interp (od: option nat) (h: nat) (hq: HistQueue): iProp Σ :=
     dangle_auth od ∗ (⌜ od = None ⌝ ∨ ⌜ od = Some (h - 1) ⌝ ∗
-            from_option (fun nd => (hn_interp nd ∗ PE nd.2.1)%I) (⌜ False ⌝)%I (hq !! (h - 1)))
-  . 
+            from_option (fun nd => (hn_interp nd (* ∗ PE nd.2.1 *))%I) (⌜ False ⌝)%I (hq !! (h - 1)))
+  .
   
   Definition auths (h t br fl: nat): iProp Σ :=
     @me_auth _ q_me_h h ∗ @me_auth _ q_me_t t ∗ @me_auth _ q_me_br br ∗
@@ -278,16 +279,22 @@ Section QueueResources.
     intros. destruct H as [-> | [-> | [-> | ->]]]; apply _.
   Qed.
 
-  Definition ohv_interp: iProp Σ := ∃ ohv, OldHeadVal q_sq↦ ohv.
+  (* TODO: ? specify which historical node is used
+     instead of explicitly requiring PE *)
+  Definition ohv_interp: iProp Σ := ∃ ohv, OldHeadVal q_sq ↦ ohv ∗ PE ohv.
 
   Definition read_hist_interp hist rop h br fl od: iProp Σ :=
     rop_auth rop ∗
     rop_interp rop h br fl od ∗ read_hist_auth hist ∗
     ⌜ read_hist_wf hist rop h ⌝ ∗ old_rps hist rop
   .
-  
-  Definition queue_elems_interp (hq: HistQueue) (h: nat): iProp Σ := 
-    [∗ list] nd ∈ (drop h hq), PE nd.2.1. 
+
+  (** Since PE is persistent, we can keep it for all historical elements of the queue.
+      It simplifies getting PE for dangling and "free later" node.
+      It should be possible to be strict and keep PE only for currently present elements,
+      but it seems to unnecessarily complicate the proofs. *)
+  Definition queue_elems_interp (hq: HistQueue) (* (h: nat) *): iProp Σ := 
+    [∗ list] nd ∈ hq, PE nd.2.1. 
   
   Definition queue_inv_inner (hq: HistQueue) (h t br fl: nat)
     (rop od: option nat) (hist: read_hist): iProp Σ :=
@@ -296,7 +303,7 @@ Section QueueResources.
     read_hist_interp hist rop h br fl od ∗ 
     ((∃ pt, read_head_resources t br pt None ∗ rop_token) ∨ read_head_token) ∗ 
     ((∃ ph, dequeue_resources h fl ph None) ∨ dequeue_token) ∗
-    queue_elems_interp hq h
+    queue_elems_interp hq
   .
   
   Definition queue_ns := nroot .@ "queue".
@@ -537,20 +544,18 @@ Section QueueResources.
     rewrite /dangle_interp.
     iDestruct "DI" as "(AUTH & [% | (_ & HNI)])".
     { done. }
-    rewrite DTH. simpl. iDestruct "HNI" as "[HNI PE]". 
+    rewrite DTH. simpl. 
     by iDestruct (hn_interp_ptr_excl with "[$] [$]") as "?".
   Qed.
 
-  Lemma queue_elems_interp_get hq h nd
-    (HTH: hq !! h = Some nd):
-    queue_elems_interp hq h -∗
+  Lemma queue_elems_interp_get hq i nd
+    (HTH: hq !! i = Some nd):
+    queue_elems_interp hq -∗
     PE nd.2.1.
   Proof using.
     iIntros "EI". 
     rewrite /queue_elems_interp.
-    iDestruct (big_sepL_lookup_acc with "[$]") as "[PEv ?]". 
-    { rewrite lookup_drop. erewrite Nat.add_0_r. eauto. }
-    done.
+    iDestruct (big_sepL_lookup_acc with "[$]") as "[PEv ?]"; eauto.  
   Qed.
 
 End QueueResources.
