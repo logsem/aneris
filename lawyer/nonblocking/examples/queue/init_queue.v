@@ -94,12 +94,6 @@ Section InitQueue.
     iApply "TOKS".
   Qed.
 
-  (* Lemma auths_exacts_init `{MaxExactPreG Σ} (n0 n1 n2 n3 n4: nat): *)
-  (*   ⊢ |==> ∃ (ME0 ME1 ME2 ME3 ME4: MaxExactG Σ), *)
-  (*       let ns := [n0; n1; n2; n3; n4] in *)
-  (*       let MES := [ME0; ME1; ME2; ME3; ME4] in *)
-  (*       ([∗ list] _ ↦ n;ME ∈ ns; MES, @me_auth _ ME n) ∗  *)
-  (*       ([∗ list] _ ↦ n;ME ∈ ns; MES, @me_exact _ ME n). *)
   Lemma auths_exacts_init `{MaxExactPreG Σ} (ns: list nat):
     ⊢ |==> ∃ (MES: list (MaxExactG Σ)),
         ([∗ list] _ ↦ n;ME ∈ ns; MES, @me_auth _ ME n) ∗ 
@@ -113,10 +107,6 @@ Section InitQueue.
     iModIntro. iExists (ME :: MES). iFrame.
   Qed.    
                                 
-  (* Lemma read_hist_init `{ReadHistPreG Σ} (hist: read_hist) *)
-  (*   (RS_INIT: forall i op, hist !! i = Some op -> op.2 = rs_init): *)
-  (*   ⊢ (|==> ∃ (_: ReadHistG Σ), read_hist_auth hist)%I. *)
-
   Definition hist0: read_hist := {[ 0 := ((0, 0), rs_proc $ Some rsp_completed )]}.
   
   Lemma read_hist_init `{ReadHistPreG Σ}:
@@ -145,19 +135,75 @@ Section InitQueue.
     - iIntros "(%ab&?)". destruct ab. iFrame.
   Qed.
 
-  Lemma queue_init sq (pfl ph: loc) (v: val):
+  (* TODO: a better way would be to relax restrictions
+     on initial nodes pointed by pfl and ph *)
+  Definition is_init_queue_cfg (c: cfg heap_lang) sq (pfl ph: loc) (v: val): Prop :=
     let '(SQ H T BR FL OHV) := sq in
-    ([∗ list] ptr ∈ [BR; FL], ptr ↦ #pfl) -∗
-    ([∗ list] ptr ∈ [H; T], ptr ↦ #ph) -∗
-    OHV ↦ v -∗ 
-    hn_interp (ph, dummy_node) -∗
-    hn_interp (pfl, (v, ph)) -∗
-    PE v
-    ={⊤}=∗
+    NoDup [H; T; BR; FL; OHV; ph; ph +ₗ 1; pfl; pfl +ₗ 1] /\
+    let pto (ptr: loc) (v: val) :=  c.2.(heap) !! ptr = Some $ Some v in
+    pto BR #pfl /\ pto FL #pfl /\
+    pto H #ph /\ pto T #ph /\
+    pto OHV v /\
+    pto ph #0 /\ pto (loc_add ph 1%Z) #(Loc 0) /\
+    pto pfl v /\ pto (loc_add pfl 1%Z) #ph
+  . 
+      
+  Definition queue_init_resource sq (pfl ph: loc) (v: val): iProp Σ :=
+    let '(SQ H T BR FL OHV) := sq in
+    ([∗ list] ptr ∈ [BR; FL], ptr ↦ #pfl) ∗
+    ([∗ list] ptr ∈ [H; T], ptr ↦ #ph) ∗
+    OHV ↦ v ∗ 
+    hn_interp (ph, dummy_node) ∗ hn_interp (pfl, (v, ph)).
+
+  (* TODO: move *)
+  Local Lemma heap_ptrs_helper (h: gmap loc (option val)) (ptrs: list loc)
+    (vals: list val)
+    (ND: NoDup ptrs)
+    (PTRS_VALS: Forall2 (fun ptr v => h !! ptr = Some (Some v)) ptrs vals):
+    ⊢ ([∗ map] l↦v ∈ h, gen_heap.pointsto l (DfracOwn 1) v) -∗
+    [∗ list] _↦ ptr;v ∈ ptrs;vals, gen_heap.pointsto ptr (DfracOwn 1) (Some v).
+  Proof using.
+    clear -ND PTRS_VALS. 
+    generalize dependent vals. generalize dependent h.
+    induction ptrs.
+    { intros. inversion PTRS_VALS. subst. set_solver. }
+    intros. inversion PTRS_VALS. subst.
+    iIntros "HEAP".
+    simpl. iDestruct (big_sepM_delete with "HEAP") as "[$ HEAP]".
+    { eauto. }
+    iDestruct (IHptrs with "HEAP") as "$".
+    { eapply NoDup_cons_1_2; eauto. }
+    apply Forall2_same_length_lookup in H4 as [LEN ALL]. 
+    apply Forall2_same_length_lookup. split; [done| ].
+    intros. erewrite lookup_delete_ne; eauto.
+    intros <-. apply NoDup_cons_1_1 in ND.
+    destruct ND. eapply elem_of_list_lookup; eauto.
+  Qed.
+
+  Lemma obtain_queue_init_resource c sq pfl ph v
+    (INIT: is_init_queue_cfg c sq pfl ph v):
+    hl_phys_init_resource c -∗ queue_init_resource sq pfl ph v.
+  Proof using.
+    rewrite /hl_phys_init_resource.
+    destruct sq. red in INIT. simpl.
+    iIntros "HEAP".
+    rewrite !bi.sep_emp.
+    destruct INIT as [ND PTRS].
+    rewrite !heap_lang_defs.pointsto_unseal.
+
+    iDestruct (heap_ptrs_helper with "HEAP") as "X".
+    { eauto. }
+    { repeat (constructor; [apply PTRS| ]). constructor. }
+    simpl. iDestruct "X" as "($&$&$&$&$&$&$&$&$&?)".
+  Qed.    
+  
+  Lemma queue_init sq (pfl ph: loc) (v: val):
+    queue_init_resource sq pfl ph (v: val) -∗ PE v ={⊤}=∗
     ∃ qv (_: QueueG Σ), queue_inv PE qv ∗ read_head_token ∗ dequeue_token. 
   Proof using All.
     destruct sq eqn:SQ. simpl.
-    iIntros "(BR & FL & _) (H & T & _) OHV HNh HNfl #PEv".
+    rewrite /queue_init_resource. 
+    iIntros "((BR & FL & _) & (H & T & _) & OHV & HNh & HNfl) #PEv".
 
     iAssert (|={⊤}=> ∃ (qv : val) (H3 : QueueG Σ), queue_at qv ∗
                (∃ hq (h t br fl : nat) (rop od : option nat) (hist : read_hist), 
@@ -237,7 +283,6 @@ Section InitQueue.
     rewrite /queue_elems_interp.
     subst hq0. rewrite big_sepL_singleton. simpl.
     done.
-  Qed.
-                                     
+  Qed.                                     
   
 End InitQueue.
