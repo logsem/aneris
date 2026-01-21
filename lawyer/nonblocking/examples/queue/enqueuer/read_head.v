@@ -884,7 +884,7 @@ Section ReadHead.
         th_phase_frag τ π q ∗ cp_mul π d read_head_fuel }}}
        read_head_enqueuer #() @ τ
     {{{ (v: val), RET v; th_phase_frag τ π q ∗ read_head_token ∗
-                         (∀ v', ⌜ v = SOMEV v' ⌝ -∗ PE v') }}}.
+                  (⌜ v = NONEV ⌝ ∨ ∃ v', ⌜ v = SOMEV v' ⌝ ∗ PE v') }}}.
   Proof using PERS_PE.
     simpl. iIntros (Φ) "([#QAT #INV] & TOK & PH & CPS) POST".
     rewrite /read_head_enqueuer. destruct q_sq eqn:Q_SQ.
@@ -928,7 +928,7 @@ Section ReadHead.
       { iFrame. iNext. iSplit; [done| ]. iLeft. iFrame. }
       iModIntro.
       pure_steps. iApply "POST". iFrame.
-      by iIntros (? [=]). }
+      by iLeft. }
 
     rewrite bool_decide_false; [| set_solver].
     pure_steps. 
@@ -949,7 +949,7 @@ Section ReadHead.
     iIntros "!> % (PH & TOK & PEv)".
 
     pure_steps. iApply "POST". iFrame.
-    iIntros (? [=->]). by iFrame. 
+    iRight. iExists _. iSplit; [done| ]. by iFrame. 
   Qed.
 
 End ReadHead. 

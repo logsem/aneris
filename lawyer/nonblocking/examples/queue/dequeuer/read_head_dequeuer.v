@@ -48,7 +48,7 @@ Section ReadHeadDequeuer.
         th_phase_frag τ π q ∗ cp_mul π d read_head_dequeuer_fuel }}}
        read_head_dequeuer #() @ τ
     {{{ (v: val), RET v; th_phase_frag τ π q ∗ dequeue_token ∗ 
-                         (∀ v', ⌜ v = SOMEV v' ⌝ -∗ PE v')}}}.
+                         (⌜ v = NONEV ⌝ ∨ ∃ v', ⌜ v = SOMEV v' ⌝ ∗ PE v') }}}.
   Proof using PERS_PE.
     simpl. iIntros (Φ) "([#QAT #INV] & TOK & PH & CPS) POST".
     rewrite /read_head_dequeuer. destruct q_sq eqn:Q_SQ.
@@ -133,7 +133,7 @@ Section ReadHeadDequeuer.
       { by iFrame. }
       iModIntro. pure_steps.
       iApply "POST". iFrame.
-      by iIntros (??). }
+      by iLeft. }
 
     rewrite bool_decide_false; [| set_solver]. pure_steps.
     split_cps "CPS" get_loc_fuel; [cbv; lia| ].
@@ -162,7 +162,7 @@ Section ReadHeadDequeuer.
  
     iModIntro. pure_steps.
     iApply "POST". iFrame.
-    iIntros (? [=->]). iFrame.
+    iRight. iExists _. iSplit; [done| ]. by iFrame. 
   Qed.
 
 End ReadHeadDequeuer.
