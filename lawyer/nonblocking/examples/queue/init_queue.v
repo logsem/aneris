@@ -82,18 +82,6 @@ Section InitQueue.
     ⊢ |==> ∃ γ, own γ (Excl ()).
   Proof using. by iApply own_alloc. Qed. 
 
-  (* TODO: add bupd to mt_init *)
-  Lemma queue_methods_tokens_init `{MethodTokenPre Σ}:
-    ⊢ |==> ∃ (MT: MethodToken queue_MS Σ), 
-        method_tok enqueuer ∗ method_tok dequeuer.
-  Proof using.
-    iDestruct (mt_init queue_MS) as "(%MT & TOKS)".
-    setoid_rewrite <- methods_toks_split.  
-    iExists MT. iFrame.
-    rewrite /queue_MS. iModIntro.
-    iApply "TOKS".
-  Qed.
-
   Lemma auths_exacts_init `{MaxExactPreG Σ} (ns: list nat):
     ⊢ |==> ∃ (MES: list (MaxExactG Σ)),
         ([∗ list] _ ↦ n;ME ∈ ns; MES, @me_auth _ ME n) ∗ 
@@ -218,7 +206,7 @@ Section InitQueue.
     iMod rop_init as "(%γ_r & RAUTH & RFRAG)".
     iMod rop_token_init as "(%γ_rtok & RTOK)". 
     iMod read_hist_init as "(%RHIST & HIST & #RP0)".
-    iMod queue_methods_tokens_init as "(%MT & ETOK & DTOK)".
+    iMod sqt_pre_init as "(%SQT & DTOK & ETOK)".
 
     iMod (auths_exacts_init [1; 1; 0; 0]) as "(%MES & AUTHS & EXS)".
     iDestruct (big_sepL2_length with "AUTHS") as %ME_LEN. simpl in ME_LEN.
@@ -286,3 +274,28 @@ Section InitQueue.
   Qed.                                     
   
 End InitQueue.
+
+
+  (* Lemma dequeue_token_excl: *)
+  (*   dequeue_token -∗ dequeue_token -∗ False. *)
+  (* Proof using. *)
+  (*   clear.  *)
+  (*   simpl. rewrite /dequeue_token. *)
+  (*   rewrite bi.wand_curry. rewrite -methods_toks_split. *)
+  (*   iIntros "X". iDestruct (methods_toks_sub with "[$]") as %V. *)
+  (*   pose proof dequeuer_neq_enqueuer. multiset_solver.  *)
+  (* Qed.  *)
+    
+
+  (* (* TODO: add bupd to mt_init *) *)
+  (* Lemma queue_methods_tokens_init `{MethodTokenPre Σ}: *)
+  (*   ⊢ |==> ∃ (MT: MethodToken queue_MS Σ),  *)
+  (*       method_tok enqueuer ∗ method_tok dequeuer. *)
+  (* Proof using. *)
+  (*   iDestruct (mt_init queue_MS) as "(%MT & TOKS)". *)
+  (*   setoid_rewrite <- methods_toks_split.   *)
+  (*   iExists MT. iFrame. *)
+  (*   rewrite /queue_MS. iModIntro. *)
+  (*   iApply "TOKS". *)
+  (* Qed. *)
+

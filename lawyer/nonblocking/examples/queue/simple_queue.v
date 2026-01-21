@@ -7,20 +7,35 @@ From lawyer.examples Require Import obls_tactics.
 From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From iris.base_logic.lib Require Import invariants.
 From lawyer.nonblocking.examples.queue Require Import simple_queue_utils.
-From lawyer.nonblocking.tokens Require Import tokens_ra.
+(* From lawyer.nonblocking.tokens Require Import tokens_ra. *)
 From heap_lang Require Import heap_lang_defs lang notation.
 
 
 Close Scope Z. 
+
+(** for technical reasons, it's easier to abstract over implementations of tokens in this file
+    and only instantiate it with tokens_ra when the queue is specialized to work with integers only *)
+Class SimpleQueueTokens Σ := SQT {
+  dequeue_token: iProp Σ;
+  read_head_token: iProp Σ;
+  dequeue_token_tl :: Timeless dequeue_token;
+  read_head_token_tl :: Timeless read_head_token;
+  dequeue_token_excl: dequeue_token -∗ dequeue_token -∗ False;
+  read_head_token_excl: read_head_token -∗ read_head_token -∗ False;
+}.
+
+Class SimpleQueueTokensPre Σ := SQTPre {
+  sqt_pre_init: ⊢ |==> ∃ (SQT: SimpleQueueTokens Σ), @dequeue_token _ SQT ∗ @read_head_token _ SQT;
+}.
 
 Class QueuePreG Σ := {
   q_pre_max :: MaxExactPreG Σ;
   q_pre_tok :: inG Σ (exclR unitO);
   q_pre_hq :: HistQueuePreG Σ;
   q_pre_rh :: ReadHistPreG Σ;
-  (* q_pre_rprot :: inG Σ (gmapUR nat read_state_cmra); *)
   q_pre_dangle_rop ::  inG Σ (excl_authUR (option nat));
-  q_pre_toks :: MethodTokenPre Σ;
+  (* q_pre_toks :: MethodTokenPre Σ; *)
+  q_pre_toks :: SimpleQueueTokensPre Σ; 
 }.
 
 
@@ -51,9 +66,8 @@ Class QueueG Σ := {
     q_γ_dangle: gname;
     q_γ_rop: gname;
 
-    (* q_γ_tok_rh: gname; *)
-    (* q_γ_tok_dq: gname; *)
-    q_toks :: MethodToken queue_MS Σ;
+    (* q_toks :: MethodToken queue_MS Σ; *)
+    q_toks :: SimpleQueueTokens Σ; 
 }.
 
 
@@ -237,9 +251,6 @@ Section QueueResources.
     @me_exact _ q_me_h h ∗ @me_exact _ q_me_fl fl ∗
     Head q_sq ↦{1/2} #ph ∗ dangle_frag od. 
   
-  Definition read_head_token: iProp Σ := method_tok enqueuer. 
-  Definition dequeue_token: iProp Σ := method_tok dequeuer.
-
   Definition hq_state_wf h t br fl: Prop :=
     (* fl <= br /\ *) (* see runs.org for a counterexample *)
     br <= h /\ fl < h /\ h <= t.
@@ -328,16 +339,6 @@ Section QueueResources.
   Lemma dequeuer_neq_enqueuer: dequeuer ≠ enqueuer.
   Proof using. clear. Admitted.
   
-  Lemma dequeue_token_excl:
-    dequeue_token -∗ dequeue_token -∗ False.
-  Proof using.
-    clear. 
-    simpl. rewrite /dequeue_token.
-    rewrite bi.wand_curry. rewrite -methods_toks_split.
-    iIntros "X". iDestruct (methods_toks_sub with "[$]") as %V.
-    pose proof dequeuer_neq_enqueuer. multiset_solver. 
-  Qed. 
-    
   Lemma dequeue_resources_excl h1 fl1 ph1 od1 h2 fl2 ph2 od2:
     dequeue_resources h1 fl1 ph1 od1 -∗ dequeue_resources h2 fl2 ph2 od2 -∗ False.
   Proof using.
@@ -455,16 +456,6 @@ Section QueueResources.
     iPureIntro. symmetry. by apply excl_auth_agree_L.
   Qed.
     
-  Lemma read_head_token_excl:
-    read_head_token -∗ read_head_token -∗ False.
-  Proof using.
-    clear. 
-    simpl. rewrite /read_head_token.
-    rewrite bi.wand_curry. rewrite -methods_toks_split.
-    iIntros "X". iDestruct (methods_toks_sub with "[$]") as %V.
-    pose proof dequeuer_neq_enqueuer. multiset_solver. 
-  Qed. 
-
   Lemma tail_interp_allocated pt:
     tail_interp pt -∗ ∃ v, pt ↦{1/2} v ∗ (pt ↦{1/2} v -∗ tail_interp pt).
   Proof using.
