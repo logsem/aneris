@@ -299,3 +299,4 @@ End InitQueue.
   (*   iApply "TOKS". *)
   (* Qed. *)
 
+  (* Definition queue_MS: gmultiset val := {[+ enqueuer; dequeuer +]}. *)

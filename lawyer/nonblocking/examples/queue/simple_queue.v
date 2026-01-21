@@ -44,12 +44,6 @@ Record SimpleQueue := SQ {
     FreeLater: loc; OldHeadVal: loc;
 }.
 
-
-(* TODO: move *)
-Definition enqueuer: val. Admitted. 
-Definition dequeuer: val. Admitted. 
-Definition queue_MS: gmultiset val := {[+ enqueuer; dequeuer +]}.
-
 Class QueueG Σ := {
     q_sq: SimpleQueue;
     q_pre :: QueuePreG Σ; 
@@ -334,10 +328,6 @@ Section QueueResources.
     queue_at q ∗ inv queue_ns 
       (∃ hq h t br fl rop od hist, queue_inv_inner hq h t br fl rop od hist)
   .
-
-  (* TODO: remove after enqueuer and dequeuer are defined *)
-  Lemma dequeuer_neq_enqueuer: dequeuer ≠ enqueuer.
-  Proof using. clear. Admitted.
   
   Lemma dequeue_resources_excl h1 fl1 ph1 od1 h2 fl2 ph2 od2:
     dequeue_resources h1 fl1 ph1 od1 -∗ dequeue_resources h2 fl2 ph2 od2 -∗ False.
