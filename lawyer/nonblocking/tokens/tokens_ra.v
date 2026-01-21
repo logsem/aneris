@@ -22,6 +22,9 @@ Section TokensRA.
   (*   IsOp (methods_toks (m1 ⊎ m2)) (methods_toks m1) (methods_toks m2). *)
   (* Proof. by rewrite /IsOp' /IsOp frac_op Qp.div_2. Qed. *)
 
+  Global Instance methods_toks_tl ms: Timeless (methods_toks ms).
+  Proof using. Admitted.
+
   Lemma methods_toks_split ms1 ms2:
     methods_toks (ms1 ⊎ ms2) ⊣⊢ methods_toks ms1 ∗ methods_toks ms2.
   Proof using. Admitted.

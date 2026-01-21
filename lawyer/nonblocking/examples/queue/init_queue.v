@@ -82,12 +82,6 @@ Section InitQueue.
     ⊢ |==> ∃ γ, own γ (Excl ()).
   Proof using. by iApply own_alloc. Qed. 
 
-  (* TODO: move *)
-  Definition enqueuer: val. Admitted. 
-  Definition dequeuer: val. Admitted. 
-
-  Definition queue_MS: gmultiset val := {[+ enqueuer; dequeuer +]}.
-
   (* TODO: add bupd to mt_init *)
   Lemma queue_methods_tokens_init `{MethodTokenPre Σ}:
     ⊢ |==> ∃ (MT: MethodToken queue_MS Σ), 
@@ -153,7 +147,6 @@ Section InitQueue.
 
   Lemma queue_init sq (pfl ph: loc) (v: val):
     let '(SQ H T BR FL OHV) := sq in
-    (* hn_interp (ptr, dummy_node) *)
     ([∗ list] ptr ∈ [BR; FL], ptr ↦ #pfl) -∗
     ([∗ list] ptr ∈ [H; T], ptr ↦ #ph) -∗
     OHV ↦ v -∗ 
@@ -162,7 +155,7 @@ Section InitQueue.
     PE v
     ={⊤}=∗
     ∃ qv (_: QueueG Σ), queue_inv PE qv ∗ read_head_token ∗ dequeue_token. 
-  Proof using PE_PERS.
+  Proof using All.
     destruct sq eqn:SQ. simpl.
     iIntros "(BR & FL & _) (H & T & _) OHV HNh HNfl #PEv".
 
@@ -186,99 +179,65 @@ Section InitQueue.
     do 5 (destruct MES; simpl in ME_LEN; try lia). 
     
     iModIntro. iExists _.
-    iExists (Build_QueueG _ _ _ _ sq _ _ _ _ _ _ m m0 m1 m2).
+    iExists (Build_QueueG _ sq _ m m0 m1 m2 _ _ _ _ _ _).
     iSplitR.
     { rewrite /queue_at. simpl. iPureIntro. reflexivity. }
     iSplitR "ETOK DTOK".
-    { iFrame "HQ". 
-      simpl. rewrite !bi.sep_emp.
-
-      iDestruct "AUTHS" as "($&$&MA_BR&$)".
-      iDestruct (me_auth_save with "MA_BR") as "#BR0". 
-      iFrame "MA_BR".
-      
-      iExists None, None, hist0.
-      iSplitR.
-      { iPureIntro. red. lia. }
-      iDestruct "H" as "[H H']". iDestruct "T" as "[T T']".
-      
-      iSplitL "H' T' HNh BR FL HNfl".
-      { rewrite /queue_interp /phys_queue_interp.
-        rewrite SQ. simpl. iFrame.
-        iSplit; [done| ].
-        iSplitL "BR".
-        - iExists _. iSplit; [done| ]. iFrame.
-        - iExists _. iSplit; [done| ]. iFrame. }
-
-      iSplitL "DAUTH".
-      { iFrame. by iLeft. }
-
-      iSplitL "OHV".
-      { rewrite SQ /=. iFrame "#∗". }
-
-      iSplitL "HIST RAUTH".
-      { iFrame. iSplit; [| iSplit]. 
-        - by iIntros (? [=]).
-        - iPureIntro. red.
-          exists 0. split; [set_solver| ].
-          split; [set_solver| ].
-          split.
-          + rewrite /hist0. intros ??? [[??]?] ?.
-            rewrite !lookup_singleton_Some. lia.
-          + rewrite /hist0. intros ? [[??]?].
-            rewrite !lookup_singleton_Some.
-            set_solver.
-        - rewrite /old_rps. rewrite /hist0.
-          simpl. rewrite big_sepM_singleton.
-          iFrame "#∗". iPureIntro.
-          red. tauto. }
-
-      iDestruct "EXS" as "(EX_H & EX_T & EX_BR & EX_FL)".
-      iSplitL "EX_BR EX_T RTOK RFRAG T".
-      { iLeft. rewrite SQ /=. iFrame. }
-      iSplitL "EX_H EX_FL H DFRAG".
-      { iLeft. rewrite SQ /=. iFrame. }
-
-      rewrite /queue_elems_interp.
-      subst hq0. rewrite big_sepL_singleton. simpl.
-      done. }
-
-    foobar. cleanup QueueG: change tokens, remove unused γs.
-        iFrame. iExists _. i rewrite /read_head_resources.
-        Set Printing Implicit. simpl. 
-        iFrame "EX_H". 
-      
-          iExists
-          
-            
-        iSplit. 
-          
-      
-      iFrame. 
-      rewrite bi.sep_exist_r. 
-      
+    2: by iFrame. 
     
+    iFrame "HQ". 
+    simpl. rewrite !bi.sep_emp.
     
-    (*     q_hq :: HistQueueG Σ; *)
-    (* q_rh :: ReadHistG Σ; *)
-
-    q_sq := _;
-
-    (* q_γ_tok_rh : gname; *)
-    (* q_γ_tok_dq: gname; *)
-    (* TODO: remove it *)
-    q_γ_tok_cc := γ_rop;
-    q_γ_tok_rop := γ_rop;
-
-    q_γ_dangle := γ_d; 
-    q_γ_rop := γ_rtok;
-
-    q_me_h :: MaxExactG Σ;
-    q_me_t :: MaxExactG Σ;
-    q_me_br :: MaxExactG Σ;
-    q_me_fl :: MaxExactG Σ;
-}
+    iDestruct "AUTHS" as "($&$&MA_BR&$)".
+    iDestruct (me_auth_save with "MA_BR") as "#BR0". 
+    iFrame "MA_BR".
     
+    iExists None, None, hist0.
+    iSplitR.
+    { iPureIntro. red. lia. }
+    iDestruct "H" as "[H H']". iDestruct "T" as "[T T']".
+    
+    iSplitL "H' T' HNh BR FL HNfl".
+    { rewrite /queue_interp /phys_queue_interp.
+      rewrite SQ. simpl. iFrame.
+      iSplit; [done| ].
+      iSplitL "BR".
+      - iExists _. iSplit; [done| ]. iFrame.
+      - iExists _. iSplit; [done| ]. iFrame. }
+    
+    iSplitL "DAUTH".
+    { iFrame. by iLeft. }
+    
+    iSplitL "OHV".
+    { rewrite SQ /=. iFrame "#∗". }
+    
+    iSplitL "HIST RAUTH".
+    { iFrame. iSplit; [| iSplit]. 
+      - by iIntros (? [=]).
+      - iPureIntro. red.
+        exists 0. split; [set_solver| ].
+        split; [set_solver| ].
+        split.
+        + rewrite /hist0. intros ??? [[??]?] ?.
+          rewrite !lookup_singleton_Some. lia.
+        + rewrite /hist0. intros ? [[??]?].
+          rewrite !lookup_singleton_Some.
+          set_solver.
+      - rewrite /old_rps. rewrite /hist0.
+        simpl. rewrite big_sepM_singleton.
+        iFrame "#∗". iPureIntro.
+        red. tauto. }
+    
+    iDestruct "EXS" as "(EX_H & EX_T & EX_BR & EX_FL)".
+    iSplitL "EX_BR EX_T RTOK RFRAG T".
+    { iLeft. rewrite SQ /=. iFrame. }
+    iSplitL "EX_H EX_FL H DFRAG".
+    { iLeft. rewrite SQ /=. iFrame. }
+    
+    rewrite /queue_elems_interp.
+    subst hq0. rewrite big_sepL_singleton. simpl.
+    done.
+  Qed.
                                      
   
 End InitQueue.
