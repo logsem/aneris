@@ -29,7 +29,7 @@ Section EnqueuerThread.
     λ: "v",
       if: "v" = #() then SOME (read_head_enqueuer #())
       else
-        match: "v" with
+        match: IsInt "v" with
           InjL "n" => SOME (enqueue q_sq "n")
         | InjR "x" => NONEV
         end.
@@ -47,6 +47,8 @@ Section EnqueuerThread.
   From lawyer.nonblocking.logrel Require Import valid_client.
 
   (** The spec needed by the token-based adequacy theorem *)
+  (** Note that at this point we choose the concrete predicate for queue elements,
+      such that it allows to establish is_ground_val in postcondition *)
   Lemma read_head_enqueuer_spec l (τ: locale heap_lang) (π: Phase) (q: Qp) (v: val):
     {{{ queue_inv val_is_int l ∗ read_head_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d et_fuel }}}

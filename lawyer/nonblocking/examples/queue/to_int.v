@@ -2,9 +2,9 @@ From heap_lang Require Import heap_lang_defs lang notation.
 
 (* TODO: change heap_lang accordingly *)
 
-Definition IsInt: expr. Admitted.
+Definition ToInt: expr. Admitted.
 
-#[global] Instance IsInt_atomic s v : Atomic s (IsInt $ Val v).
+#[global] Instance ToInt_atomic s v : Atomic s (ToInt $ Val v).
 Proof. Admitted. 
 
 Definition val_into_int (v : val) := 
@@ -13,6 +13,6 @@ Definition val_into_int (v : val) :=
   | _  => NONEV
   end. 
 
-#[global] Instance pure_IsInt (v : val) :
-  PureExec True 1 (IsInt $ Val v) (Val $ val_into_int v).
+#[global] Instance pure_ToInt (v : val) :
+  PureExec True 1 (ToInt $ Val v) (Val $ val_into_int v).
 Proof. Admitted. 
