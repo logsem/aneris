@@ -48,18 +48,12 @@ Section QueueSpec.
     { set_solver. }
     by iFrame.
   Qed.
- 
-  Program Definition SimpleQueue_WaitFreeToken: WaitFreeSpecToken queue_ms := {|
-    wfst_is_init_st := is_init_queue_cfg SQ ph pfl #0;
-    wfst_preG := QueuePreG;
-    wfst_G := QueueG;
-    wfst_Σ := queue_Σ;
-    wfst_subG := queue_sub;
-    wfst_mod_inv _ _ _ _ _ := queue_inv val_is_int;
-    wfst_init_mod _ _ _ _ _ := init_queue_inv;
-    wfst_F := max et_fuel dt_fuel;
-  |}.
-  Next Obligation.
+
+  Lemma queue_specs {M} {EM: ExecutionModel heap_lang M}
+    {Σ} {OHE: OM_HL_Env om_wfree_inst.OP_HL_WF EM Σ} {MT : MethodToken queue_ms Σ}
+    {wG : QueueG Σ}:
+    queue_inv val_is_int ⊢ [∗ set] m ∈ dom queue_ms, method_spec_token queue_ms (max et_fuel dt_fuel) m.
+  Proof using.
     iIntros "* #INV".
     iApply big_sepS_forall. iIntros (m DOM).
     rewrite /method_spec_token. iIntros (???? Φ) "!> (CPS & PH & TOK) POST".
@@ -67,19 +61,31 @@ Section QueueSpec.
     rewrite gmultiset_elem_of_disj_union !gmultiset_elem_of_singleton in DOM.
     destruct DOM as [-> | ->].
     - split_cps "CPS" et_fuel.
-      replace CannotFork with CanFork by admit.
       iApply (enqueuer_thread_spec with "[-POST]").
       { iFrame "#∗". }
       iIntros "!> %v (PH & RH & %GV)".
       iApply "POST". iFrame.
     - split_cps "CPS" et_fuel.
-      replace CannotFork with CanFork by admit.
       iApply (dequeuer_thread_spec with "[-POST]").
       { iFrame "#∗". }
       iIntros "!> %v (PH & RH & %GV)".
       iApply "POST". iFrame.
-  Admitted.
-  Final Obligation. 
-  Admitted. 
+  Qed. 
+
+  Lemma queue_pwps {Σ} {hGS: heap1GS Σ} {iGS: invGS_gen HasNoLc Σ}
+    {MT: MethodToken queue_ms Σ} {wG : QueueG Σ}:
+    queue_inv val_is_int ⊢ [∗ set] m ∈ dom queue_ms, token_safety_spec m.
+  Proof using. Admitted. 
+
+  Definition SimpleQueue_WaitFreeToken: WaitFreeSpecToken queue_ms := {|
+    wfst_G := QueueG;
+    wfst_subG := queue_sub;
+    wfst_mod_inv _ _ _ _ _ := queue_inv val_is_int;
+    wfst_init_mod _ _ _ _ _ := init_queue_inv;
+    wfst_safety_spec _ _ _ _ _ := queue_pwps;
+    wfst_spec _ _ _ _ _ _ := queue_specs;
+  |}.
+
+  (* Print Assumptions SimpleQueue_WaitFreeToken.  *)
 
 End QueueSpec. 
