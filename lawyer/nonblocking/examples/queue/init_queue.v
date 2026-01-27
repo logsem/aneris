@@ -13,6 +13,10 @@ From lawyer.nonblocking.tokens Require Import tokens_ra.
 Close Scope Z. 
 
 
+(* Class SimpleQueueTokensPre Σ := SQTPre { *)
+(*   sqt_pre_init: ⊢ |==> ∃ (SQT: SimpleQueueTokens Σ), @dequeue_token _ SQT ∗ @read_head_token _ SQT; *)
+(* }. *)
+
 Section InitQueue.
 
   (* TODO: move *)
@@ -111,7 +115,7 @@ Section InitQueue.
     iModIntro. iFrame.
   Qed.
 
-  Context `{QueuePreG Σ, heap1GS Σ, invGS_gen HasNoLc Σ, MethodTokenPre Σ}.
+  Context `{QueuePreG Σ, heap1GS Σ, invGS_gen HasNoLc Σ}.
   Context (PE: val -> iProp Σ) {PE_PERS: forall v, Persistent (PE v)}. 
 
   (* TODO: move/upstream *)
@@ -185,19 +189,18 @@ Section InitQueue.
     simpl. iDestruct "X" as "($&$&$&$&$&$&$&$&$&?)".
   Qed.    
   
-  Lemma queue_init sq (pfl ph: loc) (v: val):
+  Lemma queue_init `{SimpleQueueTokens Σ} sq (pfl ph: loc) (v: val):
     queue_init_resource sq pfl ph (v: val) -∗ PE v ={⊤}=∗
-    ∃ qv (_: QueueG Σ), queue_inv PE qv ∗ read_head_token ∗ dequeue_token. 
+    ∃ (_: QueueG Σ), queue_inv PE.
   Proof using All.
     destruct sq eqn:SQ. simpl.
     rewrite /queue_init_resource. 
     iIntros "((BR & FL & _) & (H & T & _) & OHV & HNh & HNfl) #PEv".
 
-    iAssert (|={⊤}=> ∃ (qv : val) (H3 : QueueG Σ), queue_at qv ∗
-               (∃ hq (h t br fl : nat) (rop od : option nat) (hist : read_hist), 
-               queue_inv_inner PE hq h t br fl rop od hist) ∗ read_head_token ∗ dequeue_token)%I with "[-]" as "INV".
-    2: { iMod "INV" as "(%&%&$&?&$&$)".
-         by iApply inv_alloc. }    
+    iAssert (|={⊤}=> ∃ (_ : QueueG Σ), (∃ hq h t br fl rop od hist, 
+               queue_inv_inner PE hq h t br fl rop od hist))%I with "[-]" as "INV".
+    2: { iMod "INV" as "(%QQ&X)".
+         iExists QQ. rewrite -SQ. by iApply inv_alloc. }
     rewrite /queue_inv_inner.
 
     set (hq0 := [(pfl, (v, ph))]). 
@@ -206,18 +209,14 @@ Section InitQueue.
     iMod rop_init as "(%γ_r & RAUTH & RFRAG)".
     iMod rop_token_init as "(%γ_rtok & RTOK)". 
     iMod read_hist_init as "(%RHIST & HIST & #RP0)".
-    iMod sqt_pre_init as "(%SQT & DTOK & ETOK)".
+    (* iMod sqt_pre_init as "(%SQT & DTOK & ETOK)". *)
 
     iMod (auths_exacts_init [1; 1; 0; 0]) as "(%MES & AUTHS & EXS)".
     iDestruct (big_sepL2_length with "AUTHS") as %ME_LEN. simpl in ME_LEN.
     do 5 (destruct MES; simpl in ME_LEN; try lia). 
     
-    iModIntro. iExists _.
-    iExists (Build_QueueG _ sq _ m m0 m1 m2 _ _ _ _ _ _).
-    iSplitR.
-    { rewrite /queue_at. simpl. iPureIntro. reflexivity. }
-    iSplitR "ETOK DTOK".
-    2: by iFrame. 
+    iModIntro. 
+    iExists (Build_QueueG _ _ m m0 m1 m2 _ _ _ _ _).
     
     iFrame "HQ". 
     simpl. rewrite !bi.sep_emp.
@@ -276,27 +275,28 @@ Section InitQueue.
 End InitQueue.
 
 
-  (* Lemma dequeue_token_excl: *)
-  (*   dequeue_token -∗ dequeue_token -∗ False. *)
-  (* Proof using. *)
-  (*   clear.  *)
-  (*   simpl. rewrite /dequeue_token. *)
-  (*   rewrite bi.wand_curry. rewrite -methods_toks_split. *)
-  (*   iIntros "X". iDestruct (methods_toks_sub with "[$]") as %V. *)
-  (*   pose proof dequeuer_neq_enqueuer. multiset_solver.  *)
-  (* Qed.  *)
-    
+Definition max_exact_Σ: gFunctors := #[ GFunctor (prodUR (excl_authUR nat) mono_natUR)].
+Global Instance max_exact_sub: forall Σ, subG max_exact_Σ Σ -> MaxExactPreG Σ.
+Proof using. solve_inG. Qed. 
 
-  (* (* TODO: add bupd to mt_init *) *)
-  (* Lemma queue_methods_tokens_init `{MethodTokenPre Σ}: *)
-  (*   ⊢ |==> ∃ (MT: MethodToken queue_MS Σ),  *)
-  (*       method_tok enqueuer ∗ method_tok dequeuer. *)
-  (* Proof using. *)
-  (*   iDestruct (mt_init queue_MS) as "(%MT & TOKS)". *)
-  (*   setoid_rewrite <- methods_toks_split.   *)
-  (*   iExists MT. iFrame. *)
-  (*   rewrite /queue_MS. iModIntro. *)
-  (*   iApply "TOKS". *)
-  (* Qed. *)
+Definition hist_queue_Σ: gFunctors := #[ GFunctor (authUR (gmapUR nat (agreeR HistNode)))].
+Global Instance hist_queue_sub: forall Σ, subG hist_queue_Σ Σ -> HistQueuePreG Σ.
+Proof using. solve_inG. Qed. 
 
-  (* Definition queue_MS: gmultiset val := {[+ enqueuer; dequeuer +]}. *)
+
+Definition read_hist_Σ: gFunctors := 
+  #[ GFunctor (authUR (gmapUR nat (prodR (optionR $ prodR (agreeR nat) max_natUR)
+                                   (optionR read_state_cmra) )))].
+Global Instance read_hist_sub: forall Σ, subG read_hist_Σ Σ -> ReadHistPreG Σ.
+Proof using. solve_inG. Qed. 
+  
+Definition queue_Σ: gFunctors := #[
+    max_exact_Σ;
+    GFunctor (exclR unitO);
+    hist_queue_Σ;
+    read_hist_Σ; 
+    GFunctor (excl_authUR (option nat))
+].
+
+Global Instance queue_sub: forall Σ, subG queue_Σ Σ -> QueuePreG Σ.
+Proof using. solve_inG. Qed.

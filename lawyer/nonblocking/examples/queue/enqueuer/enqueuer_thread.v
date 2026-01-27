@@ -8,7 +8,7 @@ From lawyer.obligations Require Import obligations_model obligations_resources o
 From lawyer Require Import sub_action_em program_logic.
 From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From iris.base_logic.lib Require Import invariants.
-From lawyer.nonblocking.examples.queue Require Import simple_queue_utils simple_queue to_int.
+From lawyer.nonblocking.examples.queue Require Import simple_queue_utils simple_queue to_int wrappers_lib.
 From lawyer.nonblocking.examples.queue.enqueuer Require Import enqueue read_head.
 From heap_lang Require Import heap_lang_defs lang notation.
 
@@ -35,6 +35,8 @@ Section EnqueuerThread.
 
   Context {Σ} {OHE: OM_HL_Env OP EM Σ}.
   Context {QL: QueueG Σ}.
+  Context {SQT: SimpleQueueTokens Σ}.
+  Context {q_sq: SimpleQueue}. 
 
   Context (d: Degree).
 
@@ -42,17 +44,14 @@ Section EnqueuerThread.
 
   Let hGS: heap1GS Σ := iem_phys _ EM.
   Existing Instance hGS.
-
-  (* TODO: move *)
-  Definition val_is_int (v: val): iProp Σ := ⌜ ∃ (n: Z), v = #n ⌝.
   
   From lawyer.nonblocking.logrel Require Import valid_client.
 
   (** The spec needed by the token-based adequacy theorem *)
   (** Note that at this point we choose the concrete predicate for queue elements,
       such that it allows to establish is_ground_val in postcondition *)
-  Lemma read_head_enqueuer_spec l (τ: locale heap_lang) (π: Phase) (q: Qp) (v: val):
-    {{{ queue_inv val_is_int l ∗ read_head_token ∗ 
+  Lemma enqueuer_thread_spec (τ: locale heap_lang) (π: Phase) (q: Qp) (v: val):
+    {{{ queue_inv val_is_int ∗ read_head_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d et_fuel }}}
        enqueuer_thread q_sq v @ τ
     {{{ (v: val), RET v; th_phase_frag τ π q ∗ read_head_token ∗

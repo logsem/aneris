@@ -14,12 +14,12 @@ From heap_lang Require Import heap_lang_defs lang notation.
 Close Scope Z.
 
 
-Definition enqueue '(SQ H T BR FL OHV as sq): val :=
+Definition enqueue (sq: SimpleQueue): val :=
   λ: "v",
     let: "nd" := mk_dummy_node #() in
-    let: "cl" := !#T in
+    let: "cl" := !#Tail in
     set_node "cl" "v" "nd" ;;
-    #T <- "nd"
+    #Tail <- "nd"
 .
 
 Section Enqueue.
@@ -32,7 +32,8 @@ Section Enqueue.
   Context {Σ} {OHE: OM_HL_Env OP EM Σ}.
   (* Existing Instance OHE.  *)
   Context {QL: QueueG Σ}.
-
+  Context {SQT: SimpleQueueTokens Σ}.
+  Context {q_sq: SimpleQueue}. 
   Context (d: Degree).
 
   Definition get_loc_fuel := 5.
@@ -132,16 +133,14 @@ Section Enqueue.
 
   Context (PE: val -> iProp Σ) {PERS_PE: forall v, Persistent (PE v)}. 
 
-  Lemma start_enqueue l (τ: locale heap_lang) (π: Phase) (q: Qp):
-    {{{ queue_inv PE l ∗ read_head_token ∗ 
+  Lemma start_enqueue (τ: locale heap_lang) (π: Phase) (q: Qp):
+    {{{ queue_inv PE ∗ read_head_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d 1 }}}
-       !#(Tail q_sq) @ τ
-    {{{ (pt: loc), RET #pt; th_phase_frag τ π q ∗
-                              (* rop_token ∗  *)
-                              hn_interp_wip (pt, dummy_node) ∗
-          ∃ t br, read_head_resources t br pt None }}}.
+       !#Tail @ τ
+    {{{ (pt: loc), RET #pt; th_phase_frag τ π q ∗ hn_interp_wip (pt, dummy_node) ∗
+          ∃ (t br: nat), read_head_resources t br pt None }}}.
   Proof using.
-    simpl. iIntros (Φ) "([#QAT #INV] & TOK & PH & CPS) POST".
+    simpl. iIntros (Φ) "(#INV & TOK & PH & CPS) POST".
     iInv "INV" as "(%hq & %h & %t & %br & %fl & %rop & %od & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
     iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & OHV & >RHI & >RH' & >DQ & EI)".
@@ -177,15 +176,15 @@ Section Enqueue.
     by iFrame.
   Qed.
 
-  Lemma setup_cur_tail l (τ: locale heap_lang) (π: Phase) (q: Qp)
+  Lemma setup_cur_tail(τ: locale heap_lang) (π: Phase) (q: Qp)
     pt   t br   v nxt:
 
-    {{{ queue_inv PE l ∗ hn_interp_wip (pt, dummy_node) ∗ read_head_resources t br pt None ∗
+    {{{ queue_inv PE ∗ hn_interp_wip (pt, dummy_node) ∗ read_head_resources t br pt None ∗
         th_phase_frag τ π q ∗ cp_mul π d mk_node_fuel }}}
        set_node #pt v #nxt @ τ
     {{{ RET #(); th_phase_frag τ π q ∗ hn_interp_wip (pt, (v, nxt)) ∗ read_head_resources t br pt None }}}.
   Proof using.
-    simpl. iIntros (Φ) "([#QAT #INV] & TNI' & RH & PH & CPS) POST".
+    simpl. iIntros (Φ) "(#INV & TNI' & RH & PH & CPS) POST".
     rewrite /set_node. pure_steps.
 
     rewrite /set_val. pure_steps.
@@ -351,16 +350,16 @@ Section Enqueue.
     iIntros "$ $".
   Qed.
 
-  Lemma update_tail l (τ: locale heap_lang) (π: Phase) (q: Qp)
+  Lemma update_tail(τ: locale heap_lang) (π: Phase) (q: Qp)
     pn pt v    t br:
-    {{{ queue_inv PE l ∗ hn_interp (pn, dummy_node) ∗ hn_interp_wip (pt, (v, pn)) ∗ 
+    {{{ queue_inv PE ∗ hn_interp (pn, dummy_node) ∗ hn_interp_wip (pt, (v, pn)) ∗ 
         read_head_resources t br pt None ∗ PE v ∗ 
         th_phase_frag τ π q ∗ cp_mul π d 1 }}}
-      #(Tail q_sq) <- #pn @τ
+      #Tail <- #pn @τ
     {{{ RET #(); th_phase_frag τ π q ∗ read_head_resources (S t) br pn None ∗ rop_token }}}.
   Proof using.
-    simpl. iIntros (Φ) "([#QAT #INV] & DNI & TNI & RH & PEv & PH & CPS) POST".
-    destruct q_sq eqn:Q_SQ. simpl.
+    simpl. iIntros (Φ) "(#INV & DNI & TNI & RH & PEv & PH & CPS) POST".
+    (* destruct q_sq eqn:Q_SQ. simpl. *)
 
     iInv "INV" as "(%hq & %h & %t_ & %br_ & %fl & %rop_ & %od & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
@@ -375,15 +374,13 @@ Section Enqueue.
 
     rewrite {1}/read_head_resources. iDestruct "RH" as "(TE & BRE & TAIL' & ROP)".
     iCombine "TAIL TAIL'" as "TAIL".
-    rewrite Q_SQ /=.
 
     iApply sswp_MU_wp; [done| ].
     iApply (wp_store with "[$]"). iIntros "!> [TAIL TAIL']".
     MU_by_burn_cp. iApply wp_value.
 
     iAssert (|==> read_head_resources (S t) br pn None ∗ auths h (S t) br fl)%I with "[TE BRE TAIL' ROP AUTHS]" as "X".
-    { iFrame "BRE ROP".
-      rewrite Q_SQ /=. iFrame.
+    { iFrame "BRE ROP TAIL'".
       rewrite /auths. iDestruct "AUTHS" as "($ & TA & $ & $)".
       rewrite bi.sep_comm. iApply (me_update with "TA [$]"). lia. }
     iMod "X" as "[RH AUTHS]". 
@@ -403,7 +400,7 @@ Section Enqueue.
       { iCombine "TNI0 TNI0'" as "X".
         rewrite frac_op Qp.half_half. iFrame. }
 
-      rewrite Q_SQ /=. iFrame.
+      iFrame.
       iSplitR.
       { iPureIntro. eapply is_LL_into_ext; eauto. }
       remember (drop h hq) as hq'.
@@ -413,7 +410,6 @@ Section Enqueue.
       with "[PQI BR FL]" as "QI".
     { iFrame. iSplitR.
       { iPureIntro. rewrite length_app /=. lia. }
-      rewrite Q_SQ /=. 
       iDestruct "BR" as "(% & %BR & BR)". iDestruct "FL" as "(% & %FL & FR & ?)".
       iFrame. iPureIntro.
       split; eapply lookup_app_l_Some; eauto. }
@@ -432,14 +428,14 @@ Section Enqueue.
     iPureIntro. red. red in ORDER. lia.  
   Qed.
 
-  Lemma enqueue_spec l (τ: locale heap_lang) (π: Phase) (q: Qp) (v: val):
-    {{{ queue_inv PE l ∗ read_head_token ∗ PE v ∗ 
+  Lemma enqueue_spec (τ: locale heap_lang) (π: Phase) (q: Qp) (v: val):
+    {{{ queue_inv PE ∗ read_head_token ∗ PE v ∗ 
         th_phase_frag τ π q ∗ cp_mul π d enqueue_fuel }}}
        enqueue q_sq v @ τ
     {{{ RET #(); th_phase_frag τ π q ∗ read_head_token }}}.
   Proof using.
-    simpl. iIntros (Φ) "([#QAT #INV] & TOK & PEv & PH & CPS) POST".
-    rewrite /enqueue. destruct q_sq eqn:Q_SQ.
+    simpl. iIntros (Φ) "(#INV & TOK & PEv & PH & CPS) POST".
+    rewrite /enqueue. 
     pure_steps.
 
     split_cps "CPS" mk_node_fuel; [cbv; lia| ]. 
@@ -450,15 +446,15 @@ Section Enqueue.
 
     wp_bind (! _)%E.
     split_cps "CPS" 1.
-    replace Tail with (simple_queue.Tail q_sq) by (by rewrite Q_SQ).
-    iApply (start_enqueue with "[$QAT $INV $CPS' $PH $TOK]").
+    (* replace Tail with (simple_queue.Tail q_sq) by (by rewrite Q_SQ). *)
+    iApply (start_enqueue with "[$INV $CPS' $PH $TOK]").
     iIntros "!> %pt (PH & TL & (%t & %br & RH))".
 
     wp_bind (Rec _ _ _)%E. do 3 pure_step_cases.
 
     wp_bind (set_node _ _ _)%E.
     split_cps "CPS" mk_node_fuel; [cbv; lia| ]. 
-    iApply (setup_cur_tail with "[$QAT $INV $CPS' $PH $TL $RH]").
+    iApply (setup_cur_tail with "[$INV $CPS' $PH $TL $RH]").
     iIntros "!> (PH & TL & RH)". 
     
     wp_bind (Rec _ _ _)%E. pure_steps.

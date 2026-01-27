@@ -16,10 +16,10 @@ From heap_lang Require Import heap_lang_defs lang notation.
 Close Scope Z.
 
 
-Definition read_head_dequeuer '(SQ H T BR FL OHV as sq): val := 
+Definition read_head_dequeuer (sq: SimpleQueue): val := 
   λ: <>,
-    let: "ch" := !#H in
-    let: "ct" := !#T in
+    let: "ch" := !#Head in
+    let: "ct" := !#Tail in
     if: "ch" = "ct" then NONE
     else SOME (get_val "ch")
 .
@@ -33,6 +33,8 @@ Section ReadHeadDequeuer.
 
   Context {Σ} {OHE: OM_HL_Env OP EM Σ}.
   Context {QL: QueueG Σ}.
+  Context {SQT: SimpleQueueTokens Σ}.
+  Context {q_sq: SimpleQueue}. 
 
   Context (d: Degree).
   Context (PE: val -> iProp Σ) {PERS_PE: forall v, Persistent (PE v)}.
@@ -43,15 +45,15 @@ Section ReadHeadDequeuer.
 
   (* TODO: refactor, unify with the beginning of dequeue *)
   (* TODO: extract get_head_val_spec, remove import of dequeue.v *)
-  Lemma read_head_dequeuer_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
-    {{{ queue_inv PE l ∗ dequeue_token ∗ 
+  Lemma read_head_dequeuer_spec (τ: locale heap_lang) (π: Phase) (q: Qp):
+    {{{ queue_inv PE ∗ dequeue_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d read_head_dequeuer_fuel }}}
        read_head_dequeuer q_sq #() @ τ
     {{{ (v: val), RET v; th_phase_frag τ π q ∗ dequeue_token ∗ 
                          (⌜ v = NONEV ⌝ ∨ ∃ v', ⌜ v = SOMEV v' ⌝ ∗ PE v') }}}.
   Proof using PERS_PE.
-    simpl. iIntros (Φ) "([#QAT #INV] & TOK & PH & CPS) POST".
-    rewrite /read_head_dequeuer. destruct q_sq eqn:Q_SQ.
+    simpl. iIntros (Φ) "(#INV & TOK & PH & CPS) POST".
+    rewrite /read_head_dequeuer.
     pure_steps.
 
     wp_bind (! _)%E.
@@ -61,7 +63,7 @@ Section ReadHeadDequeuer.
     
     iApply sswp_MU_wp; [done| ].
     iDestruct (access_queue_ends with "[$] [$]") as "(%ph & %pt & HEAD & TAIL & HT & CLOS')".
-    replace Head with (simple_queue.Head q_sq) by (by rewrite Q_SQ).
+    (* replace Head with (simple_queue.Head q_sq) by (by rewrite Q_SQ). *)
     iApply (wp_load with "HEAD"). iIntros "!> HEAD".
     iDestruct "DQ" as "[[%ph_ DR] | TOK']".
     2: { by iDestruct (dequeue_token_excl with "[$] [$]") as "?". }
@@ -86,7 +88,6 @@ Section ReadHeadDequeuer.
     iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & OHV & >RHI & >RH & >DQ & EI)".
     iApply sswp_MU_wp; [done| ].
     iDestruct (access_queue_ends with "[$] [$]") as "(%ph_ & %pt & HEAD & TAIL & #HT & CLOS')".
-    replace Tail with (simple_queue.Tail q_sq) by (by rewrite Q_SQ).
     iApply (wp_load with "[$]"). iIntros "!> TAIL".
     iDestruct (dequeue_res_head_agree with "DR [$]") as %->. 
     iDestruct (dequeue_resources_auth_agree with "DR [$]") as %[<- <-].

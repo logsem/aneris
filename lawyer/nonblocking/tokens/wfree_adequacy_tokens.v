@@ -91,7 +91,7 @@ Section WFAdequacy.
   Qed.
 
   (* TODO: move to lib and remove duplicate? *)
-  Lemma rah_wfree_inv {Σ} {Hinv : IEMGS HeapLangEM EM Σ} {wG: wfst_G _ SPEC Σ}
+  Lemma rah_wfree_inv {Σ} {Hinv : IEMGS HeapLangEM EM Σ} {wG: wfst_G _ SPEC Σ} {MT: MethodToken MS Σ}
     c:
   ⊢ adequacy_cond.rel_always_holds_with_trace_inv MaybeStuck
     (wfree_trace_inv ic s' SPEC (wG := wG))
@@ -131,13 +131,14 @@ Section WFAdequacy.
   Qed.
 
   (* TODO: unify with non-tokens version if invariants are unified *)
-  Lemma init_wfree_inv  {Σ} {Hinv : IEMGS HeapLangEM EM Σ} {wG: wfst_G _ SPEC Σ} c
+  Lemma init_wfree_inv  {Σ} {Hinv : IEMGS HeapLangEM EM Σ} {wG: wfst_G _ SPEC Σ}  {MT: MethodToken MS Σ}
+    c 
     (ETR0: is_init_tpool c.1)
     (MOD_INIT: wfst_is_init_st _ SPEC c)
     (M_FUN: is_fun m):
   @wfst_mod_inv _ SPEC Σ
             (@iem_phys heap_lang _ HeapLangEM EM Σ Hinv)
-            (@iris_invGS heap_lang _ Σ (@IEM_irisG heap_lang _ HeapLangEM EM Σ Hinv)) wG -∗
+            (@iris_invGS heap_lang _ Σ (@IEM_irisG heap_lang _ HeapLangEM EM Σ Hinv)) wG MT -∗
   wfree_trace_inv ic s' SPEC {tr[ c ]} {tr[ init_om_wfree_state F ic c ]} (wG := wG).
   Proof using.
     (* clear MSm. *)

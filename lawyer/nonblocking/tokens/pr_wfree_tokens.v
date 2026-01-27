@@ -87,7 +87,7 @@ Section WaitFreePR.
   Qed.
 
   (* TODO: rename or unify with non-token version *)
-  Definition wfree_trace_inv `{Hinv : @IEMGS _ _ HeapLangEM EM Σ} {wG: wfst_G _ WFST Σ}
+  Definition wfree_trace_inv `{Hinv : @IEMGS _ _ HeapLangEM EM Σ} {wG: wfst_G _ WFST Σ} {MT: MethodToken MS Σ}
     (extr: execution_trace heap_lang) (omtr: auxiliary_trace M): iProp Σ :=
     ⌜ no_extra_obls ic (trace_last extr) (trace_last omtr) /\
       from_option (fun e => to_val e = None) True (from_locale (trace_last extr).1 τi) /\

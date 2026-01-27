@@ -14,6 +14,8 @@ Close Scope Z.
 Section DequeueGhost.
   Context {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ}.  
   Context {QL: QueueG Σ}.
+  Context {SQT: SimpleQueueTokens Σ}.
+  Context {q_sq: SimpleQueue}. 
   
   (* TODO: move *)
   Lemma is_LL_into_drop hq pt k
@@ -131,11 +133,11 @@ Section DequeueGhost.
   (pt : loc)
   (LL : is_LL_into (drop h hq) pt):
   ⊢ ([∗ list] nd ∈ drop h hq, hn_interp nd) -∗
-  Tail q_sq ↦{1 / 2} #pt -∗ 
+  Tail ↦{1 / 2} #pt -∗ 
   tail_interp pt -∗
-  Head q_sq ↦{1 / 2} #nxh -∗
-  (∃ nbr : HistNode, ⌜hq !! br = Some nbr⌝ ∗ BeingRead q_sq ↦ #nbr.1) -∗ 
-  (∃ nfl : HistNode, ⌜hq !! fl = Some nfl⌝ ∗ FreeLater q_sq ↦ #nfl.1 ∗
+  Head ↦{1 / 2} #nxh -∗
+  (∃ nbr : HistNode, ⌜hq !! br = Some nbr⌝ ∗ BeingRead ↦ #nbr.1) -∗ 
+  (∃ nfl : HistNode, ⌜hq !! fl = Some nfl⌝ ∗ FreeLater ↦ #nfl.1 ∗
     hn_interp nfl) -∗ 
   queue_interp hq (h + 1) t br fl ∗ hn_interp (ph, (vh, nxh)).
   Proof using. 
@@ -200,10 +202,10 @@ Section DequeueGhost.
   hq_auth hq -∗
   auths h t br fl -∗
   ([∗ list] nd ∈ drop h hq, hn_interp nd) -∗
-  Tail q_sq ↦{1 / 2} #pt -∗
+  Tail ↦{1 / 2} #pt -∗
   tail_interp pt -∗
-  (∃ nbr : HistNode, ⌜hq !! br = Some nbr⌝ ∗ BeingRead q_sq ↦ #nbr.1) -∗
-  (∃ nfl : HistNode, ⌜hq !! fl = Some nfl⌝ ∗ FreeLater q_sq ↦ #nfl.1 ∗
+  (∃ nbr : HistNode, ⌜hq !! br = Some nbr⌝ ∗ BeingRead ↦ #nbr.1) -∗
+  (∃ nfl : HistNode, ⌜hq !! fl = Some nfl⌝ ∗ FreeLater ↦ #nfl.1 ∗
            hn_interp nfl) -∗
   dangle_auth None -∗
   ohv_interp PE -∗
@@ -215,11 +217,11 @@ Section DequeueGhost.
                 (rop0 od : option nat) (hist0 : read_hist),
                 queue_inv_inner PE hq0 h0 t0 br0 fl0 rop0 od hist0) ={
            ⊤ ∖ ↑queue_ns,⊤}=∗ emp) -∗
-  Head q_sq ↦{1 / 2} #nxh -∗
-  Head q_sq ↦{1 / 2} #nxh -∗
+  Head ↦{1 / 2} #nxh -∗
+  Head ↦{1 / 2} #nxh -∗
   queue_elems_interp PE hq -∗
   |={⊤ ∖ ↑queue_ns,⊤}=> 
-    (@me_exact _ q_me_h (h + 1) ∗ @me_exact _ q_me_fl fl ∗ Head q_sq ↦{1 / 2} #nxh ∗
+    (@me_exact _ q_me_h (h + 1) ∗ @me_exact _ q_me_fl fl ∗ Head ↦{1 / 2} #nxh ∗
      dangle_frag (Some h)) ∗
     ∃ i r b : nat, ith_read i r (h + 1) ∗ ⌜r ≤ h⌝ ∗ br_lb b ∗
       (⌜b < r⌝ -∗
@@ -399,13 +401,13 @@ Section DequeueGhost.
                 ⌜∃ nd : Node, Some (ph, ndh) = Some (ph, nd)⌝ -∗ False) -∗
   @me_exact _ (@q_me_h Σ QL) (h + 1) -∗
   @me_exact _ (@q_me_fl Σ QL) fl -∗
-  simple_queue.Head q_sq ↦{1 / 2} #ndh.2 -∗
+  simple_queue.Head ↦{1 / 2} #ndh.2 -∗
   dangle_frag (Some h) -∗
   hq_auth hq -∗
   auths (h + 1) t br fl -∗
   phys_queue_interp (drop (h + 1) hq) -∗
   (∃ nbr : HistNode, ⌜hq !! br = Some nbr⌝ ∗
-           simple_queue.BeingRead q_sq ↦ #nbr.1) -∗
+           simple_queue.BeingRead ↦ #nbr.1) -∗
   hn_interp (pfl, ndfl) -∗
   dangle_auth (Some h) -∗
   (let '(v, nxt) := ndh in ph ↦ v ∗ (ph +ₗ 1) ↦ #nxt) -∗
@@ -418,11 +420,11 @@ Section DequeueGhost.
                 (rop0 od : option nat) (hist0 : read_hist),
                 queue_inv_inner PE hq0 h0 t0 br0 fl0 rop0 od hist0) ={
            ⊤ ∖ ↑queue_ns,⊤}=∗ emp) -∗
-  simple_queue.FreeLater q_sq ↦ #ph -∗
+  simple_queue.FreeLater ↦ #ph -∗
   queue_elems_interp PE hq -∗
   |={⊤ ∖ ↑queue_ns,⊤}=>
     ∃ (x : Node) (x0 : nat), (let '(v, nxt) := x in pfl ↦ v ∗ (pfl +ₗ 1) ↦ #nxt) ∗
-      @me_exact _ q_me_h (h + 1) ∗ @me_exact _ q_me_fl x0 ∗ simple_queue.Head q_sq ↦{
+      @me_exact _ q_me_h (h + 1) ∗ @me_exact _ q_me_fl x0 ∗ simple_queue.Head ↦{
       1 / 2} #ndh.2 ∗ dangle_frag None.
   Proof using.
     clear PERS_PE. 
@@ -547,7 +549,7 @@ Section DequeueGhost.
   hq_auth hq -∗
   auths (h + 1) t br fl -∗
   phys_queue_interp (drop (h + 1) hq) -∗
-  (∃ nfl : HistNode, ⌜hq !! fl = Some nfl⌝ ∗ FreeLater q_sq ↦ #nfl.1 ∗
+  (∃ nfl : HistNode, ⌜hq !! fl = Some nfl⌝ ∗ FreeLater ↦ #nfl.1 ∗
            hn_interp nfl) -∗
   dangle_auth (Some h) -∗
   (let '(v, nxt) := ndh in ph ↦ v ∗ (ph +ₗ 1) ↦ #nxt) -∗
@@ -561,7 +563,7 @@ Section DequeueGhost.
                 (rop0 od : option nat) (hist0 : read_hist),
                 queue_inv_inner PE hq0 h0 t0 br0 fl0 rop0 od hist0) ={
            ⊤ ∖ ↑queue_ns,⊤}=∗ emp) -∗
-  BeingRead q_sq ↦ #(pbr, nbr)%core.1 -∗
+  BeingRead ↦ #(pbr, nbr)%core.1 -∗
   queue_elems_interp PE hq -∗
   |={⊤ ∖ ↑queue_ns,⊤}=>
     dangle_frag (if decide ((pbr, nbr).1 = ph) then Some h else None) ∗

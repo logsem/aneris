@@ -24,8 +24,12 @@ Class SimpleQueueTokens Σ := SQT {
   read_head_token_excl: read_head_token -∗ read_head_token -∗ False;
 }.
 
-Class SimpleQueueTokensPre Σ := SQTPre {
-  sqt_pre_init: ⊢ |==> ∃ (SQT: SimpleQueueTokens Σ), @dequeue_token _ SQT ∗ @read_head_token _ SQT;
+(** even though it doesn't make sense to infer instances of SimpleQueue automatically, 
+    we make it a typeclass so this parameter doesn't have to be repeated
+    when any of the definitions below is used *)
+Class SimpleQueue := SQ {     
+    Head: loc; Tail: loc; BeingRead: loc; 
+    FreeLater: loc; OldHeadVal: loc;
 }.
 
 Class QueuePreG Σ := {
@@ -34,18 +38,11 @@ Class QueuePreG Σ := {
   q_pre_hq :: HistQueuePreG Σ;
   q_pre_rh :: ReadHistPreG Σ;
   q_pre_dangle_rop ::  inG Σ (excl_authUR (option nat));
-  (* q_pre_toks :: MethodTokenPre Σ; *)
-  q_pre_toks :: SimpleQueueTokensPre Σ; 
-}.
-
-
-Record SimpleQueue := SQ {     
-    Head: loc; Tail: loc; BeingRead: loc; 
-    FreeLater: loc; OldHeadVal: loc;
+  (** Tokens RA is instantiated at the top-level, not by the queue module *)
+  (* q_pre_toks :: SimpleQueueTokensPre Σ;  *)
 }.
 
 Class QueueG Σ := {
-    q_sq: SimpleQueue;
     q_pre :: QueuePreG Σ; 
 
     q_me_h :: MaxExactG Σ;
@@ -58,10 +55,7 @@ Class QueueG Σ := {
     q_rh :: ReadHistG Σ;
 
     q_γ_dangle: gname;
-    q_γ_rop: gname;
-
-    (* q_toks :: MethodToken queue_MS Σ; *)
-    q_toks :: SimpleQueueTokens Σ; 
+    q_γ_rop: gname;    
 }.
 
 
@@ -90,12 +84,14 @@ Section QueueResources.
   Context {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ}.
   
   Context {QL: QueueG Σ}.
+  Context {SQT: SimpleQueueTokens Σ}.
+  Context {q_sq: SimpleQueue}. 
   Context (PE: val -> iProp Σ). (** predicate on elements of the queue*)
   (** We need persistency due to read_head which doesn't return ownership
       of the head element.
       Non-persistent predicates would only make sense with logically atomic specs,
       which we don't consider. *)
-  Context `{PE_PERS: forall v, Persistent (PE v)}. 
+  Context `{PE_PERS: forall v, Persistent (PE v)}.
   
   Definition hn_interp (hn: HistNode): iProp Σ :=
     let '(l, (v, nxt)) := hn in
@@ -141,9 +137,9 @@ Section QueueResources.
    *)
   Definition phys_queue_interp (pq: HistQueue): iProp Σ :=
     ([∗ list] nd ∈ pq, hn_interp nd) ∗
-    ∃ (pt: loc), Tail q_sq ↦{1/2} #pt ∗ tail_interp pt ∗ ⌜ is_LL_into pq pt ⌝ ∗
+    ∃ (pt: loc), @Tail q_sq ↦{1/2} #pt ∗ tail_interp pt ∗ ⌜ is_LL_into pq pt ⌝ ∗
     let ph: loc := (from_option (fun hn => hn.1) pt (pq !! 0)) in
-    Head q_sq ↦{1/2} #ph
+    @Head q_sq ↦{1/2} #ph
   . 
   
   Definition queue_interp (hq: HistQueue) (h t br fl: nat): iProp Σ :=
@@ -154,8 +150,8 @@ Section QueueResources.
     (* let ph: loc := (from_option (fun hn => hn.1) pt (hq !! h)) in *)
     (* Head q_sq ↦{1/2} #ph ∗ *)
     phys_queue_interp pq ∗ 
-    (∃ (nbr: HistNode), ⌜ hq !! br = Some nbr ⌝ ∗ BeingRead q_sq ↦#(nbr.1)) ∗
-    (∃ (nfl: HistNode), ⌜ hq !! fl = Some nfl ⌝ ∗ FreeLater q_sq ↦#(nfl.1) ∗ hn_interp nfl)
+    (∃ (nbr: HistNode), ⌜ hq !! br = Some nbr ⌝ ∗ @BeingRead q_sq ↦#(nbr.1)) ∗
+    (∃ (nfl: HistNode), ⌜ hq !! fl = Some nfl ⌝ ∗ @FreeLater q_sq ↦#(nfl.1) ∗ hn_interp nfl)
   .
 
   Lemma queue_interp_cur_empty (hq: HistQueue) (h br fl: nat):
@@ -239,11 +235,11 @@ Section QueueResources.
   
   Definition read_head_resources (t br: nat) (pt: loc) (rop: option nat): iProp Σ :=
     @me_exact _ q_me_t t ∗ @me_exact _ q_me_br br ∗ 
-    Tail q_sq ↦{1/2} #pt ∗ rop_frag rop.
+    @Tail q_sq ↦{1/2} #pt ∗ rop_frag rop.
 
   Definition dequeue_resources (h fl: nat) (ph: loc) (od: option nat): iProp Σ :=
     @me_exact _ q_me_h h ∗ @me_exact _ q_me_fl fl ∗
-    Head q_sq ↦{1/2} #ph ∗ dangle_frag od. 
+    @Head q_sq ↦{1/2} #ph ∗ dangle_frag od. 
   
   Definition hq_state_wf h t br fl: Prop :=
     (* fl <= br /\ *) (* see runs.org for a counterexample *)
@@ -293,7 +289,7 @@ Section QueueResources.
 
   (* TODO: ? specify which historical node is used
      instead of explicitly requiring PE *)
-  Definition ohv_interp: iProp Σ := ∃ ohv, OldHeadVal q_sq ↦ ohv ∗ PE ohv.
+  Definition ohv_interp: iProp Σ := ∃ ohv, @OldHeadVal q_sq ↦ ohv ∗ PE ohv.
 
   Definition read_hist_interp hist rop h br fl od: iProp Σ :=
     rop_auth rop ∗
@@ -319,15 +315,10 @@ Section QueueResources.
   .
   
   Definition queue_ns := nroot .@ "queue".
-
-  Definition queue_at (q: val): iProp Σ :=
-    ⌜ q = (#(Head q_sq), (#(Tail q_sq), (#(BeingRead q_sq), (#(FreeLater q_sq), #(OldHeadVal q_sq)))))%V ⌝. 
   
   (* Definition queue_inv (q: loc): iProp Σ := *)
-  Definition queue_inv (q: val): iProp Σ :=
-    queue_at q ∗ inv queue_ns 
-      (∃ hq h t br fl rop od hist, queue_inv_inner hq h t br fl rop od hist)
-  .
+  Definition queue_inv: iProp Σ := inv queue_ns
+    (∃ hq h t br fl rop od hist, queue_inv_inner hq h t br fl rop od hist).
   
   Lemma dequeue_resources_excl h1 fl1 ph1 od1 h2 fl2 ph2 od2:
     dequeue_resources h1 fl1 ph1 od1 -∗ dequeue_resources h2 fl2 ph2 od2 -∗ False.
@@ -371,7 +362,7 @@ Section QueueResources.
   Qed.
     
   Lemma dequeue_res_head_agree h fl (ph ph': loc) od:
-    dequeue_resources h fl ph od -∗ Head q_sq ↦{1 / 2} #ph' -∗ ⌜ ph' = ph ⌝.
+    dequeue_resources h fl ph od -∗ @Head q_sq ↦{1 / 2} #ph' -∗ ⌜ ph' = ph ⌝.
   Proof using.
     clear PE_PERS.
     simpl. rewrite /dequeue_resources. iIntros "(_&_&H'&?) H".
@@ -380,7 +371,7 @@ Section QueueResources.
   Qed.
     
   Lemma read_head_res_Tail_agree t br pt rop pt':
-    read_head_resources t br pt rop -∗ Tail q_sq ↦{1 / 2} #pt' -∗ ⌜ pt' = pt ⌝.
+    read_head_resources t br pt rop -∗ @Tail q_sq ↦{1 / 2} #pt' -∗ ⌜ pt' = pt ⌝.
   Proof using.
     clear PE_PERS. 
     simpl. rewrite /read_head_resources. iIntros "(_&_&T&?) T'".
@@ -458,9 +449,9 @@ Section QueueResources.
 
   Lemma access_queue_ends hq h t br fl:
     hq_auth hq -∗ queue_interp hq h t br fl -∗
-      ∃ (ph pt: loc), Head q_sq ↦{1/2} #ph ∗ (Tail q_sq) ↦{1/2} #pt ∗
+      ∃ (ph pt: loc), @Head q_sq ↦{1/2} #ph ∗ (@Tail q_sq) ↦{1/2} #pt ∗
         (⌜ h >= t /\ ph = pt ⌝ ∨ ⌜ h < t /\ ph ≠ pt ⌝ ∗ ∃ (nd: Node), ith_node h (ph, nd)) ∗
-        (Head q_sq ↦{1/2} #ph -∗ (Tail q_sq) ↦{1/2} #pt -∗ hq_auth hq ∗ queue_interp hq h t br fl).
+        (@Head q_sq ↦{1/2} #ph -∗ (@Tail q_sq) ↦{1/2} #pt -∗ hq_auth hq ∗ queue_interp hq h t br fl).
   Proof using.
     clear PE PE_PERS. 
     simpl. iIntros "[AUTH #FRAGS] QI".

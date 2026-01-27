@@ -15,21 +15,21 @@ From heap_lang Require Import heap_lang_defs lang notation.
 Close Scope Z.
 
 
-Definition get_head_val '(SQ H T BR FL OHV as sq): val :=
+Definition get_head_val (sq: SimpleQueue): val :=
   λ: "ch1",
-    let: "ch2" := !#H in
+    let: "ch2" := !#Head in
     if: "ch1" = "ch2"
     then get_val "ch1"
-    else !#OHV
+    else !#OldHeadVal
 .
 
-Definition read_head_enqueuer '(SQ H T BR FL OHV as sq): val := 
+Definition read_head_enqueuer (sq: SimpleQueue): val := 
   λ: <>,
-    let: "ch" := !#H in
-    let: "ct" := !#T in
+    let: "ch" := !#Head in
+    let: "ct" := !#Tail in
     if: "ch" = "ct" then NONE
     else
-      #BR <- "ch" ;;
+      #BeingRead <- "ch" ;;
       SOME (get_head_val sq "ch")
 .
 
@@ -43,6 +43,8 @@ Section ReadHead.
   Context {Σ} {OHE: OM_HL_Env OP EM Σ}.
   (* Existing Instance OHE.  *)
   Context {QL: QueueG Σ}.
+  Context {SQT: SimpleQueueTokens Σ}.
+  Context {q_sq: SimpleQueue}. 
 
   Context (d: Degree).
   Context (PE: val -> iProp Σ) {PERS_PE: forall v, Persistent (PE v)}. 
@@ -357,17 +359,17 @@ Section ReadHead.
     done.
   Qed.  
 
-  Lemma start_read l (τ: locale heap_lang) (π: Phase) (q: Qp):
-    {{{ queue_inv PE l ∗ read_head_token ∗ 
+  Lemma start_read (τ: locale heap_lang) (π: Phase) (q: Qp):
+    {{{ queue_inv PE ∗ read_head_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d 1 }}}
-       !#(Head q_sq) @ τ
+       !#Head @ τ
     {{{ (ph: loc), RET #ph; th_phase_frag τ π q ∗ rop_token ∗ 
           ∃ t br pt rop, read_head_resources t br pt rop ∗
            (⌜ pt = ph /\ rop = None ⌝ ∨ 
             ∃ i h ndh, ⌜ pt ≠ ph /\ rop = Some i ⌝ ∗ ith_node h (ph, ndh) ∗
                         ith_read i h 0 ∗ ⌜ br <= h ⌝ ∗ disj_range h t ∗ PE ndh.1) }}}.
   Proof using PERS_PE. 
-    simpl. iIntros (Φ) "([#QAT #INV] & TOK & PH & CPS) POST".
+    simpl. iIntros (Φ) "(#INV & TOK & PH & CPS) POST".
 
     iInv "INV" as "(%hq & %h & %t & %br & %fl & %rop & %od & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
@@ -410,13 +412,13 @@ Section ReadHead.
       iApply (ith_included with "ITH"). lia. 
   Qed.
 
-  Lemma read_tail_exact l (τ: locale heap_lang) (π: Phase) (q: Qp) t br pt rop:
-    {{{ queue_inv PE l ∗ read_head_resources t br pt rop ∗
+  Lemma read_tail_exact (τ: locale heap_lang) (π: Phase) (q: Qp) t br pt rop:
+    {{{ queue_inv PE ∗ read_head_resources t br pt rop ∗
         th_phase_frag τ π q ∗ cp_mul π d 1 }}}
-       !#(Tail q_sq) @ τ
+       !#Tail @ τ
     {{{ RET #pt; th_phase_frag τ π q ∗ read_head_resources t br pt rop }}}.
   Proof using.
-    simpl. iIntros (Φ) "([#QAT #INV] & RH & PH & CPS) POST".
+    simpl. iIntros (Φ) "(#INV & RH & PH & CPS) POST".
 
     iInv "INV" as "(%hq & %h & %t_ & %br_ & %fl & %rop_ & %od & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
@@ -439,16 +441,16 @@ Section ReadHead.
     done.
   Qed.
 
-  Lemma bump_BR l (τ: locale heap_lang) (π: Phase) (q: Qp) t br pt h ndh i ph
+  Lemma bump_BR (τ: locale heap_lang) (π: Phase) (q: Qp) t br pt h ndh i ph
     (BRH: br <= h):
-    {{{ queue_inv PE l ∗ read_head_resources t br pt (Some i) ∗
+    {{{ queue_inv PE ∗ read_head_resources t br pt (Some i) ∗
         rop_token ∗ ith_node h (ph, ndh) ∗
         ith_read i h 0 ∗
         th_phase_frag τ π q ∗ cp_mul π d 1 }}}
-       #(BeingRead q_sq) <- #ph @ τ
+       #BeingRead <- #ph @ τ
     {{{ RET #(); th_phase_frag τ π q ∗ read_head_resources t h pt (Some i) ∗ rop_token }}}.
   Proof using.
-    simpl. iIntros (Φ) "([#QAT #INV] & RH & RTOK & #HTH & #READ & PH & CPS) POST".
+    simpl. iIntros (Φ) "(#INV & RH & RTOK & #HTH & #READ & PH & CPS) POST".
 
     iInv "INV" as "(%hq & %h' & %t_ & %br_ & %fl & %rop_ & %od & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
@@ -518,20 +520,20 @@ Section ReadHead.
     by apply rs_le_incl.
   Qed.
 
-  Lemma check_head_change l (τ: locale heap_lang) (π: Phase) (q: Qp)
+  Lemma check_head_change (τ: locale heap_lang) (π: Phase) (q: Qp)
     t pt h ndh i ph
     (PTR_NEQ: pt ≠ ph):
-    {{{ queue_inv PE l ∗ read_head_resources t h pt (Some i) ∗
+    {{{ queue_inv PE ∗ read_head_resources t h pt (Some i) ∗
         rop_token ∗ ith_node h (ph, ndh) ∗
         ith_read i h 0 ∗ disj_range h t ∗ 
         cp_mul π d 1 ∗ th_phase_frag τ π q }}}
-      ! #(Head q_sq) @τ
+      ! #Head @τ
     {{{ (ph': loc), RET #ph'; 
         th_phase_frag τ π q ∗ ∃ rp, read_head_resources t h pt (Some i) ∗
           ith_rp i rp ∗ (⌜ ph' = ph /\ rp = rs_proc None ⌝ ∨ ⌜ ph' ≠ ph /\ rp = rs_canceled ⌝ ∗ rop_token ) }}}.
   Proof using.
     clear PERS_PE.
-    simpl. iIntros (Φ) "([#QAT #INV] & RH & TOK & #ITH & #READ & #DISJ & CPS & PH) POST".
+    simpl. iIntros (Φ) "(#INV & RH & TOK & #ITH & #READ & #DISJ & CPS & PH) POST".
 
     iInv "INV" as "(%hq & %h' & %t_ & %br_ & %fl & %rop_ & %od & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
@@ -551,7 +553,7 @@ Section ReadHead.
     iDestruct ("CLOS'" with "[$] [$]") as "(HQ & QI)".
 
     iApply "POST". iFrame "PH RH".
-    iClear "INV QAT CPS".
+    iClear "INV CPS".
 
     rewrite /read_hist_interp. iDestruct "RHI" as "(ROPA & ROP & RHIST & %RH_WF & #OLDS)".
     rewrite /rop_interp. iDestruct ("ROP" with "[//]") as "(%r & %rp & READ_ & RP & ROP)".
@@ -658,12 +660,12 @@ Section ReadHead.
     by iFrame.
   Qed.
                
-  Lemma read_ohv_spec τ π q l:
-    {{{ queue_inv PE l ∗ th_phase_frag τ π q ∗ cp_mul π d 1 }}}
-      !#(OldHeadVal q_sq) @τ
+  Lemma read_ohv_spec τ π q:
+    {{{ queue_inv PE ∗ th_phase_frag τ π q ∗ cp_mul π d 1 }}}
+      !#OldHeadVal @τ
     {{{ v, RET v; th_phase_frag τ π q ∗ PE v}}}.
   Proof using PERS_PE.
-    iIntros (Φ) "([#QAT #INV] & PH & CPS) POST".
+    iIntros (Φ) "(#INV & PH & CPS) POST".
     iInv "INV" as "(%hq & %h & %t & %br & %fl & %rop & %od & %hist & inv)" "CLOS".
     iEval (rewrite /queue_inv_inner) in "inv".
     iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & OHV & >RHI & >RH & >DQ & EI)".
@@ -676,15 +678,15 @@ Section ReadHead.
     iApply "POST". by iFrame "#∗". 
   Qed.
 
-  Lemma get_op_node_val l (τ: locale heap_lang) (π: Phase) (q: Qp)
+  Lemma get_op_node_val (τ: locale heap_lang) (π: Phase) (q: Qp)
     t h pt i ph ndh:
-    {{{ queue_inv PE l ∗ read_head_resources t h pt (Some i) ∗
+    {{{ queue_inv PE ∗ read_head_resources t h pt (Some i) ∗
         ith_node h (ph, ndh) ∗ ith_read i h 0 ∗ ith_rp i (rs_proc None) ∗
         cp_mul π d small_fuel ∗ th_phase_frag τ π q }}}
       get_val #ph @τ
     {{{ v, RET v; th_phase_frag τ π q ∗ read_head_token ∗ PE v }}}.
   Proof using PERS_PE.
-    simpl. iIntros (Φ) "([#QAT #INV] & RH & #ITH & #READ & #RP0 & CPS & PH) POST".
+    simpl. iIntros (Φ) "(#INV & RH & #ITH & #READ & #RP0 & CPS & PH) POST".
     rewrite /get_val. pure_steps.
 
     wp_bind (_ +ₗ _)%E.
@@ -806,23 +808,22 @@ Section ReadHead.
       iFrame. iFrame "EI". iNext. iSplit; [done| ]. iLeft. iFrame.
   Qed.
 
-  Lemma get_head_val_spec l (τ: locale heap_lang) (π: Phase) (q: Qp)
+  Lemma get_head_val_spec (τ: locale heap_lang) (π: Phase) (q: Qp)
     t pt h ndh i ph
     (NEQ: pt ≠ ph):
-    {{{ queue_inv PE l ∗ read_head_resources t h pt (Some i) ∗
+    {{{ queue_inv PE ∗ read_head_resources t h pt (Some i) ∗
         rop_token ∗ ith_node h (ph, ndh) ∗
         ith_read i h 0 ∗ disj_range h t ∗ 
         cp_mul π d (2 * small_fuel) ∗ th_phase_frag τ π q }}}
       get_head_val q_sq #ph @τ
     {{{ v, RET v; th_phase_frag τ π q ∗ read_head_token ∗ PE v }}}.
   Proof using PERS_PE. 
-    simpl. iIntros (Φ) "([#QAT #INV] & RH & TOK & #ITH & #READ & #DISJ & CPS & PH) POST".
-    rewrite /get_head_val. destruct q_sq eqn:SQ. 
+    simpl. iIntros (Φ) "(#INV & RH & TOK & #ITH & #READ & #DISJ & CPS & PH) POST".
+    rewrite /get_head_val. 
     pure_steps.
 
     wp_bind (! _)%E.
     split_cps "CPS" 1.
-    replace Head with (simple_queue.Head q_sq); [| by rewrite SQ]. 
     iApply (check_head_change with "[-POST CPS]").
     { apply NEQ. }
     { iFrame "#∗". }
@@ -840,9 +841,8 @@ Section ReadHead.
          pure_steps.
          split_cps "CPS" 1.
          iApply wp_fupd.
-         replace OldHeadVal with (simple_queue.OldHeadVal q_sq); [| by rewrite SQ].
  
-         iApply (read_ohv_spec with "[$QAT $INV $CPS' $PH]").
+         iApply (read_ohv_spec with "[$INV $CPS' $PH]").
          iIntros "!> % (PH & PEv)".
          iApply "POST". iFrame.
 
@@ -882,28 +882,26 @@ Section ReadHead.
     done.
   Qed.
 
-  Lemma read_head_enqueuer_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
-    {{{ queue_inv PE l ∗ read_head_token ∗ 
+  Lemma read_head_enqueuer_spec (τ: locale heap_lang) (π: Phase) (q: Qp):
+    {{{ queue_inv PE ∗ read_head_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d read_head_fuel }}}
        read_head_enqueuer q_sq #() @ τ
     {{{ (v: val), RET v; th_phase_frag τ π q ∗ read_head_token ∗
                   (⌜ v = NONEV ⌝ ∨ ∃ v', ⌜ v = SOMEV v' ⌝ ∗ PE v') }}}.
   Proof using PERS_PE.
-    simpl. iIntros (Φ) "([#QAT #INV] & TOK & PH & CPS) POST".
-    rewrite /read_head_enqueuer. destruct q_sq eqn:Q_SQ. rewrite -Q_SQ. 
+    simpl. iIntros (Φ) "(#INV & TOK & PH & CPS) POST".
+    rewrite /read_head_enqueuer. 
     pure_steps.
 
     wp_bind (! _)%E.
     split_cps "CPS" 1.
-    replace Head with (simple_queue.Head q_sq) by (by rewrite Q_SQ).
-    iApply (start_read with "[$QAT $INV $CPS' $PH $TOK]").
+    iApply (start_read with "[$INV $CPS' $PH $TOK]").
     iIntros "!> %ph (PH & RTOK & (%t & %br & %pt & %rop & RH & CASES))".
 
     wp_bind (Rec _ _ _)%E. pure_steps.
     wp_bind (! _)%E.
     split_cps "CPS" 1.
-    replace Tail with (simple_queue.Tail q_sq) by (by rewrite Q_SQ).
-    iApply (read_tail_exact with "[$QAT $INV $CPS' $PH $RH]").
+    iApply (read_tail_exact with "[$INV $CPS' $PH $RH]").
     iIntros "!> (PH & RH)".
 
     wp_bind (Rec _ _ _)%E. pure_steps.
@@ -938,7 +936,6 @@ Section ReadHead.
 
     wp_bind (_ <- _)%E.
     split_cps "CPS" 1.
-    replace BeingRead with (simple_queue.BeingRead q_sq) by (by rewrite Q_SQ). 
     iApply (bump_BR with "[-CPS POST ]").
     { apply BR_H. }
     { iFrame "#∗". }

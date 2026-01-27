@@ -23,7 +23,8 @@ Section RightUtils.
   Context {Σ} {OHE: OM_HL_Env OP EM Σ}.
   (* Existing Instance OHE.  *)
   Context {QL: QueueG Σ}.
-
+  Context {SQT: SimpleQueueTokens Σ}.
+  Context {q_sq: SimpleQueue}. 
   Context (d: Degree).
 
   Context (PE: val -> iProp Σ) {PERS_PE: forall v, Persistent (PE v)}. 
@@ -33,13 +34,13 @@ Section RightUtils.
   Let hGS: heap1GS Σ := iem_phys _ EM.
   Existing Instance hGS.
 
-  Lemma get_head_val_spec Q τ π q h nd fl ph od:
-    {{{ queue_inv PE Q ∗ ith_node h (ph, nd) ∗ dequeue_resources h fl ph od ∗
+  Lemma get_head_val_spec τ π q h nd fl ph od:
+    {{{ queue_inv PE ∗ ith_node h (ph, nd) ∗ dequeue_resources h fl ph od ∗
         th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
       get_val #ph @τ
     {{{ RET (nd.1); th_phase_frag τ π q ∗ dequeue_resources h fl ph od ∗ PE nd.1 }}}.
   Proof using PERS_PE.
-    simpl. iIntros (Φ) "([#QAT #INV] & #HEADhn & DR & PH & CPS) POST".
+    simpl. iIntros (Φ) "(#INV & #HEADhn & DR & PH & CPS) POST".
     rewrite /get_val.
     destruct nd as [v nxt]. simpl.
     pure_steps.

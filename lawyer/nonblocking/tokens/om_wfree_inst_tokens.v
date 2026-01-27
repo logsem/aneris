@@ -41,9 +41,9 @@ Record WaitFreeSpecToken (MS: gmultiset val) := {
   wfst_subG: forall Σ, subG wfst_Σ Σ -> wfst_preG Σ;
 
   (** for wait-free modules, we expect that invariant doesn't contain OM resources *)
-  wfst_mod_inv {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ} {wG: wfst_G Σ}:
+  wfst_mod_inv {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ} {wG: wfst_G Σ} {MT: MethodToken MS Σ}:
     iProp Σ;
-  wfst_mod_inv_Pers `{heap1GS Σ, invGS_gen HasNoLc Σ} {wG: wfst_G Σ} ::
+  wfst_mod_inv_Pers `{heap1GS Σ, invGS_gen HasNoLc Σ} {wG: wfst_G Σ} {MT: MethodToken MS Σ} ::
     Persistent (wfst_mod_inv (wG := wG));
   wfst_init_mod `{heap1GS Σ, invGS_gen HasNoLc Σ, MethodTokenPre Σ, wfst_preG Σ}:
     forall c (INIT: wfst_is_init_st c),
