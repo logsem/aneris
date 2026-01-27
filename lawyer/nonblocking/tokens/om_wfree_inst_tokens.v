@@ -35,8 +35,8 @@ Definition token_safety_spec `{invGS_gen HasNoLc Σ, MethodToken MS Σ}
 Record WaitFreeSpecToken (MS: gmultiset val) := {
   wfst_is_init_st: cfg heap_lang -> Prop;
 
-  wfst_preG: gFunctors -> Set;
-  wfst_G: gFunctors -> Set;
+  wfst_preG: gFunctors -> Type;
+  wfst_G: gFunctors -> Type;
   wfst_Σ: gFunctors;
   wfst_subG: forall Σ, subG wfst_Σ Σ -> wfst_preG Σ;
 
