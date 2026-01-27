@@ -125,7 +125,7 @@ Section InitQueue.
 
   (* TODO: a better way would be to relax restrictions
      on initial nodes pointed by pfl and ph *)
-  Definition is_init_queue_cfg (c: cfg heap_lang) sq (pfl ph: loc) (v: val): Prop :=
+  Definition is_init_queue_cfg sq (pfl ph: loc) (v: val) (c: cfg heap_lang): Prop :=
     let '(SQ H T BR FL OHV) := sq in
     NoDup [H; T; BR; FL; OHV; ph; ph +ₗ 1; pfl; pfl +ₗ 1] /\
     let pto (ptr: loc) (v: val) :=  c.2.(heap) !! ptr = Some $ Some v in
@@ -169,7 +169,7 @@ Section InitQueue.
   Qed.
 
   Lemma obtain_queue_init_resource c sq pfl ph v
-    (INIT: is_init_queue_cfg c sq pfl ph v):
+    (INIT: is_init_queue_cfg sq pfl ph v c):
     hl_phys_init_resource c -∗ queue_init_resource sq pfl ph v.
   Proof using.
     rewrite /hl_phys_init_resource.
