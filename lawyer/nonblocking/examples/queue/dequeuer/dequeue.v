@@ -399,9 +399,9 @@ Section Dequeue.
   Lemma dequeue_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ queue_inv PE l ∗ dequeue_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d dequeue_fuel }}}
-      dequeue q_sq l @ τ
+      dequeue q_sq #() @ τ
     {{{ (v: val), RET v; th_phase_frag τ π q ∗ dequeue_token ∗
-                         (∀ v', ⌜ v = SOMEV v' ⌝ -∗ PE v') }}}.
+                         (⌜ v = NONEV ⌝ ∨ ∃ v', ⌜ v = SOMEV v' ⌝ ∗ PE v') }}}.
   Proof using PERS_PE.
     simpl. iIntros (Φ) "([#QAT #INV] & TOK & PH & CPS) POST".
     rewrite /dequeue. destruct q_sq eqn:Q_SQ.
@@ -481,7 +481,7 @@ Section Dequeue.
       iMod ("CLOS" with "[-POST CPS PH TOK]") as "_".
       { by iFrame. }
       iModIntro. pure_steps.
-      iApply "POST". iFrame. by iIntros (??). }
+      iApply "POST". iFrame. by iLeft. }
 
     rewrite bool_decide_false; [| set_solver]. pure_steps.
     split_cps "CPS" get_loc_fuel; [cbv; lia| ].  
@@ -548,7 +548,7 @@ Section Dequeue.
  
     iModIntro. pure_steps.
     iApply "POST". iFrame.
-    iIntros (? [=->]). iFrame.
+    iRight. iExists _. iSplit; [done| ]. by iFrame. 
   Qed.
     
 End Dequeue.
