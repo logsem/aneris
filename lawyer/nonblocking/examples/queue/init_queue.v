@@ -129,7 +129,7 @@ Section InitQueue.
 
   (* TODO: a better way would be to relax restrictions
      on initial nodes pointed by pfl and ph *)
-  Definition is_init_queue_cfg sq (pfl ph: loc) (v: val) (c: cfg heap_lang): Prop :=
+  Definition is_init_queue_cfg sq (ph pfl: loc) (v: val) (c: cfg heap_lang): Prop :=
     let '(SQ H T BR FL OHV) := sq in
     NoDup [H; T; BR; FL; OHV; ph; ph +ₗ 1; pfl; pfl +ₗ 1] /\
     let pto (ptr: loc) (v: val) :=  c.2.(heap) !! ptr = Some $ Some v in
@@ -140,7 +140,7 @@ Section InitQueue.
     pto pfl v /\ pto (loc_add pfl 1%Z) #ph
   . 
       
-  Definition queue_init_resource sq (pfl ph: loc) (v: val): iProp Σ :=
+  Definition queue_init_resource sq (ph pfl: loc) (v: val): iProp Σ :=
     let '(SQ H T BR FL OHV) := sq in
     ([∗ list] ptr ∈ [BR; FL], ptr ↦ #pfl) ∗
     ([∗ list] ptr ∈ [H; T], ptr ↦ #ph) ∗
@@ -172,9 +172,9 @@ Section InitQueue.
     destruct ND. eapply elem_of_list_lookup; eauto.
   Qed.
 
-  Lemma obtain_queue_init_resource c sq pfl ph v
-    (INIT: is_init_queue_cfg sq pfl ph v c):
-    hl_phys_init_resource c -∗ queue_init_resource sq pfl ph v.
+  Lemma obtain_queue_init_resource c sq ph pfl v
+    (INIT: is_init_queue_cfg sq ph pfl v c):
+    hl_phys_init_resource c -∗ queue_init_resource sq ph pfl v.
   Proof using.
     rewrite /hl_phys_init_resource.
     destruct sq. red in INIT. simpl.
@@ -189,8 +189,8 @@ Section InitQueue.
     simpl. iDestruct "X" as "($&$&$&$&$&$&$&$&$&?)".
   Qed.    
   
-  Lemma queue_init `{SimpleQueueTokens Σ} sq (pfl ph: loc) (v: val):
-    queue_init_resource sq pfl ph (v: val) -∗ PE v ={⊤}=∗
+  Lemma queue_init `{SimpleQueueTokens Σ} sq (ph pfl: loc) (v: val):
+    queue_init_resource sq ph pfl (v: val) -∗ PE v ={⊤}=∗
     ∃ (_: QueueG Σ), queue_inv PE.
   Proof using All.
     destruct sq eqn:SQ. simpl.
