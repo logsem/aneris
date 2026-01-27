@@ -61,35 +61,25 @@ Section WFAdequacy.
 
   (* TODO: move gfunctors for tokens and call tracker *)
   Definition wfreeΣ: gFunctors := 
-    #[iemΣ HeapLangEM EM; (* TODO: add gfunctor for tokens*)
+    #[iemΣ HeapLangEM EM;
+      mt_Σ;
       GFunctor $ excl_authUR (option expr);
       wfst_Σ _ SPEC]. 
 
   Instance wfree_heap_pre: @heapGpreS wfreeΣ M EM.
   Proof. unshelve esplit. Qed. 
   (* Instance wfree_mt_pre: MethodTokenPre wfreeΣ. *)
+
+  (* TODO: move *)
+  Instance CT_pre_sub: forall Σ, subG (GFunctor $ excl_authUR (option expr)) Σ -> CallTrackerPre Σ.
+  Proof using. solve_inG. Qed.
+
+
   Instance wfree_CT_sub: subG (GFunctor $ excl_authUR (option expr)) wfreeΣ.
   Proof using. apply _. Qed. 
   Lemma wfree_WpreG_sub: wfst_preG _ SPEC wfreeΣ.
   Proof using. apply wfst_subG. apply _. Qed.
-
-  Instance wfree_CT_pre: CallTrackerPre wfreeΣ.
-  Proof using.
-    (* TODO: prove automatically *)
-    clear. 
-    econstructor. rewrite /wfreeΣ.
-    unshelve econstructor.
-    { simpl. rewrite /gid. simpl.
-      apply (@Fin.of_nat_lt 13). lia. }
-    done.
-  Qed.     
     
-(* solve_inG.  eapply subG_inG. apply _.  *)
-(* apply _.  *)
-(*                rewrite /wfreeΣ. simpl. *)
-               
-(*                apply subG_inG.  *)
-
   (* TODO: move *)
   Lemma ct_init `{CallTrackerPre Σ}:
     ⊢ |==> ∃ (CT: CallTracker Σ), ct_auth None ∗ ct_frag None.
@@ -661,8 +651,7 @@ Section WFAdequacy.
     by rewrite JTH in H0.
 
     Unshelve.
-    - apply wfree_WpreG_sub.
-    - set_solver. 
+    apply wfree_WpreG_sub.
   Qed.
 
   Theorem simple_om_simulation_adequacy_terminate_multiple_waitfree extr
