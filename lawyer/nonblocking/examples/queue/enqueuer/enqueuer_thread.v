@@ -53,7 +53,7 @@ Section EnqueuerThread.
   Lemma enqueuer_thread_spec (τ: locale heap_lang) (π: Phase) (q: Qp) (v: val):
     {{{ queue_inv val_is_int ∗ read_head_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d et_fuel }}}
-       enqueuer_thread q_sq v @ τ
+       enqueuer_thread q_sq v @ CannotFork; NotStuck; τ; ⊤
     {{{ (v: val), RET v; th_phase_frag τ π q ∗ read_head_token ∗
                   ⌜ is_ground_val v ⌝ }}}.
   Proof using.

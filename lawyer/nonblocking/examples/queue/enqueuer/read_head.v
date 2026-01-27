@@ -362,7 +362,7 @@ Section ReadHead.
   Lemma start_read (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ queue_inv PE ∗ read_head_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d 1 }}}
-       !#Head @ τ
+       !#Head @ CannotFork; NotStuck; τ; ⊤
     {{{ (ph: loc), RET #ph; th_phase_frag τ π q ∗ rop_token ∗ 
           ∃ t br pt rop, read_head_resources t br pt rop ∗
            (⌜ pt = ph /\ rop = None ⌝ ∨ 
@@ -415,7 +415,7 @@ Section ReadHead.
   Lemma read_tail_exact (τ: locale heap_lang) (π: Phase) (q: Qp) t br pt rop:
     {{{ queue_inv PE ∗ read_head_resources t br pt rop ∗
         th_phase_frag τ π q ∗ cp_mul π d 1 }}}
-       !#Tail @ τ
+       !#Tail @ CannotFork; NotStuck; τ; ⊤
     {{{ RET #pt; th_phase_frag τ π q ∗ read_head_resources t br pt rop }}}.
   Proof using.
     simpl. iIntros (Φ) "(#INV & RH & PH & CPS) POST".
@@ -447,7 +447,7 @@ Section ReadHead.
         rop_token ∗ ith_node h (ph, ndh) ∗
         ith_read i h 0 ∗
         th_phase_frag τ π q ∗ cp_mul π d 1 }}}
-       #BeingRead <- #ph @ τ
+       #BeingRead <- #ph @ CannotFork; NotStuck; τ; ⊤
     {{{ RET #(); th_phase_frag τ π q ∗ read_head_resources t h pt (Some i) ∗ rop_token }}}.
   Proof using.
     simpl. iIntros (Φ) "(#INV & RH & RTOK & #HTH & #READ & PH & CPS) POST".
@@ -527,7 +527,7 @@ Section ReadHead.
         rop_token ∗ ith_node h (ph, ndh) ∗
         ith_read i h 0 ∗ disj_range h t ∗ 
         cp_mul π d 1 ∗ th_phase_frag τ π q }}}
-      ! #Head @τ
+      ! #Head @ CannotFork; NotStuck; τ; ⊤
     {{{ (ph': loc), RET #ph'; 
         th_phase_frag τ π q ∗ ∃ rp, read_head_resources t h pt (Some i) ∗
           ith_rp i rp ∗ (⌜ ph' = ph /\ rp = rs_proc None ⌝ ∨ ⌜ ph' ≠ ph /\ rp = rs_canceled ⌝ ∗ rop_token ) }}}.
@@ -662,7 +662,7 @@ Section ReadHead.
                
   Lemma read_ohv_spec τ π q:
     {{{ queue_inv PE ∗ th_phase_frag τ π q ∗ cp_mul π d 1 }}}
-      !#OldHeadVal @τ
+      !#OldHeadVal @ CannotFork; NotStuck; τ; ⊤
     {{{ v, RET v; th_phase_frag τ π q ∗ PE v}}}.
   Proof using PERS_PE.
     iIntros (Φ) "(#INV & PH & CPS) POST".
@@ -683,7 +683,7 @@ Section ReadHead.
     {{{ queue_inv PE ∗ read_head_resources t h pt (Some i) ∗
         ith_node h (ph, ndh) ∗ ith_read i h 0 ∗ ith_rp i (rs_proc None) ∗
         cp_mul π d small_fuel ∗ th_phase_frag τ π q }}}
-      get_val #ph @τ
+      get_val #ph @ CannotFork; NotStuck; τ; ⊤
     {{{ v, RET v; th_phase_frag τ π q ∗ read_head_token ∗ PE v }}}.
   Proof using PERS_PE.
     simpl. iIntros (Φ) "(#INV & RH & #ITH & #READ & #RP0 & CPS & PH) POST".
@@ -815,7 +815,7 @@ Section ReadHead.
         rop_token ∗ ith_node h (ph, ndh) ∗
         ith_read i h 0 ∗ disj_range h t ∗ 
         cp_mul π d (2 * small_fuel) ∗ th_phase_frag τ π q }}}
-      get_head_val q_sq #ph @τ
+      get_head_val q_sq #ph @ CannotFork; NotStuck; τ; ⊤
     {{{ v, RET v; th_phase_frag τ π q ∗ read_head_token ∗ PE v }}}.
   Proof using PERS_PE. 
     simpl. iIntros (Φ) "(#INV & RH & TOK & #ITH & #READ & #DISJ & CPS & PH) POST".
@@ -885,7 +885,7 @@ Section ReadHead.
   Lemma read_head_enqueuer_spec (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ queue_inv PE ∗ read_head_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d read_head_fuel }}}
-       read_head_enqueuer q_sq #() @ τ
+       read_head_enqueuer q_sq #() @ CannotFork; NotStuck; τ; ⊤
     {{{ (v: val), RET v; th_phase_frag τ π q ∗ read_head_token ∗
                   (⌜ v = NONEV ⌝ ∨ ∃ v', ⌜ v = SOMEV v' ⌝ ∗ PE v') }}}.
   Proof using PERS_PE.

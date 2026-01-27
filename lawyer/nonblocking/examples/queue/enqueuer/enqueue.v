@@ -46,7 +46,7 @@ Section Enqueue.
 
   Lemma set_node_spec (τ: locale heap_lang) (π: Phase) (q: Qp) (pt: loc) nd (v: val) (nxt: loc):
     {{{ th_phase_frag τ π q ∗ cp_mul π d mk_node_fuel ∗ hn_interp (pt, nd) }}}
-       set_node #pt v #nxt @τ
+       set_node #pt v #nxt @ CannotFork; NotStuck; τ; ⊤
     {{{ RET #(); th_phase_frag τ π q ∗ hn_interp (pt, (v, nxt)) }}}.
   Proof using.
     destruct nd. iIntros (Φ) "(PH & CPS & (V & NXT)) POST".

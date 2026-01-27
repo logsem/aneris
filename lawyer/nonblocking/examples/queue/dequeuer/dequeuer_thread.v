@@ -49,7 +49,7 @@ Section DequeuerThread.
   Lemma dequeuer_thread_spec (τ: locale heap_lang) (π: Phase) (q: Qp) (v: val):
     {{{ queue_inv val_is_int ∗ dequeue_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d dt_fuel }}}
-       dequeuer_thread q_sq v @ τ
+       dequeuer_thread q_sq v @ CannotFork; NotStuck; τ; ⊤
     {{{ (v: val), RET v; th_phase_frag τ π q ∗ dequeue_token ∗
                   ⌜ is_ground_val v ⌝ }}}.
   Proof using.

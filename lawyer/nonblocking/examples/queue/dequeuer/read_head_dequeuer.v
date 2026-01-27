@@ -48,7 +48,7 @@ Section ReadHeadDequeuer.
   Lemma read_head_dequeuer_spec (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ queue_inv PE ∗ dequeue_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d read_head_dequeuer_fuel }}}
-       read_head_dequeuer q_sq #() @ τ
+       read_head_dequeuer q_sq #() @ CannotFork; NotStuck; τ; ⊤
     {{{ (v: val), RET v; th_phase_frag τ π q ∗ dequeue_token ∗ 
                          (⌜ v = NONEV ⌝ ∨ ∃ v', ⌜ v = SOMEV v' ⌝ ∗ PE v') }}}.
   Proof using PERS_PE.

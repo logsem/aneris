@@ -69,7 +69,7 @@ Section Dequeue.
   Lemma get_head_next_spec τ π q h nd fl ph od:
     {{{ queue_inv PE ∗ ith_node h (ph, nd) ∗ dequeue_resources h fl ph od ∗
         th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel }}}
-      get_next #ph @τ
+      get_next #ph @ CannotFork; NotStuck; τ; ⊤
     {{{ RET #(nd.2); th_phase_frag τ π q ∗ dequeue_resources h fl ph od }}}.
   Proof using.
     simpl. iIntros (Φ) "(#INV & #HEADhn & DR & PH & CPS) POST".
@@ -103,7 +103,7 @@ Section Dequeue.
 
   Lemma update_ohv_spec τ π q (v: val):
     {{{ queue_inv PE ∗ th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel ∗ PE v }}}
-      #OldHeadVal <- v @τ
+      #OldHeadVal <- v @ CannotFork; NotStuck; τ; ⊤
     {{{ RET #(); th_phase_frag τ π q }}}.
   Proof using.
     iIntros (Φ) "(#INV & PH & CPS & PEv) POST".
@@ -131,7 +131,7 @@ Section Dequeue.
         ith_node h (ph, (vh, nxh)) ∗ 
         th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel ∗
         dequeue_resources h fl ph None }}}
-      #Head <- #nxh @τ
+      #Head <- #nxh @ CannotFork; NotStuck; τ; ⊤
     {{{ RET #(); th_phase_frag τ π q ∗ dequeue_resources (h + 1) fl nxh (Some h) ∗
                    ∃ i r b, ith_read i r (h + 1) ∗ ⌜ r <= h ⌝ ∗
                                br_lb b ∗
@@ -182,7 +182,7 @@ Section Dequeue.
         th_phase_frag τ π q ∗ cp_mul π d get_loc_fuel ∗
         ith_read i r (h + 1) ∗ br_lb b0
     }}}
-      ! #BeingRead @τ
+      ! #BeingRead @ CannotFork; NotStuck; τ; ⊤
     {{{ (pbr: loc), RET #pbr; th_phase_frag τ π q ∗
             dequeue_resources (h + 1) fl ndh.2 (if (decide (pbr = ph)) then Some h else None) ∗
             (⌜ pbr = ph ⌝ ∨ 
@@ -228,7 +228,7 @@ Section Dequeue.
   Lemma read_FL_spec τ π h q fl nd od:
   {{{ queue_inv PE ∗ dequeue_resources h fl nd od ∗
       cp π d ∗ th_phase_frag τ π q }}}
-    ! #FreeLater @τ
+    ! #FreeLater @ CannotFork; NotStuck; τ; ⊤
   {{{ (pfl: loc), RET (#pfl);
       ∃ ndfl, ith_node fl (pfl, ndfl) ∗ 
       dequeue_resources h fl nd od ∗ th_phase_frag τ π q }}}.
@@ -264,7 +264,7 @@ Section Dequeue.
         ith_read i r (h + 1) ∗
         br_lb b ∗ (⌜ b < r ⌝ -∗ (ith_rp i rs_canceled ∨ ith_rp i rs_aborted ∨ ith_rp i (rs_proc (Some rsp_completed))))
     }}}
-      get_to_free q_sq #ph @ τ
+      get_to_free q_sq #ph @ CannotFork; NotStuck; τ; ⊤
     {{{ (to_free: loc), RET #to_free;
         ∃ hn fl', hn_interp (to_free, hn) ∗ th_phase_frag τ π q ∗
                     dequeue_resources (h + 1) fl' ndh.2 None ∗ PE ndh.1 }}}.
@@ -363,7 +363,7 @@ Section Dequeue.
   Lemma free_el_spec τ π q ptr nd:
     {{{ th_phase_frag τ π q ∗ cp_mul π d (2 * get_loc_fuel) ∗ 
         hn_interp (ptr, nd) }}}
-      free_el #ptr @ τ
+      free_el #ptr @ CannotFork; NotStuck; τ; ⊤
     {{{ v, RET v; th_phase_frag τ π q }}}.
   Proof using.
     simpl. iIntros (Φ) "(PH & CPS & HN) POST".
@@ -399,7 +399,7 @@ Section Dequeue.
   Lemma dequeue_spec (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ queue_inv PE ∗ dequeue_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d dequeue_fuel }}}
-      dequeue q_sq #() @ τ
+      dequeue q_sq #() @ CannotFork; NotStuck; τ; ⊤
     {{{ (v: val), RET v; th_phase_frag τ π q ∗ dequeue_token ∗
                          (⌜ v = NONEV ⌝ ∨ ∃ v', ⌜ v = SOMEV v' ⌝ ∗ PE v') }}}.
   Proof using PERS_PE.
