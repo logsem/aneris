@@ -15,6 +15,24 @@ From heap_lang Require Import heap_lang_defs lang notation.
 Close Scope Z.
 
 
+Definition get_head_val '(SQ H T BR FL OHV as sq): val :=
+  λ: "ch1",
+    let: "ch2" := !#H in
+    if: "ch1" = "ch2"
+    then get_val "ch1"
+    else !#OHV
+.
+
+Definition read_head_enqueuer '(SQ H T BR FL OHV as sq): val := 
+  λ: <>,
+    let: "ch" := !#H in
+    let: "ct" := !#T in
+    if: "ch" = "ct" then NONE
+    else
+      #BR <- "ch" ;;
+      SOME (get_head_val sq "ch")
+.
+
 Section ReadHead.
 
   Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
@@ -33,24 +51,6 @@ Section ReadHead.
   Existing Instance hGS.
 
   Definition read_head_fuel := 100.
-
-  Definition get_head_val: val :=
-    λ: "ch1",
-      let: "ch2" := !#(Head q_sq) in
-      if: "ch1" = "ch2"
-      then get_val "ch1"
-      else !#(OldHeadVal q_sq)
-  .
-
-  Definition read_head_enqueuer: val := 
-    λ: <>,
-      let: "ch" := !#(Head q_sq) in
-      let: "ct" := !#(Tail q_sq) in
-      if: "ch" = "ct" then NONE
-      else
-        #(BeingRead q_sq) <- "ch" ;;
-        SOME (get_head_val "ch")
-  .
 
   (* TODO: move, remove duplicates *)
   Lemma dom_max_set_fold n:
@@ -813,15 +813,16 @@ Section ReadHead.
         rop_token ∗ ith_node h (ph, ndh) ∗
         ith_read i h 0 ∗ disj_range h t ∗ 
         cp_mul π d (2 * small_fuel) ∗ th_phase_frag τ π q }}}
-      get_head_val #ph @τ
+      get_head_val q_sq #ph @τ
     {{{ v, RET v; th_phase_frag τ π q ∗ read_head_token ∗ PE v }}}.
   Proof using PERS_PE. 
     simpl. iIntros (Φ) "([#QAT #INV] & RH & TOK & #ITH & #READ & #DISJ & CPS & PH) POST".
-    rewrite /get_head_val. 
+    rewrite /get_head_val. destruct q_sq eqn:SQ. 
     pure_steps.
 
     wp_bind (! _)%E.
-    split_cps "CPS" 1. 
+    split_cps "CPS" 1.
+    replace Head with (simple_queue.Head q_sq); [| by rewrite SQ]. 
     iApply (check_head_change with "[-POST CPS]").
     { apply NEQ. }
     { iFrame "#∗". }
@@ -838,7 +839,9 @@ Section ReadHead.
     2: { rewrite bool_decide_false; [| set_solver].
          pure_steps.
          split_cps "CPS" 1.
-         iApply wp_fupd. 
+         iApply wp_fupd.
+         replace OldHeadVal with (simple_queue.OldHeadVal q_sq); [| by rewrite SQ].
+ 
          iApply (read_ohv_spec with "[$QAT $INV $CPS' $PH]").
          iIntros "!> % (PH & PEv)".
          iApply "POST". iFrame.
@@ -882,12 +885,12 @@ Section ReadHead.
   Lemma read_head_enqueuer_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ queue_inv PE l ∗ read_head_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d read_head_fuel }}}
-       read_head_enqueuer #() @ τ
+       read_head_enqueuer q_sq #() @ τ
     {{{ (v: val), RET v; th_phase_frag τ π q ∗ read_head_token ∗
                   (⌜ v = NONEV ⌝ ∨ ∃ v', ⌜ v = SOMEV v' ⌝ ∗ PE v') }}}.
   Proof using PERS_PE.
     simpl. iIntros (Φ) "([#QAT #INV] & TOK & PH & CPS) POST".
-    rewrite /read_head_enqueuer. destruct q_sq eqn:Q_SQ.
+    rewrite /read_head_enqueuer. destruct q_sq eqn:Q_SQ. rewrite -Q_SQ. 
     pure_steps.
 
     wp_bind (! _)%E.
@@ -943,6 +946,8 @@ Section ReadHead.
 
     wp_bind (Rec _ _ _)%E. pure_steps.
     split_cps "CPS" (2 * small_fuel); [cbv; lia| ].
+    
+    wp_bind (get_head_val _ _)%E. 
     iApply (get_head_val_spec with "[-CPS POST]").
     { apply NEQ. }
     { iFrame. iFrame "#∗". }

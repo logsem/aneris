@@ -15,6 +15,13 @@ From heap_lang Require Import heap_lang_defs lang notation.
 Close Scope Z.
 
 
+Definition dequeuer_thread sq: val := 
+  λ: "v",
+    if: "v" = #true then SOME (read_head_dequeuer sq #())
+    else if: "v" = #false then SOME (dequeue sq #())
+    else NONEV
+. 
+
 Section DequeuerThread.
 
   Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
@@ -24,13 +31,6 @@ Section DequeuerThread.
 
   Context {Σ} {OHE: OM_HL_Env OP EM Σ}.
   Context {QL: QueueG Σ}.
-
-  Definition dequeuer_thread: val := 
-    λ: "v",
-      if: "v" = #true then SOME (read_head_dequeuer #())
-      else if: "v" = #false then SOME (dequeue q_sq #())
-      else NONEV
-  . 
 
   Context (d: Degree).
 
@@ -50,12 +50,12 @@ Section DequeuerThread.
   Lemma read_head_queuer_spec l (τ: locale heap_lang) (π: Phase) (q: Qp) (v: val):
     {{{ queue_inv val_is_int l ∗ dequeue_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d dt_fuel }}}
-       dequeuer_thread v @ τ
+       dequeuer_thread q_sq v @ τ
     {{{ (v: val), RET v; th_phase_frag τ π q ∗ dequeue_token ∗
                   ⌜ is_ground_val v ⌝ }}}.
   Proof using.
     iIntros (Φ) "(#INV & TOK & PH & CPS) POST".
-    rewrite /dequeuer_thread.
+    rewrite /dequeuer_thread. 
     pure_steps. simpl.
 
     wp_bind (_ = _)%E.
@@ -67,7 +67,8 @@ Section DequeuerThread.
     destruct (decide (v = #true)) as [-> | NEQ].
     - rewrite bool_decide_true; [| done].
       pure_steps.
-      split_cps "CPS" read_head_dequeuer_fuel; [cbv; lia| ].  
+      split_cps "CPS" read_head_dequeuer_fuel; [cbv; lia| ].
+      wp_bind (read_head_dequeuer _ _)%E. 
       iApply (read_head_dequeuer_spec with "[-POST CPS]").
       2: { iFrame "#∗". }
       { apply _. }

@@ -14,6 +14,14 @@ From heap_lang Require Import heap_lang_defs lang notation.
 Close Scope Z.
 
 
+Definition enqueue '(SQ H T BR FL OHV as sq): val :=
+  λ: "v",
+    let: "nd" := mk_dummy_node #() in
+    let: "cl" := !#T in
+    set_node "cl" "v" "nd" ;;
+    #T <- "nd"
+.
+
 Section Enqueue.
 
   Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
@@ -31,14 +39,6 @@ Section Enqueue.
 
   Let hGS: heap1GS Σ := iem_phys _ EM.
   Existing Instance hGS.
-
-  Definition enqueue '(SQ H T BR FL OHV as sq): val :=
-    λ: "v",
-      let: "nd" := mk_dummy_node #() in
-      let: "cl" := !#T in
-      set_node "cl" "v" "nd" ;;
-      #T <- "nd"
-  .
 
   (** TODO: move, remove duplicates *)
   Definition mk_node_fuel := 20.

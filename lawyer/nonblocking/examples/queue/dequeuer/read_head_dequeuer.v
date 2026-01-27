@@ -16,6 +16,14 @@ From heap_lang Require Import heap_lang_defs lang notation.
 Close Scope Z.
 
 
+Definition read_head_dequeuer '(SQ H T BR FL OHV as sq): val := 
+  λ: <>,
+    let: "ch" := !#H in
+    let: "ct" := !#T in
+    if: "ch" = "ct" then NONE
+    else SOME (get_val "ch")
+.
+
 Section ReadHeadDequeuer.      
 
   Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
@@ -25,14 +33,6 @@ Section ReadHeadDequeuer.
 
   Context {Σ} {OHE: OM_HL_Env OP EM Σ}.
   Context {QL: QueueG Σ}.
-
-  Definition read_head_dequeuer: val := 
-    λ: <>,
-      let: "ch" := !#(Head q_sq) in
-      let: "ct" := !#(Tail q_sq) in
-      if: "ch" = "ct" then NONE
-      else SOME (get_val "ch")
-  .
 
   Context (d: Degree).
   Context (PE: val -> iProp Σ) {PERS_PE: forall v, Persistent (PE v)}.
@@ -46,7 +46,7 @@ Section ReadHeadDequeuer.
   Lemma read_head_dequeuer_spec l (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ queue_inv PE l ∗ dequeue_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d read_head_dequeuer_fuel }}}
-       read_head_dequeuer #() @ τ
+       read_head_dequeuer q_sq #() @ τ
     {{{ (v: val), RET v; th_phase_frag τ π q ∗ dequeue_token ∗ 
                          (⌜ v = NONEV ⌝ ∨ ∃ v', ⌜ v = SOMEV v' ⌝ ∗ PE v') }}}.
   Proof using PERS_PE.
