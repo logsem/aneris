@@ -25,14 +25,6 @@ Section Enqueue.
   (* Existing Instance OHE.  *)
   Context {QL: QueueG Σ}.
 
-  Definition read_head_dequeuer: val := 
-    λ: <>,
-      let: "ch" := !#(Head q_sq) in
-      let: "ct" := !#(Tail q_sq) in
-      if: "ch" = "ct" then NONE
-      else SOME (get_val "ch")
-  .
-
   Context (d: Degree).
 
   Definition get_loc_fuel := 5.
@@ -444,7 +436,7 @@ Section Enqueue.
     {{{ queue_inv PE l ∗ read_head_token ∗ PE v ∗ 
         th_phase_frag τ π q ∗ cp_mul π d enqueue_fuel }}}
        enqueue q_sq v @ τ
-    {{{ (v: val), RET v; th_phase_frag τ π q ∗ read_head_token }}}.
+    {{{ RET #(); th_phase_frag τ π q ∗ read_head_token }}}.
   Proof using.
     simpl. iIntros (Φ) "([#QAT #INV] & TOK & PEv & PH & CPS) POST".
     rewrite /enqueue. destruct q_sq eqn:Q_SQ.

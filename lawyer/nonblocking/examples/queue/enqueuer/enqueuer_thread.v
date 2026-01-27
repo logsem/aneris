@@ -8,7 +8,7 @@ From lawyer.obligations Require Import obligations_model obligations_resources o
 From lawyer Require Import sub_action_em program_logic.
 From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From iris.base_logic.lib Require Import invariants.
-From lawyer.nonblocking.examples.queue Require Import simple_queue_utils simple_queue is_int.
+From lawyer.nonblocking.examples.queue Require Import simple_queue_utils simple_queue to_int.
 From lawyer.nonblocking.examples.queue.enqueuer Require Import enqueue read_head.
 From heap_lang Require Import heap_lang_defs lang notation.
 
@@ -29,9 +29,9 @@ Section EnqueuerThread.
     λ: "v",
       if: "v" = #() then SOME (read_head_enqueuer #())
       else
-        match: IsInt "v" with
-          InjL "n" => SOME (enqueue q_sq "n")
-        | InjR "x" => NONEV
+        match: ToInt "v" with
+          InjR "n" => SOME (enqueue q_sq "n")
+        | InjL "x" => NONEV
         end.
 
   Context (d: Degree).
@@ -56,8 +56,47 @@ Section EnqueuerThread.
     {{{ (v: val), RET v; th_phase_frag τ π q ∗ read_head_token ∗
                   ⌜ is_ground_val v ⌝ }}}.
   Proof using.
-    
-    
-  Admitted. 
+    iIntros (Φ) "(#INV & TOK & PH & CPS) POST".
+    rewrite /enqueuer_thread.
+    pure_steps. simpl.
+    wp_bind (_ = _)%E.
+    iApply sswp_MU_wp; [done| ].
+    iApply sswp_pure_step.
+    { red. set_solver. }
+    MU_by_burn_cp.
+
+    destruct (decide (v = #())) as [-> | NEQ].
+    - rewrite bool_decide_true; [| done].
+      pure_steps.
+      split_cps "CPS" read_head_fuel; [cbv; lia| ].  
+      iApply (read_head_enqueuer_spec with "[-POST CPS]").
+      2: { iFrame "#∗". }
+      { apply _. }
+      iIntros "!> %v (PH & TOK & %RET)".
+      pure_steps.
+      iApply "POST". iFrame.
+      iPureIntro. destruct RET as [-> | (?&->&?&->)]; by repeat constructor.
+    - rewrite bool_decide_false; [| done].
+      pure_steps. simpl.
+      rewrite ToInt_subst. simpl.
+      wp_bind (ToInt _)%E.
+      iApply sswp_MU_wp.
+      { apply ToInt_nval. }
+      iApply sswp_pure_step; [done| ]. 
+      MU_by_burn_cp.
+      destruct (val_into_int_spec v) as [(?&->&->) | (NINT & ->) ].
+      2: { pure_steps. wp_bind (Rec _ _ _)%E. pure_steps. 
+           iApply "POST". iFrame.
+           iPureIntro. repeat constructor. }
+      pure_steps. wp_bind (Rec _ _ _)%E. pure_steps.
+      wp_bind (enqueue _ _)%E.
+      split_cps "CPS" enqueue_fuel; [cbv; lia| ].
+      iApply (enqueue_spec with "[-POST CPS]").
+      { iFrame "#∗". eauto. } 
+      iIntros "!> (PH & TOK)".
+      pure_steps. 
+      iApply "POST". iFrame.
+      iPureIntro. by repeat constructor.
+  Qed.
 
 End EnqueuerThread. 
