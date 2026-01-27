@@ -87,7 +87,7 @@ From heap_lang Require Import sswp_logic lang locales_helpers_hl.
 Close Scope Z. 
 
 Section SpecLifting.
-  Context `{PWT: PrWfreeTok MS Σ}.
+  Context {MS: gmultiset val} `{PWT: @PrWfreeTok MS WFST Σ}.
 
   Context {M: Model} {EM: ExecutionModel heap_lang M}.
 
@@ -104,10 +104,10 @@ Section SpecLifting.
     (Q: val -> iProp Σ)
     (* (NOFORKS: no_forks e) *)
     :
-    (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) si_add_none in
+    (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ _ PWT) si_add_none in
      WP e @ CannotFork; s ; τ ; E {{ v, method_tok m ∗ Q v }}) -∗
     ct_frag (Some e) -∗
-    (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) (@ct_interp_tok ic _ m _ PWT) in WP e @ CannotFork; s ; τ ; E {{ v, ct_frag None ∗ Q v }}).
+    (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ _ PWT) (@ct_interp_tok ic _ _ m _ PWT) in WP e @ CannotFork; s ; τ ; E {{ v, ct_frag None ∗ Q v }}).
   Proof using.
     simpl. 
     iIntros "WP MRK".
@@ -234,9 +234,9 @@ Section SpecLifting.
 
   Lemma lift_spec `{Hinv : @IEMGS heap_lang M LG EM Σ} E (a: val)
     (P: iProp Σ) (Q: val -> iProp Σ):
-    (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) si_add_none in
+    (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ _ PWT) si_add_none in
      □ (method_tok m -∗ P -∗ WP (App m a) @ CannotFork; s ; τ ; E {{ v, method_tok m ∗ Q v }} )) ⊢
-    (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) (@ct_interp_tok ic _ m _ PWT) in
+    (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ _ PWT) (@ct_interp_tok ic _ _ m _ PWT) in
      □ (ct_frag None -∗ P -∗ WP (App m a) @ CannotFork; s ; τ ; E {{ v, ct_frag None ∗ Q v }} )).
   Proof using.
     simpl. iIntros "#WP".

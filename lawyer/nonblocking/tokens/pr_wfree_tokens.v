@@ -65,10 +65,11 @@ Section WaitFreePR.
   
   Open Scope WFR_scope. 
 
-  Lemma get_call_wp {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} {MT: MethodToken MS Σ}
+  Lemma get_call_wp {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
+    {MT: MethodToken MS Σ} {wG: wfst_G _ WFST Σ}
     (a: val) π:
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ Hinv in
-    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ WFST) -∗
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ WFST (wG := wG)) -∗
     cp_mul π0 d0 F -∗ th_phase_frag τi π (1 / 2)%Qp -∗ method_tok m -∗
     WP m a @ CannotFork; NotStuck; τi ; ⊤ {{ _, ⌜ True ⌝ }}.
   Proof using MSm.
@@ -86,12 +87,12 @@ Section WaitFreePR.
   Qed.
 
   (* TODO: rename or unify with non-token version *)
-  Definition wfree_trace_inv `{Hinv : @IEMGS _ _ HeapLangEM EM Σ}
+  Definition wfree_trace_inv `{Hinv : @IEMGS _ _ HeapLangEM EM Σ} {wG: wfst_G _ WFST Σ}
     (extr: execution_trace heap_lang) (omtr: auxiliary_trace M): iProp Σ :=
     ⌜ no_extra_obls ic (trace_last extr) (trace_last omtr) /\
       from_option (fun e => to_val e = None) True (from_locale (trace_last extr).1 τi) /\
       call_progresses ic s' extr ⌝ ∗
-    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ WFST). 
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ WFST (wG := wG)). 
   
   Context (ai: val).
 
@@ -99,6 +100,7 @@ Section WaitFreePR.
       pwt_Hinv :: @IEMGS _ _ HeapLangEM EM Σ;
       pwt_CT :: CallTracker Σ;
       pwt_UT :: MethodToken MS Σ;
+      pwt_wG: wfst_G _ WFST Σ;
   }.
 
   Definition ct_interp_tok `{PWT: PrWfreeTok Σ} (etr: execution_trace heap_lang): iProp Σ
@@ -219,9 +221,9 @@ Section WaitFreePR.
     :
     let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ (@pwt_Hinv _ PWT) in
     let RES := (cur_obls_sigs ic etr ∗ wptp_wfree s f etr Φs ∗ state_interp etr mtr)%I in
-    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ WFST) -∗
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ WFST (wG := pwt_wG)) -∗
     RES
-    ={⊤}=∗ wfree_trace_inv etr mtr ∗ RES. 
+    ={⊤}=∗ wfree_trace_inv etr mtr (wG := pwt_wG) ∗ RES. 
   Proof using.
     simpl. iIntros "#INV (OB & WPS & TI)".
     clear -FIT VALID. 
@@ -481,7 +483,7 @@ Section WaitFreePR.
   thread_pr s f (trace_length etr) e (locale_of t1 e) Φ ∗ 
   wptp_from_gen (thread_pr s f (trace_length etr)) (t1 ++ [e]) t2 Φs2.
   Proof using FIN.
-    clear mtr WFST VALID F. 
+    clear mtr VALID F. 
     iIntros "WPS".
     simpl.
     inversion STEP as
@@ -522,7 +524,7 @@ Section WaitFreePR.
     (CALL : inside_call m τi K s0 (etr :tr[ τ ]: c'') e'):
   False.
   Proof using.
-    clear WFST F. 
+    clear F. 
     red in CALL. simpl in CALL.
     rewrite Nat.sub_0_r in CALL. 
     destruct CALL as (a & CALL & PREV & NORET & ?).
@@ -570,7 +572,7 @@ Section WaitFreePR.
     (etr' := etr :tr[ oτ ]: c')
     (FIT: fits_inf_call ic m ai etr')
     :
-    state_interp etr mtr -∗ wfree_trace_inv etr mtr -∗
+    state_interp etr mtr -∗ wfree_trace_inv etr mtr (wG := pwt_wG) -∗
     pr_pr_wfree s f etr Φs 
     ={⊤,∅}=∗ |={∅}▷=>^(S (trace_length etr)) |={∅,⊤}=>
     ⌜f = CannotFork → length c'.1 = length c.1⌝ ∗ 
@@ -869,7 +871,6 @@ Section WaitFreePR.
     (STEP: locale_step (trace_last etr) (Some τ) c''):
     ct_interp_tok etr -∗ ct_interp_tok (etr :tr[ Some τ ]: c'').
   Proof using.
-    clear WFST F.
     rewrite /ct_interp_tok /ct_interp.
     iIntros "(%&?&[(? & %) | (%&%&%&->&%)])".
     { iExists _. iFrame. iLeft. eauto. }
@@ -883,7 +884,6 @@ Section WaitFreePR.
     (STEP: locale_step (trace_last etr) (Some τ) c''):
     cti_cond etr -∗ cti_cond (etr :tr[ Some τ ]: c'').
   Proof using.
-    clear WFST F.
     rewrite /cti_cond. simpl.
     iIntros "CTI" (LEN).
     iSpecialize ("CTI" with "[]").
@@ -897,7 +897,7 @@ Section WaitFreePR.
     (etr' := etr :tr[ oτ ]: c')
     (FIT: fits_inf_call ic m ai etr')
     :
-    state_interp etr mtr -∗ wfree_trace_inv etr mtr -∗
+    state_interp etr mtr -∗ wfree_trace_inv etr mtr (wG := pwt_wG) -∗
     pr_pr_wfree s f etr Φs 
     ={⊤,∅}=∗ |={∅}▷=>^(S (trace_length etr)) |={∅,⊤}=>
     ⌜f = CannotFork → length c'.1 = length c.1⌝ ∗ 
@@ -1288,14 +1288,14 @@ Section WaitFreePR.
     (etr' := etr :tr[ oτ ]: c')
     (FIT: fits_inf_call ic m ai etr')
     :
-    state_interp etr mtr -∗ wfree_trace_inv etr mtr -∗
+    state_interp etr mtr -∗ wfree_trace_inv etr mtr (wG := pwt_wG) -∗
     pr_pr_wfree s f etr Φs 
     ={⊤,∅}=∗ |={∅}▷=>^(S (trace_length etr)) |={∅,⊤}=>
     ⌜∀ e2: expr, s = NotStuck → e2 ∈ c'.1 → not_stuck e2 c'.2⌝ ∗
      ⌜f = CannotFork → length c'.1 = length c.1⌝ ∗ 
     ∃ (δ' : M) (ℓ : mlabel M),
       state_interp etr' (mtr :tr[ ℓ ]: δ') ∗
-      wfree_trace_inv etr' (mtr :tr[ ℓ ]: δ') ∗
+      wfree_trace_inv etr' (wG := pwt_wG) (mtr :tr[ ℓ ]: δ') ∗
       pr_pr_wfree s f etr' (Φs ++ newposts c.1 c'.1).
   Proof using VALID FIN MSm.
     iIntros "? #INV ?".
@@ -1328,7 +1328,7 @@ Section WaitFreePR.
 
   Program Definition PR_wfree_tokens {Σ} {PWT: PrWfreeTok Σ}:
     @ProgressResource heap_lang M Σ (@iem_invGS _ _ _ _ _ (@pwt_Hinv _ PWT))
-      state_interp wfree_trace_inv
+      state_interp (wfree_trace_inv (wG := pwt_wG))
 
       (* fork_post *)
       (fun _ _ =>

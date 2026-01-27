@@ -62,13 +62,16 @@ Section WFAdequacy.
   (* TODO: move gfunctors for tokens and call tracker *)
   Definition wfreeΣ: gFunctors := 
     #[iemΣ HeapLangEM EM; (* TODO: add gfunctor for tokens*)
-      GFunctor $ excl_authUR (option expr)]. 
+      GFunctor $ excl_authUR (option expr);
+      wfst_Σ _ SPEC]. 
 
   Instance wfree_heap_pre: @heapGpreS wfreeΣ M EM.
   Proof. unshelve esplit. Qed. 
   (* Instance wfree_mt_pre: MethodTokenPre wfreeΣ. *)
   Instance wfree_CT_sub: subG (GFunctor $ excl_authUR (option expr)) wfreeΣ.
   Proof using. apply _. Qed. 
+  Lemma wfree_WpreG_sub: wfst_preG _ SPEC wfreeΣ.
+  Proof using. apply wfst_subG. apply _. Qed.
 
   Instance wfree_CT_pre: CallTrackerPre wfreeΣ.
   Proof using.
@@ -98,10 +101,10 @@ Section WFAdequacy.
   Qed.
 
   (* TODO: move to lib and remove duplicate? *)
-  Lemma rah_wfree_inv {Σ} {Hinv : IEMGS HeapLangEM EM Σ}
+  Lemma rah_wfree_inv {Σ} {Hinv : IEMGS HeapLangEM EM Σ} {wG: wfst_G _ SPEC Σ}
     c:
   ⊢ adequacy_cond.rel_always_holds_with_trace_inv MaybeStuck
-    (wfree_trace_inv ic s' SPEC)
+    (wfree_trace_inv ic s' SPEC (wG := wG))
     (map (λ (_ : nat) (_ : val), True) (adequacy_utils.locales_of_list c.1))
     (obls_sim_rel_wfree ic s') c (init_om_wfree_state F ic c).
   Proof using.
@@ -138,14 +141,14 @@ Section WFAdequacy.
   Qed.
 
   (* TODO: unify with non-tokens version if invariants are unified *)
-  Lemma init_wfree_inv  {Σ} {Hinv : IEMGS HeapLangEM EM Σ} c
+  Lemma init_wfree_inv  {Σ} {Hinv : IEMGS HeapLangEM EM Σ} {wG: wfst_G _ SPEC Σ} c
     (ETR0: is_init_tpool c.1)
     (MOD_INIT: wfst_is_init_st _ SPEC c)
     (M_FUN: is_fun m):
   @wfst_mod_inv _ SPEC Σ
             (@iem_phys heap_lang _ HeapLangEM EM Σ Hinv)
-            (@iris_invGS heap_lang _ Σ (@IEM_irisG heap_lang _ HeapLangEM EM Σ Hinv)) -∗
-  wfree_trace_inv ic s' SPEC {tr[ c ]}{tr[ init_om_wfree_state F ic c ]}.
+            (@iris_invGS heap_lang _ Σ (@IEM_irisG heap_lang _ HeapLangEM EM Σ Hinv)) wG -∗
+  wfree_trace_inv ic s' SPEC {tr[ c ]} {tr[ init_om_wfree_state F ic c ]} (wG := wG).
   Proof using.
     (* clear MSm. *)
     iIntros "#INV". 
@@ -188,12 +191,12 @@ Section WFAdequacy.
     Z ⊆ Y -> (X ⊎ Y) ∖ Z = X ⊎ Y ∖ Z.
   Proof using. clear. multiset_solver. Qed.
 
-  Lemma init_τi_pwp_ext {Σ} {PWT: @PrWfreeTok MS Σ} e
+  Lemma init_τi_pwp_ext {Σ} {PWT: @PrWfreeTok _ SPEC Σ} e
     (VALID_CL: valid_op_client no_forks m e)
     (TI: elements MS !! τi = Some m)
     (M_FUN: is_fun m):
-    ⊢ □ ( (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ SPEC) -∗
-         ct_frag None -∗ pwp_ext ic m MaybeStuck CannotFork ⊤ τi e (λ _, True)).
+    ⊢ □ ( (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ SPEC (wG := @pwt_wG _ _ _ PWT)) -∗
+         ct_frag None -∗ pwp_ext ic SPEC m MaybeStuck CannotFork ⊤ τi e (λ _, True)).
   Proof using.
     simpl.
 
@@ -252,15 +255,15 @@ Section WFAdequacy.
     tok_add_pres P (fun _ => emp%I).
   Proof using. clear. red. set_solver. Qed.
 
-  Lemma init_pwp {Σ} {PWT: @PrWfreeTok MS Σ}
+  Lemma init_pwp {Σ} {PWT: @PrWfreeTok _ SPEC Σ}
     τ e0 m'
     (VALID: valid_client e0)
     (NOFORKS: no_forks e0)
     (M'_IN: m' ∈ MS)
     (M'_FUN: is_fun m'):
-    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ SPEC) -∗ 
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ SPEC (wG := @pwt_wG _ _ _ PWT)) -∗ 
     method_tok m' -∗ 
-    pwp0 MaybeStuck CannotFork ⊤ τ (subst "m" m' e0) (λ _, method_tok m').
+    pwp0 SPEC MaybeStuck CannotFork ⊤ τ (subst "m" m' e0) (λ _, method_tok m').
   Proof using SPEC.
     simpl. 
     
@@ -301,14 +304,14 @@ Section WFAdequacy.
     by iApply ground_val_interp.
   Qed.
 
-  Lemma init_wptp_wfree_pwps {Σ} {PWT: @PrWfreeTok MS Σ} tp0 tp tks N
+  Lemma init_wptp_wfree_pwps {Σ} {PWT: @PrWfreeTok _ SPEC Σ} tp0 tp tks N
     (NO: τi ∉ locales_of_list_from tp0 tp)
     (TP: Forall2 (valid_op_client no_forks) tks tp)
     (TKS_MS: forall tk, tk ∈ tks -> tk ∈ MS)
     (TKS_FUN: forall tk, tk ∈ tks -> is_fun tk):
-    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ SPEC) -∗
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ SPEC (wG := @pwt_wG _ _ _ PWT)) -∗
     methods_toks (list_to_set_disj tks) -∗
-   wptp_from_gen (thread_pr ic s' m MaybeStuck CannotFork N) tp0 tp
+   wptp_from_gen (thread_pr ic s' SPEC m MaybeStuck CannotFork N) tp0 tp
       (map (λ (_ : nat) (_ : val), ⌜ True ⌝%I)
          (adequacy_utils.locales_of_list_from tp0 tp)).
   Proof using.
@@ -342,16 +345,16 @@ Section WFAdequacy.
   (* TODO: move, remove similar for m *)
   Context (MS_FUNS: forall m', m' ∈ MS -> is_fun m').
 
-  Lemma init_wptp_wfree {Σ} {PWT: @PrWfreeTok MS Σ} c
+  Lemma init_wptp_wfree {Σ} {PWT: @PrWfreeTok _ SPEC Σ} c
     (ETR0: is_init_tpool c.1)
     (M_FUN: is_fun m):
-    let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ (@pwt_Hinv _ _ PWT) in
-    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ SPEC) -∗
+    let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ (@pwt_Hinv _ _ _ PWT) in
+    (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ SPEC (wG := @pwt_wG _ _ _ PWT)) -∗
     (⌜ ii = 0 ⌝ → ∃ π, cp_mul π0 d0 F ∗ th_phase_frag τi π (/2)%Qp) -∗
     methods_toks (MS ∖ {[+ m +]}) -∗
     (⌜ ii = 0 ⌝ → method_tok m) -∗
     ct_frag None -∗
-    wptp_wfree ic s' m MaybeStuck CannotFork {tr[ c ]}
+    wptp_wfree ic s' SPEC m MaybeStuck CannotFork {tr[ c ]}
       (map (λ _ _, True) (adequacy_utils.locales_of_list c.1)).
   Proof using MS_FUNS.
     simpl. iIntros "#INV T TOKS TOKm CTF".
@@ -427,13 +430,13 @@ Section WFAdequacy.
     iApply (wp_stuck_mono with "[$]"). done.
   Qed.
 
-  Lemma init_pr_pr_wfree {Σ} {PWT: @PrWfreeTok MS Σ}
+  Lemma init_pr_pr_wfree {Σ} {PWT: @PrWfreeTok _ SPEC Σ}
     c
     (ETR0: is_init_tpool c.1)
     (M_FUN: is_fun m):
-  (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ SPEC) -∗
+  (let _: heap1GS Σ := iem_phys HeapLangEM EM in wfst_mod_inv _ SPEC (wG := @pwt_wG _ _ _ PWT)) -∗
   @obls_init_resource _ _ _ _ _ _
-            (@iem_fairnessGS heap_lang _ HeapLangEM EM Σ (@pwt_Hinv _ _ PWT))
+            (@iem_fairnessGS heap_lang _ HeapLangEM EM Σ (@pwt_Hinv _ _ _ PWT))
             (init_om_wfree_state F ic c) () -∗
   methods_toks MS -∗
   ct_auth None -∗ ct_frag None -∗
@@ -461,7 +464,7 @@ Section WFAdequacy.
 
     rewrite -bi.sep_assoc. 
     iAssert (_%I ∗ (⌜ ii = 0 ⌝ →
-                    let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ (@pwt_Hinv _ _ PWT) in
+                    let _: ObligationsGS Σ := @iem_fairnessGS _ _ _ _ _ (@pwt_Hinv _ _ _ PWT) in
                     ∃ π, th_phase_frag τi π (/ 2)%Qp))%I with "[PH]" as "[X PHτi]".
     2: iSplitL "X"; [by iApply "X"| ].
     { destruct (decide (τi ∈ locales_of_cfg c)).
@@ -493,7 +496,7 @@ Section WFAdequacy.
     rewrite bi.sep_comm !bi.sep_assoc. iSplit; [| done].
     iSplit; [| by destruct s'].
     
-    iAssert (cti_cond ic m {tr[ c ]} ∗ (⌜ ii = 0 ⌝ → method_tok m))%I with "[CTA TOK]" as "[$ TOK]". 
+    iAssert (cti_cond ic SPEC m {tr[ c ]} ∗ (⌜ ii = 0 ⌝ → method_tok m))%I with "[CTA TOK]" as "[$ TOK]". 
     { rewrite /cti_cond /=.
       fold ii. destruct ii eqn:II.
       - iSplitR; [| by iFrame]. iIntros (?). lia.
@@ -511,7 +514,7 @@ Section WFAdequacy.
     - iFrame.
   Qed.
 
-  Lemma PR_premise_wfree `{hPre: @heapGpreS Σ M EM} 
+  Lemma PR_premise_wfree `{hPre: @heapGpreS Σ M EM} {wGPre: wfst_preG _ SPEC Σ}
     {MTPre: MethodTokenPre Σ} {CTPre: CallTrackerPre Σ} c
     (ETR0: is_init_tpool c.1)
     (MOD_INIT: wfst_is_init_st _ SPEC c)
@@ -524,12 +527,13 @@ Section WFAdequacy.
     (init_om_wfree_state F ic c) ((): @em_init_param _ _ EM).
   Proof using MS_FUNS. 
     red. iIntros (Hinv) "(PHYS & MOD)". simpl.
-    iMod (@wfst_init_mod _ SPEC with "[PHYS]") as "[#INV (%MT & TOKS)]".
+    iMod (@wfst_init_mod _ SPEC with "[PHYS]") as "(%MT & %WG & #INV & TOKS)".
+    { eauto. }
     2: { iFrame. }
     { by rewrite -surjective_pairing. }
          
     iMod ct_init as "(%CT & CTA & CTF)".
-    set (PWT := {| pwt_UT := MT; pwt_CT := CT |}).
+    set (PWT := {| pwt_UT := MT; pwt_CT := CT; pwt_wG := WG |}).
 
     iModIntro.
     iExists (wfree_trace_inv ic s' SPEC).
@@ -657,7 +661,8 @@ Section WFAdequacy.
     by rewrite JTH in H0.
 
     Unshelve.
-    set_solver. 
+    - apply wfree_WpreG_sub.
+    - set_solver. 
   Qed.
 
   Theorem simple_om_simulation_adequacy_terminate_multiple_waitfree extr
