@@ -83,7 +83,7 @@ Section Enqueue.
 
   Lemma mk_dummy_node_spec (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ th_phase_frag τ π q ∗ cp_mul π d mk_node_fuel }}}
-       mk_dummy_node #() @τ
+       mk_dummy_node #() @ CannotFork; NotStuck; τ; ⊤
     {{{ (pt: loc), RET #pt; th_phase_frag τ π q ∗ hn_interp (pt, dummy_node) }}}.
   Proof using.
     iIntros (Φ) "(PH & CPS) POST". rewrite /mk_dummy_node.
@@ -136,7 +136,7 @@ Section Enqueue.
   Lemma start_enqueue (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ queue_inv PE ∗ read_head_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d 1 }}}
-       !#Tail @ τ
+       !#Tail @ CannotFork; NotStuck; τ; ⊤
     {{{ (pt: loc), RET #pt; th_phase_frag τ π q ∗ hn_interp_wip (pt, dummy_node) ∗
           ∃ (t br: nat), read_head_resources t br pt None }}}.
   Proof using.
@@ -181,7 +181,7 @@ Section Enqueue.
 
     {{{ queue_inv PE ∗ hn_interp_wip (pt, dummy_node) ∗ read_head_resources t br pt None ∗
         th_phase_frag τ π q ∗ cp_mul π d mk_node_fuel }}}
-       set_node #pt v #nxt @ τ
+       set_node #pt v #nxt @ CannotFork; NotStuck; τ; ⊤
     {{{ RET #(); th_phase_frag τ π q ∗ hn_interp_wip (pt, (v, nxt)) ∗ read_head_resources t br pt None }}}.
   Proof using.
     simpl. iIntros (Φ) "(#INV & TNI' & RH & PH & CPS) POST".
@@ -355,7 +355,7 @@ Section Enqueue.
     {{{ queue_inv PE ∗ hn_interp (pn, dummy_node) ∗ hn_interp_wip (pt, (v, pn)) ∗ 
         read_head_resources t br pt None ∗ PE v ∗ 
         th_phase_frag τ π q ∗ cp_mul π d 1 }}}
-      #Tail <- #pn @τ
+      #Tail <- #pn @ CannotFork; NotStuck; τ; ⊤
     {{{ RET #(); th_phase_frag τ π q ∗ read_head_resources (S t) br pn None ∗ rop_token }}}.
   Proof using.
     simpl. iIntros (Φ) "(#INV & DNI & TNI & RH & PEv & PH & CPS) POST".
@@ -431,7 +431,7 @@ Section Enqueue.
   Lemma enqueue_spec (τ: locale heap_lang) (π: Phase) (q: Qp) (v: val):
     {{{ queue_inv PE ∗ read_head_token ∗ PE v ∗ 
         th_phase_frag τ π q ∗ cp_mul π d enqueue_fuel }}}
-       enqueue q_sq v @ τ
+       enqueue q_sq v @ CannotFork; NotStuck; τ; ⊤
     {{{ RET #(); th_phase_frag τ π q ∗ read_head_token }}}.
   Proof using.
     simpl. iIntros (Φ) "(#INV & TOK & PEv & PH & CPS) POST".
