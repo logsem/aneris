@@ -8,6 +8,7 @@ From lawyer.obligations Require Import obligations_model obligations_resources o
 From lawyer Require Import sub_action_em program_logic.
 From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From iris.base_logic.lib Require Import invariants.
+From lawyer.nonblocking.logrel Require Import valid_client.
 From lawyer.nonblocking.examples.queue Require Import simple_queue_utils simple_queue to_int wrappers_lib.
 From lawyer.nonblocking.examples.queue.enqueuer Require Import enqueue read_head.
 From heap_lang Require Import heap_lang_defs lang notation.
@@ -26,7 +27,7 @@ Definition enqueuer_thread sq: val :=
 .
 
 
-Section EnqueuerThread.
+Section EnqueuerThreadLawyer.
 
   Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
   Context `{EM: ExecutionModel heap_lang M}.
@@ -101,4 +102,80 @@ Section EnqueuerThread.
       iPureIntro. by repeat constructor.
   Qed.
 
-End EnqueuerThread. 
+End EnqueuerThreadLawyer.
+
+From lawyer.nonblocking Require Import pwp.
+From lawyer.nonblocking.examples Require Import pwp_tactics. 
+
+ 
+Section EnqueuerThreadPwp.
+
+  Context {Σ} {hG: heap1GS Σ} {invG: invGS_gen HasNoLc Σ}. 
+  
+  Context {QL: QueueG Σ}.
+  Context {SQT: SimpleQueueTokens Σ}.
+  Context {q_sq: SimpleQueue}.
+
+  Let iG := @irisG_looping _ HeapLangEM _ _ hG si_add_none.
+  Existing Instance iG.
+
+  (** The spec needed by the token-based adequacy theorem *)
+  (** Note that at this point we choose the concrete predicate for queue elements,
+      such that it allows to establish is_ground_val in postcondition *)
+  (** The spec needed by the token-based adequacy theorem *)
+  (** Note that at this point we choose the concrete predicate for queue elements,
+      such that it allows to establish is_ground_val in postcondition *)
+  Lemma enqueuer_thread_pwp_spec (τ: locale heap_lang) (v: val):
+    {{{ queue_inv val_is_int ∗ read_head_token }}}
+       enqueuer_thread q_sq v @ CannotFork; NotStuck; τ; ⊤
+    {{{ (v: val), RET v; ⌜ is_ground_val v ⌝ ∗ read_head_token }}}.
+  Proof using.
+    iIntros (Φ) "(#INV & TOK) POST".
+    rewrite /enqueuer_thread.
+
+    (* TODO: pwp_pure_step gets stuck without it; fix *)
+    assert (forall v, Persistent (@val_is_int Σ v)) by apply _. 
+
+    pwp_pure_steps. simpl.
+    wp_bind (_ = _)%E.
+    iApply sswp_pwp; [done| ].
+    iApply sswp_pure_step.
+    { red. set_solver. }
+    iModIntro.
+
+    destruct (decide (v = #())) as [-> | NEQ].
+    - rewrite bool_decide_true; [| done].
+      pwp_pure_steps.
+      iNext.
+      wp_bind (read_head_enqueuer _ _)%E. 
+      iApply (read_head_enqueuer_pwp_spec with "[-POST]").
+      2: { iFrame "#∗". }
+      { apply _. }
+      iIntros "!> %v (TOK & %RET)".
+      pwp_pure_steps.
+      iApply "POST". iFrame.
+      iPureIntro. destruct RET as [-> | (?&->&?&->)]; by repeat constructor.
+    - rewrite bool_decide_false; [| done].
+      pwp_pure_steps. simpl.
+      rewrite ToInt_subst. simpl.
+      iNext. 
+      wp_bind (ToInt _)%E.
+      iApply sswp_pwp.
+      { apply ToInt_nval. }
+      iApply sswp_pure_step; [done| ]. 
+      do 2 iModIntro.
+      destruct (val_into_int_spec v) as [(?&->&->) | (NINT & ->) ].
+      2: { pwp_pure_steps. 
+           iApply "POST". iFrame.
+           iPureIntro. repeat constructor. }
+      pwp_pure_steps. 
+      wp_bind (enqueue _ _)%E.
+      iApply (enqueue_pwp_spec with "[-POST]").
+      { iFrame "#∗". eauto. } 
+      iIntros "!> TOK".
+      pwp_pure_steps. 
+      iApply "POST". iFrame.
+      iPureIntro. by repeat constructor.
+  Qed.
+
+End EnqueuerThreadPwp.
