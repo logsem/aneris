@@ -13,7 +13,51 @@ From heap_lang Require Import heap_lang_defs lang notation.
 
 Close Scope Z.
 
-Section RightUtils.
+
+Section GetHeadValViewshifts.
+  Context {Σ} {hG: heap1GS Σ} {invG: invGS_gen HasNoLc Σ}.   
+  Context {QL: QueueG Σ}.
+  Context {SQT: SimpleQueueTokens Σ}.
+  Context {q_sq: SimpleQueue}.
+  Context (PE: val -> iProp Σ) {PERS_PE: forall v, Persistent (PE v)}.
+
+  Lemma get_head_val_vs h nd fl ph od:
+    queue_inv PE -∗ ith_node h (ph, nd) -∗
+    dequeue_resources h fl ph od -∗
+    |={⊤, ⊤∖↑queue_ns}=> ph ↦ nd.1 ∗ ▷ (ph ↦ nd.1 -∗ (PE nd.1 ∗ |={⊤∖↑queue_ns, ⊤}=> dequeue_resources h fl ph od)).
+  Proof using PERS_PE. 
+    iIntros "#INV #HEADhn DR".
+    destruct nd as [v nxt]. simpl.
+    iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od_ & %hist & inv)" "CLOS".
+    iEval (rewrite /queue_inv_inner) in "inv".
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & OHV & >RHI & >RH & >DQ & #EI)".
+    iModIntro.
+    iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[<- <-].
+    iDestruct "DR" as "[HEAD FL]".
+    iDestruct (hq_auth_lookup with "[$] [$]") as %HTH.
+    iAssert (⌜ t ≠ h ⌝)%I as %NEMPTY.
+    { iIntros (->). iDestruct (queue_interp_cur_empty with "[$]") as %NO.
+      specialize (NO 0). rewrite Nat.add_0_r in NO. congruence. }
+
+    iDestruct (access_queue with "[$] [$] [$]") as "[HNI CLOS']".
+    { red in ORDER. lia. }
+    rewrite {1}/hn_interp. iDestruct "HNI" as "[VAL NXT]".
+    iFrame "VAL".
+    iIntros "!> VAL". 
+    iDestruct ("CLOS'" with "[$VAL $NXT]") as "[? HQ]".
+
+    iDestruct (queue_elems_interp_get with "[$]") as "PEv"; eauto.
+    iFrame "PEv". 
+
+    iMod ("CLOS" with "[-HEAD FL]") as "_".
+    { iFrame. by iFrame "EI". }
+    iModIntro. iFrame.
+  Qed.
+
+End GetHeadValViewshifts.
+
+
+Section GetHeadValLawyer.
 
   Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
   Context `{EM: ExecutionModel heap_lang M}.
@@ -48,28 +92,56 @@ Section RightUtils.
     iApply sswp_MU_wp; [done| ].
     iApply sswp_pure_step; [done| ].
     MU_by_burn_cp. rewrite loc_add_0. iApply wp_value.
-    iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od_ & %hist & inv)" "CLOS".
-    iEval (rewrite /queue_inv_inner) in "inv".
-    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & OHV & >RHI & >RH & >DQ & #EI)".
-    iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[<- <-].
-    iDestruct "DR" as "[HEAD FL]".
-    iDestruct (hq_auth_lookup with "[$] [$]") as %HTH.
-    iAssert (⌜ t ≠ h ⌝)%I as %NEMPTY.
-    { iIntros (->). iDestruct (queue_interp_cur_empty with "[$]") as %NO.
-      specialize (NO 0). rewrite Nat.add_0_r in NO. congruence. }
-    iDestruct (access_queue with "[$] [$] [$]") as "[HNI CLOS']".
-    { red in ORDER. lia. }
-    rewrite {1}/hn_interp. iDestruct "HNI" as "[VAL NXT]".
-    iApply sswp_MU_wp; [done| ].
-    iApply (wp_load with "VAL"). iIntros "!> VAL". 
-    MU_by_burn_cp. iApply wp_value.
-    iDestruct ("CLOS'" with "[$VAL $NXT]") as "[? HQ]".
 
-    iDestruct (queue_elems_interp_get with "[$]") as "PEv"; eauto. 
-      
-    iMod ("CLOS" with "[-POST PH HEAD FL PEv]") as "_".
-    { iFrame. by iFrame "EI". }
-    iModIntro. iApply "POST". iFrame.
+    iMod (get_head_val_vs with "[$] [$] [$]") as "(VAL & VAL')".
+    iApply sswp_MU_wp; [done| ].
+    iApply (wp_load with "VAL"). iIntros "!> VAL".
+    iDestruct ("VAL'" with "[$]") as "(#PEv & CLOS)". 
+    MU_by_burn_cp. iApply wp_value.
+    iMod "CLOS" as "DR". iModIntro. 
+    iApply "POST". iFrame "#∗". 
   Qed.
 
-End RightUtils.
+End GetHeadValLawyer.
+
+
+From lawyer.nonblocking Require Import pwp.
+From lawyer.nonblocking.examples Require Import pwp_tactics. 
+
+Section GetHeadValPwp.
+  Context {Σ} {hG: heap1GS Σ} {invG: invGS_gen HasNoLc Σ}. 
+  
+  Context {QL: QueueG Σ}.
+  Context {SQT: SimpleQueueTokens Σ}.
+  Context {q_sq: SimpleQueue}.
+
+  Context (PE: val -> iProp Σ) {PERS_PE: forall v, Persistent (PE v)}.
+
+  Let iG := @irisG_looping _ HeapLangEM _ _ hG si_add_none.
+  Existing Instance iG.
+
+  Lemma get_head_val_pwp_spec τ h nd fl ph od:
+    {{{ queue_inv PE ∗ ith_node h (ph, nd) ∗ dequeue_resources h fl ph od }}}
+      get_val #ph @ CannotFork; NotStuck; τ; ⊤
+    {{{ RET (nd.1); dequeue_resources h fl ph od ∗ PE nd.1 }}}.
+  Proof using PERS_PE.
+    simpl. iIntros (Φ) "(#INV & #HEADhn & DR) POST".
+    rewrite /get_val.
+    destruct nd as [v nxt]. simpl.
+    pwp_pure_steps.
+    wp_bind (_ +ₗ _)%E.
+    iApply sswp_pwp; [done| ].
+    iApply sswp_pure_step; [done| ].
+    do 2 iModIntro. rewrite loc_add_0. iApply wp_value.
+
+    iApply wp_atomic.
+    iMod (get_head_val_vs with "[$] [$] [$]") as "(VAL & VAL')".
+    iApply sswp_pwp; [done| ]. iModIntro. 
+    iApply (wp_load with "VAL"). iIntros "!> VAL".
+    iDestruct ("VAL'" with "[$]") as "(#PEv & CLOS)". 
+    iModIntro. iApply wp_value.
+    iMod "CLOS" as "DR". iModIntro. 
+    iApply "POST". iFrame "#∗". 
+  Qed.
+
+End GetHeadValPwp.
