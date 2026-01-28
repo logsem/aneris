@@ -272,7 +272,7 @@ Section EnqueueViewshifts.
       iFrame. iPureIntro.
       split; eapply lookup_app_l_Some; eauto. }
 
-    iDestruct (queue_elems_interp_extend _ _ (pt, (v, pn)) with "[$] [$]") as "EI'".
+    iDestruct (queue_elems_interp_extend _ (pt, (v, pn)) with "[$] [$]") as "EI'".
 
     iMod (hq_auth_extend with "[$]") as "HQ".
     iDestruct (dangle_interp_extend with "[$]") as "DANGLE".
