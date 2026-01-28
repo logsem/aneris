@@ -35,7 +35,7 @@ Definition read_head_enqueuer (sq: SimpleQueue): val :=
 .
 
 
-Section ReadHead.
+Section ReadHeadLawyer.
 
   Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
   Context `{EM: ExecutionModel heap_lang M}.
@@ -56,7 +56,7 @@ Section ReadHead.
 
   Definition read_head_fuel := 100.
 
-  Lemma start_read (τ: locale heap_lang) (π: Phase) (q: Qp):
+  Lemma start_read_spec (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ queue_inv PE ∗ read_head_token ∗ 
         th_phase_frag τ π q ∗ cp_mul π d 1 }}}
        !#Head @ CannotFork; NotStuck; τ; ⊤
@@ -77,7 +77,7 @@ Section ReadHead.
     iApply "POST". by iFrame.
   Qed.
 
-  Lemma read_tail_exact (τ: locale heap_lang) (π: Phase) (q: Qp) t br pt rop:
+  Lemma read_tail_exact_spec (τ: locale heap_lang) (π: Phase) (q: Qp) t br pt rop:
     {{{ queue_inv PE ∗ read_head_resources t br pt rop ∗
         th_phase_frag τ π q ∗ cp_mul π d 1 }}}
        !#Tail @ CannotFork; NotStuck; τ; ⊤
@@ -94,7 +94,7 @@ Section ReadHead.
     iApply "POST". by iFrame.
   Qed.
 
-  Lemma bump_BR (τ: locale heap_lang) (π: Phase) (q: Qp) t br pt h ndh i ph
+  Lemma bump_BR_spec (τ: locale heap_lang) (π: Phase) (q: Qp) t br pt h ndh i ph
     (BRH: br <= h):
     {{{ queue_inv PE ∗ read_head_resources t br pt (Some i) ∗
         rop_token ∗ ith_node h (ph, ndh) ∗
@@ -116,7 +116,7 @@ Section ReadHead.
 
   Definition small_fuel := 10.
 
-  Lemma check_head_change (τ: locale heap_lang) (π: Phase) (q: Qp)
+  Lemma check_head_change_spec (τ: locale heap_lang) (π: Phase) (q: Qp)
     t pt h ndh i ph
     (PTR_NEQ: pt ≠ ph):
     {{{ queue_inv PE ∗ read_head_resources t h pt (Some i) ∗
@@ -198,7 +198,7 @@ Section ReadHead.
 
     wp_bind (! _)%E.
     split_cps "CPS" 1.
-    iApply (check_head_change with "[-POST CPS]").
+    iApply (check_head_change_spec with "[-POST CPS]").
     { apply NEQ. }
     { iFrame "#∗". }
     iIntros "!> %ph' (PH & %rp & RH & RP & CASES)".
@@ -240,13 +240,13 @@ Section ReadHead.
 
     wp_bind (! _)%E.
     split_cps "CPS" 1.
-    iApply (start_read with "[$INV $CPS' $PH $TOK]").
+    iApply (start_read_spec with "[$INV $CPS' $PH $TOK]").
     iIntros "!> %ph (PH & RTOK & (%t & %br & %pt & %rop & RH & CASES))".
 
     wp_bind (Rec _ _ _)%E. pure_steps.
     wp_bind (! _)%E.
     split_cps "CPS" 1.
-    iApply (read_tail_exact with "[$INV $CPS' $PH $RH]").
+    iApply (read_tail_exact_spec with "[$INV $CPS' $PH $RH]").
     iIntros "!> (PH & RH)".
 
     wp_bind (Rec _ _ _)%E. pure_steps.
@@ -269,7 +269,7 @@ Section ReadHead.
 
     wp_bind (_ <- _)%E.
     split_cps "CPS" 1.
-    iApply (bump_BR with "[-CPS POST ]").
+    iApply (bump_BR_spec with "[-CPS POST ]").
     { apply BR_H. }
     { iFrame "#∗". }
     iIntros "!> (PH & RH & RTOK)".
@@ -287,4 +287,242 @@ Section ReadHead.
     iRight. iExists _. iSplit; [done| ]. by iFrame. 
   Qed.
 
-End ReadHead. 
+End ReadHeadLawyer. 
+
+
+From lawyer.nonblocking Require Import pwp.
+From lawyer.nonblocking.examples Require Import pwp_tactics. 
+
+
+Section ReadHeadPwp.
+
+  Context {Σ} {hG: heap1GS Σ} {invG: invGS_gen HasNoLc Σ}. 
+  
+  Context {QL: QueueG Σ}.
+  Context {SQT: SimpleQueueTokens Σ}.
+  Context {q_sq: SimpleQueue}.
+
+  Context (PE: val -> iProp Σ) {PERS_PE: forall v, Persistent (PE v)}.
+
+  Let iG := @irisG_looping _ HeapLangEM _ _ hG si_add_none.
+  Existing Instance iG.
+
+  Lemma start_read_pwp_spec (τ: locale heap_lang):
+    {{{ queue_inv PE ∗ read_head_token }}}
+       !#Head @ CannotFork; NotStuck; τ; ⊤
+    {{{ (ph: loc), RET #ph; rop_token ∗ 
+          ∃ t br pt rop, read_head_resources t br pt rop ∗
+           (⌜ pt = ph /\ rop = None ⌝ ∨ 
+            ∃ i h ndh, ⌜ pt ≠ ph /\ rop = Some i ⌝ ∗ ith_node h (ph, ndh) ∗
+                        ith_read i h 0 ∗ ⌜ br <= h ⌝ ∗ disj_range h t ∗ PE ndh.1) }}}.
+  Proof using PERS_PE. 
+    simpl. iIntros (Φ) "(#INV & TOK) POST".
+    iApply wp_atomic.
+    iMod (start_read_vs with "[$] [$]") as "(%ph & HEAD & HEAD')".
+    iModIntro. 
+    iApply sswp_pwp; [done| ].
+    iApply (wp_load with "HEAD"). iIntros "!> HEAD".
+    iModIntro. iApply wp_value.
+    iMod ("HEAD'" with "[$]") as "X".
+    iApply "POST". by iFrame.
+  Qed.
+
+  Lemma read_tail_exact_pwp_spec (τ: locale heap_lang) t br pt rop:
+    {{{ queue_inv PE ∗ read_head_resources t br pt rop }}}
+       !#Tail @ CannotFork; NotStuck; τ; ⊤
+    {{{ RET #pt; read_head_resources t br pt rop }}}.
+  Proof using.
+    simpl. iIntros (Φ) "(#INV & RH) POST".
+    iApply wp_atomic.
+    iMod (read_tail_exact_vs with "[$] [$]") as "(TAIL & TAIL')".
+    iModIntro. 
+    iApply sswp_pwp; [done| ].
+    iApply (wp_load with "TAIL"). iIntros "!> TAIL".
+    iModIntro. iApply wp_value.
+    iMod ("TAIL'" with "[$]") as "RH". 
+    iApply "POST". by iFrame.
+  Qed.
+
+  Lemma bump_BR_pwp_spec (τ: locale heap_lang) t br pt h ndh i ph
+    (BRH: br <= h):
+    {{{ queue_inv PE ∗ read_head_resources t br pt (Some i) ∗
+        rop_token ∗ ith_node h (ph, ndh) ∗
+        ith_read i h 0 }}}
+       #BeingRead <- #ph @ CannotFork; NotStuck; τ; ⊤
+    {{{ RET #(); read_head_resources t h pt (Some i) ∗ rop_token }}}.
+  Proof using.
+    simpl. iIntros (Φ) "(#INV & RH & RTOK & #HTH & #READ) POST".
+    iApply wp_atomic.
+    iMod (bump_BR_vs with "[$] [$] [$] [$] [$] ") as "(%pbr0 & BR & BR')"; eauto.
+    iModIntro.
+    iApply sswp_pwp; [done| ].
+    iApply (wp_store with "BR"). iIntros "!> BR". 
+    iModIntro. iApply wp_value.
+    iMod ("BR'" with "[$]") as "[RH ROP]".
+    iApply "POST". by iFrame.
+  Qed.
+
+  Lemma check_head_change_pwp_spec (τ: locale heap_lang)
+    t pt h ndh i ph
+    (PTR_NEQ: pt ≠ ph):
+    {{{ queue_inv PE ∗ read_head_resources t h pt (Some i) ∗
+        rop_token ∗ ith_node h (ph, ndh) ∗
+        ith_read i h 0 ∗ disj_range h t }}}
+      ! #Head @ CannotFork; NotStuck; τ; ⊤
+    {{{ (ph': loc), RET #ph'; ∃ rp, read_head_resources t h pt (Some i) ∗
+          ith_rp i rp ∗ (⌜ ph' = ph /\ rp = rs_proc None ⌝ ∨ ⌜ ph' ≠ ph /\ rp = rs_canceled ⌝ ∗ rop_token ) }}}.
+  Proof using.
+    clear PERS_PE.
+    simpl. iIntros (Φ) "(#INV & RH & TOK & #ITH & #READ & #DISJ) POST".
+    iApply wp_atomic.
+    iMod (check_head_change_vs with "[$] [$] [$] [$] [$] [$]") as "(%ph' & HEAD & HEAD')"; eauto.
+    iModIntro. 
+    iApply sswp_pwp; [done| ].
+    iApply (wp_load with "HEAD"). iIntros "!> HEAD".
+    iModIntro. iApply wp_value.
+    iMod ("HEAD'" with "[$]") as "X". 
+    iApply "POST". by iFrame.
+  Qed.
+               
+  Lemma read_ohv_pwp_spec τ:
+    {{{ queue_inv PE }}}
+      !#OldHeadVal @ CannotFork; NotStuck; τ; ⊤
+    {{{ v, RET v; PE v}}}.
+  Proof using PERS_PE.
+    iIntros (Φ) "#INV POST".
+    iApply wp_atomic.
+    iMod (read_ohv_vs with "[$]") as "(%v & OHV & OHV')".
+    iModIntro. 
+    iApply sswp_pwp; [done| ].
+    iApply (wp_load with "[$]"). iIntros "!> ?".
+    iModIntro. iApply wp_value.
+    iMod ("OHV'" with "[$]") as "?". 
+    iApply "POST". by iFrame.
+  Qed.
+
+  Lemma get_op_node_val_pwp_spec (τ: locale heap_lang)
+    t h pt i ph ndh:
+    {{{ queue_inv PE ∗ read_head_resources t h pt (Some i) ∗
+        ith_node h (ph, ndh) ∗ ith_read i h 0 ∗ ith_rp i (rs_proc None) }}}
+      get_val #ph @ CannotFork; NotStuck; τ; ⊤
+    {{{ v, RET v; read_head_token ∗ PE v }}}.
+  Proof using PERS_PE.
+    simpl. iIntros (Φ) "(#INV & RH & #ITH & #READ & #RP0) POST".
+    rewrite /get_val. pwp_pure_steps.
+
+    wp_bind (_ +ₗ _)%E.
+    iApply sswp_pwp; [done| ].
+    iApply sswp_pure_step; [done| ].
+    iModIntro. rewrite loc_add_0. iApply wp_value.
+
+    iApply wp_atomic.
+    iNext. 
+    iMod (get_op_node_val_vs with "[$] [$] [$] [$] [$]") as "(%v & PPH & PPH')".
+    iModIntro.
+    iApply sswp_pwp; [done| ]. 
+    iApply (wp_load with "PPH"). iIntros "!> PPH".  
+    iModIntro. iApply wp_value.
+    iMod ("PPH'" with "[$]") as "X".
+    iApply "POST". by iFrame.
+  Qed.
+
+  Lemma get_head_val_pwp_spec (τ: locale heap_lang)
+    t pt h ndh i ph
+    (NEQ: pt ≠ ph):
+    {{{ queue_inv PE ∗ read_head_resources t h pt (Some i) ∗
+        rop_token ∗ ith_node h (ph, ndh) ∗
+        ith_read i h 0 ∗ disj_range h t }}}
+      get_head_val q_sq #ph @ CannotFork; NotStuck; τ; ⊤
+    {{{ v, RET v; read_head_token ∗ PE v }}}.
+  Proof using PERS_PE. 
+    simpl. iIntros (Φ) "(#INV & RH & TOK & #ITH & #READ & #DISJ) POST".
+    rewrite /get_head_val. 
+    pwp_pure_steps.
+
+    wp_bind (! _)%E.
+    iApply (check_head_change_pwp_spec with "[-POST]").
+    { apply NEQ. }
+    { iFrame "#∗". }
+    iIntros "!> %ph' (%rp & RH & RP & CASES)".
+
+    wp_bind (Rec _ _ _)%E. pwp_pure_steps.
+    wp_bind (_ = _)%E.
+    iApply sswp_pwp; [done| ]. 
+    iApply sswp_pure_step.
+    { set_solver. }
+    iModIntro. iApply wp_value. 
+
+    iNext.
+    iDestruct "CASES" as "[(-> & ->) | ((%NEQ' & ->) & RTOK)]".
+    - rewrite bool_decide_true; [| set_solver].
+      pwp_pure_steps.
+      iApply (get_op_node_val_pwp_spec with "[-POST]").
+      { iFrame. iFrame "#∗". }
+      done.
+    - rewrite bool_decide_false; [| set_solver].
+      pwp_pure_steps.      
+      iApply wp_fupd.      
+      iApply (read_ohv_pwp_spec with "[$INV]").
+      iIntros "!> % PEv".
+      iApply "POST". iFrame.      
+      iApply (read_head_close_cancelled_vs with "[$] [$] [$] [$] [$] [$]").    
+  Qed.
+
+  Lemma read_head_enqueuer_pwp_spec (τ: locale heap_lang):
+    {{{ queue_inv PE ∗ read_head_token }}}
+       read_head_enqueuer q_sq #() @ CannotFork; NotStuck; τ; ⊤
+    {{{ (v: val), RET v; read_head_token ∗
+                  (⌜ v = NONEV ⌝ ∨ ∃ v', ⌜ v = SOMEV v' ⌝ ∗ PE v') }}}.
+  Proof using PERS_PE.
+    simpl. iIntros (Φ) "(#INV & TOK) POST".
+    rewrite /read_head_enqueuer. 
+    pwp_pure_steps.
+
+    wp_bind (! _)%E.
+    iApply (start_read_pwp_spec with "[$INV $TOK]").
+    iIntros "!> %ph (RTOK & (%t & %br & %pt & %rop & RH & CASES))".
+
+    wp_bind (Rec _ _ _)%E. pwp_pure_steps.
+    wp_bind (! _)%E.
+    iApply (read_tail_exact_pwp_spec with "[$INV $RH]").
+    iIntros "!> RH".
+
+    wp_bind (Rec _ _ _)%E. pwp_pure_steps.
+    wp_bind (_ = _)%E.
+    iApply sswp_pwp; [done| ].
+    iApply sswp_pure_step.
+    { set_solver. }
+    iModIntro. iApply wp_value.
+
+    iDestruct "CASES" as "[[-> ->] | (%i & %h & %ndh & [%NEQ ->] & #ITH & #READ & %BR_H & #DISJ & PEh)]". 
+    { rewrite bool_decide_true; [| done].
+      iApply wp_fupd.
+      pwp_pure_steps.
+      iNext.
+      iMod (enqueuer_close_vs with "[$] [$] [$]") as "TOK".
+      iApply "POST". iFrame.  
+      by iLeft. }
+
+    rewrite bool_decide_false; [| set_solver].
+    pwp_pure_steps. 
+
+    iNext. 
+    wp_bind (_ <- _)%E.
+    iApply (bump_BR_pwp_spec with "[-POST ]").
+    { apply BR_H. }
+    { iFrame "#∗". }
+    iIntros "!> (RH & RTOK)".
+
+    wp_bind (Rec _ _ _)%E. pwp_pure_steps.
+    
+    wp_bind (get_head_val _ _)%E. 
+    iApply (get_head_val_pwp_spec with "[-POST]").
+    { apply NEQ. }
+    { iFrame. iFrame "#∗". }
+    iIntros "!> % (TOK & PEv)".
+
+    pwp_pure_steps. iApply "POST". iFrame.
+    iRight. iExists _. iSplit; [done| ]. by iFrame. 
+  Qed.
+
+End ReadHeadPwp. 
