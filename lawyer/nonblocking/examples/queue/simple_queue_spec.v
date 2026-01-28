@@ -75,7 +75,18 @@ Section QueueSpec.
   Lemma queue_pwps {Σ} {hGS: heap1GS Σ} {iGS: invGS_gen HasNoLc Σ}
     {MT: MethodToken queue_ms Σ} {wG : QueueG Σ}:
     queue_inv val_is_int ⊢ [∗ set] m ∈ dom queue_ms, token_safety_spec m.
-  Proof using. Admitted. 
+  Proof using.
+    iIntros "* #INV".
+    iApply big_sepS_forall. iIntros (m DOM).
+    rewrite /token_safety_spec. iIntros "!> % % TOK".
+    apply gmultiset_elem_of_dom in DOM. rewrite /queue_ms in DOM.
+    rewrite gmultiset_elem_of_disj_union !gmultiset_elem_of_singleton in DOM.
+    destruct DOM as [-> | ->].
+    - admit. 
+    - iApply wp_stuck_weaken.
+      iApply (dequeuer_thread_pwp_spec with "[$TOK $INV]").
+      set_solver.
+  Admitted. 
 
   Definition SimpleQueue_WaitFreeToken: WaitFreeSpecToken queue_ms := {|
     wfst_G := QueueG;

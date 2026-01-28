@@ -126,7 +126,7 @@ Section ReadHeadDequeuerPwp.
   Lemma read_head_dequeuer_pwp_spec (τ: locale heap_lang):
     {{{ queue_inv PE ∗ dequeue_token }}}
        read_head_dequeuer q_sq #() @ CannotFork; NotStuck; τ; ⊤
-    {{{ (v: val), RET v; (⌜ v = NONEV ⌝ ∨ ∃ v', ⌜ v = SOMEV v' ⌝ ∗ PE v') }}}.
+    {{{ (v: val), RET v; dequeue_token ∗ (⌜ v = NONEV ⌝ ∨ ∃ v', ⌜ v = SOMEV v' ⌝ ∗ PE v') }}}.
   Proof using PERS_PE.
     simpl. iIntros (Φ) "(#INV & TOK) POST".
     rewrite /read_head_dequeuer.
