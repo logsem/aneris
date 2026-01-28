@@ -21,6 +21,72 @@ Section GetHeadValViewshifts.
   Context {q_sq: SimpleQueue}.
   Context (PE: val -> iProp Σ) {PERS_PE: forall v, Persistent (PE v)}.
 
+  Lemma dequeuer_read_head_vs:
+    queue_inv PE -∗ dequeue_token -∗
+    |={⊤, ⊤ ∖ ↑queue_ns}=> ∃ h (ph: loc) fl,
+      Head ↦{1/2} #ph ∗ ▷ (Head ↦{1/2} #ph -∗ |={⊤ ∖ ↑queue_ns, ⊤}=> dequeue_resources h fl ph None).
+  Proof using.
+    iIntros "#INV TOK".
+    iInv "INV" as "(%hq & %h & %t & %br & %fl & %rop & %od & %hist & inv)" "CLOS".
+    iEval (rewrite /queue_inv_inner) in "inv".
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & OHV & >RHI & >RH & >DQ & EI)".
+    iModIntro.
+    
+    iDestruct (access_queue_ends with "[$] [$]") as "(%ph & %pt & HEAD & TAIL & HT & CLOS')".
+    iFrame "HEAD".
+    iExists _, _. iIntros "!> HEAD".
+    iDestruct "DQ" as "[[%ph_ DR] | TOK']".
+    2: { by iDestruct (dequeue_token_excl with "[$] [$]") as "?". }
+    iDestruct (dequeue_res_head_agree with "DR [$]") as %<-. 
+    iDestruct (dequeue_resources_dangle_agree with "DR [$]") as %->.
+    iDestruct ("CLOS'" with "[$] [$]") as "(HQ & QI)".
+    iFrame "DR". 
+
+    iMod ("CLOS" with "[-]") as "_"; [| done].
+    by iFrame.
+  Qed.    
+
+  Lemma dequeuer_read_tail_vs h fl ph:
+    queue_inv PE -∗ dequeue_resources h fl ph None -∗ 
+    |={⊤, ⊤ ∖ ↑queue_ns}=> ∃ t br (pt: loc),
+      Tail ↦{1 / 2} #pt ∗ ⌜ hq_state_wf h t br fl ⌝ ∗ 
+      (⌜h ≥ t ∧ ph = pt⌝ ∨ ⌜h < t ∧ ph ≠ pt⌝ ∗ (∃ nd, ith_node h (ph, nd))) ∗
+      ▷ (Tail ↦{1 / 2} #pt -∗ |={⊤∖↑queue_ns, ⊤}=> dequeue_resources h fl ph None).
+  Proof using.
+    iIntros "#INV DR".
+    iInv "INV" as "(%hq & %h_ & %t & %br & %fl_ & %rop & %od_ & %hist & inv)" "CLOS".
+    iEval (rewrite /queue_inv_inner) in "inv".
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & OHV & >RHI & >RH & >DQ & EI)".
+    iModIntro.
+    iDestruct (access_queue_ends with "[$] [$]") as "(%ph_ & %pt & HEAD & TAIL & #HT & CLOS')".
+    iFrame "TAIL".
+    iDestruct (dequeue_res_head_agree with "DR [$]") as %->. 
+    iDestruct (dequeue_resources_auth_agree with "DR [$]") as %[<- <-].
+    iDestruct "DQ" as "[(% & DR') | TOK]".
+    { by iDestruct (dequeue_resources_excl with "DR DR'") as "?". }
+    iFrame (ORDER). iFrame "HT".
+    iIntros "!> TAIL".
+    iDestruct ("CLOS'" with "[$] [$]") as "(HQ & QI)".
+    iMod ("CLOS" with "[-DR]") as "_".
+    { by iFrame. }
+    by iFrame. 
+  Qed.
+
+  Lemma dequeuer_close h fl ph:
+    queue_inv PE -∗ dequeue_resources h fl ph None ={⊤}=∗ dequeue_token.
+  Proof using.
+    iIntros "#INV DR".
+    iInv "INV" as "(%hq & %h_ & %t & %br' & %fl_ & %rop & %od_ & %hist & inv)" "CLOS".
+    iEval (rewrite /queue_inv_inner) in "inv".
+    iDestruct "inv" as "(>HQ & >AUTHS & >%ORDER & >QI & >DANGLE & OHV & >RHI & >RH & >DQ & EI)".
+    iDestruct "DQ" as "[(% & DR') | TOK]".
+    { by iDestruct (dequeue_resources_excl with "[$] [$]") as "?". }
+    iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[-> ->]. 
+    iMod ("CLOS" with "[-TOK]") as "_".
+    { by iFrame. }
+    by iFrame.
+  Qed.
+
   Lemma get_head_val_vs h nd fl ph od:
     queue_inv PE -∗ ith_node h (ph, nd) -∗
     dequeue_resources h fl ph od -∗
