@@ -33,26 +33,12 @@ Definition read_head_enqueuer (sq: SimpleQueue): val :=
       SOME (get_head_val sq "ch")
 .
 
-Section ReadHead.
 
-  Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
-  Context `{EM: ExecutionModel heap_lang M}.
-  Notation "'Degree'" := (om_hl_Degree). 
-  Notation "'Level'" := (om_hl_Level).  
-
-  Context {Σ} {OHE: OM_HL_Env OP EM Σ}.
-  (* Existing Instance OHE.  *)
+Section ReadHeadViewshifts.
+  Context {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ}.  
   Context {QL: QueueG Σ}.
   Context {SQT: SimpleQueueTokens Σ}.
   Context {q_sq: SimpleQueue}. 
-
-  Context (d: Degree).
-  Context (PE: val -> iProp Σ) {PERS_PE: forall v, Persistent (PE v)}. 
-
-  Let hGS: heap1GS Σ := iem_phys _ EM.
-  Existing Instance hGS.
-
-  Definition read_head_fuel := 100.
 
   (* TODO: move, remove duplicates *)
   Lemma dom_max_set_fold n:
@@ -150,7 +136,6 @@ Section ReadHead.
     (ith_rp n rp ∗ ⌜rs_fin rp⌝ ∗ (br_lb r ∨ ⌜rp = rs_aborted ∨ rp = rs_canceled⌝)) -∗
     old_rps hist None.
   Proof using.
-    clear PERS_PE. 
     iIntros "OLDS (RP & %FIN & #ADD)".
     rewrite /old_rps. simpl.
     rewrite {2}(map_split hist n).
@@ -175,7 +160,6 @@ Section ReadHead.
  ==∗
   ∃ hist', read_head_resources t br pt None ∗ read_hist_interp hist' None h br fl od ∗ (⌜ rs_compat (rs_proc None) rp⌝ -∗ rop_token).
   Proof using.
-    clear PERS_PE. 
     iIntros "RH ROP #BR RP0".
     rewrite {1}/read_hist_interp {1}/read_head_resources.
     iDestruct "ROP" as "(ROPA & ROP & RHIST & %RH_WF & #OLDS)".
@@ -328,16 +312,6 @@ Section ReadHead.
     iIntros "PQI AUTH". 
     iDestruct (phys_queue_interp_disj_impl with "PQI") as %DISJ. 
     rewrite /phys_queue_interp. iDestruct "PQI" as "(Q & (%pt & TAIL & DUMMY & %LL & HEAD))".
-    (* iAssert ([∗ set] i ∈ set_seq h (length hq - h), ∃ nd, ith_node i nd)%I *)
-    (*   with "[AUTH]" as "#FRAGS".  *)
-    (* { iApply big_sepS_forall. iIntros (i IN). *)
-    (*   apply elem_of_set_seq in IN as [HH TT]. *)
-    (*   destruct (decide (h <= length hq)); [| lia]. *)
-    (*   rewrite -Nat.le_add_sub in TT; [| done]. *)
-    (*   pose proof TT as [nd ITH]%lookup_lt_is_Some.  *)
-    (*   iDestruct (hq_auth_get_ith with "AUTH") as "#ITH"; [done| ]. *)
-    (*   iFrame "ITH". } *)
-    (* iSplit; [done| ]. *)
     iIntros (i j [??] [??] (NEQ & II & JJ)).
     simpl.
     apply elem_of_set_seq in II, JJ.
@@ -358,6 +332,40 @@ Section ReadHead.
     2, 3: rewrite lookup_drop; eauto.
     done.
   Qed.  
+
+  (* TODO: move *)
+  Lemma ith_rp_get_rs_p0 i rs
+    (LE: rs_le (rs_proc None) rs):
+    ith_rp i rs -∗ ith_rp i (rs_proc None).
+  Proof using.
+    rewrite /ith_rp. iApply own_mono.
+    apply auth_frag_mono. apply singleton_included_mono.
+    apply pair_included. split; [done| ].
+    by apply rs_le_incl.
+  Qed.
+
+End ReadHeadViewshifts.
+
+Section ReadHead.
+
+  Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
+  Context `{EM: ExecutionModel heap_lang M}.
+  Notation "'Degree'" := (om_hl_Degree). 
+  Notation "'Level'" := (om_hl_Level).  
+
+  Context {Σ} {OHE: OM_HL_Env OP EM Σ}.
+  (* Existing Instance OHE.  *)
+  Context {QL: QueueG Σ}.
+  Context {SQT: SimpleQueueTokens Σ}.
+  Context {q_sq: SimpleQueue}. 
+
+  Context (d: Degree).
+  Context (PE: val -> iProp Σ) {PERS_PE: forall v, Persistent (PE v)}. 
+
+  Let hGS: heap1GS Σ := iem_phys _ EM.
+  Existing Instance hGS.
+
+  Definition read_head_fuel := 100.
 
   Lemma start_read (τ: locale heap_lang) (π: Phase) (q: Qp):
     {{{ queue_inv PE ∗ read_head_token ∗ 
@@ -508,17 +516,6 @@ Section ReadHead.
   Qed.
 
   Definition small_fuel := 10.
-
-  (* TODO: move *)
-  Lemma ith_rp_get_rs_p0 i rs
-    (LE: rs_le (rs_proc None) rs):
-    ith_rp i rs -∗ ith_rp i (rs_proc None).
-  Proof using.
-    rewrite /ith_rp. iApply own_mono.
-    apply auth_frag_mono. apply singleton_included_mono.
-    apply pair_included. split; [done| ].
-    by apply rs_le_incl.
-  Qed.
 
   Lemma check_head_change (τ: locale heap_lang) (π: Phase) (q: Qp)
     t pt h ndh i ph
