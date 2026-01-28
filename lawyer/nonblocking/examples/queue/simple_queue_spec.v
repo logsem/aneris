@@ -22,7 +22,6 @@ Section QueueSpec.
 
   Definition queue_ms: gmultiset val := {[+ enqueuer_thread SQ; dequeuer_thread SQ +]}.
 
-  (* Instance queue_tokens_pre: SimpleQueueTokensPre mt_Σ. *)
   Program Instance mt_sqt Σ (MT: MethodToken queue_ms Σ): SimpleQueueTokens Σ := 
     {| dequeue_token := method_tok (dequeuer_thread SQ);
        read_head_token := method_tok (enqueuer_thread SQ); |}.
@@ -82,11 +81,13 @@ Section QueueSpec.
     apply gmultiset_elem_of_dom in DOM. rewrite /queue_ms in DOM.
     rewrite gmultiset_elem_of_disj_union !gmultiset_elem_of_singleton in DOM.
     destruct DOM as [-> | ->].
-    - admit. 
+    - iApply wp_stuck_weaken.
+      iApply (enqueuer_thread_pwp_spec with "[$TOK $INV]").
+      set_solver.
     - iApply wp_stuck_weaken.
       iApply (dequeuer_thread_pwp_spec with "[$TOK $INV]").
       set_solver.
-  Admitted. 
+  Qed.
 
   Definition SimpleQueue_WaitFreeToken: WaitFreeSpecToken queue_ms := {|
     wfst_G := QueueG;
