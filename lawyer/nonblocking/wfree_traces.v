@@ -4,10 +4,169 @@ From lawyer.nonblocking Require Import trace_context calls.
 From lawyer.nonblocking.logrel Require Import valid_client.
 From heap_lang Require Import lang notation locales_helpers_hl.
 From trillium.traces Require Import exec_traces trace_lookup inftraces.
+From trillium.prelude Require Import classical.
 
 Close Scope Z.
 
 
+From fairness Require Import fin_branch. 
+
+(* TODO: move *)
+Lemma list_approx_impl {A: Type} (P Q: A -> Prop)
+  (IMPL: forall a, Q a -> P a):
+  list_approx P -> list_approx Q.
+Proof using.
+  intros [l APX]. exists l.
+  intros. set_solver.
+Qed.
+
+(* TODO: move, use to prove pcr_dec and not_stuck_dec (for heap_lang) *)
+Lemma eq_fill_item_fin e: list_approx (fun xy => fill_item xy.1 xy.2 = e).
+Proof using.
+  eapply list_approx_impl with (P := fun '(Ki, e') => under_ctx_item Ki e = Some e').
+  { intros [??] ?. eapply under_ctx_item_spec; eauto. }
+  destruct e; simpl.
+  all: try by (exists []; intros [Ki ?]; by destruct Ki).
+  - exists (cprod [AppLCtx (default #0 (to_val e2)); AppRCtx e1] [e1; e2]).
+    intros [Ki ?]. destruct Ki; try done. 
+    all: simpl; rewrite /calls.check; destruct decide; set_solver.
+  - exists [(UnOpCtx op, e)]. intros [??].
+    destruct e0; simpl; try done.
+    rewrite /calls.check; destruct decide; set_solver.
+  - exists (cprod [BinOpLCtx op (default #0 (to_val e2)); BinOpRCtx op e1] [e1; e2]).
+    intros [Ki ?]. destruct Ki; try done. 
+    all: simpl; rewrite /calls.check; destruct decide; set_solver.
+  - exists [(IfCtx e2 e3, e1)].
+    intros [Ki ?].
+    destruct Ki; try done. simpl.
+    rewrite /calls.check; destruct decide; set_solver.
+  - exists (cprod [PairLCtx (default #0 (to_val e2)); PairRCtx e1] [e1; e2]).
+    intros [Ki ?]. destruct Ki; try done. 
+    all: simpl; rewrite /calls.check.
+    + destruct e2; try done. destruct decide; set_solver.
+    + destruct decide; set_solver.
+  - exists [(FstCtx, e)]. 
+    intros [Ki ?].
+    destruct Ki; try done. simpl.
+    set_solver.
+  - exists [(SndCtx, e)]. 
+    intros [Ki ?].
+    destruct Ki; try done. simpl.
+    set_solver.
+  - exists [(InjLCtx, e)]. 
+    intros [Ki ?].
+    destruct Ki; try done. simpl.
+    set_solver.
+  - exists [(InjRCtx, e)]. 
+    intros [Ki ?].
+    destruct Ki; try done. simpl.
+    set_solver.
+  - exists [(CaseCtx e2 e3, e1)].
+    intros [Ki ?].
+    destruct Ki; try done. simpl.
+    rewrite /calls.check; destruct decide; set_solver.
+  - exists (cprod [AllocNLCtx (default #0 (to_val e2)); AllocNRCtx e1] [e1; e2]).
+    intros [Ki ?]. destruct Ki; try done. 
+    all: simpl; rewrite /calls.check.
+    + destruct e2; try done. destruct decide; set_solver.
+    + destruct decide; set_solver.
+  - exists [(FreeCtx, e)]. 
+    intros [Ki ?].
+    destruct Ki; try done. simpl.
+    set_solver.
+  - exists [(LoadCtx, e)]. 
+    intros [Ki ?].
+    destruct Ki; try done. simpl.
+    set_solver.
+  - exists (cprod [StoreLCtx (default #0 (to_val e2)); StoreRCtx e1] [e1; e2]).
+    intros [Ki ?]. destruct Ki; try done. 
+    all: simpl; rewrite /calls.check.
+    + destruct e2; try done. destruct decide; set_solver.
+    + destruct decide; set_solver.
+  - exists (cprod [CmpXchgLCtx (default #0 (to_val e2)) (default #0 (to_val e3));
+              CmpXchgMCtx e1 (default #0 (to_val e3));
+              CmpXchgRCtx e1 e2
+         ] [e1; e2; e3]).
+    intros [Ki ?]. destruct Ki; try done. 
+    all: simpl; rewrite /calls.check.
+    + destruct e2, e3; try done. destruct decide; set_solver.
+    + destruct e3; try done. destruct decide; set_solver.
+    + destruct decide; set_solver.
+  - exists (cprod [FaaLCtx (default #0 (to_val e2)); FaaRCtx e1] [e1; e2]).
+    intros [Ki ?]. destruct Ki; try done. 
+    all: simpl; rewrite /calls.check.
+    + destruct e2; try done. destruct decide; set_solver.
+    + destruct decide; set_solver.
+Qed.
+
+
+Fixpoint list_of_elems {A: Type} (l: list A): list {a: A| a ∈ l} :=
+  match l with 
+  | [] => []
+  | a :: l' => exist _ a (elem_of_list_here a l') ::
+               (map (fun b_pf => exist _ (proj1_sig b_pf) (elem_of_list_further (proj1_sig b_pf) a l' (proj2_sig b_pf))) (list_of_elems l'))
+  end. 
+               
+
+Lemma eq_fill_fin (e: expr): list_approx (fun xy => fill xy.1 xy.2 = e).
+Proof using.  
+  
+  remember (expr_depth e) as D. generalize dependent e.
+  pattern D. apply lt_wf_rect. clear D. simpl.  
+  intros n IH e D.
+  pose proof (eq_fill_item_fin e) as [l APX].
+
+  assert {l': list (ectx_item * expr) |
+          forall a, a ∈ l' <-> fill_item a.1 a.2 = e} as [l' L']. 
+  { exists (filter (fun (a : ectx_item * expr) => fill_item a.1 a.2 = e) l).
+    intros ?. rewrite elem_of_list_filter. set_solver. }
+
+  set (l'' := list_of_elems l'). 
+
+  subst n.
+  assert (forall x, x ∈ l' -> expr_depth x.2 < expr_depth e).
+  { intros. apply L' in H. subst.
+    apply fill_item_depth. }
+
+  set (foobar := flat_map 
+                   (fun x => let lst' := proj1_sig $ IH (expr_depth (`x).2) (H (`x) (proj2_sig x)) (`x).2 eq_refl in
+                          map (fun '(K', e') => (K' ++ [(`x).1], fill_item (`x).1 e')) lst') l''         
+).
+
+  exists ((ectx_emp, e) :: flat_map (flip cons nil) foobar).
+  intros. apply elem_of_list_In. simpl.
+
+  destruct a as [K e']. 
+  assert (K = [] \/ exists t K', K = K' ++ [t]) as [-> | (t & K' & ->)].
+  { admit. }
+  { set_solver. }
+  simpl in H0. rewrite fill_app /= in H0.
+
+  assert ((t, (fill K' e')) ∈ l').
+  { by apply L'. }
+
+  subst. right.
+  apply in_flat_map.
+  subst foobar. simpl.
+  eexists. split.
+  2: { left. reflexivity. }
+  apply in_flat_map.
+  eexists (exist _ (t, fill K' e') _).
+  split.
+  2: { apply in_map_iff.
+       eexists (_, _). simpl. split.
+       { f_equal. apply L' in H1. simpl in H1. 
+  simpl.   
+  
+  
+  pose proof H0 as IN. apply L'. 
+  
+
+simpl in *.
+
+  Abort. 
+  
+ 
 Section CallInTrace.
 
   (** parameterized with additional restriction on client
@@ -148,10 +307,10 @@ Section CallInTrace.
     apply forall_proper. intros k. 
     split.
     2: { intros FAIR ? LE KTH EN NORET.
-         destruct (decide (not_stuck_tid τ ck)).
+         destruct (Classical_Prop.classic (not_stuck_tid τ ck)) as [NSTUCK | STUCK].
          2: { exists 0. rewrite Nat.add_0_r.
               eexists. split; eauto.
-              red. left. intros (?&?). by apply n. } 
+              red. left. intros (?&?). by apply STUCK. }
          ospecialize * FAIR; eauto.
          destruct FAIR as [d STEP].
          destruct STEP as [STEP | STUCK]. 
@@ -165,14 +324,14 @@ Section CallInTrace.
            
     intros FAIR c LE KTH NORET.
     destruct (tr S!! i) eqn:ITH; [| done]. simpl in CALLi. destruct CALLi.
-    destruct (decide (not_stuck_tid τ c)) as [NS | STUCK].
+    destruct (Classical_Prop.classic (not_stuck_tid τ c)) as [NS | STUCK].
     2: { exists 0. right. rewrite Nat.add_0_r KTH /=.
          apply stuck_tid_neg. split; auto.
          eapply from_locale_trace in LE; eauto.
          by rewrite KTH /= in LE. } 
          
     ospecialize * FAIR; eauto.
-    { odestruct (decide (locale_enabled_safe _ _ )) as [EN | DIS]; [by apply EN| ].
+    { odestruct (Classical_Prop.classic (locale_enabled_safe _ _ )) as [EN | DIS]; [by apply EN| ].
       eapply call_returns_if_not_continues in LE; eauto.
       { destruct LE as (?&?&?&?&?&RET).
         edestruct NORET. eexists. split; [apply H0| ].
@@ -185,7 +344,7 @@ Section CallInTrace.
     2: { red in STEP. subst. eauto. }
 
     rewrite /locale_enabled_safe in DIS.
-    apply not_and_r in DIS as [DIS | STUCK].
+    apply Classical_Prop.not_and_or in DIS as [DIS | STUCK].
     2: { eexists. right. erewrite H0. simpl.
          apply stuck_tid_neg. split; auto.
          pose proof KTH as KK. eapply (from_locale_trace _ k) in KK.
@@ -313,8 +472,22 @@ Section FitsInfCall.
            from_option (fun c => exists a, call_at tpc c m a (APP := App)) False (etr !! j) ->
            exists r, j < r <= i /\ from_option (fun c => exists v, return_at tpc c v) False (etr !! r).
 
+  (* TODO: proving this requires iteraing over all possible contexts,
+     which is possible for ectxi languages, but not implemented so far *)
   Global Instance pcr_dec etr i τ m: Decision (previous_calls_return etr i τ m).
-  Proof using. Admitted.
+  Proof using.
+    rewrite /previous_calls_return.
+    eapply traces.utils_logic.Decision_iff_impl.
+    { do 2 (eapply forall_proper; intros).
+      apply ZifyClasses.impl_morph; [| reflexivity].
+      Unshelve. 2: exact (x ∈ seq 0 i).
+      rewrite elem_of_seq. lia. }
+    simpl.
+    eapply traces.utils_logic.Decision_iff_impl.
+    { symmetry. apply forall_prod_helper. }
+    simpl. 
+    opose proof (list_forall_dec _ (seq 0 i)).
+  Abort.
     
   Context (ic: @trace_ctx heap_lang).
   Let ii := tctx_index ic.
@@ -451,8 +624,8 @@ Section FitsInfCall.
       destruct lookup eqn:ITH; try done. simpl in *.
       apply H0. split; [lia| ].
       eapply trace_lookup_lt_Some_1; eauto. }
-    step_dec_proof.
-    by left.
-  Qed. 
+    (* step_dec_proof. *)
+    (* by left. *)
+  Abort. 
 
 End FitsInfCall. 

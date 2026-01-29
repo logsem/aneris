@@ -272,7 +272,7 @@ Section Lib.
 
     rewrite /locale_enabled_safe in STEP.
     rewrite and_comm in STEP. 
-    rewrite not_and_l_alt in STEP. rewrite -or_assoc in STEP.
+    rewrite not_and_r in STEP. rewrite -or_assoc in STEP.
     destruct STEP; [| set_solver].
     destruct H.
     ospecialize (PROGRESS _). erewrite DTH in PROGRESS.
@@ -584,7 +584,7 @@ Section Lib.
          assert (es = []) as -> by (destruct es; simpl in H; lia || done).
          opose proof * extrace_valid_empty as ->; eauto.
 
-         destruct (decide (fits_inf_call ic m ai ({tr[ ([], σ1) ]}))) as [FITS | ].
+         destruct (Classical_Prop.classic (fits_inf_call ic m ai ({tr[ ([], σ1) ]}))) as [FITS | ].
          2: { right. exists 0. by rewrite trace_take_fwd_0_first. }
          
          assert (obls_st_rel_wfree ([], σ1) s1) as PROP by (by apply obls_st_rel_wfree_empty).

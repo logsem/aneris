@@ -96,23 +96,23 @@ Section StuckTid.
       intros (?&?&?). edestruct H0; eauto. congruence.   
   Qed.
     
-  (* TODO: is it provable for general Λ? *)
+  (* TODO: should be provable for heap_lang *)
   Global Instance not_stuck_dec e (c: language.state Λ): Decision (not_stuck e c).
   Proof using.
     rewrite /not_stuck.
     apply or_dec; try solve_decision.
     rewrite /reducible.
-  Admitted. 
+  Abort. 
 
-  Global Instance not_stuck_tid_dec `{EqDecision (expr Λ)} τ c: Decision (not_stuck_tid τ c).
-  Proof using.
-    rewrite /not_stuck_tid.
-    destruct (from_locale c.1 τ) as [e| ] eqn:TT.
-    2: right; by intros (?&?&?).
-    destruct (decide (not_stuck e c.2)).
-    - left. eauto.
-    - right; intros (?&?&?). congruence.
-  Qed.
+  (* Global Instance not_stuck_tid_dec `{EqDecision (expr Λ)} τ c: Decision (not_stuck_tid τ c). *)
+  (* Proof using. *)
+  (*   rewrite /not_stuck_tid. *)
+  (*   destruct (from_locale c.1 τ) as [e| ] eqn:TT. *)
+  (*   2: right; by intros (?&?&?). *)
+  (*   destruct (decide (not_stuck e c.2)). *)
+  (*   - left. eauto. *)
+  (*   - right; intros (?&?&?). congruence. *)
+  (* Qed. *)
 
 End StuckTid.
 
