@@ -9,7 +9,7 @@ From lawyer Require Import sub_action_em program_logic.
 From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From iris.base_logic.lib Require Import invariants.
 From lawyer.nonblocking.logrel Require Import valid_client.
-From lawyer.nonblocking.examples.queue Require Import simple_queue_utils simple_queue to_int wrappers_lib.
+From lawyer.nonblocking.examples.queue Require Import simple_queue_utils simple_queue wrappers_lib.
 From lawyer.nonblocking.examples.queue.enqueuer Require Import enqueue read_head.
 From heap_lang Require Import heap_lang_defs lang notation.
 
@@ -20,7 +20,7 @@ Definition enqueuer_thread sq: val :=
   λ: "v",
     if: "v" = #() then SOME (read_head_enqueuer sq #())
     else
-      match: ToInt "v" with
+      match: UnOp ToIntOp "v" with
         InjR "n" => SOME (enqueue sq "n")
       | InjL "x" => NONEV
       end
@@ -81,11 +81,10 @@ Section EnqueuerThreadLawyer.
       iPureIntro. destruct RET as [-> | (?&->&?&->)]; by repeat constructor.
     - rewrite bool_decide_false; [| done].
       pure_steps. simpl.
-      rewrite ToInt_subst. simpl.
-      wp_bind (ToInt _)%E.
-      iApply sswp_MU_wp.
-      { apply ToInt_nval. }
-      iApply sswp_pure_step; [done| ]. 
+      wp_bind (UnOp _ _)%E.
+      iApply sswp_MU_wp; [done| ].
+      iApply sswp_pure_step.
+      { reflexivity. }
       MU_by_burn_cp.
       destruct (val_into_int_spec v) as [(?&->&->) | (NINT & ->) ].
       2: { pure_steps. wp_bind (Rec _ _ _)%E. pure_steps. 
@@ -157,12 +156,11 @@ Section EnqueuerThreadPwp.
       iPureIntro. destruct RET as [-> | (?&->&?&->)]; by repeat constructor.
     - rewrite bool_decide_false; [| done].
       pwp_pure_steps. simpl.
-      rewrite ToInt_subst. simpl.
       iNext. 
-      wp_bind (ToInt _)%E.
-      iApply sswp_pwp.
-      { apply ToInt_nval. }
-      iApply sswp_pure_step; [done| ]. 
+      wp_bind (UnOp _ _)%E.
+      iApply sswp_pwp; [done| ].
+      iApply sswp_pure_step.
+      { reflexivity. }
       do 2 iModIntro.
       destruct (val_into_int_spec v) as [(?&->&->) | (NINT & ->) ].
       2: { pwp_pure_steps. 

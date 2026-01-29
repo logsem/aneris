@@ -69,7 +69,7 @@ Inductive base_lit : Set :=
   | LitInt (n : Z) | LitBool (b : bool) | LitUnit | LitPoison
   | LitLoc (l : loc) | LitProphecy (p: proph_id).
 Inductive un_op : Set :=
-  | NegOp | MinusUnOp.
+  | NegOp | MinusUnOp | ToIntOp.
 Inductive bin_op : Set :=
   | PlusOp | MinusOp | MultOp | QuotOp | RemOp (* Arithmetic *)
   | AndOp | OrOp | XorOp (* Bitwise *)
@@ -280,8 +280,9 @@ Proof.
 Qed.
 #[global] Instance un_op_finite : Countable un_op.
 Proof.
- refine (inj_countable' (λ op, match op with NegOp => 0 | MinusUnOp => 1 end)
-  (λ n, match n with 0 => NegOp | _ => MinusUnOp end) _); by intros [].
+ refine (inj_countable'
+           (λ op, match op with NegOp => 0 | MinusUnOp => 1 | ToIntOp => 2 end)
+  (λ n, match n with 0 => NegOp | 1 => MinusUnOp | _ => ToIntOp end) _); by intros [].
 Qed.
 #[global] Instance bin_op_countable : Countable bin_op.
 Proof.
@@ -479,12 +480,27 @@ Fixpoint subst (x : string) (v : val) (e : expr)  : expr :=
 Definition subst' (mx : binder) (v : val) : expr → expr :=
   match mx with BNamed x => subst x v | BAnon => id end.
 
+Definition val_into_int (v : val) := 
+  match v with
+  | LitV (LitInt n) => InjRV v
+  | _  => InjLV $ LitV LitUnit
+  end.
+
+Lemma val_into_int_spec v:
+  (exists (n: Z), v = LitV $ LitInt n /\ val_into_int v = InjRV $ LitV $ LitInt n) \/ (¬ (exists (n: Z), v = LitV $ LitInt n) /\ val_into_int v = InjLV $ LitV LitUnit).
+Proof using.
+  destruct v; simpl; eauto.
+  all: try set_solver. 
+  destruct l; simpl; set_solver.
+Qed.
+
 (** The stepping relation *)
 Definition un_op_eval (op : un_op) (v : val) : option val :=
   match op, v with
   | NegOp, LitV (LitBool b) => Some $ LitV $ LitBool (negb b)
   | NegOp, LitV (LitInt n) => Some $ LitV $ LitInt (Z.lnot n)
   | MinusUnOp, LitV (LitInt n) => Some $ LitV $ LitInt (- n)
+  | ToIntOp, v => Some $ val_into_int v
   | _, _ => None
   end.
 

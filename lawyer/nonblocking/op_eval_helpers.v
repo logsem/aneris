@@ -39,14 +39,15 @@ From heap_lang Require Import heap_lang_defs tactics.
     (EVAL: un_op_eval op v = Some r):
     (op = NegOp /\ exists b, v = LitV $ LitBool b /\ r = LitV $ LitBool $ negb b) \/
     (op = NegOp /\ exists n, v = LitV $ LitInt n /\ r = LitV $ LitInt $ (Z.lnot n)) \/ 
-    (op = MinusUnOp /\ exists n, v = LitV $ LitInt n /\ r = LitV $ LitInt (- n)). 
+    (op = MinusUnOp /\ exists n, v = LitV $ LitInt n /\ r = LitV $ LitInt (- n)) \/
+    (op = ToIntOp /\ r = val_into_int v).
   Proof using.
     rewrite /un_op_eval in EVAL.
     destruct op, v; try congruence.
-    all: destruct l; try congruence; inversion EVAL; subst.
+    all: try destruct l; try congruence; inversion EVAL; subst.
     all: set_solver.
   Qed.
 
   Ltac inv_unop_eval H :=
     apply un_op_eval_inv in H as
-        [(-> & ? & -> & ->) | [(-> & ? & -> & ->)| (-> & ? & -> & ->)]]. 
+        [(-> & ? & -> & ->) | [(-> & ? & -> & ->)| [(-> & ? & -> & ->) | (-> & ->)]]]. 

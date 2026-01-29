@@ -197,7 +197,11 @@ Section typed_interp.
     iApply wp_value.
 
     rewrite {3}interp_unfold.
-    inv_unop_eval EVAL; done. 
+    inv_unop_eval EVAL; try done. 
+    destruct (val_into_int_spec v) as [(?&->&?) | (?&->)]; simpl.
+    - set_solver.
+    - iLeft. iExists _. iSplit; [done| ].
+      by rewrite {3}interp_unfold.
   Qed.
 
   Lemma logrel_binop op e1 e2
