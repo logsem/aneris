@@ -4,7 +4,6 @@ From lawyer.nonblocking Require Import trace_context calls.
 From lawyer.nonblocking.logrel Require Import valid_client.
 From heap_lang Require Import lang notation locales_helpers_hl.
 From trillium.traces Require Import exec_traces trace_lookup inftraces.
-From trillium.prelude Require Import classical.
 
 Close Scope Z.
 
@@ -21,6 +20,7 @@ Proof using.
 Qed.
 
 (* TODO: move, use to prove pcr_dec and not_stuck_dec (for heap_lang) *)
+(* TODO: simplify *)
 Lemma eq_fill_item_fin e: list_approx (fun xy => fill_item xy.1 xy.2 = e).
 Proof using.
   eapply list_approx_impl with (P := fun '(Ki, e') => under_ctx_item Ki e = Some e').
@@ -100,17 +100,28 @@ Proof using.
 Qed.
 
 
-Fixpoint list_of_elems {A: Type} (l: list A): list {a: A| a ∈ l} :=
-  match l with 
-  | [] => []
-  | a :: l' => exist _ a (elem_of_list_here a l') ::
-               (map (fun b_pf => exist _ (proj1_sig b_pf) (elem_of_list_further (proj1_sig b_pf) a l' (proj2_sig b_pf))) (list_of_elems l'))
-  end. 
-               
+(* TODO: upstream? *)
+Lemma rev_empty_inv {A: Type} (l: list A):
+  rev l = [] <-> l = [].
+Proof using.
+  pose proof (length_rev l).
+  rewrite -!length_zero_iff_nil.
+  lia.
+Qed.
+
+(* TODO: upstream? *)
+Lemma list_empty_or_snoc {A: Type} (l: list A):
+  l = [] \/ exists t l', l = l' ++ [t].
+Proof using.
+  destruct (rev l) eqn:RL.
+  - left. by apply rev_empty_inv.
+  - right. exists a, (rev l0).
+    apply rev_inj. rewrite RL.
+    rewrite rev_app_distr. by rewrite rev_involutive.
+Qed.
 
 Lemma eq_fill_fin (e: expr): list_approx (fun xy => fill xy.1 xy.2 = e).
 Proof using.  
-  
   remember (expr_depth e) as D. generalize dependent e.
   pattern D. apply lt_wf_rect. clear D. simpl.  
   intros n IH e D.
@@ -121,51 +132,70 @@ Proof using.
   { exists (filter (fun (a : ectx_item * expr) => fill_item a.1 a.2 = e) l).
     intros ?. rewrite elem_of_list_filter. set_solver. }
 
-  set (l'' := list_of_elems l'). 
-
   subst n.
-  assert (forall x, x ∈ l' -> expr_depth x.2 < expr_depth e).
-  { intros. apply L' in H. subst.
+  clear l APX.
+
+  assert (forall x, x ∈ l' -> list_approx (λ y, fill y.1 y.2 = x.2)) as REC.
+  { intros [Ki e'] IN. simpl.
+    eapply IH; [| reflexivity].
+    eapply L' in IN. subst.
     apply fill_item_depth. }
 
-  set (foobar := flat_map 
-                   (fun x => let lst' := proj1_sig $ IH (expr_depth (`x).2) (H (`x) (proj2_sig x)) (`x).2 eq_refl in
-                          map (fun '(K', e') => (K' ++ [(`x).1], fill_item (`x).1 e')) lst') l''         
-).
+  assert (forall x, (list_approx (λ y, fill y.1 y.2 = x.2) * (x ∈ l')%type) + (x ∉ l')) as REC'.
+  { intros x. simpl.
+    destruct (@decide (x ∈ l')).
+    { simpl in *. eapply traces.utils_logic.Decision_iff_impl.
+      { symmetry. apply L'. }
+      apply _. }
+    - left. split; auto.
+    - right. auto. }
 
-  exists ((ectx_emp, e) :: flat_map (flip cons nil) foobar).
-  intros. apply elem_of_list_In. simpl.
+  simpl in *.
+  set (extract := (fun x =>
+                           let (Ki, e') := (x: ectx_item * expr) in 
+                           let subs := REC' x in
+                           let subs': list (ectx heap_lang * expr) := 
+                             match subs with 
+                             | inl lst => proj1_sig lst.1
+                             | inr _ => []
+                             end in
+                           let exts: list (ectx heap_lang * expr) :=
+                             map (fun '(K', e'') => (K' ++ [Ki], e'')) subs'
+                           in exts
+                      )).   
+  
+  set (extracted := map extract l'). 
 
-  destruct a as [K e']. 
-  assert (K = [] \/ exists t K', K = K' ++ [t]) as [-> | (t & K' & ->)].
-  { admit. }
+  exists ((ectx_emp, e) :: flat_map id extracted).
+  intros [K e'] EQ.
+  (* subst.  *)
+  simpl in EQ.
+  destruct (list_empty_or_snoc K) as [-> | (t & K' & ->)].
   { set_solver. }
-  simpl in H0. rewrite fill_app /= in H0.
-
-  assert ((t, (fill K' e')) ∈ l').
-  { by apply L'. }
-
-  subst. right.
-  apply in_flat_map.
-  subst foobar. simpl.
-  eexists. split.
-  2: { left. reflexivity. }
-  apply in_flat_map.
-  eexists (exist _ (t, fill K' e') _).
-  split.
-  2: { apply in_map_iff.
-       eexists (_, _). simpl. split.
-       { f_equal. apply L' in H1. simpl in H1. 
-  simpl.   
+  simpl in EQ. rewrite fill_app /= in EQ.
+  right.
+  apply elem_of_list_In, in_flat_map. simpl.
+  assert (In (t, fill K' e') l') as INt.
+  { apply elem_of_list_In. by apply L'. }
+  exists (extract (t, (fill K' e'))). split.
+  - subst extracted. apply in_map_iff. eexists. split; [reflexivity| ].
+    apply INt. 
+  - apply in_map_iff. eexists (_, _).
+    split; [reflexivity| ].
+    destruct (REC' (t, fill K' e')) as [[[l'' APX''] IN] | NOTIN].
+    2: { destruct NOTIN. by apply elem_of_list_In. }
+    simpl.
+    apply elem_of_list_In. apply APX''. simpl. done.
+Qed.
   
-  
-  pose proof H0 as IN. apply L'. 
-  
-
-simpl in *.
-
-  Abort. 
-  
+Lemma eq_fill_fin' (e: expr): list_approx (fun K => exists e', fill K e' = e).
+Proof using.
+  destruct (eq_fill_fin e) as [l APX].
+  exists l.*1. intros K [e' EQ].
+  apply elem_of_list_fmap. eexists (_, _). split.
+  2: { eapply APX; eauto. }
+  done.
+Qed.
  
 Section CallInTrace.
 
@@ -472,8 +502,40 @@ Section FitsInfCall.
            from_option (fun c => exists a, call_at tpc c m a (APP := App)) False (etr !! j) ->
            exists r, j < r <= i /\ from_option (fun c => exists v, return_at tpc c v) False (etr !! r).
 
-  (* TODO: proving this requires iteraing over all possible contexts,
-     which is possible for ectxi languages, but not implemented so far *)
+  Global Instance Decision_all_in_list_inf_helper `{EqDecision A} (P: A -> Prop) (l: list A)
+    (IN: forall a, P a -> a ∈ l)
+    (DEC: forall a, Decision (P a))
+    (INF: finite.Finite A -> False)
+    :
+    Decision (forall a, P a).
+  Proof using.
+    assert {l': list A | forall a, a ∈ l' <-> P a} as [l' IN']. 
+    { exists (filter P l). intros ?. rewrite elem_of_list_filter. set_solver. }
+    clear l IN. 
+    eapply traces.utils_logic.Decision_iff_impl.
+    { apply forall_proper. intros ?. apply IN'. }
+    simpl.
+    right. intros FIN. destruct INF.
+    exists (remove_dups l').
+    { by apply NoDup_remove_dups. }
+    intros. by apply elem_of_remove_dups.
+  Qed.
+
+  Global Instance Decision_impl_all_helper {A: Type} (P Q: A -> Prop) (l: list A)
+    (IN: forall a, P a -> a ∈ l)
+    (DECP: forall a, Decision (P a))
+    (DECQ: forall a, Decision (Q a))
+    :
+    Decision (forall a, P a -> Q a).
+  Proof using.
+    destruct (decide (Forall (fun a => P a -> Q a) l)).
+    - left. intros.
+      eapply Forall_forall in f; eauto.
+    - right. intros ALL.
+      apply n.
+      eapply Forall_forall; eauto.
+  Qed.
+
   Global Instance pcr_dec etr i τ m: Decision (previous_calls_return etr i τ m).
   Proof using.
     rewrite /previous_calls_return.
@@ -484,10 +546,65 @@ Section FitsInfCall.
       rewrite elem_of_seq. lia. }
     simpl.
     eapply traces.utils_logic.Decision_iff_impl.
-    { symmetry. apply forall_prod_helper. }
-    simpl. 
-    opose proof (list_forall_dec _ (seq 0 i)).
-  Abort.
+    { symmetry. rewrite forall_prod_helper.
+      setoid_rewrite curry_uncurry_prop. reflexivity. }
+    
+    apply Decision_impl_all_helper with
+      (l := cprod (seq 0 i) 
+              (flat_map (fun i => from_option (fun c => from_option (fun e => (proj1_sig (eq_fill_fin e)).*1) [] (from_locale c.1 τ)) [] (etr !! i)) 
+                 (seq 0 i))).
+    { simpl. intros [??] [IND VAL].
+      simpl in *. apply elem_of_list_cprod. split; [done| ]. 
+      simpl. apply elem_of_list_In, in_flat_map.
+      eexists. split.
+      { apply elem_of_list_In. eauto. }
+      destruct (etr !! n); try done. simpl in *.
+      destruct VAL as [a CALL]. rewrite CALL /=.
+      apply elem_of_list_In.
+      destruct (eq_fill_fin (fill l (m a))) as [items APX] eqn:ITEMS.
+      rewrite ITEMS. simpl in *.
+      opose proof * (APX (_, _)); eauto.
+      apply elem_of_list_fmap. eexists. by split; eauto. }
+    { intros [??]. simpl. apply and_dec; try solve_decision.
+      destruct (etr !! n); try solve_decision.
+      simpl. destruct (from_locale c.1 τ) eqn:TT; rewrite TT.
+      2: { right. by intros (? & [=]). }
+      destruct (under_ctx l e) eqn:CC.
+      2: { right. rewrite under_ctx_spec_neg in CC.
+           intros (? & [=]). set_solver. }
+      assert ({a': val | e0 = m a'} + {forall (v: val), e0 ≠ m v}) as VV. 
+      { clear. destruct e0.
+        all: try by (right; intros ? ?).
+        destruct (decide (of_val m = e0_1)).
+        - subst. Set Printing Coercions. 
+          destruct (to_val e0_2) eqn:V2.
+          + left. exists v. f_equal.
+            symmetry. by apply of_to_val. 
+          + right. intros ? ?. inversion H.
+            subst. done.  
+        - right. intros ? ?. inversion H. by subst. }
+      apply under_ctx_spec in CC.
+      destruct VV as [[? ->] | NEQ].
+      - subst. left. eauto.
+      - right. intros (?&?). inversion H. subst.
+        apply fill_inj in H1. subst. set_solver. }
+    { intros [??]. simpl.
+      apply ex_fin_dec with (l := seq 0 (S i)).
+      2: { intros. apply in_seq. lia. }
+      intros a. apply and_dec; try solve_decision.
+      destruct (etr !! a); try solve_decision.
+      simpl. destruct (from_locale c.1 τ) eqn:TT; rewrite TT.
+      2: { right. by intros (? & [=]). }
+      destruct (under_ctx l e) eqn:CC.
+      2: { right. rewrite under_ctx_spec_neg in CC.
+           intros (? & [=]). set_solver. }
+      apply under_ctx_spec in CC. subst.
+      destruct (to_val e0) eqn:V2.
+      + left. exists v. f_equal.
+        f_equal. symmetry. by apply of_to_val. 
+      + right. intros (?&?). inversion H.
+        apply fill_inj in H1. subst. set_solver. }
+  Qed.
     
   Context (ic: @trace_ctx heap_lang).
   Let ii := tctx_index ic.
@@ -624,8 +741,8 @@ Section FitsInfCall.
       destruct lookup eqn:ITH; try done. simpl in *.
       apply H0. split; [lia| ].
       eapply trace_lookup_lt_Some_1; eauto. }
-    (* step_dec_proof. *)
-    (* by left. *)
-  Abort. 
+    step_dec_proof.
+    by left.
+  Qed.
 
 End FitsInfCall. 
