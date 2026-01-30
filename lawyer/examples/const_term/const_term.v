@@ -39,7 +39,6 @@ Section Decr.
   Definition cnt_frag `{DecrG Σ} (n: nat) :=
     own γ__decr (◯ (Excl' n)). 
 
-  (* TODO: such resources and lemmas are used often, move them to library *)
   Lemma cnt_agree `{DecrG Σ} n1 n2:
     cnt_auth n1-∗ cnt_frag n2 -∗ ⌜ n1 = n2 ⌝.
   Proof using.
@@ -172,7 +171,6 @@ Section Decr.
 
     wp_bind (ref _)%E.
     iApply sswp_MU_wp; [done| ]. iApply wp_alloc. iIntros "!> %l L _".
-    (* TODO: why elimination takes so long? *)
     iMod (alloc_decr_inv with "L") as (?) "[#INV CNT]". 
     
     MU_by_burn_cp. iApply wp_value. 

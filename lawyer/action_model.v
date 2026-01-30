@@ -282,7 +282,6 @@ Section ActionModel.
       rewrite elem_of_list_bind.
       rewrite !ex_prod.
 
-      (* TODO: shorten the following proof *)
       inversion STEP; subst.
       { exists s1', a, (Some r1).
         split; [| set_solver]. 

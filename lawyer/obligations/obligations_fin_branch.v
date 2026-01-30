@@ -280,7 +280,6 @@ Section FiniteBranching.
         subst new_obls0. rewrite dom_insert. set_solver.
     Qed.
 
-    (* TODO: rename *)
     Theorem OM_fin_branch_impl
       `{EqDecision (expr Λ)}
       c δ

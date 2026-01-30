@@ -29,7 +29,6 @@ Section Adequacy.
   Let l__acq2 := CL 1.
   Let l02 := CL 0.
 
-  (* Definition ClosedLim := max_list [tl_c__cr; tl_fl_B c__cl; MAX_EXC + 2; tl_fl_B c__cl]. *)
   Definition ClosedLim := max_list [MAX_EXC + 2; rfl_fl_sb_fun_impl tl_c__cr tl_fl_B c__cl]. 
 
   Instance ClosedObligationsPre: ObligationsParamsPre ClosedDegree ClosedLevel ClosedLim.
@@ -175,11 +174,9 @@ Section Adequacy.
       intros [-> | ->] [-> | ->]; apply ith_bn_lt; lia. }
     1, 2: apply ith_bn_lt; lia. 
     { simpl. by iIntros (? _) "X". }
-    { (* TODO: why solve_inG doesn't solve it? *)
-      intros. split; try solve_inG || apply _.
+    { intros. split; try solve_inG || apply _.
       simpl. apply _. }  
-    { (* TODO: why solve_inG doesn't solve it? *)
-      intros. split; try solve_inG || apply _.
+    { intros. split; try solve_inG || apply _.
       simpl. apply _. }
     { cbv. lia. }
     2: { by iIntros "!> % ?". }

@@ -108,7 +108,6 @@ Section MotivatingClient.
 
       iApply (rfl_acquire_spec with "[-POST]").
       { iFrame "#∗". 
-        (* TODO: make a lemma? *)
         iApply big_opS_singleton. iExists _. iFrame "SF'".
         iPureIntro. set_solver. }
       all: try by eauto.
@@ -415,7 +414,7 @@ Section MotivatingClient.
 
       iApply (OU_wand with "[-CPSm' PH]").
       2: { iApply (@create_ep_upd with "[$] [$] [$]").
-           apply LThm. } (* TODO: rename that hypothesis *)
+           apply LThm. } 
       iIntros "(EPf & _ & PH)".
       
       BOU_burn_cp.

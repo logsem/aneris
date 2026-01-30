@@ -16,7 +16,6 @@ From lawyer.examples.ticketlock Require Import obls_atomic fair_lock.
 Section Ticketlock.
   Context {DegO LvlO LIM_STEPS} {OP: OP_HL DegO LvlO LIM_STEPS}.
   Context `{EM: ExecutionModel heap_lang M}.
-  (* Context {FLP: FairLockPre}. *)
   Notation "'Degree'" := (om_hl_Degree). 
   Notation "'Level'" := (om_hl_Level).
 
@@ -165,9 +164,6 @@ Section Ticketlock.
 
   (** we need to have a non-empty set of "acquire levels" 
       to eventually verify the sequential lock spec. *)
-  (* TODO: seemingly it's possible to get rid of this restriction 
-     by having an extra "lower bound" of levels in the definition of TLAT. 
-     clarify if it's possible *)
   Context (lvl_acq: Level).
 
   Definition lvls_acq: gset Level := {[ lvl_acq ]}. 
@@ -441,7 +437,6 @@ Section Ticketlock.
         
   Context {TLG: TicketlockG Σ}.
     
-  (* TODO: find existing *)
   Lemma fupd_frame_all E1 E2 P:
     ((|==> P) ∗ |={E1, E2}=> emp: iProp Σ) ⊢ |={E1, E2}=> P.
   Proof using.
@@ -483,8 +478,6 @@ Section Ticketlock.
 
     pure_steps.
 
-    (* TODO: ??? worked fine when get_ticket was inlined into tl_acquire:
-       wp_bind (Snd _)%E. *)
     assert (FAA (Snd lk) #1 = fill_item (FaaLCtx #(LitInt 1)) (Snd lk)) as CTX by done.
     iApply (wp_bind [(FaaLCtx #1)] s ⊤ τ (Snd lk) (Λ := heap_lang)). simpl.
     
@@ -626,7 +619,6 @@ Section Ticketlock.
     pure_steps.
 
     wp_bind (Fst _)%E.
-    (* TODO: make a lemma? and remove duplicates *)
     iApply wp_atomic.
     iMod (fupd_mask_subseteq _) as "CLOS'"; [| iInv "INV" as "inv" "CLOS"]; [set_solver| ].
     iModIntro. rewrite {1}/tl_inv_inner.
@@ -896,7 +888,6 @@ Section Ticketlock.
     iMod "TAU" as ([[]]) "[ST TAU]". iModIntro.
     rewrite /release_at_pre. simpl.
 
-    (* TODO: fix later elimination *)
     match goal with | |- envs_entails _ ?P => iAssert (P -∗ P)%I as "GOAL"; [iIntros "X"; by iApply "X"| ] end.
     iDestruct "ST" as "(>(%&%&%&OW'&HELD')&[% %EQ])". subst.
     iApplyHyp "GOAL".

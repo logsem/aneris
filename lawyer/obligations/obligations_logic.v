@@ -12,7 +12,6 @@ Close Scope Z.
 
 (** Some lemmas about HeapLang rely on concrete instances of EqDecision and Countable.
     Therefore we construct ObligationsParams instance with these concrete instances using LocaleOP. *)
-(* TODO: find better solution *)
 Class ObligationsParamsPre (Degree Level: Type) (LIM_STEPS: nat) := { 
     opar_deg_eqdec' :: EqDecision Degree;
     opar_deg_cnt' :: Countable Degree;

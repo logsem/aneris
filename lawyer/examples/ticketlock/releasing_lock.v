@@ -57,7 +57,6 @@ Section ReleasingLockSpec.
         τ lk (π: Phase) (Ob: gset SignalId) (u: nat) (P: iProp Σ) s__o Q
         (ADD: s__o ∉ Ob):
       {{{ rfl_is_lock lk u P (rfl_G0 := RFLG) ∗
-          (* sgns_levels_gt' Ob rfl_lvls ∗ *)
           obls τ (Ob ∪ {[ s__o ]}) ∗ 
           th_phase_eq τ π ∗ cp π rfl_d ∗
           rfl_locked s__o (rfl_G0 := RFLG) ∗
@@ -328,7 +327,6 @@ Section RFLFromFL.
            iNext. rewrite /lock_inv_inner. do 3 iExists _. iFrame. }
 
       { iIntros (O' q') "(OB & #LVLS' & PH & %Q' & (-> & CASES))". simpl.
-        (* TODO: don't unfold BOU *)
         remember_goal.
         iDestruct "ST" as "[>(_ & (%s__o & [-> #SMAP__o])) | [>% ?]]"; [| done].
         iMod "LOCK_OW". iMod "SR".
@@ -401,8 +399,6 @@ Section RFLFromFL.
     Definition acquire_aux: val := method_aux' (fl_acquire FLP).
     Definition newlock_aux: val := method_aux (fl_create FLP). 
 
-    (* TODO: change the definition of (our counterpart of) atomic_wp,
-       so that it allows showing postcondition under later *)
     Lemma acquire_usage:
       rfl_acquire_spec_gen acquire_aux P__lock d__m'.
     Proof using L__FL LVL_ORDo LTmm'.
@@ -438,7 +434,6 @@ Section RFLFromFL.
            { Unshelve. 2: exact (flip Nat.ltb (S r)).
              simpl. apply Nat.ltb_lt. lia. }
            { set_solver. }
-           (* TODO: extract lemma, use in eo_fin *)
            intros. simpl.
            apply elem_of_set_seq in H0.
            destruct (Nat.lt_trichotomy j (S r)) as [LT | [-> | LT]]; revgoals.

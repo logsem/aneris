@@ -169,7 +169,6 @@ Section MotivatingClient.
       split_cps "CP1" 1. split_cps "CP2" 1. 
       
       wp_bind (_%V lk1 lk2)%E.
-      (* pure_steps. *)
       do 6 pure_step_cases.
       wp_bind (acquire_two lk1 lk2).
       split_cps "CPS" 5. 

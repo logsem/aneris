@@ -67,7 +67,6 @@ Section RTBound.
 
     wp_bind (ref _)%E.
     iApply sswp_MU_wp; [done| ]. iApply wp_alloc. iIntros "!> %l L _".
-    (* TODO: why elimination takes so long? *)
     iMod (alloc_decr_inv with "L") as (?) "[#DECR_INV CNT]".     
     MU_by_burn_cp. iApply wp_value.
 

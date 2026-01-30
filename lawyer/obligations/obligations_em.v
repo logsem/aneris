@@ -70,10 +70,6 @@ Section ObligationsEM.
   .
 
   Definition obls_is_init_st (σ: cfg Λ) (δ: mstate OM) :=
-    (* exists τ0, *)
-    (*   let R := {[ τ0 ]} in *)
-    (*   locales_of_cfg σ = R /\ dom $ ps_obls δ = R /\  *)
-    (*   om_st_wf δ. *)
       locales_of_cfg σ = dom (ps_obls δ) /\
       om_st_wf δ.
 
@@ -163,7 +159,6 @@ Section ObligationsEM.
     set_solver.
   Qed. 
 
-  (* TODO: move *)
   Lemma zip_lookup_Some_1 {A B: Type} (la: list A) (lb: list B) i a b:
     zip la lb !! i = Some (a, b) -> la !! i = Some a /\ lb !! i = Some b.
   Proof using.

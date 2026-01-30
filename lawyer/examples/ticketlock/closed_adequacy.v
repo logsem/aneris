@@ -143,8 +143,7 @@ Section Adequacy.
     1, 2: apply ith_bn_lt; lia. 
     { cbv; lia. }
     { simpl. by iIntros (? _) "X". }
-    { (* TODO: why solve_inG doesn't solve it? *)
-      intros. split; try solve_inG || apply _.
+    { intros. split; try solve_inG || apply _.
       simpl. apply _. }
     2: { by iIntros "!> % ?". }
 

@@ -318,7 +318,6 @@ Section Termination.
     destruct b; tauto.
   Qed.
 
-  (* TODO: rephrase in terms of preserved_by? *)
   Lemma expected_signal_created_before δ1 δ2 τ n sid l
     (NSTEPS: nsteps (flip loc_step_with τ) n δ1 δ2)
     (SIG2: ps_sigs δ2 !! sid = Some (l, false))
@@ -690,7 +689,6 @@ Section Termination.
         do 2 red. congruence. 
       - eapply burns_cp_ms_le; eauto. }
     
-    (* TODO: extract the lemma below? *)    
     clear δ' NTH'.
     intros τ' IDTHl. 
     red. intros δk δk' mb mf k ITH BOUND NSTEPS BSTEP FSTEP.
@@ -739,7 +737,6 @@ Section Termination.
       - eapply nsteps_mono; [| apply STEPS].
         do 2 red. rewrite /obls_any_step_of. eauto.
       - apply nsteps_1. left. eauto.
-      (* TODO: get rid of it *)
       Unshelve. exact τ. 
     }
     specialize (IHk ltac:(lia) _ STEPS).
@@ -1120,7 +1117,6 @@ Section Termination.
     rewrite EQ. apply phase_lt_fork.
   Qed. 
 
-  (* TODO: unify with previous *)
   Lemma om_trans_eps_bound δ1 τ δ2 π ep τ' π'
     (WF1: om_st_wf δ1)
     (PH: ps_phases δ1 !! τ = Some π)
@@ -1272,7 +1268,6 @@ Section Termination.
     2: { rewrite -MTH'. f_equal. lia. }
     2: { rewrite OBLSd'. done. } 
     
-    (* TODO: extract? *)
     rewrite /TPF /TPF' /PF'.
     generalize ((LIM_STEPS + 2) * S (d + m)) as N. intros.
     rewrite plus_n_Sm -Nat.add_1_r Nat.add_assoc MTH'. simpl.
@@ -1419,7 +1414,6 @@ Section Termination.
     rewrite -gmultiset_scalar_mul_S_r. f_equiv. lia.
   Qed.
   
-  (* TODO: try to unify with similar lemmas? *)
   Lemma om_trans_all_ms_lt n
     (DOM: is_Some (tr S!! (S n)))
     (ALL_SET: forall sid, ¬ (exists c, is_Some (tr S!! c) /\ never_set_after sid c))
@@ -1437,13 +1431,11 @@ Section Termination.
       inversion BURNS. subst. 
       eapply burns_cp_own_ms_lt with (πb := x); done. }
     
-    (* TODO: extract the lemma below? *)
     intros τ' IDTHl. 
     red. intros δn δn' mb mf k ITH%state_label_lookup BOUND NSTEPS BSTEP FSTEP.
     destruct ITH as (ITH & ITH' & _).
     rewrite Nat.add_1_r NTH' in ITH'. inversion ITH'. subst. clear ITH'.
 
-    (* TODO: get rid of duplicate *)
     assert (forall sid, sig_st_le (ps_sigs mb !! sid) (ps_sigs δn' !! sid)) as SIG_LE''.
     { intros.
       etrans.
@@ -1502,7 +1494,6 @@ Section Termination.
       destruct b0; try tauto.
       destruct SB. exists j. red. rewrite JTH. simpl. by rewrite SIGj. }
 
-    (* TODO: unify with previous case? *)
     destruct SB as (f & SETf & LEf_sb).
     forward eapply sig_is_set_at_after with (j := n).
     { eauto. }

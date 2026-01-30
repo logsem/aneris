@@ -250,8 +250,6 @@ Section SpawnJoin.
     (DISJsw: R__s ## R__w):
       waiter_spec (f__w #()) R__w R__w' d__w Q__w -∗
       spawnee_spec (f__s #()) R__s d__s Q__s -∗
-      (* TODO: is it possible to avoid mentioning phase specifically?
-         tried to do so, but have problems with eliminating laters and/or phase disappearing *)
       (▷ ∀ vw vs, obls τ R__w' -∗ Q__w vw -∗ Q__s vs -∗
                         ▷ Φ (vs, vw)%V) -∗
       obls τ (R__w ∪ R__s) -∗ th_phase_eq τ π -∗
@@ -323,8 +321,6 @@ Section SpawnJoin.
     (DISJ12: R1 ## R2) (DISJ': R' ## (R1 ∪ R2)):
       spawnee_spec (f1 #()) R1 df1 Q1 -∗
       spawnee_spec (f2 #()) R2 df2 Q2 -∗
-      (* TODO: is it possible to avoid mentioning phase specifically?
-         tried to do so, but have problems with eliminating laters and/or phase disappearing *)
       (▷ ∀ v1 v2, obls τ R' -∗ Q1 v1 -∗ Q2 v2 -∗
                         ▷ Φ (v1, v2)%V) -∗
       obls τ (R1 ∪ R2 ∪ R') -∗ th_phase_eq τ π -∗

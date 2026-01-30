@@ -8,7 +8,6 @@ From lawyer Require Import action_model.
 
 Class ActionSubEM (Λ: language) (AM: ActionModel) := {
 
-    (* TODO: how to express that these two are typeclasses themselves? *)
     asem_preGS: gFunctors -> Set;
     asem_GS: gFunctors -> Set;
     asem_Σ: gFunctors;

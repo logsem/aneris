@@ -98,7 +98,6 @@ Section Nondet.
 
     MU_by_BOU.
     iApply BOU_lower; [apply LS_LB| ]. iApply OU_BOU_rep.
-    (* TODO: add proofmode class for OU_rep *)
     iPoseProof (expect_sig_upd_rep with "EP [$] [$] [] [$]") as "OU'".
     { iApply empty_sgns_levels_rel. }
     iApply (OU_rep_wand with "[-OU'] [$]").
@@ -127,7 +126,6 @@ Section Nondet.
     
     MU_by_BOU.
     iApply BOU_lower; [apply K_LB| ]. iApply OU_BOU_rep.
-    (* TODO: add proofmode instance *)
     iApply (OU_rep_wand with "[-]").
     2: { iApply (increase_eb_upd_rep with "EB"). }
     iIntros "#EB'". 

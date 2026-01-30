@@ -126,7 +126,6 @@ Section TotalTriples.
       Local Definition TAU_def :=
         bi_greatest_fixpoint TAU_pre ().
 
-      (* TODO: seal *)
       Definition TAU := TAU_def.
       
       Lemma TAU_elim:
@@ -250,7 +249,6 @@ Section TotalTriples.
 
   End AtomicTriples.
 
-  (* TODO: simplify *)
   Global Instance TAU_acc_Proper {ST: Type}:
     Proper
       (eq ==> (eq ==> equiv) ==> (eq ==> eq ==> equiv) ==> equiv ==> 

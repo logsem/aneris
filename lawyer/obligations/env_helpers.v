@@ -2,8 +2,6 @@ From lawyer Require Import sub_action_em.
 From lawyer.obligations Require Import obligations_model  obligations_am obligations_em obligations_logic obligations_resources.
 
 
-(* TODO: use all that throughout development *)
-
 Class OP_HL (DegO LvlO: ofe) (LIM_STEPS: nat) := {
     om_hl_DegO_discr :: OfeDiscrete DegO; 
     om_hl_LvlO_discr :: OfeDiscrete LvlO; 

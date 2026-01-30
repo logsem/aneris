@@ -328,7 +328,6 @@ Section OblsAdequacy.
     rewrite OB_ in OB. congruence.
   Qed.
 
-  (* TODO: move *)
   Lemma prefixes_simpl {A: Type} (es tp: list expr) (P: nat -> gset SignalId -> A): 
     ((λ '(tnew, e) (_ : val), P (locale_of tnew e) ∅) <$> prefixes_from es (drop (length es) tp)) = (map (fun i _ => P i ∅) (seq (length es) (length tp - length es))). 
   Proof using.
@@ -356,10 +355,9 @@ Section OblsAdequacy.
     rewrite -H2. simpl. done.
   Qed.    
 
-  (* TODO: generalize? *)
   Lemma om_sim_RAH_multiple
           {Σ: gFunctors} {Hinv: @heapGS Σ M EM}
-    σ1 es (* ds eb *) δ
+    σ1 es δ
     (LIVE0: om_live_tids id locale_enabled (es, σ1) δ) :
   ⊢
   rel_always_holds  NotStuck
@@ -368,7 +366,6 @@ Section OblsAdequacy.
             _ Hinv))) (seq 0 (length es)))
     (@obls_sim_rel)
     (es, σ1)
-    (* (@init_om_state _ _ _ LIM_STEPS OP (es, σ1) ds eb) *)
     δ
   .
   Proof using.
@@ -389,11 +386,8 @@ Section OblsAdequacy.
       red in EX0, OM0. simpl in EX0, OM0. subst.
       rewrite /obls_sim_rel. rewrite /valid_state_evolution_fairness /om_live_tids.
       split; [done| ]. simpl. red.
-      (* apply om_live_tids_init. *)
       apply LIVE0. 
     }
-
-    (* Unset Printing Notations. *)
 
     rewrite prefixes_simpl.
     rewrite -map_app. rewrite -seq_app.
@@ -412,7 +406,6 @@ Section OblsAdequacy.
     all: eauto.
   Qed.
 
-  (* TODO: generalize? *)
   Lemma om_sim_RAH
           {Σ: gFunctors} {Hinv: @heapGS Σ M EM}
     σ1 e ds eb:
@@ -459,8 +452,6 @@ Section OblsAdequacy.
   Lemma obls_match_impl_multiple Σ
     {HEAP: heapGpreS Σ EM}
     (extr : heap_lang_extrace) (es: list expr) (σ: state)
-    (* (cps_degs: gmultiset Degree) (eb: nat) *)
-    (* (s1 := init_om_state (trfirst extr) cps_degs eb (OP := OP)) *)
     δ
     (Hexfirst : trfirst extr = (es, σ))
     (LEN: length es ≥ 1)
@@ -512,8 +503,6 @@ Section OblsAdequacy.
   Lemma obls_terminates_impl_multiple Σ
     {HEAP: heapGpreS Σ EM}
     (extr : heap_lang_extrace) (es: list expr) (σ: state)
-    (* (cps_degs: gmultiset Degree) (eb: nat)     *)
-    (* (s1 := init_om_state (trfirst extr) cps_degs eb (OP := OP)) *)
     δ
     (Hexfirst : trfirst extr = (es, σ))
     (LEN: length es >= 1)
@@ -605,7 +594,6 @@ Section OblsAdequacy.
     iDestruct "OM" as "(PH & CPS & OB & #EB)".
     subst τ0. iFrame.
     erewrite <- cp_mul_1. iFrame.
-    (* eb is not used in this spec *)
     Unshelve. exact 0.
   Qed.
 

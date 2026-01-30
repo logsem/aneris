@@ -2,7 +2,6 @@ From stdpp Require Export sets.
 From iris.proofmode Require Import tactics.
 
 
-(* TODO: find implementation; check the PR in stdpp *)
 Section GsetProd.
   Context `{Countable K, Countable T}. 
 

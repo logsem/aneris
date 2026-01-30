@@ -280,7 +280,6 @@ Section EoFin.
           
           replace (Z.add (Z.of_nat m) 2) with (Z.of_nat (m + 2)) by lia.
 
-          (* TODO: refine the precondition and do this early in the proof *)
           iClear "IH". rewrite /thread_prog.
           pure_steps.
           wp_bind (_ ≤ _)%E. pure_step.
@@ -338,7 +337,6 @@ Section EoFin.
 
         iDestruct "EXTRA" as "[CP2' | EXP]". 
         + MU_by_BOU. 
-          (* TODO: avoid unfolding BOU *)
           rewrite /smap_repr_eo. 
           iPoseProof (smap_create_ep' B__eo m with "[$] [$] [$]") as "OU"; eauto.
           { apply elem_of_set_seq. lia. } 
