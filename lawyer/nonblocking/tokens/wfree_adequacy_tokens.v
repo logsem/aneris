@@ -637,7 +637,7 @@ Section WFAdequacy.
     rewrite /gets_stuck_at /= in NS.
     rewrite (ic_helper ic) /tpc (tc_helper ic) in NS.
     rewrite JTH in NS.
-    destruct (decide (not_stuck_tid τi c)); [done| ]. destruct NS.
+    destruct (Classical_Prop.classic (not_stuck_tid τi c)) as [NSTUCK | STUCK]; [done| ]. destruct NS.
     eexists. repeat split.
     { lia. }
     apply stuck_tid_neg. split; eauto.
