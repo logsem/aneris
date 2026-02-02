@@ -10,6 +10,7 @@ TRILLIUM_GIT_URL=git@github.com:logsem/trillium.git
 TRILLIUM_BRANCH=opam_package
 LAWYER_GIT_URL=git@github.com:logsem/aneris.git
 LAWYER_BRANCH=lawyer_paper
+LAWYER_OOPSLA26_PATH=lawyer_oopsla26
 
 WORKING_DIR_NAME=submission
 COMMITS_LOG=commits.log
@@ -32,7 +33,7 @@ touch $WORKING_DIR/$COMMITS_LOG
 # prepare paper
 cd $WORKING_DIR
 git clone -b $PAPER_BRANCH --single-branch $PAPER_GIT_URL paper
-cd paper/lawyer
+cd paper/$LAWYER_OOPSLA26_PATH
 echo "Paper commit:" >> $WORKING_DIR/$COMMITS_LOG
 git log -1 >> $WORKING_DIR/$COMMITS_LOG
 make clean
@@ -64,7 +65,7 @@ cleanup_current_dir paper README.md
 cd $WORKING_DIR
 
 ## 2) prepare paper with appendix
-cd paper/lawyer
+cd paper/$LAWYER_OOPSLA26_PATH
 make clean
 make
 cp paper.pdf $WORKING_DIR/paper-appendix.pdf
