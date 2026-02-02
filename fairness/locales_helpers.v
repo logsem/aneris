@@ -6,9 +6,6 @@ Section XX.
 
   Notation "'Tid'" := (locale Λ). 
 
-  (* TODO: unify with existing locales_of_list_from_locale_from, 
-     remove restriction for Λ *)
-
   Lemma locales_of_list_from_locale_from' tp0 tp1 ζ:
     ζ ∈ locales_of_list_from tp0 tp1 (Λ := Λ) ->
     is_Some (from_locale_from tp0 tp1 ζ).

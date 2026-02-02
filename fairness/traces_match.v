@@ -76,7 +76,6 @@ Section TracesMatch.
     | _, _ => True
     end.
 
-  (* TODO: this should already be covered by .._strong' lemma above *)
   Lemma valid_inf_system_trace_implies_traces_match
         (φ : execution_trace Λ -> auxiliary_trace M -> Prop)
         ex atr iex iatr progtr (auxtr : model_trace):

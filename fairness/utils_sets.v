@@ -183,7 +183,6 @@ Qed.
 Section FlattenGset.
   Context `{Countable K}. 
   
-  (* TODO: find existing? *)
   Definition flatten_gset (ss: gset (gset K)): gset K :=
     list_to_set (concat (map elements (elements ss))).
 
@@ -344,7 +343,6 @@ Section SetMax.
     by rewrite set_Forall_elements.
   Qed.
 
-  (* TODO: does it exist already? *)
   Lemma list_max_elems X:
     forall x, x ∈ X -> x <= list_max X.
   Proof using.

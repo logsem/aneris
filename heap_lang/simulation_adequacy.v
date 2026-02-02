@@ -80,7 +80,6 @@ Section adequacy.
     iDestruct "Hwp" as ">[Hwp H]". 
     iModIntro. iFrame "Hwp Hgen MSI".
 
-    (* TODO: make a lemma *)
     iIntros (??????????) "SI POSTS".
     rewrite /rel_always_holds. iDestruct ("H" with "[][][][][][][] SI POSTS") as "R".
     all: try by done.

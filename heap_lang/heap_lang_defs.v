@@ -6,8 +6,6 @@ From fairness Require Export execution_model.
 From heap_lang Require Import tactics notation.
 
 
-(* TODO: the missing fact of em_GS etc. being typeclasses
-   hardens automatic resolution of their instances *)
 Class heapGpreS Σ `(EM: ExecutionModel heap_lang M) := HeapPreG {
   heapGpreS_inv :: invGpreS Σ;
   heapGpreS_gen_heap :: gen_heapGpreS loc val Σ;
@@ -28,7 +26,6 @@ Definition heapΣ `(EM: ExecutionModel heap_lang M) : gFunctors :=
   #[ invΣ; gen_heapΣ loc val; em_Σ ].
 
 
-(* TODO: automatize *)
 Global Instance subG_heapPreG {Σ} `{EM: ExecutionModel heap_lang M}:
   subG (heapΣ EM) Σ → heapGpreS Σ EM.
 Proof. 
@@ -54,7 +51,6 @@ Section GeneralProperties.
   Lemma posts_of_empty_mapping_multiple  (es e: expr) v (tid : nat) (tp : list expr):
     tp !! tid = Some e ->
     to_val e = Some v ->
-    (* cur_posts tp e1 (fun _ => em_thread_post 0%nat (em_GS0 := eGS)) -∗ *)
     (let Φs := map (fun τ _ => @em_thread_post heap_lang M EM Σ (@heap_fairnessGS Σ M EM _) τ) (seq 0 (length tp)) in
       posts_of tp Φs) -∗
     em_thread_post tid (em_GS0 := eGS).
@@ -78,7 +74,6 @@ Section GeneralProperties.
       eapply lookup_lt_is_Some; eauto. 
   Qed.
 
-  (* TODO: derive from previous? *)
   Lemma posts_of_empty_mapping  (e1 e: expr) v (tid : nat) (tp : list expr):
     tp !! tid = Some e ->
     to_val e = Some v ->

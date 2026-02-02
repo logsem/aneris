@@ -145,7 +145,6 @@ Proof using.
   lia. 
 Qed.   
 
-(* TODO: can be proved simpler if we could unfold ndot *)
 Lemma ns_ndot_diff_not_subseteq (ns: namespace) (i j: nat)
   (NEQ: i ≠ j):
   (↑ (ns .@ i): coPset) ⊈ ↑ (ns .@ j).

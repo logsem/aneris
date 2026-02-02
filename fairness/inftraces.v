@@ -572,7 +572,6 @@ Section destuttering.
             pred_at btr i (fun b' _ => b' = b) ->
             exists j, pred_at str j (fun s' _ => s' = Us b) /\ j <= n). 
 
-  (* TODO: try to express the prefix property with 'upto_stutter' and 'subtrace' *)
   Lemma upto_stutter_after_strong {btr str} n {str'}:
     upto_stutter btr str ->
     after n str = Some str' ->
@@ -825,7 +824,6 @@ Section destuttering.
 
 End destuttering.
 
-(* TODO: Does this belong here? *)
 (** Adapted from Arthur Azevedo De Amorim *)
 Section lex_ind.
   Section Lexicographic.

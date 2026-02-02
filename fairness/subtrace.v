@@ -402,7 +402,6 @@ Section ModelSubtrace.
   
   From Paco Require Import paco1 paco2 pacotac.
 
-  (* TODO: merge with mtrace_valid_steps'*)
   Lemma trace_valid_equiv `{M: FairModel} (tr: mtrace M)
     (VALID': forall i s1 ℓ s2, tr !! i = Some (s1, Some (ℓ, s2)) ->
                           fmtrans _ s1 ℓ s2):

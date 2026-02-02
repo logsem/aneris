@@ -4,8 +4,6 @@ From trillium.prelude Require Import quantifiers finitary.
 From fairness Require Export utils_coPset utils_logic utils_maps utils_sets utils_relations utils_multisets.
 
 
-(* TODO: move these lemmas to appropriate places *)
-
 Section Disjoint.
 
   Lemma disjoint_subseteq:

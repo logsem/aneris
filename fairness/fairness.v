@@ -141,7 +141,7 @@ Qed.
 
 
 Section LocaleFairness.
-  (** TODO: this is in fact a case of fair_by_gen with a simpler does_step relation,
+  (** This is in fact a case of fair_by_gen with a simpler does_step relation,
       but formalizing it would require some routine work to adjust all the proofs. *)
   Context {S L T: Type}.
   Context (locale_prop: T -> S -> Prop).
