@@ -1,4 +1,4 @@
-#! /bin/bash
+#! /bin/bash -e
 
 # this is a script that automatically prepares the submission of the Lawyer paper: the main paper and supplementary material.
 # This is intended to be used by the paper authors, not by the end user/reviewers!
@@ -13,6 +13,7 @@ LAWYER_BRANCH=lawyer_paper
 LAWYER_OOPSLA26_PATH=lawyer_oopsla26
 
 WORKING_DIR_NAME=submission
+VM_SHARED_DIR=~/research/lawyer-artifact/vm_shared
 COMMITS_LOG=commits.log
 
 cleanup_current_dir () {
@@ -58,6 +59,7 @@ cleanup_current_dir
 cd $WORKING_DIR
 
 mv lawyer/paper/README.md .
+mv lawyer/paper/ARTIFACT.md .
 cd lawyer
 echo "Lawyer commit:" >> $WORKING_DIR/$COMMITS_LOG
 git log -1 >> $WORKING_DIR/$COMMITS_LOG
@@ -70,9 +72,14 @@ make clean
 make
 cp paper.pdf $WORKING_DIR/paper-appendix.pdf
 
-## 3) complete supplementary material
+## 3) complete supplementary material; ARTIFACT.md is not included there
 cd $WORKING_DIR
 zip -r lawyer_suppl.zip trillium lawyer README.md paper-appendix.pdf
+
+## 4) the artifact is pretty much the content of working dir (plus the actual VM) 
+
+## 5) move the sources to VM's shared folder
+cp -f lawyer_suppl.zip $VM_SHARED_DIR
 
 echo "Submission material is built in $WORKING_DIR"
 cat $WORKING_DIR/$COMMITS_LOG
