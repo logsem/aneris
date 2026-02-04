@@ -22,7 +22,7 @@ This manual incorporates (a slightly edited version of) `README.md` file (includ
    - if you use a Mac with an Apple Silicon chip (**we followed [these instructions](https://simo9265.medium.com/convert-ova-to-qcow2-and-start-it-with-utm-13fa3fc4c3db) to obtain `artifact.qcow2` and run the VM on Mac**):
      1. Install [UTM](https://mac.getutm.app/). We used version 4.5.4 (100)
      2. Download the `artifact.qcow2` file.
-     3. Open UTM, press `+` button, select `Emulate`, `Other`, choose `Skip ISO boot` option and follow instructions to create a VM.
+     3. Open UTM, press `+` button, select `Emulate`, `Other`, choose `Boot Device: None` and follow instructions to create a VM.
      4. Open settings for the new VM, navigate to `QEMU` and uncheck `UEFI Boot` option.
      5. Create a disk to boot from:
 	     1. Open settings for the new VM and navigate to `New Drive`.
