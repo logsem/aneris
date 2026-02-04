@@ -1,7 +1,6 @@
 # Supplementary material for the Lawyer paper
 
 This document describes the Rocq formalization of Lawyer paper.
-**For instructions on using the artifact consult `ARTIFACT.md` first.**
 
 ## Structure of the technical development
 
