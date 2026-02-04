@@ -17,6 +17,8 @@ This document describes the Rocq formalization of Lawyer paper.
 	 
 ## Installation
 
+First, install [opam](https://opam.ocaml.org/) according to the instructions for your operating system. We used the version 2.1.2. Then execute the following:
+
     # unpack the files (assuming the supplementary material is in lawyer_suppl.zip)
     unzip -d lawyer_suppl lawyer_suppl.zip
 	# move into the working directory

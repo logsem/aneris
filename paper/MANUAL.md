@@ -1,30 +1,31 @@
 # Artifact for the Lawyer paper
 
-This artifact provides the technical development for the *Lawyer: Modular Obligations-Based Liveness Reasoning in Higher-Order Impredicative Concurrent Separation Logic* accepted to OOPSLA'26.
+This artifact provides the reproducible technical development for the *Lawyer: Modular Obligations-Based Liveness Reasoning in Higher-Order Impredicative Concurrent Separation Logic* accepted to OOPSLA'26.
 
 It consists of:
 
 - Rocq formalization of all the results in the paper, located in `lawyer_suppl.zip`.
-- Virtual machine with pre-built formalization.
+- Virtual machine (LUbuntu based on Ubuntu 24.04) with pre-built formalization.
   Username/password: `lawyer`.
   All relevant files are located in `/home/lawyer/artifact`.
 - Full version of the paper with appendix.
 
-This manual is a slightly edited concatenation of `ARTIFACT.md` and `README.md` which describe the VM and Rocq formalization correspondingly.
+This manual incorporates (a slightly edited version of) `README.md` file (included in `lawyer_suppl.zip`) which describes the Rocq formalization.
 
 ## Kick-the-tires: checking the pre-built formalization in the virtual machine
 
 1. Install [VirtualBox](https://www.virtualbox.org/) (we used the version 7.2.4)
 2. Download the `artifact.ova` file.
 2. Open VirtualBox and navigate to `File/Import Appliance`. Provide the path to the downloaded `artifact.ova` and follow instructions to create a VM.
-3. Run the newly created VM. 
+3. Run the newly created VM. The rest of the instructions below are to be executed inside the VM.
 4. Navigate to `/home/lawyer/artifact/lawyer`. 
-5. Run `make -j 4` (this should terminate in a second, as the proofs are already compiled).
-6. Open `check/check.v` with an editor of choice; the VM provides Emacs+Proof General and VSCode+vsrocq. 
+5. Run `make -j 4`. This will build the proofs of Lawyer and should terminate in a second, as the proofs are already built.
+6. Open `check/check.v` with an editor of choice; the VM provides Emacs+Proof General and VSCode+vsrocq.
+   This file collects all the theorems we prove for our case studies and examples.
 7. Step through every line of this file (`Next` button in Proof General or `Step Forward` button in vsrocq).
-8. The last `Print Assumptions` line prints all the axioms that all the paper results (listed in `results` definition above) rely on.
+8. The last `Print Assumptions` line prints all the axioms that the listed theorems rely on.
    Processing it might take a while, and vsrocq might appear to be stuck; wait for up to a minute for it to complete.
-   Check that only the following axioms are used:
+   The used axioms will be listed at the bottom of the output. Check that only the following axioms are used:
    - `RelationalChoice.relational_choice`
    - `ClassicalUniqueChoice.dependent_unique_choice`
    - `Classical_Prop.classic`
@@ -38,8 +39,31 @@ This manual is a slightly edited concatenation of `ARTIFACT.md` and `README.md` 
 - In the VM, you can run `make clean; make -j 4` in `/home/lawyer/artifact/lawyer`.
   This will rebuild the formalization of Lawyer, while keeping the rest of dependencies, including Trillium, untouched.
 - Alternatively, you can rebuild the entire development from scratch, either inside VM or locally.
-  For that, use the `lawyer_suppl.zip` file (in the VM, it is located in `/home/lawyer/artifact/`) and follow the installation instructions below.
-  
+  First, install [opam](https://opam.ocaml.org/) according to the instructions for your operating system. We used the version 2.1.2.
+  Then, use the `lawyer_suppl.zip` file (in the VM, it is located in `/home/lawyer/artifact/`) and follow the installation instructions below:
+    
+        # unpack the files (assuming the supplementary material is in lawyer_suppl.zip)
+        unzip -d lawyer_suppl lawyer_suppl.zip
+        # move into the working directory
+        cd lawyer_suppl
+        
+        # create a new opam environment
+        opam switch create lawyer-env 5.2.0
+        # switch into the new environment
+        eval $(opam env --switch=lawyer-env)
+        
+        # set up repository for Rocq packages
+        opam repo add coq-released https://coq.inria.fr/opam/released
+        # set up the local repository for Trillium
+        opam pin add trillium trillium/ --no-action
+        
+        # move into the Lawyer directory
+        cd lawyer/
+        # install all dependencies of Lawyer
+        opam install . --deps-only
+        # build Lawyer; adjust the number of jobs as needed
+        make -j 5
+	
 ## Structure of the technical development
 
 - `trillium/` - the Trillium framework
@@ -52,30 +76,6 @@ This manual is a slightly edited concatenation of `ARTIFACT.md` and `README.md` 
    - `check/` - collection of the end results
 - `paper-appendix.pdf` - version of the paper with the technical appendix.
 	 
-## Installation
-
-    # unpack the files (assuming the supplementary material is in lawyer_suppl.zip)
-    unzip -d lawyer_suppl lawyer_suppl.zip
-	# move into the working directory
-	cd lawyer_suppl
-	
-    # create a new opam environment
-    opam switch create lawyer-env 5.2.0
-	# switch into the new environment
-    eval $(opam env --switch=lawyer-env)
-	
-	# set up repository for Rocq packages
-    opam repo add coq-released https://coq.inria.fr/opam/released
-    # set up the local repository for Trillium
-    opam pin add trillium trillium/ --no-action
-
-	# move into the Lawyer directory
-    cd lawyer/
-    # install all dependencies of Lawyer
-    opam install . --deps-only
-    # build Lawyer; adjust the number of jobs as needed
-    make -j 5
-	
 ## Correspondence between the paper and Rocq formalization
 
 ### Section 2
