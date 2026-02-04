@@ -5,7 +5,7 @@ This artifact provides the reproducible technical development for the *Lawyer: M
 It consists of:
 
 - Rocq formalization of all the results in the paper, located in `lawyer_suppl.zip`.
-- Virtual machine (LUbuntu based on Ubuntu 24.04) with pre-built formalization.
+- Two virtual machines (LUbuntu based on Ubuntu 24.04 for Virtualbox and Qemu) with pre-built formalization.
   Username/password: `lawyer`.
   All relevant files are located in `/home/lawyer/artifact`.
 - Full version of the paper with appendix.
@@ -14,10 +14,22 @@ This manual incorporates (a slightly edited version of) `README.md` file (includ
 
 ## Kick-the-tires: checking the pre-built formalization in the virtual machine
 
-1. Install [VirtualBox](https://www.virtualbox.org/) (we used the version 7.2.4)
-2. Download the `artifact.ova` file.
-2. Open VirtualBox and navigate to `File/Import Appliance`. Provide the path to the downloaded `artifact.ova` and follow instructions to create a VM.
-3. Run the newly created VM. The rest of the instructions below are to be executed inside the VM.
+1. Obtain the appropriate VM
+   - if you use an x86 system (**we highly recommend following this option if you have access to an x86 machine**):
+     1. Install [VirtualBox](https://www.virtualbox.org/) (we used the version 7.2.4)
+	 2. Download the `artifact.ova` file.
+	 2. Open VirtualBox and navigate to `File/Import Appliance`. Provide the path to the downloaded `artifact.ova` and follow instructions to create a VM.
+   - if you use a Mac with an Apple Silicon chip (**we followed [these instructions](https://simo9265.medium.com/convert-ova-to-qcow2-and-start-it-with-utm-13fa3fc4c3db) to obtain `artifact.qcow2` and run the VM on Mac**):
+     1. Install [UTM](https://mac.getutm.app/). We used version 4.5.4 (100)
+     2. Download the `artifact.qcow2` file.
+     3. Open UTM, press `+` button, select `Emulate`, `Other`, choose `Skip ISO boot` option and follow instructions to create a VM.
+     4. Open settings for the new VM, navigate to `QEMU` and uncheck `UEFI Boot` option.
+     5. Create a disk to boot from:
+	     1. Open settings for the new VM and navigate to `New Drive`.
+		 2. Choose IDE interface, set `Size` to be the size of `artifact.qcow2`, click `Import`.
+		 3. In the next window, select `artifact.qcow2` and press `Open`.
+		 4. Upon completion, drag the new IDE drive to the top of available drives.
+3. Run the newly created VM. The rest of the instructions below are to be executed inside the VM.	 
 4. Navigate to `/home/lawyer/artifact/lawyer`. 
 5. Run `make -j 4`. This will build the proofs of Lawyer and should terminate in a second, as the proofs are already built.
 6. Open `check/check.v` with an editor of choice; the VM provides Emacs+Proof General and VSCode+vsrocq.
