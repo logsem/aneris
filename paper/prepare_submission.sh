@@ -59,7 +59,7 @@ cleanup_current_dir
 cd $WORKING_DIR
 
 mv lawyer/paper/README.md .
-mv lawyer/paper/ARTIFACT.md .
+mv lawyer/paper/MANUAL.md .
 cd lawyer
 echo "Lawyer commit:" >> $WORKING_DIR/$COMMITS_LOG
 git log -1 >> $WORKING_DIR/$COMMITS_LOG
@@ -72,7 +72,7 @@ make clean
 make
 cp paper.pdf $WORKING_DIR/paper-appendix.pdf
 
-## 3) complete supplementary material; ARTIFACT.md is not included there
+## 3) complete supplementary material; MANUAL.md is not included there
 cd $WORKING_DIR
 zip -r lawyer_suppl.zip trillium lawyer README.md paper-appendix.pdf
 
