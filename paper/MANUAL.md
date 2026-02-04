@@ -76,7 +76,7 @@ This manual incorporates (a slightly edited version of) `README.md` file (includ
         # build Lawyer; adjust the number of jobs as needed
         make -j 5
 	
-## Structure of the technical development
+## Structure of the technical development (`lawyer_suppl.zip`)
 
 - `trillium/` - the Trillium framework
 - `lawyer/` - the implementation of the Lawyer project
