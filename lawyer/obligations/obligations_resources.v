@@ -497,7 +497,7 @@ Section ObligationsRepr.
     Qed.
 
     Lemma cp_mul_0 π d:
-      ⊢ |==> cp_mul π d 0.
+      ⊢ cp_mul π d 0.
     Proof using.
       clear H H0 H1.
       rewrite cp_mul_unseal. 
