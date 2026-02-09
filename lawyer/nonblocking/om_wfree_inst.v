@@ -2,7 +2,6 @@ From iris.proofmode Require Import tactics.
 From lawyer.examples Require Import orders_lib.
 From lawyer.obligations Require Import env_helpers obligations_model.
 From lawyer.nonblocking.logrel Require Import logrel.
-From lawyer.nonblocking Require Import wait_free_spec_defs.
 
 
 Definition WF_Degree := bounded_nat 2.
@@ -40,6 +39,20 @@ From heap_lang Require Import heap_lang_defs lang notation.
 From lawyer.obligations Require Import obligations_resources.
 
 
+(** In fact, for most of proofs it is not necessary to return the phase,
+    but it is needed for higher-order functions *)
+Definition wait_free_method_gen
+    {M} {EM: ExecutionModel heap_lang M} {Σ}
+    `{OP: OP_HL DegO LvlO LIM} {OHE: OM_HL_Env OP EM Σ}    
+    (s: stuckness) (* (f: forks_bit) *)
+    (m: val) d (F: val -> nat) (P Q: val -> iProp Σ)
+    : iProp Σ :=
+    ∀ τ π (a: val), 
+      {{{ cp_mul π d (F a) ∗ th_phase_frag τ π (1/2)%Qp ∗ P a }}}
+        App m a @ τ; CannotFork; s; ⊤
+      {{{ v, RET v; th_phase_frag τ π (1/2)%Qp ∗ Q v }}}. 
+
+
 (** So far P is only actually set to (fun _ => True).
     See comment for wfree_adequacy.main_returns_reduction. *)
 Record WaitFreeSpec (s: stuckness) (P: val -> Prop) (m: val) := {
@@ -75,7 +88,7 @@ Final Obligation.
   simpl. intros.
   iIntros "#?". rewrite /wait_free_method_gen.
   iIntros (**).
-  iIntros (?) "!> (?&?&?) POST".
+  iIntros (?) "!> (?&?) POST".
   iApply wp_stuck_weaken.
   iApply (wfs_spec _ _ _ WFS with "[] [-POST]"); iFrame "#∗".
 Qed.

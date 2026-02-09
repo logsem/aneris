@@ -64,10 +64,10 @@ Qed.
 Lemma mk_ref_wfree_spec {M} {EM: ExecutionModel heap_lang M} {Σ : gFunctors}
   (OHE : OM_HL_Env OP_HL_WF EM Σ):
   (let _: heap1GS Σ := iem_phys HeapLangEM EM in mk_ref_inv)
-  ⊢ wait_free_spec_defs.wait_free_method_gen NotStuck mk_ref d_wfr0 (fun _ => 5%nat) (fun _ => True) (fun _ => True).
+  ⊢ wait_free_method_gen NotStuck mk_ref d_wfr0 (fun _ => 5%nat) (fun _ => True) (fun _ => True).
 Proof using. 
-  rewrite /wait_free_spec_defs.wait_free_method_gen.
-  iIntros "#INV" (τ π q a). simpl. 
+  rewrite /wait_free_method_gen.
+  iIntros "#INV" (τ π a). simpl. 
   iIntros "!>" (Φ) "(CPS & PH & ?) POST".
   iApply (mk_ref_spec with "[-POST]").
   { iFrame. }
