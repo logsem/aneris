@@ -186,23 +186,22 @@ Section ProgramLogic.
       rewrite big_opL_nil. set_solver. 
     Qed.
 
-    Lemma MU_wand E ζ (P Q : iProp Σ) :
-      (P -∗ Q) -∗ MU E ζ P -∗ MU E ζ Q.
+    Lemma MU_impl_wand oζ' E ζ (P Q : iProp Σ) :
+      (P -∗ Q) -∗ MU_impl oζ' E ζ P -∗ MU_impl oζ' E ζ Q.
     Proof.
-      rewrite /MU. iIntros "HPQ HMU".
+      rewrite /MU_impl. iIntros "HPQ HMU".
       iIntros (extr atr) "Hσ".
       iMod ("HMU" with "Hσ") as (??) "[Hσ HP]". iModIntro.
       iExists _, _. iFrame. by iApply "HPQ".
     Qed.
 
+    Lemma MU_wand E ζ (P Q : iProp Σ) :
+      (P -∗ Q) -∗ MU E ζ P -∗ MU E ζ Q.
+    Proof. by apply MU_impl_wand. Qed. 
+
     Lemma MU__f_wand E ζ ζ' (P Q : iProp Σ) :
       (P -∗ Q) -∗ MU__f E ζ ζ' P -∗ MU__f E ζ ζ' Q.
-    Proof.
-      rewrite /MU__f /MU_impl. iIntros "HPQ HMU".
-      iIntros (extr atr) "Hσ".
-      iMod ("HMU" with "Hσ") as (??) "[Hσ HP]". iModIntro.
-      iExists _, _. iFrame. by iApply "HPQ".
-    Qed.
+    Proof. by apply MU_impl_wand. Qed. 
     
     Lemma sswp_MU_wp s f E ζ e (Φ : val → iProp Σ)
       (NVAL: language.to_val e = None):
