@@ -10,6 +10,7 @@ TRILLIUM_GIT_URL=git@github.com:logsem/trillium.git
 TRILLIUM_BRANCH=forks_bit
 LAWYER_GIT_URL=git@github.com:logsem/aneris.git
 LAWYER_BRANCH=no_admits
+README_FILE=README_wfree.md
 
 # LAWYER_OOPSLA26_PATH=lawyer_oopsla26
 
@@ -60,12 +61,12 @@ git log -1 >> $WORKING_DIR/$COMMITS_LOG
 cleanup_current_dir
 cd $WORKING_DIR
 
-mv lawyer/paper/README.md .
+mv lawyer/paper/$README_FILE ./README.md
 # mv lawyer/paper/MANUAL.md .
 cd lawyer
 echo "Lawyer commit:" >> $WORKING_DIR/$COMMITS_LOG
 git log -1 >> $WORKING_DIR/$COMMITS_LOG
-cleanup_current_dir paper README.md
+cleanup_current_dir paper *.md
 cd $WORKING_DIR
 
 ## 2) prepare paper with appendix
@@ -77,7 +78,7 @@ cp paper.pdf $WORKING_DIR/paper-appendix.pdf
 
 ## 3) complete supplementary material; MANUAL.md is not included there
 cd $WORKING_DIR
-zip -r lawyer_suppl.zip trillium lawyer README.md paper-appendix.pdf
+zip -r wfree_suppl.zip trillium lawyer README.md paper-appendix.pdf
 
 ## 4) the artifact is pretty much the content of working dir (plus the actual VM) 
 
