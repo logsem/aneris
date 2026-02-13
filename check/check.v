@@ -16,10 +16,12 @@ Definition results := (
   rt_bound_termination
 ). 
 
-Goal True. 
-  idtac "-------------------------------------------".
-  idtac "The axioms used throughout the development:".
-Abort. 
+(** Disabled to avoid confusion with wait-freedom check *)
+
+(* Goal True.  *)
+(*   idtac "-------------------------------------------". *)
+(*   idtac "The axioms used throughout the development:". *)
+(* Abort.  *)
 
 
-Print Assumptions results.
+(* Print Assumptions results. *)

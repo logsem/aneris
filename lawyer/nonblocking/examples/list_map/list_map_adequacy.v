@@ -22,4 +22,4 @@ Proof using.
   simpl. done.
 Qed.
 
-Print Assumptions list_map_incr_is_wait_free.
+(* Print Assumptions list_map_incr_is_wait_free. *)

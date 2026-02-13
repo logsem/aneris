@@ -8,4 +8,4 @@ Proof using.
   eauto. 
 Qed.
 
-Print Assumptions mk_ref_is_wait_free.
+(* Print Assumptions mk_ref_is_wait_free. *)

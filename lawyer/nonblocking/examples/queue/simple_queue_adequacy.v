@@ -13,4 +13,4 @@ Proof using.
   destruct DOM as [-> | ->]; red; eauto.
 Qed.
 
-Print Assumptions simple_queue_is_restr_wait_free. 
+(* Print Assumptions simple_queue_is_restr_wait_free.  *)
