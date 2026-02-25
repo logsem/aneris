@@ -38,7 +38,8 @@ cd paper/$LAWYER_OOPSLA26_PATH
 echo "Paper commit:" >> $WORKING_DIR/$COMMITS_LOG
 git log -1 >> $WORKING_DIR/$COMMITS_LOG
 make clean
-make no-appendix
+# make no-appendix
+make # no appendix by default in camera-ready
 cp paper.pdf $WORKING_DIR/paper.pdf
 
 # echo "Supplementary material is built in $(realpath $WORKING_DIR/paper.pdf)"
@@ -69,7 +70,8 @@ cd $WORKING_DIR
 ## 2) prepare paper with appendix
 cd paper/$LAWYER_OOPSLA26_PATH
 make clean
-make
+# make
+make with-appendix # no appendix by default in camera-ready
 cp paper.pdf $WORKING_DIR/paper-appendix.pdf
 
 ## 3) complete supplementary material; MANUAL.md is not included there
@@ -80,6 +82,26 @@ zip -r lawyer_suppl.zip trillium lawyer README.md paper-appendix.pdf
 
 ## 5) move the sources to VM's shared folder
 cp -f lawyer_suppl.zip $VM_SHARED_DIR
+
+## 6) prepare archive with paper sources
+mkdir $WORKING_DIR/paper_src
+cd $WORKING_DIR/paper/$LAWYER_OOPSLA26_PATH
+cp paper.tex case-study-new.tex introduction.tex related.tex\
+   conclusion.tex logic.tex data-availability.tex model.tex\
+   paper.bbl\
+   *.sty *.cls *.png\
+   Makefile\
+   $WORKING_DIR/paper_src
+cd $WORKING_DIR/paper_src
+zip -r $WORKING_DIR/paper_src.zip *
+# check that the archive is enough to build the paper
+rm -rf $WORKING_DIR/paper_src
+cd $WORKING_DIR
+unzip -d paper_src paper_src.zip
+cd paper_src
+# make
+pdflatex paper.tex
+pdflatex paper.tex
 
 echo "Submission material is built in $WORKING_DIR"
 cat $WORKING_DIR/$COMMITS_LOG
