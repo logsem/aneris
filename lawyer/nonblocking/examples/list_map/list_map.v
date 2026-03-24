@@ -37,6 +37,14 @@ Fixpoint hl_list_size (l: val): nat :=
   end. 
 
 
+Fixpoint hl_list_map_out {A: Type} (f: val -> A) (l: val): list A :=
+  match l with
+  | NONEV => []
+  | SOMEV (h, l') => f h :: hl_list_map_out f l'
+  | _ => []
+  end. 
+
+
 From lawyer.nonblocking.logrel Require Import logrel stuck_utils.
 From lawyer.nonblocking.examples Require Import pwp_tactics. 
 From iris.base_logic Require Import invariants.
@@ -181,25 +189,27 @@ Section ListMapSpec.
 
   Let K := 20.
 
-  Definition hl_map_fuel (F: nat) (l: val heap_lang)  := (K + F) * (S $ hl_list_size l). 
+  Definition hl_map_fuel (f: heap_lang.val → nat) (l: val heap_lang) :=
+    list_sum (hl_list_map_out (fun v => f v + K) l) + K. 
 
   (** ******************** safe specs ****************)
 
   Require lawyer.nonblocking.om_wfree_inst. 
 
   Lemma list_map_spec' τ π (* q *) (l: val heap_lang)
-    f F P Q
+    f fl P Q
     (LIST: is_hl_list P l)
     :
-    cp_mul π d (hl_map_fuel F l) -∗ 
+    cp_mul π d (hl_map_fuel fl l) -∗ 
     th_phase_frag τ π (1/2)%Qp -∗ 
-    om_wfree_inst.wait_free_method_gen NotStuck f d (fun _ => F) (fun v => ⌜ P v ⌝) (fun v => ⌜ Q v ⌝) -∗
+    om_wfree_inst.wait_free_method_gen NotStuck f d fl (fun v => ⌜ P v ⌝) (fun v => ⌜ Q v ⌝) -∗
     WP hl_list_map_cur f l @ CannotFork; NotStuck; τ; ⊤ {{ l', th_phase_frag τ π (1/2)%Qp ∗ ⌜is_hl_list Q l'⌝ }}.
   Proof using. 
     iIntros "CPS PH #F_SPEC".
-    iInduction LIST as [| ] "IH"; rewrite /hl_list_map_cur. 
-    { split_cps "CPS" 10.
-      { rewrite /hl_map_fuel. lia. }
+    iInduction LIST as [| ] "IH".
+    { rewrite /hl_list_map_cur.
+      split_cps "CPS" 10.
+      { rewrite /hl_map_fuel. simpl. lia. }
       iClear "CPS". iRename "CPS'" into "CPS". 
       pure_steps.  
       wp_bind (Rec _ _ _)%E.
@@ -211,11 +221,13 @@ Section ListMapSpec.
       pure_steps. 
       iFrame. iPureIntro.
       by constructor. }
+    rewrite {2}/hl_list_map_cur.
     rewrite /hl_map_fuel.
-    rewrite (Nat.mul_succ_r _ (hl_list_size (InjRV _))).
-    iDestruct (cp_mul_split with "CPS") as "[CPS' CPS]".
+    simpl.
+    rewrite -Nat.add_assoc. 
+    iDestruct (cp_mul_split with "CPS") as "[CPS CPS']".
     iSpecialize ("IH" with "CPS'"). 
-    iDestruct (cp_mul_split with "CPS") as "[CPS CPSf]".
+    iDestruct (cp_mul_split with "CPS") as "[CPSf CPS]".
     simpl. 
     pure_steps. wp_bind (Rec _ _ _)%E. pure_steps.
 
@@ -239,9 +251,9 @@ Section ListMapSpec.
   Qed.
 
   Lemma list_map_spec τ π l
-    f F P Q :
-    {{{ cp_mul π d (hl_map_fuel F l) ∗ th_phase_frag τ π (1/2)%Qp ∗
-        ⌜ is_hl_list P l ⌝ ∗ om_wfree_inst.wait_free_method_gen NotStuck f d (fun _ => F) (fun v => ⌜ P v ⌝) (fun v => ⌜ Q v ⌝) }}}
+    f fl P Q :
+    {{{ cp_mul π d (hl_map_fuel fl l) ∗ th_phase_frag τ π (1/2)%Qp ∗
+        ⌜ is_hl_list P l ⌝ ∗ om_wfree_inst.wait_free_method_gen NotStuck f d fl (fun v => ⌜ P v ⌝) (fun v => ⌜ Q v ⌝) }}}
       hl_list_map_cur f l @ CannotFork; NotStuck; τ; ⊤
     {{{ l', RET l'; th_phase_frag τ π (1/2)%Qp ∗ ⌜ is_hl_list Q l' ⌝ }}}.
   Proof using.
@@ -253,13 +265,13 @@ Section ListMapSpec.
     iIntros "% ([??] & POST)". iApply "POST". iFrame.
   Qed.
 
-  Definition hl_map_unc_fuel (F: nat) (l: val heap_lang) :=
-    5 + hl_map_fuel F l. 
+  Definition hl_map_unc_fuel fl (l: val heap_lang) :=
+    5 + hl_map_fuel fl l. 
 
   Lemma list_map_spec_unc τ π l
-    f F P Q :
-    {{{ cp_mul π d (hl_map_unc_fuel F l) ∗ th_phase_frag τ π (1/2)%Qp ∗ 
-        ⌜ is_hl_list P l ⌝ ∗ om_wfree_inst.wait_free_method_gen NotStuck f d (fun _ => F) (fun v => ⌜ P v ⌝) (fun v => ⌜ Q v ⌝) }}}
+    f fl P Q :
+    {{{ cp_mul π d (hl_map_unc_fuel fl l) ∗ th_phase_frag τ π (1/2)%Qp ∗ 
+        ⌜ is_hl_list P l ⌝ ∗ om_wfree_inst.wait_free_method_gen NotStuck f d fl (fun v => ⌜ P v ⌝) (fun v => ⌜ Q v ⌝) }}}
       hl_list_map (f, l)%V @ CannotFork; NotStuck; τ; ⊤
     {{{ l', RET l'; th_phase_frag τ π (1/2)%Qp ∗ ⌜ is_hl_list Q l' ⌝ }}}.
   Proof using.
@@ -277,29 +289,27 @@ Section ListMapSpec.
   (** ******************** unsafe specs ****************)
 
   Lemma list_map_spec'_unsafe τ π  (l: val heap_lang)
-    f F (* P Q *)
+    f fl (* P Q *)
     (* (LIST: is_hl_list P l) *)
     :
-    cp_mul π d (hl_map_fuel F l) -∗
+    cp_mul π d (hl_map_fuel fl l) -∗
     th_phase_frag τ π (1/2)%Qp -∗
-    om_wfree_inst.wait_free_method_gen MaybeStuck f d (fun _ => F) (fun v => ⌜ True ⌝) (fun v => ⌜ True ⌝) -∗
+    om_wfree_inst.wait_free_method_gen MaybeStuck f d fl (fun v => ⌜ True ⌝) (fun v => ⌜ True ⌝) -∗
     WP hl_list_map_cur f l @ CannotFork; MaybeStuck; τ; ⊤  {{ l', th_phase_frag τ π (1/2)%Qp }}.
   Proof using.
     iIntros "CPS PH #F_SPEC".
 
-    remember (hl_map_fuel F l) as N.
+    remember (hl_map_fuel fl l) as N.
     iInduction N as [ N ] "IH" using lt_wf_ind forall (l HeqN) "CPS".
     iEval (rewrite HeqN) in "CPS".
 
     rewrite {2}/hl_list_map_cur. 
 
     rewrite {2}/hl_map_fuel.
-    rewrite (Nat.mul_succ_r _ (hl_list_size l)).
     iDestruct (cp_mul_split with "CPS") as "[CPS' CPS]".
-    iDestruct (cp_mul_split with "CPS") as "[CPS CPSf]".
 
     wp_bind (App _ f)%E.
-    remember ((K + F) * hl_list_size l) as U. (** to avoid unfolding *)
+    (* remember ((K + F) * hl_list_size l) as U. (** to avoid unfolding *) *)
     pure_step.
     pure_step. iApply wp_value.
     pure_step. 
@@ -330,6 +340,9 @@ Section ListMapSpec.
 
     wp_bind (App f _)%E.
 
+    iDestruct (cp_mul_split with "CPS'") as "[CPS'' CPS']".
+    iDestruct (cp_mul_split with "CPS''") as "[CPSf CPS'']".
+
     iApply (trillium.program_logic.weakestpre.wp_wand with "[CPSf PH]"). 
     { iApply ("F_SPEC" with "[-]").
       { iFrame. }
@@ -344,13 +357,15 @@ Section ListMapSpec.
 
     wp_bind (App _ l')%E. 
 
+    iDestruct (cp_mul_split with "[CPS'' CPS']") as "CPS'".
+    { iFrame. }
     iApply (trillium.program_logic.weakestpre.wp_wand with "[CPS' PH]"). 
     { iApply ("IH" with "[] [] [$]").
       2: iPureIntro; reflexivity.
       { iPureIntro. subst N.
         rewrite /hl_map_fuel. simpl. lia. }
       iApply (cp_mul_weaken with "[$]"); [done| ].
-      subst U. rewrite /hl_map_fuel. simpl. lia. }
+      done. }
 
     iIntros "%v' PH".
     wp_bind (Rec _ _ _)%E. pure_step. iApply wp_value.
@@ -361,9 +376,9 @@ Section ListMapSpec.
   Qed.
 
   Lemma list_map_spec_unsafe τ π l
-    f F :
-    {{{ cp_mul π d (hl_map_fuel F l) ∗ th_phase_frag τ π (1/2)%Qp ∗
-        om_wfree_inst.wait_free_method_gen MaybeStuck f d (fun _ => F) (fun _ => ⌜ True ⌝) (fun _ => ⌜ True ⌝) }}}
+    f fl :
+    {{{ cp_mul π d (hl_map_fuel fl l) ∗ th_phase_frag τ π (1/2)%Qp ∗
+        om_wfree_inst.wait_free_method_gen MaybeStuck f d fl (fun _ => ⌜ True ⌝) (fun _ => ⌜ True ⌝) }}}
       hl_list_map_cur f l @ CannotFork; MaybeStuck ; τ ; ⊤
     {{{ l', RET l'; th_phase_frag τ π (1/2)%Qp }}}.
   Proof using.
@@ -486,14 +501,14 @@ Section ListMapWFree.
   
   Lemma hlm_spec_fix:
   forall {M} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ}
-    (f: val heap_lang) (F_inner: nat),
+    (f: val heap_lang) (fl: val heap_lang -> nat),
     (let _: heap1GS Σ := iem_phys HeapLangEM EM in hlm_mod_inv) ∗
-    wait_free_method_gen NotStuck f d_wfr0 (fun _ => F_inner) (fun _ => True) (fun _ => True)
+    wait_free_method_gen NotStuck f d_wfr0 fl (fun _ => True) (fun _ => True)
       ⊢
       wait_free_method_gen NotStuck
       (λ: "x", hl_list_map_cur f "x")
       d_wfr0
-      (S ∘ (hl_map_fuel F_inner))
+      (S ∘ (hl_map_fuel fl))
       (fun l => ⌜ hlm_arg_restr l ⌝)
       (fun _ => True).
   Proof using.
@@ -515,14 +530,14 @@ Section ListMapWFree.
   
   Lemma hlm_spec_fix_unsafe:
   forall {M} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ}
-    (f: val heap_lang) (F_inner: nat),
+    (f: val heap_lang) (fl: val heap_lang -> nat),
     (let _: heap1GS Σ := iem_phys HeapLangEM EM in hlm_mod_inv) ∗
-    wait_free_method_gen MaybeStuck f d_wfr0 (fun _ => F_inner) (fun _ => True) (fun _ => True)
+    wait_free_method_gen MaybeStuck f d_wfr0 fl (fun _ => True) (fun _ => True)
       ⊢
       wait_free_method_gen MaybeStuck
       (λ: "x", hl_list_map_cur f "x")
       d_wfr0
-      (S ∘ (hl_map_fuel F_inner))
+      (S ∘ (hl_map_fuel fl))
       (fun l => True)
       (fun _ => True).
   Proof using.
@@ -553,14 +568,12 @@ Section ListMapWFree.
     by iApply list_map_phys_spec'.
   Qed.
 
-  Program Definition hlm_WF_fix_spec_unsafe f (WFf: WaitFreeSpec MaybeStuck any_arg f) F
-    (* TODO: try to lift this restriction *)
-    (F_FUEL: wfs_F _ _ _ WFf = fun _ => F)
+  Program Definition hlm_WF_fix_spec_unsafe f (WFf: WaitFreeSpec MaybeStuck any_arg f)
     :
     WaitFreeSpec MaybeStuck any_arg (λ: "x", hl_list_map_cur f "x")%V := {|
     wfs_is_init_st := wfs_is_init_st _ _ _ WFf;
     wfs_mod_inv Σ _ _ := (hlm_mod_inv ∗ wfs_mod_inv _ _ _ WFf)%I;
-    wfs_F := S ∘ (hl_map_fuel F);
+    wfs_F := S ∘ (hl_map_fuel (wfs_F _ _ _ WFf));
   |}.
   Next Obligation.
     intros. simpl.
@@ -578,7 +591,7 @@ Section ListMapWFree.
       rewrite /wait_free_method_gen. iIntros (**).
       iIntros (Ψ) "!> (CP & PH & _) POST".
       iApply (wfs_spec _ _ _ WFf with "[$] [-POST]").
-      { iFrame. rewrite F_FUEL. iApply "CP". }
+      { iFrame. }
       iNext. iIntros "% PH". iApply "POST". by iFrame. }
     { iFrame. }
     iNext. iIntros "% (PH & _)". iApply "POST". by iFrame.

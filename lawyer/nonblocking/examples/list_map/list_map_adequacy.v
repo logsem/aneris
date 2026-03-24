@@ -16,9 +16,8 @@ Proof using.
   2: done.
   Unshelve.
   2: { unshelve eapply hlm_WF_fix_spec_unsafe.
-       { apply om_wfree_inst.WFS_weaken.
-         apply counter_WF_spec. }
-       2: { simpl. reflexivity. } }
+       apply om_wfree_inst.WFS_weaken.
+       apply counter_WF_spec. }
   simpl. done.
 Qed.
 
