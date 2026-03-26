@@ -102,6 +102,7 @@ cd paper_src
 # make
 pdflatex paper.tex
 pdflatex paper.tex
+pdflatex paper.tex # apparently it's required for the correct page count
 
 echo "Submission material is built in $WORKING_DIR"
 cat $WORKING_DIR/$COMMITS_LOG
