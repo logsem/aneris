@@ -107,14 +107,17 @@ Our development relies on the axiom of choice, law of excluded middle, functiona
 
 - Stuckness variations of definitions related to wait-freedom (Definitions 6 and those mentioned below it): they are specific cases of definitions used for Section 2.1 with stuckness bit set to `MaybeStuck`.
 - Adequacy theorem for possibly-stuck wait-freedom: instantiation of `lawyer/nonblocking/wfree_adequacy.v`, theorem `wfree_is_wait_free` with stuckness bit set to `MaybeStuck`.
-- Modular verification of `list_map`: `lawyer/nonblocking/examples/list_map/list_map.v`, definition `hlm_WF_fix_spec_unsafe`.
+- Modular verification of `list_map`: `lawyer/nonblocking/examples/list_map/list_map.v`
+  - `list_map` implementation (Figure 6a): `hl_list_map_cur`.
+  - Modular proof of specification: `hlm_WF_fix_spec_unsafe`. Note that we verify wait-freedom for eta-expanded `hl_list_map_cur f` due to the lambda-expression restriction (mentioned above).
 - Possibly-stuck wait-fredom of `list_map (incr l)`: `lawyer/nonblocking/examples/list_map/list_map_adequacy.v`.
+- Fuel function: `wfs_F` component of `WaitFreeSpec`.
 
 #### Section 5.2
 
 Note that throughout the restricted wait-freedom development we use multisets of operations instead of lists.
 
-- Implementation of the queue algorithm in our language: 
+- Implementation of the queue algorithm (Figure 7) in our language: 
   The methods are scattered across multiple files in `lawyer/nonblocking/examples/queue`:
   - `dequeuer/dequeue.v`, definition `dequeue`
   - `dequeuer/read_head_dequeuer.v`, definition `read_head_dequeuer`
@@ -127,7 +130,7 @@ Note that throughout the restricted wait-freedom development we use multisets of
 - Specification of restricted wait-freedom (Definition 8): `lawyer/nonblocking/tokens/om_wfree_inst_tokens.v`, definition `WaitFreeSpecToken`.
 - Definition and lemmas about tokens resource algebra: `lawyer/nonblocking/tokens/tokens_ra.v`
 - Adequacy theorem for restricted wait-freedom (Theorem 9): `lawyer/nonblocking/tokens/wfree_adequacy_tokens.v`, theorem `wfree_token_is_wait_free_restr`.
-- Restricted wait-freedom of queue: `lawyer/nonblocking/examples/queue/simple_queue_adequacy.v`
+- Restricted wait-freedom of the queue algorithm: `lawyer/nonblocking/examples/queue/simple_queue_adequacy.v`
 
 ### Section 6
 
@@ -136,12 +139,12 @@ Note that throughout the restricted wait-freedom development we use multisets of
 - Reduction to proving termination: it is scattered across multiple lemmas used to prove `wfree_is_wait_free` mentioned above.
   In particular, see the lemmas in `WFAdequacy` section which fixes the parameters of an infinite call.
 - Definition of progress resource: `trillium/trillium/program_logic/adequacy_cond.v`, record `ProgressResource`. Note that it is additionally parameterized with stuckness and forking bits (and list of postconditions mentioned in the appendix).
-- Conditional adequacy theorem of Trillium: `trillium/trillium/program_logic/simulation_adequacy_em_cond.v`, theorem `PR_strong_simulation_adequacy_traces_multiple`.
+- Conditional adequacy theorem of Trillium (Theorem 10): `trillium/trillium/program_logic/simulation_adequacy_em_cond.v`, theorem `PR_strong_simulation_adequacy_traces_multiple`.
 - Refinement relation for wait-freedom: `lawyer/nonblocking/wfree_adequacy_lib.v`, definition `obls_sim_rel_wfree`
 
 #### Section 6.2
 - Expression relation: `lawyer/nonblocking/logrel/logrel.v`, definition `interp_expr`
-- Value relation: `lawyer/nonblocking/logrel/logrel.v`, definition `interp`
+- Value relation (Definition 11): `lawyer/nonblocking/logrel/logrel.v`, definition `interp`
 - Fundamental theorem (Theorem 12): `lawyer/nonblocking/logrel/fundamental.v`, theorem `fundamental`
 - Robust safety of the wait-free operation (Theorem 13): `lawyer/nonblocking/wfree_adequacy.v`, definition `init_wptp_wfree`
 
