@@ -10,7 +10,6 @@ Close Scope Z.
 
 From fairness Require Import fin_branch. 
 
-(* TODO: move *)
 Lemma list_approx_impl {A: Type} (P Q: A -> Prop)
   (IMPL: forall a, Q a -> P a):
   list_approx P -> list_approx Q.
@@ -19,8 +18,6 @@ Proof using.
   intros. set_solver.
 Qed.
 
-(* TODO: move, use to prove pcr_dec and not_stuck_dec (for heap_lang) *)
-(* TODO: simplify *)
 Lemma eq_fill_item_fin e: list_approx (fun xy => fill_item xy.1 xy.2 = e).
 Proof using.
   eapply list_approx_impl with (P := fun '(Ki, e') => under_ctx_item Ki e = Some e').
@@ -100,7 +97,6 @@ Proof using.
 Qed.
 
 
-(* TODO: upstream? *)
 Lemma rev_empty_inv {A: Type} (l: list A):
   rev l = [] <-> l = [].
 Proof using.
@@ -109,7 +105,6 @@ Proof using.
   lia.
 Qed.
 
-(* TODO: upstream? *)
 Lemma list_empty_or_snoc {A: Type} (l: list A):
   l = [] \/ exists t l', l = l' ++ [t].
 Proof using.
@@ -168,7 +163,6 @@ Proof using.
 
   exists ((ectx_emp, e) :: flat_map id extracted).
   intros [K e'] EQ.
-  (* subst.  *)
   simpl in EQ.
   destruct (list_empty_or_snoc K) as [-> | (t & K' & ->)].
   { set_solver. }
@@ -239,7 +233,6 @@ Section CallInTrace.
     forall k ck, i <= k -> 
             tr S!! k = Some ck ->
             locale_enabled_safe τ ck ->
-            (* ¬ (exists j, j <= k /\ has_return_at tr (TraceCtx i tpc) j) -> *)
             no_return_before tr tpc i k ->
     exists d cd, tr S!! (k + d) = Some cd /\
             fairness_sat locale_enabled_safe tid_match τ cd (tr L!! (k + d)). 
@@ -414,7 +407,6 @@ Section CallInTrace.
   Proof using.
     rewrite /wait_free /wait_free_strong.
     repeat (apply forall_proper; intros).
-    (* destruct x3 as [? [??]].  *)
     split; intros RET **; apply RET; auto.
     all: eapply fair_call_strenghten; eauto;
       rewrite H0 /=; exists x6; eauto.
@@ -479,7 +471,6 @@ End CallInTrace.
 Section RestrWFree.
 
   Definition valid_init_tpool_restr (tp: list expr) (MS: gmultiset val) :=
-    (* TODO: allow "smaller" thread pools too *)
     Forall2 (valid_op_client no_forks) (elements MS) tp.
 
   (** TODO: account for multiple m's in unrestricted wait-freedom too *)
@@ -495,7 +486,6 @@ End RestrWFree.
 
 Section FitsInfCall.
 
-  (* TODO: do we need a similar def for infinite traces? *)
   Definition previous_calls_return (etr: execution_trace heap_lang) i τ m :=
     forall j K, let tpc := TpoolCtx K τ in
            j < i ->
@@ -656,7 +646,6 @@ Section FitsInfCall.
       specialize (NVAL i). erewrite LOOKUP in NVAL; eauto.
     - intros LEN j K' ? PREV CALL. 
       destruct (etr !! j) as [c0| ] eqn:JTH; [| done]. simpl in CALL.
-      (* destruct CALL as (a & CALL). *)
       ospecialize (MAIN _ j K' _ _).
       1, 2: simpl in *; lia.
       { erewrite LOOKUP; eauto. }

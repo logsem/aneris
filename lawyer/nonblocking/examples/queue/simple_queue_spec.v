@@ -98,6 +98,6 @@ Section QueueSpec.
     wfst_spec _ _ _ _ _ _ := queue_specs;
   |}.
 
-  (* Print Assumptions SimpleQueue_WaitFreeToken.  *)
+  (** Print Assumptions SimpleQueue_WaitFreeToken.  *)
 
 End QueueSpec. 

@@ -14,10 +14,6 @@ Section Pwp.
   Definition LoopingModel: Model :=
     {| mstate := unit; mlabel := unit; mtrans := fun _ _ _ => True |}.
 
-  (* Definition pwp {Λ: language} {Σ: gFunctors} := @wp Λ (iProp Σ) LoopingModel. *)
-  (* Definition pwp := @wp (A := LoopingModel). *)
-  (* Definition pwp {Λ: language} {PROP} := @wp Λ PROP LoopingModel. *)
-  (* Global Arguments pwp {_ _ _}.  wp *)
   Definition pwp `{!irisG Λ LoopingModel Σ} :=
     @wp Λ (iProp Σ) stuckness forks_bit _.
 
@@ -73,7 +69,7 @@ Lemma pwp_MU_ctx_take_step {Σ} `{Hinv : @IEMGS heap_lang M HeapLangEM EM Σ}
       ([∗ list] i↦ef ∈ efs,
         let τf := locale_of (tp1 ++ E1 :: tp2 ++ take i efs) ef in
         (let _ := IEMGS_into_Looping Hinv si_add in
-         pwp s f ⊤ τf ef (fork_post τf) (* for pwp *)        )
+         pwp s f ⊤ τf ef (fork_post τf) )
       ) ∗
       ⌜ f = CannotFork -> efs = [] ⌝ ∗ 
       P.
@@ -114,7 +110,6 @@ Qed.
 
 Definition si_add_none {Λ} {Σ} (etr: execution_trace Λ): iProp Σ := emp%I. 
 
-(* TODO: move? *)
 Definition IEMGS_into_Looping_simpl {Σ} `(Hinv : @IEMGS Λ M LG EM Σ) :=
   IEMGS_into_Looping Hinv si_add_none.
 
@@ -122,7 +117,6 @@ Definition tok_add_pres `{invGS_gen HasNoLc Σ, heap1GS Σ}
   (tok: iProp Σ) (si_add: execution_trace heap_lang -> iProp Σ) :=
   forall etr τ c, tok -∗ si_add etr ==∗ tok ∗ si_add (trace_extend etr τ c). 
 
-(* TODO: move? try to unify with sswp_MU_wp_fupd  *)
 Lemma sswp_pwp_fupd_pres {Σ} {iG: invGS_gen HasNoLc Σ} {hG: heap1GS Σ}
   s f
   E E' τ e Φ
@@ -207,7 +201,6 @@ Proof using.
   iIntros. by do 2 iModIntro.
 Qed.
 
-(* TODO: ? generalize *)
 Lemma pre_step_looping_wfree_elim {Σ M} {EM: ExecutionModel heap_lang M}
   {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
   (P: iProp Σ):

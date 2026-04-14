@@ -108,7 +108,6 @@ End MaxExact.
 Section ListToIMap.
   Context {A: Type}.
 
-  (* TODO: rename *)
   Definition list_to_imap: list A -> gmap nat A :=
     list_to_map ∘ imap pair.
 
@@ -185,7 +184,6 @@ Section HistQueue.
     iDestruct (own_valid with "OWN") as %V%auth_both_valid_discrete.
     iPureIntro.
 
-    (* TODO: make a lemma, unify with similar proof in signal_map *)
     destruct V as [SUB V].
     apply singleton_included_l in SUB as (hn_ & ITH & LE).
     rewrite Some_included_total in LE.
@@ -209,7 +207,6 @@ Section ReadProtocol.
 
   Inductive read_state_proc := rsp_going | rsp_completed | rsp_protected. 
 
-  (* TODO: rename rs_canceled to rs_prevented *)
   Inductive read_state :=
     rs_init | rs_aborted | rs_canceled | rs_proc (orsp: option read_state_proc).
 
@@ -283,10 +280,6 @@ Section ReadProtocol.
       | [H : Cinr _ ≡ _ |- _  ] => csum_option_inv_act H
       | [H : Some _ ≡ _ |- _  ] => csum_option_inv_act H
       | [H : None ≡ _ |- _  ] => csum_option_inv_act H
-      (* | [H : Cinl _ = _ |- _  ] => csum_option_inv_act H *)
-      (* | [H : Cinr _ = _ |- _  ] => csum_option_inv_act H *)
-      (* | [H : Some _ = _ |- _  ] => csum_option_inv_act H *)
-      (* | [H : None = _ |- _  ] => csum_option_inv_act H *)
   end). 
 
   Global Instance rs2cmra_inj: Inj eq equiv rs2cmra.
@@ -449,8 +442,6 @@ Section ReadProtocol.
     intros. apply rs_le_incl. by apply Some_included_mono.
   Qed.
 
-  (* Ltac csum_valid_simpl := *)
-  (*   repeat (rewrite Cinl_valid || rewrite Cinr_valid || rewrite -Some_op Some_valid || rewrite op_None_right_id || rewrite op_None_left_id). *)
   Ltac csum_valid_simpl := repeat (rewrite
     ?Cinl_valid ?Cinr_valid 
     -?Some_op ?Some_valid
@@ -504,10 +495,7 @@ Section ReadProtocol.
     rs_step (rs_proc (Some rsp1)) (rs_proc (Some rsp2))
   . 
 
-  (* TODO: don't want to deal with updates to None rsp
-     and arbitrary jumps from init to cancel/prot *)
   Lemma rs_step_update rs1 rs2:
-    (* rs_step rs1 rs2 <-> rs2cmra rs1 ~~> rs2cmra rs2. *)
     rs_step rs1 rs2 -> rs2cmra rs1 ~~> rs2cmra rs2.
   Proof using.
     intros STEP. inversion STEP.
@@ -599,35 +587,16 @@ Section ReadsHistory.
   Definition ith_read `{ReadHistG Σ} i r b :=
     own rh_γ__map (◯ {[ i := (Some (to_agree r, MaxNat b), None) ]}).
 
-  (* Lemma read_hist_init `{ReadHistPreG Σ} (hist: read_hist) *)
-  (*   (RS_INIT: forall i op, hist !! i = Some op -> op.2 = rs_init): *)
-  (*   ⊢ (|==> ∃ (_: ReadHistG Σ), read_hist_auth hist)%I. *)
-  (* Proof using. *)
-  (*   iMod (own_alloc (let hist' := (((fun '(r, b, p) => (Some (to_agree r, MaxNat b), Some p)) <$> hist): gmapUR _ _) in *)
-  (*                    (● hist' ⋅ ◯ hist')) *)
-  (*        ) as (γ) "X". *)
-  (*   { simpl. apply auth_both_valid_2; [| done]. *)
-  (*     (* HIDE: TODO: find/make lemma, fix similar thing in obligations_em *) *)
-  (*     intros s. destruct lookup eqn:L; [| done]. *)
-  (*     apply lookup_fmap_Some in L.  *)
-  (*     destruct L as ([[l b] p]&<-&?). *)
-  (*     apply Some_valid. split; apply Some_valid; try done. *)
-  (*     apply RS_INIT in H0. simpl in H0. by subst. } *)
-  (*   iModIntro. iExists {| rh_γ__map := γ; |}. done. *)
-  (* Qed. *)
-
   Context `{ReadHistG Σ}. 
 
   Lemma ith_read_hist_compat hist i r b:
     read_hist_auth hist -∗ ith_read i r b -∗ ⌜ exists b' p, hist !! i = Some ((r, b'), p) /\ b <= b' ⌝.
   Proof using.
-    (* TODO: can simplify this proof *)
     iIntros "[X _] Y". iCombine "X Y" as "X". iDestruct (own_valid with "X") as %V.
     iPureIntro.
     apply auth_both_valid_discrete in V as [SUB V].
     apply @singleton_included_l in SUB. destruct SUB as ([l' y]&SIG'&LE').
     
-    (* TODO: make a lemma, unify with similar proof in signal_map and ?obligations_resources *)
     simpl in LE'. rewrite -SIG' in LE'.
     rewrite lookup_fmap in LE'.
     destruct (hist !! i) as [[[??]?]|] eqn:LL.
@@ -638,7 +607,6 @@ Section ReadsHistory.
     rewrite Some_included_total in LE'.
     apply pair_included in LE' as [LE1 LE2].
     apply to_agree_included in LE1. rewrite leibniz_equiv_iff in LE1. subst.
-    (****)
 
     do 2 eexists. split; [reflexivity| ].
     by rewrite max_nat_included /= in LE2. 
@@ -655,7 +623,6 @@ Section ReadsHistory.
     apply auth_both_valid_discrete in V as [SUB V].
     apply @singleton_included_l in SUB. destruct SUB as ([l' y]&SIG'&LE').
 
-    (* TODO: make a lemma, unify with similar proof in signal_map and ?obligations_resources *)
     simpl in LE'. rewrite -SIG' in LE'.
     rewrite lookup_fmap in LE'.
     destruct (hist !! i) as [[[??]?]|] eqn:LL.
@@ -663,7 +630,6 @@ Section ReadsHistory.
     2: { apply option_included_total in LE' as [?|?]; set_solver. }
     rewrite Some_included_total in LE'.
     apply pair_included in LE' as [_ LE'].
-    (****)
     eexists. split; [reflexivity| ]. simpl.     
     rewrite Some_included in LE'. destruct LE'.
     - apply rs2cmra_inj in H0. subst. econstructor. 
@@ -703,7 +669,6 @@ Section ReadsHistory.
   (** The ITH hypothesis (and in general not hiding the details of hist and hist')
       is needed, because the obtained hist' must satisfy read_hist_wf,
       proving which requires knowing the exact shape of hist'. *)
-  (* TODO: try to make read_hist_wf part of read_hist? *)
   Lemma read_hist_update' hist i r ba pa b' p p'
     (RS_STEP: rs_step p p')
     (ITH: hist !! i = Some (r, ba, pa))
@@ -714,7 +679,6 @@ Section ReadsHistory.
   Proof using.
     iIntros "AUTH RP".
     iDestruct (ith_rp_hist_compat with "[$] [$]") as "(%x & %ITH' & %LE)".
-    (* iDestruct (ith_read_hist_compat with "[$] [$]") as "(%ba & %pa & %ITH' & %_)". *)
     rewrite ITH in ITH'. inversion ITH'. subst. clear ITH'.    
     simpl in LE.
 

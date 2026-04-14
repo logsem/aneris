@@ -32,7 +32,6 @@ Section EnqueueLawyer.
   Notation "'Level'" := (om_hl_Level).  
 
   Context {Σ} {OHE: OM_HL_Env OP EM Σ}.
-  (* Existing Instance OHE.  *)
   Context {QL: QueueG Σ}.
   Context {SQT: SimpleQueueTokens Σ}.
   Context {q_sq: SimpleQueue}. 
@@ -221,7 +220,6 @@ Section EnqueueLawyer.
 
     wp_bind (! _)%E.
     split_cps "CPS" 1.
-    (* replace Tail with (simple_queue.Tail q_sq) by (by rewrite Q_SQ). *)
     iApply (start_enqueue_spec with "[$INV $CPS' $PH $TOK]").
     iIntros "!> %pt (PH & TL & (%t & %br & RH))".
 
@@ -233,7 +231,6 @@ Section EnqueueLawyer.
     iIntros "!> (PH & TL & RH)". 
     
     wp_bind (Rec _ _ _)%E. pure_steps.
-    (* rewrite Q_SQ /=.  *)
     iApply wp_fupd.
     split_cps "CPS" 1.
     iApply (update_tail_spec with "[-POST CPS]").
@@ -273,8 +270,6 @@ Section EnqueuePwp.
     destruct nd. iIntros (Φ) "(V & NXT) POST".
     rewrite /set_node.
 
-    (* TODO: fix tactics *)
-    (* pwp_pure_steps. *)
     wp_bind (App _ #pt)%E.
     pwp_pure_steps. 
     wp_bind (App _ v)%E.
@@ -302,7 +297,6 @@ Section EnqueuePwp.
     wp_bind (Rec _ _ _)%E. pwp_pure_steps.
     rewrite /set_next.
 
-    (* pwp_pure_steps. *)
     wp_bind (App _ #pt)%E. pwp_pure_steps. 
 
     wp_bind (_ +ₗ _)%E.
@@ -338,7 +332,6 @@ Section EnqueuePwp.
 
     wp_bind (Rec _ _ _)%E. pwp_pure_steps.
     rewrite /set_next.
-    (* pwp_pure_steps. *)
     wp_bind (App _ #pt)%E. pwp_pure_steps. 
     wp_bind (App _ #_)%E. pwp_pure_steps. 
 
@@ -389,7 +382,6 @@ Section EnqueuePwp.
     wp_bind (App _ v)%E. pwp_pure_steps.
 
     rewrite /set_val.
-    (* pwp_pure_steps. *)
     wp_bind (App _ #pt)%E. pwp_pure_steps.
     wp_bind (App _ v)%E. pwp_pure_steps.
 

@@ -30,7 +30,6 @@ Proof.
   - by apply elem_of_list_In.
 Qed.
 
-(* TODO: find existing*)
 Lemma nth_error_lookup {A: Type} (l: list A) i:
   nth_error l i = l !! i.
 Proof using.

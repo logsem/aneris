@@ -63,7 +63,6 @@ Section ThreadPoolContext.
     ¬ expr_at κ ([], σ) e.
   Proof using. destruct κ. rewrite /expr_at. set_solver. Qed. 
 
-  (* TODO: use in more places *)
   Lemma nval_enabled K τ c
     (NVAL: nval_at (TpoolCtx K τ) c):
     locale_enabled τ c.
@@ -78,7 +77,6 @@ End ThreadPoolContext.
 Section StuckTid.
   Context `{EqDecision (locale Λ)}.
 
-(* TODO: move all of this *)
   Definition not_stuck_tid (τ: locale Λ) (c: cfg Λ) :=
     exists e, from_locale c.1 τ = Some e /\ not_stuck e c.2.
 
@@ -96,7 +94,6 @@ Section StuckTid.
       intros (?&?&?). edestruct H0; eauto. congruence.   
   Qed.
     
-  (* TODO: should be provable for heap_lang *)
   Global Instance not_stuck_dec e (c: language.state Λ): Decision (not_stuck e c).
   Proof using.
     rewrite /not_stuck.
@@ -104,35 +101,17 @@ Section StuckTid.
     rewrite /reducible.
   Abort. 
 
-  (* Global Instance not_stuck_tid_dec `{EqDecision (expr Λ)} τ c: Decision (not_stuck_tid τ c). *)
-  (* Proof using. *)
-  (*   rewrite /not_stuck_tid. *)
-  (*   destruct (from_locale c.1 τ) as [e| ] eqn:TT. *)
-  (*   2: right; by intros (?&?&?). *)
-  (*   destruct (decide (not_stuck e c.2)). *)
-  (*   - left. eauto. *)
-  (*   - right; intros (?&?&?). congruence. *)
-  (* Qed. *)
-
 End StuckTid.
 
 
 Section TraceContext.
   Context `{EqDecision (locale Λ)}.
 
-  (* Record trace_ctx := TraceCtx { *)
-  (*   tctx_index: nat; *)
-  (*   tctx_tid: locale Λ; *)
-  (*   tctx_ctx: ectx Λ; *)
-  (* }. *)
   Record trace_ctx := TraceCtx {
     tctx_index: nat;
     tctx_tpctx: @tpool_ctx Λ;
   }.
   
   Context (tr: extrace Λ). 
-
-  (* Definition expr_under '(TraceCtx i τ K) (e: expr Λ) := *)
-  (*   exists c, tr S!! i = Some c /\ from_locale c.1 τ = Some (ectx_fill K e). *)
 
 End TraceContext.

@@ -16,7 +16,6 @@ Global Instance mt_sub: forall Σ, subG mt_Σ Σ -> MethodTokenPre Σ.
 Proof using. solve_inG. Qed.
 
 
-(* TODO: generalize, upstream? *)
 Section TokensRA.
   Context `{MethodToken MS Σ}.
   

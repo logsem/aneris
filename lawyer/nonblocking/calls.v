@@ -61,7 +61,6 @@ Section UnderCtx.
     - destruct e3; by apply not_eq_helper || solve_iff.
   Qed.
 
-  (* TODO: move *)
   Lemma fill_item_nval_strong e1 e2 i1 i2
     (NVAL1: to_val e1 = None) (NVAL2: to_val e2 = None)
     (EQ: fill_item i1 e1 = fill_item i2 e2):
@@ -95,15 +94,12 @@ Section UnderCtx.
 
   From lawyer.nonblocking.logrel Require Import substitutions.
 
-  (* TODO: upstream most of fill/fill_item lemmas below *)
-  (* TODO: move, find existing? *)
   Lemma fill_app K1 K2 (e: expr):
     fill K1 (fill K2 e) = fill (K2 ++ K1) e. 
   Proof using.
     rewrite /fill. by rewrite foldl_app.
   Qed.
 
-  (* TODO: move, find existing? *)
   Lemma fill_item_fill_1 i (e: expr):
     fill_item i e = fill [i] e. 
   Proof using. done. Qed.
@@ -121,7 +117,7 @@ Section UnderCtx.
     generalize dependent i. clear e. pattern K. apply rev_ind; clear K. 
     { done. }
     intros. simpl. 
-    (* we really only need the tail element, IH doesn't matter *)
+    (** we really only need the tail element, IH doesn't matter *)
     clear H. 
     rewrite length_app. simpl.
     rewrite app_comm_cons.
@@ -165,7 +161,6 @@ Section UnderCtx.
     by apply fill_depth'.
   Qed.
 
-  (* TODO: move *)
   Lemma ectx_fill_ctx_nval e
     (NVAL: to_val e = None):
     Inj eq eq (flip fill e).
@@ -252,9 +247,9 @@ End UnderCtx.
 Section NestedCalls.
   Context (f x: binder) (b: expr). 
   Let m := RecV f x b. 
-  (* TODO: the restriction to RecV is reasonable,
-     but is only needed for premise of head_redex_unique.
-     What changes if (m a) is not reducible (i.e. m ≠ RecV)? *)
+  (** The restriction to RecV is reasonable,
+      but is only needed for premise of head_redex_unique.
+      What changes if (m a) is not reducible (i.e. m ≠ RecV)? *)
 
   Definition empty_state := Build_state ∅ ∅. 
 
@@ -273,12 +268,6 @@ Section NestedCalls.
     forall (K1 K2: ectx heap_lang), comp_ectx K1 K2 = K2 ++ K1.
   Proof using. done. Qed.
 
-      (* fill K' e1' = fill K_redex e1_redex → (* K' = K1, K_redex = K2 *) *)
-      (* to_val e1' = None → (* e1' = e1 ∉ Val *) *)
-      (* head_step e1_redex σ1 e2 σ2 efs → (* e1_redex = m a2 *) *)
-      (* ∃ K'', K_redex = comp_ectx K' K''; (* ==> K2 is deeper than K1 *) *)
-
-  (* TODO: rename? *)
   Lemma call_ctx_is_deeper K1 e1 K2 (a2: val)
     (EQ: fill K1 e1 = fill K2 (m a2))
     (NVAL1: to_val e1 = None):
@@ -290,7 +279,6 @@ Section NestedCalls.
     Unshelve. exact empty_state.
   Qed.
 
-  (* TODO: move  *)
   Lemma locale_of_hl_expr_irrel tp e e':
     locale_of tp e = locale_of tp e'.
   Proof using. done. Qed. 
@@ -367,7 +355,6 @@ Section NestedCalls.
     (CALL1: call_at (TpoolCtx K1 τ) c1 m a1 (APP := App))
     (ST2: etr S!! i2 = Some c2)
     (CALL2: call_at (TpoolCtx K2 τ) c2 m a2 (APP := App))
-    (* (NESTED: nval_at *)
     (NESTED: exists K', K2 = ectx_comp K1 K')
     (AFTER: i1 <= i2)
     (ST1': etr S!! r1 = Some c1')
@@ -391,7 +378,6 @@ Section NestedCalls.
     4: by apply RET2.
     3: by apply H0.
     all: try lia.
-    (* TODO: get rid of it *)
     Unshelve. eauto.
   Qed.                                    
 

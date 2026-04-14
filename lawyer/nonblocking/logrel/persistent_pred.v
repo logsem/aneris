@@ -6,7 +6,6 @@ From iris.prelude Require Import options.
 Section persistent_pred.
   Context (A : Type) (PROP : bi).
 
-  (* The domain of semantic types: persistent Iris predicates type A. *)
   Record persistent_pred := PersPred {
     pers_pred_car :> A → PROP;
     pers_pred_persistent x : Persistent (pers_pred_car x)

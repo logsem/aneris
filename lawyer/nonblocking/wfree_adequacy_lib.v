@@ -39,11 +39,8 @@ Section Lib.
     update_obls obls' $ update_sigs sigs' $ update_eps eps' δ0. 
 
   Lemma init_om_wfree_is_init
-    (* F TI d0 d1 τi l0 ii *)
     c:
-    obls_is_init_st c (init_om_wfree_state 
-                         (* F TI d0 d1 τi l0 ii  *)
-                         c).
+    obls_is_init_st c (init_om_wfree_state c).
   Proof using.
     clear. 
     red. rewrite /init_om_wfree_state. split.
@@ -158,7 +155,6 @@ Section Lib.
     iApply big_sepM_dom. iApply (big_sepM_impl with "[$]"). set_solver.  
   Qed.
 
-  (* TODO: move *)
   Lemma RecV_App_not_stuck (mm a: val) c e τ K
     (M_FUN: ∃ f x b, mm = (rec: f x := b)%V)
     (EXPR: from_locale c.1 τ = Some e)
@@ -192,10 +188,6 @@ Section Lib.
   Lemma ic_helper:
     ic = {| tctx_tpctx := tpc; tctx_index := ii |}.
   Proof using. clear.  by destruct ic. Qed.
-
-  (* Local Lemma tpc_helper: *)
-  (*   tpc = {| tpctx_ctx := Ki; tpctx_tid := τi |}. *)
-  (* Proof using. clear. by destruct ic as [? []]. Qed. *)
 
   Lemma om_trace_fair 
     (extr: extrace heap_lang)
@@ -245,7 +237,7 @@ Section Lib.
     assert (exists cm: cfg heap_lang, extr S!! (max n N) = Some cm) as [cm MTH].
     { edestruct (Nat.max_spec_le n N) as [[? ->] | [? ->]]; eauto. }
     destruct (decide (locale_enabled τi cm)) as [ENm | DISm].
-    2: { (* there must've been a step between n and m*)
+    2: { 
       opose proof * (enabled_disabled_step_between extr n) as STEP; eauto.
       { lia. }
       destruct STEP as (k & [LE BOUND] & STEP).
@@ -279,7 +271,6 @@ Section Lib.
     apply PROGRESS. lia. 
   Qed.
 
-  (* TODO: ? move, generalize *)
   Global Instance under_ctx_ex_dec (extr: extrace heap_lang) e':
     Decision (∃ e, from_locale (trfirst extr).1 τi = Some e ∧ under_ctx Ki e = Some e').
   Proof using.
@@ -315,10 +306,8 @@ Section Lib.
     set_solver.
   Qed.
 
-  (* TODO: find existing *)
   Global Instance stuckness_eqdec: EqDecision stuckness.
   Proof using. red. intros [] []; (by left) || (by right). Qed.
-
 
   Lemma not_all_ex_not_iff: ∀ (A : Type) (P : A → Prop),
       ¬ (∀ x : A, P x) <-> ∃ x : A, ¬ P x.
@@ -353,8 +342,6 @@ Section Lib.
     pose proof EXPR as [eτi TI]%expr_at_in_locales%locales_of_cfg_Some.
     2: by apply c1. 
     red in EXPR. destruct tpc_ as [K' τ'].  
-    (* pose proof EXPR as [eτi TI]%expr_at_in_locales%locales_of_cfg_Some. *)
-    (* 2: { by apply c1. } *)
     inversion STEP. subst. inversion H1.
     2: { by subst. }
 
@@ -410,7 +397,6 @@ Section Lib.
     do 3 eexists. split; eauto. lia.
   Qed.
 
-  (* TODO: try to remove duplication between this and previous_calls_return *)
   Definition previous_calls_return_tr (tr: extrace heap_lang) i τ m :=
     forall j K, let tpc := TpoolCtx K τ in
            j < i ->
@@ -478,7 +464,6 @@ Section Lib.
         eapply val_preserved_trace in LE; eauto.
         rewrite ITH /= in LE.
 
-        (* TODO: lemma? *)
         do 2 red in CALL. rewrite /tpc tc_helper in CALL.
         rewrite LE in CALL. inversion CALL.
         apply Some_inj in CALL. 
@@ -503,7 +488,6 @@ Section Lib.
       intros j K PREV CALL.
       destruct (trace_take_fwd n extr !! j) eqn:JJ; rewrite JJ /= // in CALL.
       pose proof (trace_take_fwd_length_bound n extr). 
-      (* apply trace_take_fwd_lookup_Some in JJ. *)
       red in MAIN. eapply MAIN in PREV.
       2: { apply trace_take_fwd_lookup_Some in JJ. rewrite JJ. eauto. }
       destruct PREV as (r&PREV'&RET).
@@ -559,7 +543,6 @@ Section Lib.
   Theorem om_simulation_adequacy_model_trace_multiple_waitfree Σ
         `{hPre: @heapGpreS Σ M EM} (s: stuckness) f
         (es: list (expr heap_lang)) σ1 (s1: mstate M) p
-        (* s' ic *)
         m ai
         (INIT: em_is_init_st (es, σ1) s1 (ExecutionModel := EM))
         (extr : extrace heap_lang)
@@ -572,14 +555,11 @@ Section Lib.
     ) \/
     (exists k, ¬ (fits_inf_call ic m ai) (trace_take_fwd k extr)).
   Proof using.
-
-    (* Set Printing Implicit. *)
     intros PREM.
 
     destruct (decide (1 <= length es)).
     2: { clear PREM.
          
-      (* TODO: make a lemma *)
          assert (length es = 0) by lia.
          assert (es = []) as -> by (destruct es; simpl in H; lia || done).
          opose proof * extrace_valid_empty as ->; eauto.
@@ -668,12 +648,10 @@ Lemma find_main_call etr i K τ m a ci
     fair_call etr tpc' i' /\ etr S!! i' = Some ci' /\ call_at tpc' ci' m a' (APP := App) /\
     previous_calls_return_tr etr i' τ m /\
     i' <= i /\
-      (* nval_at tpc' ci /\ *)
       no_return_before etr tpc' i' i.
 Proof using.
   subst tpc.
   assert (exists j cj Kj aj, fair_call etr {| tpctx_ctx := Kj; tpctx_tid := τ |} j /\ etr S!! j = Some cj /\ call_at {| tpctx_ctx := Kj; tpctx_tid := τ |} cj m aj (APP := App) /\ j ≤ i ∧
-    (* nval_at {| tpctx_ctx := Kj; tpctx_tid := τ |} ci /\ *)
     no_return_before etr {| tpctx_ctx := Kj; tpctx_tid := τ |} j i /\
     ¬ has_return etr (TraceCtx j {| tpctx_ctx := Kj; tpctx_tid := τ |})) as [j JJ].
   { do 4 eexists. repeat split; eauto.
@@ -734,8 +712,6 @@ Proof using.
        rewrite /no_return_before in NNVAL.
        apply NNP_P in NNVAL.
 
-       (* TODO: ? make a lemma, use below  *)
-       
        destruct NNVAL as (r & ? & v & cr & LEkr & RTH & RETr).
        destruct (decide (r <= j)).
        - destruct X. exists r. split.
@@ -811,7 +787,6 @@ Proof using.
 
   destruct MAIN_RET as [RETj | [-> STUCKj]].
   2: { right. split; [done| ].
-       (* TODO: extract a lemma *)
        red. intros.
        red in STUCKj. odestruct (STUCKj (max i N) _) as (?&?&?&?).
        { pose proof (Nat.max_spec_le i N) as [[? MAX] | [? MAX]]; rewrite MAX; eauto. }
@@ -868,7 +843,6 @@ Proof using.
   
   assert (locale_enabled τ c) as EN. 
   { red. eexists. split; eauto.
-    (* TODO: make lemma, use above *)
     destruct NVAL as (?&EXPR&?).
     red in EXPR. simpl in *. 
     rewrite EE in EXPR. inversion_clear EXPR.

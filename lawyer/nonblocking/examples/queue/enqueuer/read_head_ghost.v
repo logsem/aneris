@@ -17,7 +17,6 @@ Section ReadHeadViewshifts.
 
   Context (PE: val -> iProp Σ). 
 
-  (* TODO: move, remove duplicates *)
   Lemma dom_max_set_fold n:
     set_fold max 0 (set_seq 0 (S n): gset nat) = n.
   Proof using.
@@ -124,15 +123,12 @@ Section ReadHeadViewshifts.
     iFrame "#∗ %".
   Qed.
 
-  Lemma finish_read_op t br pt i hist h fl od (* rp rp' *) rp
-    (* (STEP: rs_step rp rp') *)
-    (* (FIN: rs_fin rp') *)
+  Lemma finish_read_op t br pt i hist h fl od rp
     (RP: rp = rs_canceled \/ rp = rs_proc None)
     :
     read_head_resources t br pt (Some i) -∗
     read_hist_interp hist (Some i) h br fl od -∗
     br_lb br -∗
-    (* ith_rp i (rs_proc None) *)
     ith_rp i rp
  ==∗
   ∃ hist', read_head_resources t br pt None ∗ read_hist_interp hist' None h br fl od ∗ (⌜ rs_compat (rs_proc None) rp⌝ -∗ rop_token).
@@ -172,7 +168,6 @@ Section ReadHeadViewshifts.
          iRight. set_solver. }
 
     rewrite /safe_read.
-    (* TODO: refactor *)
     iDestruct "SAFE" as "[FROM_HEAD | GOING]".
     2: { iFrame "RHIST". iFrame "#∗". iModIntro.
          iAssert (⌜ rp_ = rs_proc (Some rsp_protected)⌝ ∗ rop_token ∗ ⌜ r = br ⌝)%I with "[GOING]" as "(-> & RTOK & ->)".
@@ -218,7 +213,6 @@ Section ReadHeadViewshifts.
          iFrame "BR RP".
          iPureIntro. red. tauto. }
 
-    (* TODO: find duplicates, make a lemma *)
     iPureIntro.
     red.
     exists n. split; [| split; [| split]]. 
@@ -238,7 +232,6 @@ Section ReadHeadViewshifts.
 
   Definition disj_range (h t: nat): iProp Σ :=
     let range := set_seq h (t - h): gset nat in
-    (* ([∗ set] i ∈ range, ∃ nd, ith_node i nd) ∗ *)
     (∀ i j ndi ndj, ⌜ i ≠ j /\ i ∈ range /\ j ∈ range ⌝ -∗
                       □ (ith_node i ndi -∗ ith_node j ndj -∗ ⌜ ndi.1 ≠ ndj.1 ⌝)).
 
@@ -260,7 +253,6 @@ Section ReadHeadViewshifts.
     by iDestruct (hn_interp_ptr_excl with "X Y") as %?.
   Qed.
 
-  (* TODO: move *)
   Lemma ith_node_agree i nd1 nd2:
     ith_node i nd1 -∗ ith_node i nd2 -∗ ⌜ nd2 = nd1 ⌝.
   Proof using.
@@ -310,7 +302,6 @@ Section ReadHeadViewshifts.
     done.
   Qed.  
 
-  (* TODO: move *)
   Lemma ith_rp_get_rs_p0 i rs
     (LE: rs_le (rs_proc None) rs):
     ith_rp i rs -∗ ith_rp i (rs_proc None).
@@ -510,7 +501,6 @@ Section ReadHeadViewshifts.
       { iIntros (->). iDestruct (queue_interp_cur_empty with "[$]") as %NO.
         specialize (NO 0). rewrite Nat.add_0_r in NO. congruence. }
 
-      (* TODO: add a head element access lemma? *)
       rewrite /queue_interp. iDestruct "QI" as "(%T_LEN & PQI & BR & FL)".
       rewrite /phys_queue_interp. iDestruct "PQI" as "(Q & (%pt_ & TAIL & DUMMY & %LL & HEAD))".
       rewrite lookup_drop Nat.add_0_r. rewrite HTH. iEval (simpl) in "HEAD".
@@ -546,7 +536,6 @@ Section ReadHeadViewshifts.
       iNext. iSplit; [done| ].
       iLeft. iFrame.
     -
-      (* TODO: rewrite the invariant into this form *)
       iAssert (⌜ rp = rs_proc (Some rsp_protected)⌝ ∗ rop_token ∗ ⌜ h = h' - 1 /\ is_Some od \/ h = fl ⌝)%I with "[PROT]" as "(-> & RTOK & %CASES)".
       { iDestruct "PROT" as "[((-> & ? & %) & -> & TOK) | ((? & ->) & -> & TOK)]"; iFrame.
         all: iPureIntro; tauto. }
@@ -721,7 +710,6 @@ Section ReadHeadViewshifts.
     inversion EQ. subst ph' nd'. clear EQ.
     iDestruct (ith_rp_get_rs_p0 with "RP") as "#RP0".
     { constructor. }
-    (* TODO: make/find a lemma *)
     iApply fupd_trans_frame. iSplitL.
     2: { iModIntro. iApply bi.True_sep'. iFrame "RP0". set_solver. }
     iIntros "_".

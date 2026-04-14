@@ -130,7 +130,6 @@ Section DequeuerThreadPwp.
     iIntros (Φ) "(#INV & TOK) POST".
     rewrite /dequeuer_thread.
 
-    (* TODO: pwp_pure_step gets stuck without it; fix *)
     assert (forall v, Persistent (@val_is_int Σ v)) by apply _. 
 
     pwp_pure_steps. simpl.

@@ -6,7 +6,6 @@ From iris.proofmode Require Import tactics.
 Section RelationsUtils.
   Context {A: Type}.
 
-  (* TODO: find existing definition *)
   Definition rel_compose (R1 R2 : relation A): relation A :=
     fun x y => exists z, R1 x z /\ R2 z y.
   

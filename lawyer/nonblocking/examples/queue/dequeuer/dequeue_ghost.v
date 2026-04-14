@@ -5,7 +5,6 @@ From fairness Require Import utils.
 From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From iris.base_logic.lib Require Import invariants.
 From lawyer.nonblocking.examples.queue Require Import simple_queue_utils simple_queue.
-(* From lawyer.nonblocking.examples.queue.dequeuer Require Import (* dequeuer_lib *). *)
 From heap_lang Require Import heap_lang_defs lang notation.
 
 Close Scope Z.
@@ -17,7 +16,6 @@ Section DequeueGhost.
   Context {SQT: SimpleQueueTokens Σ}.
   Context {q_sq: SimpleQueue}. 
   
-  (* TODO: move *)
   Lemma is_LL_into_drop hq pt k
     (LL: is_LL_into hq pt):
     is_LL_into (drop k hq) pt.
@@ -32,7 +30,6 @@ Section DequeueGhost.
     destruct h as [? [? ?]]. tauto.
   Qed.
 
-  (* TODO: move *)
   Lemma dom_max_set_fold n:
     set_fold max 0 (set_seq 0 (S n): gset nat) = n.
   Proof using.
@@ -113,7 +110,6 @@ Section DequeueGhost.
     red. destruct FIN as [-> | [-> | [-> | ->]]]; subst; simpl; try by eauto.
   Qed.
 
-  (* TODO: move *)
   Lemma drop_drop_comm: ∀ {A : Type} (l : list A) (n1 n2 : nat),
       drop n1 (drop n2 l) = drop n2 (drop n1 l).
   Proof using.
@@ -151,13 +147,11 @@ Section DequeueGhost.
     rewrite -SPLIT.
     assert (length (take h hq) = h) as H_LEN. 
     { apply length_take_le. apply lookup_lt_Some in HTH.
-      (* simpl in *. lia. *)
       apply Nat.le_lteq. tauto. }
     rewrite drop_app_length'; [| done]. simpl.
     rewrite cons_middle app_assoc.
     rewrite drop_app_length'.
     2: { rewrite length_app /=.
-         (* clear -H_LEN. lia. *)
          by rewrite H_LEN. }
     iDestruct "Q" as "[$ $]".
     iSplit.
@@ -171,18 +165,6 @@ Section DequeueGhost.
     - simpl. destruct h0 as [? [??]]. simpl.
       destruct LL as [-> ?]. by iFrame.
   Qed.
-
-  (* Lemma queue_elems_interp_shorten (PE: val -> iProp Σ) hq h: *)
-  (*   queue_elems_interp PE hq h ⊣⊢ queue_elems_interp PE hq (h + 1) ∗ from_option (PE ∘ fst ∘ snd) True (hq !! h).  *)
-  (* Proof using. *)
-  (*   rewrite /queue_elems_interp. *)
-  (*   rewrite Nat.add_comm'  -skipn_skipn. *)
-  (*   rewrite -{3}(Nat.add_0_r h). rewrite -lookup_drop. *)
-  (*   remember (drop h hq) as l. rewrite -Heql. clear Heql.  *)
-  (*   destruct l. *)
-  (*   { simpl. iSplit; set_solver. } *)
-  (*   simpl. rewrite drop_0. iSplit; iIntros "[$ $]". *)
-  (* Qed. *)
 
   Context (PE: val -> iProp Σ) {PERS_PE: forall v, Persistent (PE v)}. 
 
@@ -227,7 +209,6 @@ Section DequeueGhost.
       (⌜b < r⌝ -∗
        ith_rp i rs_canceled
        ∨ ith_rp i rs_aborted ∨ ith_rp i (rs_proc (Some rsp_completed)))
-      (* ∗ PE vh *) (** it is moved from queue_elems_interp to dangle_interp *)
   .
   Proof using PERS_PE. 
     iIntros "#HTH CH CFL DFRAG HQ AUTHS Q TAIL DUMMY BR FL DAUTH OHV RHI RH TOK CLOS HEAD HEAD' #EI".
@@ -249,9 +230,6 @@ Section DequeueGhost.
     
     iDestruct (take_snapshot with "[$]") as "#SHT".
     iDestruct "SHT" as "(_&_&#BR_LB&_)".
-
-    (* iDestruct (queue_elems_interp_shorten with "EI") as "[EI' PEv]". *)
-    (* rewrite HTH /=. *)    
 
     rewrite /read_hist_interp. iDestruct "RHI" as "(ROPA & ROP & RHIST & %RH_WF & #OLDS)". 
     rewrite /rop_interp.
@@ -350,7 +328,7 @@ Section DequeueGhost.
       rewrite /rop_interp. iSplit. 
       { iIntros (i_ [=]). }
       iSplitR.
-      2: { (* TODO: make a lemma? *)
+      2: { 
         rewrite /old_rps. simpl.
         rewrite -insert_delete_insert.         
         rewrite insert_union_singleton_l big_sepM_union.
@@ -363,7 +341,6 @@ Section DequeueGhost.
         iDestruct "LB" as "[$ | [-> | ->]]".
         all: simpl; iRight; iPureIntro; tauto. }
 
-      (* TODO: make a lemma *)
       rewrite /read_hist_wf.
       iPureIntro. 
 
@@ -553,7 +530,6 @@ Section DequeueGhost.
            hn_interp nfl) -∗
   dangle_auth (Some h) -∗
   (let '(v, nxt) := ndh in ph ↦ v ∗ (ph +ₗ 1) ↦ #nxt) -∗
-  (* PE ndh.1 -∗ *) (** follows from historical queue *)
   ohv_interp PE -∗
   read_hist_interp hist rop (h + 1) br fl (Some h) -∗
   ((∃ pt : loc, read_head_resources t br pt None ∗ rop_token)
@@ -690,7 +666,6 @@ Section DequeueGhost.
     iMod ("CLOS" with "[-]") as "_"; by iFrame.
   Qed.
 
-  (* TODO: merge with dequeue_upd_head_post *)
   Lemma dequeue_upd_head_vs h ph vh (nxh: loc) fl:
     queue_inv PE -∗ ith_node h (ph, (vh, nxh)) -∗ dequeue_resources h fl ph None -∗
     |={⊤, ⊤ ∖ ↑queue_ns}=> ▷ Head ↦ #ph ∗
@@ -714,7 +689,6 @@ Section DequeueGhost.
     
     iClear "INV".
 
-    (* TODO: split into lemmas *)
     iDestruct (hq_auth_lookup with "[$] [$]") as %HTH.
     iAssert (⌜ t ≠ h ⌝)%I as %NEMPTY.
     { iIntros (->). iDestruct (queue_interp_cur_empty with "[$]") as %NO.
@@ -758,7 +732,6 @@ Section DequeueGhost.
 
     iClear "INV".
 
-    (* TODO: split into lemmas *)
     iDestruct (hq_auth_lookup with "[$] [$]") as %HTH.
     iAssert (⌜ t ≠ h ⌝)%I as %NEMPTY.
     { iIntros (->). red in ORDER. lia. }
@@ -767,7 +740,6 @@ Section DequeueGhost.
     rewrite Nat.add_sub HTH /=. 
     rewrite /dequeue_resources. iDestruct "DR" as "(CH & CFL & HEAD' & DFRAG)".
     rewrite /queue_interp. iDestruct "QI" as "(%T_LEN & PQI & BR & FL)".
-    (* rewrite /phys_queue_interp. iDestruct "PQI" as "(Q & (%pt & TAIL & DUMMY & %LL & HEAD))". *)
     iDestruct "BR" as "(%nbr & %BRTH & BR)". destruct nbr as [pbr nbr].
     iFrame "BR". iIntros "BR". 
     iFrame.
@@ -799,7 +771,6 @@ Section DequeueGhost.
     by iFrame "#∗".
   Qed.
 
-  (* TODO: merge with get_to_free_post *)
   Lemma upd_fl_vs h fl (ph: loc) ndh i r b b1 ndbr1 pfl ndfl
     (READ_BOUND: r <= h)
     (LEb : b ≤ b1):
@@ -820,7 +791,6 @@ Section DequeueGhost.
     iDestruct "DQ" as "[(% & DR') | TOK]".
     { by iDestruct (dequeue_resources_excl with "[$] [$]") as "?". }
     iDestruct (dequeue_resources_auth_agree with "[$] [$]") as %[<- <-]. 
-    (* iDestruct (dequeue_resources_dangle_agree with "[$] [$]") as %->. *)
     iAssert (▷ ⌜ od_ = Some h ⌝)%I with "[DR DANGLE]" as "#EQ".
     { iNext. by iDestruct (dequeue_resources_dangle_agree with "[$] [$]") as %->. }
     setoid_rewrite <- bi.later_sep. iMod "EQ" as %->.
@@ -831,7 +801,6 @@ Section DequeueGhost.
 
     rewrite /dangle_interp. iDestruct "DANGLE" as "(DAUTH & [% | (_ & HNI)])"; [done| ].
 
-    (* TODO: split into lemmas *)
     iDestruct (hq_auth_lookup with "[$] HTH") as %HTH.
     iAssert (⌜ t ≠ h ⌝)%I as %NEMPTY.
     { iIntros (->). red in ORDER. lia. }

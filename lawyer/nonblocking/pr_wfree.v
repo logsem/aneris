@@ -67,7 +67,6 @@ Section WaitFreePR.
       pwp s f ⊤ τi e Φ
     else
       let e' := default (Val #false) (under_ctx Ki e) in
-      (* from now on, we forget about the original postcondition *)
       wp s' CannotFork ⊤ τi e' (fun _ => ⌜ True ⌝%I).
 
   Definition thread_pr {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ} s f N :=
@@ -118,11 +117,9 @@ Section WaitFreePR.
     - apply fits_inf_call_last_or_short in FIT as [NVAL | SHORT].
       2: { apply Nat.leb_gt in LEN. 
            exfalso. clear -LEN SHORT.
-           (* TODO: why lia doesn't work? *)
            by apply Nat.lt_nge in LEN. }
       rewrite Hex in NVAL.
 
-      (* red in NVAL. rewrite /expr_at in NVAL.  *)
       eapply runs_call_helper in NVAL; eauto.
       destruct NVAL as (ec & CUR & NVAL).
 
@@ -145,7 +142,6 @@ Section WaitFreePR.
         iSplit; [| done]. 
         by iDestruct "HSI" as "(?&?&?)". }
       simpl. by rewrite Hex in NS.
-    (* TODO: get rid of this? *)
     Unshelve. all: by apply trace_singleton. 
   Qed. 
 
@@ -172,7 +168,6 @@ Section WaitFreePR.
     rewrite /wfree_trace_inv. iFrame "INV". simpl.
     rewrite /no_extra_obls. simpl.
     rewrite and_assoc. rewrite bi.pure_and.
-    (* rewrite -!bi.sep_assoc. *)
     rewrite pure_and_sep. rewrite -bi.sep_assoc. 
     iApply fupd_frame_l.
     iSplit. 
@@ -200,7 +195,6 @@ Section WaitFreePR.
         destruct etr; simpl; lia.
     - iFrame "OB". iClear "INV".
 
-      (* TODO: extract lemma, unify with similar proof in wptp_wfre_not_stuck *)
       rewrite /call_progresses. 
 
       destruct (decide (ii < trace_length etr)) as [LONG | SHORT].
@@ -403,8 +397,6 @@ Section WaitFreePR.
   Context 
     (VALID: valid_exec etr)
     (FIN: trace_ends_in etr c)
-    (* (STEP: locale_step c oτ c') *)
-    (* (FIT: fits_inf_call ic m ai (etr :tr[ oτ ]: c')) *)
   .
 
   Lemma unfold_helper (STEP: locale_step c oτ c'):
@@ -477,7 +469,6 @@ Section WaitFreePR.
     destruct c as [tp σ], c' as [tp' σ'].
     simpl in PROPS. 
     destruct PROPS as ([=EQ_TID'] & -> & -> & PSTEP & NO1 & NO' & NO2 & EQ_Φs & LEN1 & LEN2).
-    (* set (τ := locale_of t1 e).  *)
 
     iEval (rewrite /thread_pr) in "WP".
     rewrite decide_True.
@@ -589,8 +580,6 @@ Section WaitFreePR.
       rewrite /thread_pr. rewrite decide_True; [done| ]. 
       done. }
 
-      (* pr is reestablished differently depending on whether we reach ii.
-         TODO: try to unify it *)
       apply Nat.le_lteq in LEN as [LT | <-].
       * iSpecialize ("CPS" with "[$CPP]"); [done| ]. 
         iSpecialize ("WPS" with "[He2]").
@@ -599,7 +588,6 @@ Section WaitFreePR.
           done. }
           
         iFrame "CPS WPS".
-        (* rewrite leb_correct; [| simpl in *; lia]. *)
         iSpecialize ("PHS" with "[PH]").
         { destruct ii eqn:II; [lia| ].
           unfold ii in II. rewrite II.
@@ -622,10 +610,9 @@ Section WaitFreePR.
         { iPoseProof (get_call_wp with "[] [$] [$]") as "WP".
           { done. }
           { iDestruct "INV" as "[??]". done. }
-          (* TODO: extract lemma *)
           clear LEN2 PH CORR.
           clear STEP VALID FIN.
-          clear (* H H1 *) NO' NO2 NO1.
+          clear NO' NO2 NO1.
           clear dependent Φs1.
           rewrite /wp_tc. rewrite leb_correct_conv.
           2: { simpl. lia. }
@@ -821,7 +808,6 @@ Section WaitFreePR.
       { simpl. iDestruct "HSI" as "(?&?&?)". iFrame. }
 
       iSpecialize ("PHS" with "[$PH]"). 
-      (* iSpecialize ("OBLS" with "[$]"). *)
 
       iModIntro.
       iSplitR.
@@ -885,8 +871,6 @@ Section WaitFreePR.
 
         iFrame (S'_LE). 
           
-        (* pr is reestablished differently depending on whether we reach ii.
-           TODO: try to unify it *)
         apply Nat.le_lteq in LEN as [LT | <-].
         ** iClear "PHτi". 
            iSpecialize ("CPS" with "[$CPP]"); [done| ].
@@ -924,7 +908,6 @@ Section WaitFreePR.
            { (** just drop the pwp for the newly forked τi *)
              iDestruct (wptp_from_gen_app' with "[$]") as "[WPS _]".
              { rewrite EQ_Φs. rewrite !length_app. simpl in *.
-               (* lia.  - ??? *)
                f_equal.
                { by symmetry. }
                f_equal. by symmetry. }
@@ -979,9 +962,6 @@ Section WaitFreePR.
         rewrite FIN -Heqsf.
         iDestruct ("PHS" with "[$]") as "[PHS PHτi]". iFrame "PHS". 
 
-        (* pr is reestablished differently depending on whether we reach ii.
-           TODO: try to unify it *)
-        (* TODO: the case analysis above is very similar to this one *)
         apply Nat.le_lteq in LEN as [LT | <-].
         ** iClear "PHτi". 
            iSpecialize ("CPS" with "[$CPP]"); [done| ].
@@ -1042,8 +1022,6 @@ Section WaitFreePR.
            iApply wptp_from_gen_app. iSplitR "WPS'".
            2: { simpl. iApply (wptp_wfree_upd_other with "[$]"). done. }
 
-           (*****)
-           (* TODO: extract a lemma *)
            remember (t1 ++ e' :: t2) as tp'.
            generalize τ. clear τ. intros τ. 
            clear dependent Φs1 Φs2  t1 t2 e.
@@ -1059,7 +1037,6 @@ Section WaitFreePR.
              intros (?&?&?&?)%elem_of_lookup_imap.
              apply lookup_lt_Some in H2. simpl in *. lia. }
            simpl. destruct Φs2; [done| ].
-           (* drop the existing pwp for τi *)
            rewrite wptp_from_gen_cons. iDestruct "WPS"  as "[_ WPS2]". 
            iApply wptp_from_gen_cons. iSplitR "WPS2".
            2: { iApply (wptp_wfree_upd_other with "[$]").
@@ -1166,7 +1143,6 @@ Section WaitFreePR.
            apply fits_inf_call_prev, fits_inf_call_last_or_short in FIT.
            destruct FIT as [NVAL | SHORT].
            2: { simpl in SHORT. lia. }
-           (* red in FIT. destruct FIT as (?& IN & ?&?). *)
            move NVAL at bottom.
            rewrite /τi in e0.
            red in NVAL. destruct NVAL as (?&EXPR&NVAL).
@@ -1183,12 +1159,10 @@ Section WaitFreePR.
         simpl. iApply wptp_from_gen_cons. iSplitR "WPS2".
         { rewrite /thread_pr. rewrite decide_False; done. }
         iApply (wptp_from_gen_locales_equiv_1 with "[$]").
-        (* TODO: make a lemma and use it above *)
         rewrite !prefixes_from_app.
         eapply Forall2_app; [apply adequacy_utils.locales_equiv_refl| ].
         simpl. by constructor. }
           
-      (* TODO: Make a lemma *)
       iApply (big_sepL2_impl with "[$]").
       iModIntro. 
       iIntros (i pfi Φi PFith Φith).
@@ -1198,8 +1172,6 @@ Section WaitFreePR.
       simpl in *. lia. 
   Qed.
   
-  (* our PR instance in fact implies the not-stuck property *)
-  (* TODO: ? move this property to definition of PR? *)
   Lemma wptp_wfree_take_step 
     (STEP: locale_step c oτ c')
     (FIT: fits_inf_call ic m ai (etr :tr[ oτ ]: c')):
@@ -1245,10 +1217,9 @@ Section WaitFreePR.
     @ProgressResource heap_lang M Σ (@iem_invGS _ _ _ _ _ Hinv)
       state_interp wfree_trace_inv
 
-      (* fork_post *)
       (fun _ _ =>
          let _ := IEM_irisG HeapLangEM EM in
-         ⌜ True ⌝%I: iProp Σ) (* because upon forks we only obtain pwp .. { True } *)
+         ⌜ True ⌝%I: iProp Σ) (** because upon forks we only obtain pwp .. { True } *)
 
       (fits_inf_call ic m ai) :=
     {| pr_pr := pr_pr_wfree |}.
@@ -1260,13 +1231,12 @@ Section WaitFreePR.
     by iFrame. 
   Qed.
   Next Obligation.
-    (* iApply @wptp_wfree_not_stuck. *)
     iIntros "**".
     iMod (wptp_wfree_not_stuck with "[$] [$]") as "foo"; eauto. 
   Qed.
   Final Obligation.
     intros ???? etr Φs c oτ c' mtr VALID FIN STEP.
-    iIntros "_ TI #INV PR %FIT". (* cwp is not needed*)
+    iIntros "_ TI #INV PR %FIT".
     iApply (wptp_wfree_take_step with "[$] [$] [$]"); eauto.  
   Qed.
 

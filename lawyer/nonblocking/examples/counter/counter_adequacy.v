@@ -10,4 +10,4 @@ Proof using.
   eauto. 
 Qed.
 
-(* Print Assumptions counter_is_wait_free.  *)
+(** Print Assumptions counter_is_wait_free.  *)

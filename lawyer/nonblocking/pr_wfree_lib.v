@@ -75,7 +75,6 @@ Section WaitFreePR.
     s' = NotStuck -> ii < trace_length etr -> 
     not_stuck_tid τi (trace_last etr).
 
-  (* TODO: refactor *)
   Lemma same_phase_no_fork {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
     etr mtr
     (e : expr)
@@ -121,7 +120,6 @@ Section WaitFreePR.
     red in MSTEP. destruct MSTEP as (_ & MSTEP & [=<-] & CORR').
     simpl in MSTEP.
     
-    (* TODO: make a lemma *)
     assert (ps_phases (trace_last mtr) = ps_phases δ') as PH_EQ.
     { destruct MSTEP as (δ2 & PSTEP & OFORK).
       destruct PSTEP as (? & ? & δ1 & STEPS & BURN).
@@ -375,11 +373,9 @@ Section WaitFreePR.
     rewrite big_sepS_singleton. by iApply "OB'". 
   Qed.
 
-  (* TODO: refactor *)
   Lemma cur_phases_other_step `{!ObligationsGS Σ} etr c' τ
                               m ai
     (STEP: locale_step (trace_last etr) (Some τ) c')
-    (* (etr' := etr :tr[ Some τi ]: c') *)
     (etr' := etr :tr[ Some τ ]: c')
     (FITS: fits_inf_call ic m ai etr')
     (OTHER: τ ≠ τi):
@@ -509,8 +505,7 @@ Section WaitFreePR.
     rewrite /obls_τi. iDestruct "OBτi" as "(%s & OBτi & SGN & #EP)".    
     iMod (expect_sig_upd with "[] [$] OB [] [$]") as "(?&?&?&?)".
     { iApply (ep_weaken with "[$]"). apply (phase_le_init π). } 
-    { (* TODO: Make a lemma *)
-      rewrite /sgns_level_gt. rewrite /sgns_levels_gt'.
+    { rewrite /sgns_level_gt. rewrite /sgns_levels_gt'.
       iApply empty_sgns_levels_rel. }
     { rewrite /WF_SB. lia. }
     iModIntro. iFrame "#∗".
@@ -588,7 +583,6 @@ Section WaitFreePR.
     apply locales_equiv_middle. done.
   Qed.
 
-  (* TODO: this doesn't rely on (oτ ≠ Some τi)? can it be reused?*)
   Lemma take_model_step {Σ} {Hinv : @IEMGS _ _ HeapLangEM EM Σ}
     c (etr: execution_trace heap_lang)
     t1 e' t2 efs σ' π e

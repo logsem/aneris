@@ -12,10 +12,6 @@ Definition valid_bin_op (op: bin_op): Prop :=
   | _ => True
   end. 
 
-(* a valid client proram is any program without:
-     - hard-coded locations
-     - address offset operations
-     TODO: currently we also exclude prophecies, seems reasonable? *)
 Fixpoint valid_client (e : expr) : Prop :=
   match e with
   | Val v => valid_val v

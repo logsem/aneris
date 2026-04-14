@@ -114,7 +114,6 @@ Lemma subst_env_insert' s v vs e
   subst_env (<[ s := v ]> vs) e = subst_env vs (subst s v e). 
 Proof using.
   rewrite subst_env_insert; [| done].
-  (* TODO: extract lemma *)
   gd e. revert FRESH. pattern vs. apply map_first_key_ind; clear vs. 
   { intros. by rewrite !subst_env_empty. }
   intros. rewrite subst_env_insert; [| by apply not_elem_of_dom].

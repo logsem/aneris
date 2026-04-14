@@ -51,13 +51,6 @@ Section Counter.
 
   Existing Instance OHE.
 
-  (* Goal heap1GS Σ. *)
-  (*   apply (iem_phys HeapLangEM EM).  *)
-  (*   Show Proof.  *)
-  (*   apply _.  *)
-
-  (* TODO: derive from LAT spec *)
-  (* TODO: restrict the set of arguments *)
   Lemma counter_mock_spec τ π q (a: val):
     let _: heap1GS Σ := (iem_phys HeapLangEM EM) in
     {{{ cp_mul π d 5 ∗ th_phase_frag τ π q ∗ counter_inv }}}

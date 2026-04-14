@@ -131,7 +131,6 @@ Section GetHeadValLawyer.
   Notation "'Level'" := (om_hl_Level).  
 
   Context {Σ} {OHE: OM_HL_Env OP EM Σ}.
-  (* Existing Instance OHE.  *)
   Context {QL: QueueG Σ}.
   Context {SQT: SimpleQueueTokens Σ}.
   Context {q_sq: SimpleQueue}. 

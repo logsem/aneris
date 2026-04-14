@@ -79,9 +79,6 @@ From iris.base_logic Require Import invariants.
 Lemma mk_ref_safety_spec
   {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ}
   :
-  (* ∀ (Σ : gFunctors) (H : irisG heap_lang LoopingModel Σ)  *)
-  (*                       (H0 : heap1GS Σ), *)    
-    (* let _ := irisG_looping HeapLangEM (lG := hG) in  *)
     ⊢ persistent_pred.pers_pred_car interp mk_ref.
 Proof using.
   iIntros "**". rewrite interp_unfold /mk_ref /=.

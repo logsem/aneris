@@ -4,8 +4,6 @@ From trillium.prelude Require Import quantifiers finitary.
 From fairness Require Export utils_coPset utils_logic utils_maps utils_sets utils_relations utils_multisets utils_lists.
 
 
-(* TODO: move these lemmas to appropriate places *)
-
 Section Disjoint.
 
   Lemma disjoint_subseteq:
@@ -139,7 +137,6 @@ Section Arithmetic.
     - rewrite Nat.leb_nle. apply leb_complete_conv in LE. lia.
   Qed.
 
-  (* TODO: any simpler way? *)
   Lemma half_inv2: (/2)%Qp = (1/2)%Qp.
   Proof using. 
     apply (Qp.mul_inj_r 2%Qp).

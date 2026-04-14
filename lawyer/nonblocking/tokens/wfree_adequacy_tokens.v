@@ -1,13 +1,12 @@
 From iris.proofmode Require Import tactics.
-From iris.algebra Require Import auth gmap gset excl gmultiset big_op mono_nat gmap_view.
+From iris.algebra Require Import auth gmap gset excl gmultiset big_op mono_nat gmap_view excl_auth.
 From trillium.traces Require Import inftraces trace_lookup exec_traces trace_len trace_utils. 
 From trillium.program_logic Require Import execution_model weakestpre adequacy simulation_adequacy_em_cond. 
 From trillium.prelude Require Import classical.
 From fairness Require Import fairness locales_helpers utils.
 From lawyer Require Import program_logic sub_action_em action_model.
 From lawyer.examples Require Import orders_lib obls_tactics.
-From lawyer.nonblocking Require Import trace_context om_wfree_inst pr_wfree_lib (* pr_wfree *) wfree_traces wptp_gen pwp calls wfree_adequacy_lib pwp_ext.
-(* From lawyer.nonblocking.logrel Require Import fundamental.  *)
+From lawyer.nonblocking Require Import trace_context om_wfree_inst pr_wfree_lib wfree_traces wptp_gen pwp calls wfree_adequacy_lib pwp_ext.
 From lawyer.nonblocking.logrel Require Import valid_client.
 From lawyer.nonblocking.tokens Require Import om_wfree_inst_tokens pr_wfree_tokens tokens_ra fundamental_tok op_spec_lifting.
 From lawyer.obligations Require Import obligations_resources obligations_logic env_helpers obligations_adequacy obligations_model obligations_em obligations_am obls_termination.
@@ -15,7 +14,6 @@ From heap_lang Require Import lang simulation_adequacy.
 
 Close Scope Z. 
 
-(* TODO: use in other file *)
 Definition is_fun (v: val) := exists f x b, v = RecV f x b. 
 
 
@@ -38,17 +36,14 @@ Section WFAdequacy.
   Context (s': stuckness).
   
   Context `(SPEC: WaitFreeSpecToken MS).
-  Context (m: val) (* (MSm: m ∈ MS) *)
-  .
-  (* Local Definition m: val := default #()  *)
+  Context (m: val).
   
   Let F := wfst_F _ SPEC.
   
-  Context ((* m *) ai: val).
+  Context (ai: val).
 
   Let fic := fits_inf_call ic m ai.
 
-  (* TODO: unify with non-tokens version *)
   Definition is_init_tpool (tp: list expr) :=
     valid_init_tpool_restr tp MS /\
     (** the operation under consideration is determined by the thread id,
@@ -57,9 +52,7 @@ Section WFAdequacy.
     (ii = 0 -> exists e, from_locale tp τi = Some e /\ under_ctx Ki e = Some (m ai)) /\
     (forall e, from_locale tp τi = Some e -> to_val e = None).
 
-  From iris.algebra Require Import excl_auth.
 
-  (* TODO: move gfunctors for tokens and call tracker *)
   Definition wfreeΣ: gFunctors := 
     #[iemΣ HeapLangEM EM;
       mt_Σ;
@@ -68,9 +61,7 @@ Section WFAdequacy.
 
   Instance wfree_heap_pre: @heapGpreS wfreeΣ M EM.
   Proof. unshelve esplit. Qed. 
-  (* Instance wfree_mt_pre: MethodTokenPre wfreeΣ. *)
 
-  (* TODO: move *)
   Instance CT_pre_sub: forall Σ, subG (GFunctor $ excl_authUR (option expr)) Σ -> CallTrackerPre Σ.
   Proof using. solve_inG. Qed.
 
@@ -80,7 +71,6 @@ Section WFAdequacy.
   Lemma wfree_WpreG_sub: wfst_preG _ SPEC wfreeΣ.
   Proof using. apply wfst_subG. apply _. Qed.
     
-  (* TODO: move *)
   Lemma ct_init `{CallTrackerPre Σ}:
     ⊢ |==> ∃ (CT: CallTracker Σ), ct_auth None ∗ ct_frag None.
   Proof using.
@@ -90,7 +80,6 @@ Section WFAdequacy.
     iExists {| ct_γ := γ |}. by iFrame.
   Qed.
 
-  (* TODO: move to lib and remove duplicate? *)
   Lemma rah_wfree_inv {Σ} {Hinv : IEMGS HeapLangEM EM Σ} {wG: wfst_G _ SPEC Σ} {MT: MethodToken MS Σ}
     c:
   ⊢ adequacy_cond.rel_always_holds_with_trace_inv MaybeStuck
@@ -130,7 +119,6 @@ Section WFAdequacy.
     eapply @obls_τi_enabled; eauto.
   Qed.
 
-  (* TODO: unify with non-tokens version if invariants are unified *)
   Lemma init_wfree_inv  {Σ} {Hinv : IEMGS HeapLangEM EM Σ} {wG: wfst_G _ SPEC Σ}  {MT: MethodToken MS Σ}
     c 
     (ETR0: is_init_tpool c.1)
@@ -141,7 +129,6 @@ Section WFAdequacy.
             (@iris_invGS heap_lang _ Σ (@IEM_irisG heap_lang _ HeapLangEM EM Σ Hinv)) wG MT -∗
   wfree_trace_inv ic s' SPEC {tr[ c ]} {tr[ init_om_wfree_state F ic c ]} (wG := wG).
   Proof using.
-    (* clear MSm. *)
     iIntros "#INV". 
     rewrite /wfree_trace_inv. iFrame "INV". 
     iPureIntro. repeat split.
@@ -177,7 +164,6 @@ Section WFAdequacy.
     apply lookup_lt_Some in IN. lia.
   Qed.
 
-  (* TODO: move *)
   Lemma gmultiset_disj_union_difference_r `{Countable K} (X Y Z: gmultiset K):
     Z ⊆ Y -> (X ⊎ Y) ∖ Z = X ⊎ Y ∖ Z.
   Proof using. clear. multiset_solver. Qed.
@@ -241,7 +227,6 @@ Section WFAdequacy.
     4: apply PWT. 
   Qed.
 
-  (* TODO: move, replace existing one *)
   Lemma tok_pres_empty' `{invGS_gen HasNoLc Σ, heap1GS Σ} (P: iProp Σ):
     tok_add_pres P (fun _ => emp%I).
   Proof using. clear. red. set_solver. Qed.
@@ -277,7 +262,6 @@ Section WFAdequacy.
 
     rewrite -insert_empty. iApply interp_env_cons; [done| ].
     iSplitL; [| by iApply interp_env_nil].      
-    (* destruct SPEC. by iApply wfs_safety_spec.  *)
     pose proof (@wfst_safety_spec _ SPEC) as SAFE.
     iPoseProof (SAFE with "[$]") as "SAFE".
     iDestruct (big_sepS_elem_of_acc _ (dom MS) m' with "[$]") as "[#SPEC _]".
@@ -333,7 +317,6 @@ Section WFAdequacy.
     set_solver. 
   Qed.
 
-  (* TODO: move, remove similar for m *)
   Context (MS_FUNS: forall m', m' ∈ MS -> is_fun m').
 
   Lemma init_wptp_wfree {Σ} {PWT: @PrWfreeTok _ SPEC Σ} c
@@ -545,7 +528,6 @@ Section WFAdequacy.
     by iApply rah_wfree_inv.
   Qed.
 
-  (* TODO: rename *)
   Lemma simple_om_simulation_adequacy_terminate_multiple_waitfree_impl extr
     (MOD_INIT : wfst_is_init_st _ SPEC (trfirst extr))
     (VALID : extrace_valid extr)
@@ -657,7 +639,6 @@ Section WFAdequacy.
 
   Theorem simple_om_simulation_adequacy_terminate_multiple_waitfree extr
         (ETR0: valid_init_tpool_restr (trfirst extr).1 MS)
-        (* (ETR0: is_init_tpool (trfirst extr).1) *)
         (TI: elements MS !! τi = Some m)
         (MOD_INIT: wfst_is_init_st _ SPEC (trfirst extr))
         (CALL: from_option (fun c => call_at tpc c m ai (APP := App)) False (extr S!! ii))
@@ -703,7 +684,6 @@ Section WFAdequacy.
     repeat split; eauto.     
   Qed.
 
-  (* TODO: rename *)
   Lemma obls_terminates_impl_multiple_waitfree
     (extr : extrace heap_lang)
     (ETR0: valid_init_tpool_restr (trfirst extr).1 MS)
@@ -734,7 +714,7 @@ Theorem wfree_token_is_wait_free_restr MS
   (SPEC: WaitFreeSpecToken MS)
   (FUNS: set_Forall is_fun (dom MS))
   :
-  wait_free_restr MS (wfst_is_init_st _ SPEC) (* s' *) NotStuck any_arg.
+  wait_free_restr MS (wfst_is_init_st _ SPEC) NotStuck any_arg.
 Proof using.
   red. intros etr ETR0 MOD_INIT VALID. intros τ m TI.
 
@@ -785,20 +765,6 @@ Proof using.
       2: { eapply call_nval_at; eauto. done. }
       destruct DOM as (k & r & ck & RANGE & KTH & RETk).
       red. exists k, r, ck. split; eauto. lia. }
-  
-  (* destruct s'. *)
-  (* 2: { destruct (decide (not_stuck_tid (tpctx_tid tpc) c)). *)
-  (*      { by apply IF_NS. } *)
-  (*      right. split; auto.          *)
-  (*      red. intros N [? NTH]. *)
-  (*      exists (len - 1). repeat split; eauto. *)
-  (*      { red. eapply mk_is_Some, state_lookup_dom in NTH; eauto. *)
-  (*        simpl in NTH. lia. } *)
-  (*      red. destruct tpc. *)
-  (*      eexists. repeat split; eauto. *)
-  (*      apply stuck_tid_neg. split; auto. *)
-  (*      eapply from_locale_trace in DOM; eauto. *)
-  (*      by rewrite LAST in DOM. } *)
   
   apply IF_NS.
   eapply ref_call_progress_last in PROGRESS; eauto. 

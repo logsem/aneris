@@ -1,6 +1,3 @@
-(* From iris.program_logic Require Import lifting ectx_lifting. *)
-(* From iris.program_logic Require Export weakestpre. *)
-
 From iris.proofmode Require Import proofmode coq_tactics.
 From lawyer.nonblocking.logrel Require Export persistent_pred logrel substitutions valid_client stuck_utils.
 From lawyer.nonblocking Require Export pwp op_eval_helpers. 
@@ -11,7 +8,6 @@ From heap_lang Require Import heap_lang_defs sswp_logic tactics.
 
 Section typed_interp.
   Context {Σ: gFunctors}
-    (* {iG: irisG heap_lang LoopingModel Σ} *)
     {hG: heap1GS Σ}
     {invG: invGS_gen HasNoLc Σ}
   .
@@ -152,7 +148,6 @@ Section typed_interp.
     rewrite /pwp wp_unfold /wp_pre.
     iIntros "FORK POST". simpl. 
     iIntros (extr atr K tp1 tp2 σ1 Hvalid Hζ Hextr) "Hσ".
-    (* iMod "Hsswp" as "foo". *)
     iSimpl in "Hσ".
     iApply fupd_mask_intro; [set_solver| ]. iIntros "CLOS'".
     iSplit.
@@ -161,7 +156,6 @@ Section typed_interp.
       3: eapply ForkS.
       all: erewrite ectx_fill_emp; reflexivity. }
     iIntros (e2 σ2 efs Hstep).
-    (* iDestruct ("Hsswp" with "[//]") as "Hsswp". *)
     iApply (step_fupdN_le 1); [| done| ].
     { pose proof (trace_length_at_least extr). done. }
     do 6 iModIntro. iMod "CLOS'" as "_".
@@ -665,7 +659,5 @@ Section typed_interp.
       iRight. iExists _. iSplit; [done| ].
       by iApply H.
   Qed.
-
-  (* Print Assumptions fundamental. *)
 
 End typed_interp.

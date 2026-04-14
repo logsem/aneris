@@ -21,7 +21,6 @@ Definition method_spec_token {M} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_
 Definition token_safety_spec `{invGS_gen HasNoLc Σ, MethodToken MS Σ}
   {hG: heap1GS Σ}
   m: iProp Σ :=
-  (* interp (method_tok m) si_add_none m *)
   (** The spec above might be provable, but our approach requires more restrictive one below.
       See the comment in op_spec_lifting *)
   □ ∀ τ v, method_tok m -∗
@@ -31,7 +30,6 @@ Definition token_safety_spec `{invGS_gen HasNoLc Σ, MethodToken MS Σ}
         (fun v => ⌜ is_ground_val v ⌝ ∗ method_tok m).
 
 
-(** TODO: add the stuckness bit? *)
 Record WaitFreeSpecToken (MS: gmultiset val) := {
   wfst_is_init_st: cfg heap_lang -> Prop;
 

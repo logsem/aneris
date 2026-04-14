@@ -7,7 +7,6 @@ From lawyer.examples Require Import obls_tactics.
 From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From iris.base_logic.lib Require Import invariants.
 From lawyer.nonblocking.examples.queue Require Import simple_queue_utils.
-(* From lawyer.nonblocking.tokens Require Import tokens_ra. *)
 From heap_lang Require Import heap_lang_defs lang notation.
 
 
@@ -39,7 +38,6 @@ Class QueuePreG Σ := {
   q_pre_rh :: ReadHistPreG Σ;
   q_pre_dangle_rop ::  inG Σ (excl_authUR (option nat));
   (** Tokens RA is instantiated at the top-level, not by the queue module *)
-  (* q_pre_toks :: SimpleQueueTokensPre Σ;  *)
 }.
 
 Class QueueG Σ := {
@@ -103,7 +101,6 @@ Section QueueResources.
     match hq with 
     | [] => True
     | [ (_, (_, nxt)) ] => nxt = pt
-    (*   | (_, (_, nxt1)) :: ((l2, (_, _)) as hn2) :: hq' => nxt1 = l2 /\ is_LL (hn2 :: hq') *)
     (** to avoid introducing Function *)
     | (_, (_, nxt1)) :: hq' =>
         match hq' with
@@ -145,10 +142,6 @@ Section QueueResources.
   Definition queue_interp (hq: HistQueue) (h t br fl: nat): iProp Σ :=
     let pq := drop h hq in
     ⌜ t = length hq ⌝ ∗ 
-    (* ([∗ list] nd ∈ pq, hn_interp nd) ∗ *)
-    (* ∃ (pt: loc), Tail q_sq ↦ #pt ∗ hn_interp (pt, dummy_node) ∗ ⌜ is_LL_into pq pt ⌝ ∗ *)
-    (* let ph: loc := (from_option (fun hn => hn.1) pt (hq !! h)) in *)
-    (* Head q_sq ↦{1/2} #ph ∗ *)
     phys_queue_interp pq ∗ 
     (∃ (nbr: HistNode), ⌜ hq !! br = Some nbr ⌝ ∗ @BeingRead q_sq ↦#(nbr.1)) ∗
     (∃ (nfl: HistNode), ⌜ hq !! fl = Some nfl ⌝ ∗ @FreeLater q_sq ↦#(nfl.1) ∗ hn_interp nfl)
@@ -161,13 +154,11 @@ Section QueueResources.
     intros. apply lookup_ge_None_2. lia.
   Qed.
   
-  (* TODO: try to get rid of if *)
   Global Instance hni_tl hn: Timeless (hn_interp hn).
   Proof using.
     destruct hn as [? [??]]. apply _.
   Defined. 
   
-  (* TODO: try to get rid of if *)
   Global Instance qi_tl: forall hq h t br fl, Timeless (queue_interp hq h t br fl).
   Proof using. 
     intros. rewrite /queue_interp.
@@ -191,7 +182,7 @@ Section QueueResources.
   (** PE for dangling node can be retrieved from historical queue *)
   Definition dangle_interp (od: option nat) (h: nat) (hq: HistQueue): iProp Σ :=
     dangle_auth od ∗ (⌜ od = None ⌝ ∨ ⌜ od = Some (h - 1) ⌝ ∗
-            from_option (fun nd => (hn_interp nd (* ∗ PE nd.2.1 *))%I) (⌜ False ⌝)%I (hq !! (h - 1)))
+            from_option (fun nd => (hn_interp nd)%I) (⌜ False ⌝)%I (hq !! (h - 1)))
   .
   
   Definition auths (h t br fl: nat): iProp Σ :=
@@ -242,10 +233,10 @@ Section QueueResources.
     @Head q_sq ↦{1/2} #ph ∗ dangle_frag od. 
   
   Definition hq_state_wf h t br fl: Prop :=
-    (* fl <= br /\ *) (* see runs.org for a counterexample *)
+    (** fl <= br /\ *) (** see runs.org for a counterexample *)
     br <= h /\ fl < h /\ h <= t.
-    (* THIS IS FALSE: br can fall behind arbitrarily *)
-    (* (br = h \/ br = fl \/ od = Some (h - 1) /\ br = h - 1).  *)
+    (** THIS IS FALSE: br can fall behind arbitrarily *)
+    (** (br = h \/ br = fl \/ od = Some (h - 1) /\ br = h - 1).  *)
 
   Definition br_lb (b: nat) := @me_lb _ q_me_br b.
 
@@ -256,15 +247,11 @@ Section QueueResources.
            (forall i opi, hist !! i = Some opi -> opi.1.1 <= h /\ opi.1.2 <= h).
 
   Definition old_rps (hist: read_hist) (rop: option nat): iProp Σ :=
-    (* [∗ set] i ∈ (dom hist) ∖ (from_option (fun n => {[ n ]}) ∅ rop), *)
     [∗ map] i ↦ '((r, b), rp) ∈ (from_option (fun n => delete n hist) hist rop),
-      (* (dom hist) ∖ (from_option (fun n => {[ n ]}) ∅ rop), *)
       ∃ rp, ith_rp i rp ∗ ⌜ rs_fin rp ⌝ ∗
-              (* (⌜ rp ≠ rs_canceled ⌝ -∗ br_lb b) *)
               (br_lb r ∨ ⌜ rp = rs_aborted \/ rp = rs_canceled ⌝)
   . 
 
-  (* TODO: upstream, find existing? *)
   Global Instance Persistent_pure_helper P (R: iProp Σ) `{Decision P}:
     (P -> Persistent R) -> Persistent (R ∗ ⌜ P ⌝).
   Proof using.
@@ -287,8 +274,6 @@ Section QueueResources.
     intros. destruct H as [-> | [-> | [-> | ->]]]; apply _.
   Qed.
 
-  (* TODO: ? specify which historical node is used
-     instead of explicitly requiring PE *)
   Definition ohv_interp: iProp Σ := ∃ ohv, @OldHeadVal q_sq ↦ ohv ∗ PE ohv.
 
   Definition read_hist_interp hist rop h br fl od: iProp Σ :=
@@ -301,7 +286,7 @@ Section QueueResources.
       It simplifies getting PE for dangling and "free later" node.
       It should be possible to be strict and keep PE only for currently present elements,
       but it seems to unnecessarily complicate the proofs. *)
-  Definition queue_elems_interp (hq: HistQueue) (* (h: nat) *): iProp Σ := 
+  Definition queue_elems_interp (hq: HistQueue): iProp Σ := 
     [∗ list] nd ∈ hq, PE nd.2.1. 
   
   Definition queue_inv_inner (hq: HistQueue) (h t br fl: nat)
@@ -316,7 +301,6 @@ Section QueueResources.
   
   Definition queue_ns := nroot .@ "queue".
   
-  (* Definition queue_inv (q: loc): iProp Σ := *)
   Definition queue_inv: iProp Σ := inv queue_ns
     (∃ hq h t br fl rop od hist, queue_inv_inner hq h t br fl rop od hist).
   
@@ -495,25 +479,6 @@ Section QueueResources.
     { erewrite lookup_drop; eauto. }
     iFrame. iIntros. iFrame. repeat iSplit; try done. by iApply "CLOS".     
   Qed. 
-
-  (* (* TODO: also holds if h is not in the hist queue (e.g. initially) *) *)
-  (* Lemma queue_interp_ph_neq_pfl' (hq: HistQueue) h t br fl (ptr: loc): *)
-  (*   queue_interp hq h t br fl -∗ ⌜ exists nd, hq !! h = Some (ptr, nd) ⌝ -∗ *)
-  (*   ⌜ exists nd, hq !! fl = Some (ptr, nd) ⌝ -∗ *)
-  (*     False. *)
-  (* Proof using. *)
-  (*   simpl.  *)
-  (*   iIntros "QI (%ndh & %HTH) (%ndfl & %FLTH)". rewrite /queue_interp. *)
-  (*   rewrite /queue_interp. iDestruct "QI" as "(%T_LEN &  HNIS & %pt & TAIL & TLI & %LL & HEAD & BR & FL)". *)
-  (*   iDestruct "FL" as "(% & %FLTH_ & FL & HNI_FL)". *)
-  (*   rewrite FLTH in FLTH_. inversion FLTH_. subst. simpl. *)
-  (*   rewrite HTH. simpl. *)
-  (*   iDestruct (big_sepL_elem_of with "HNIS") as "II". *)
-  (*   { apply elem_of_list_lookup. eexists. *)
-  (*     erewrite lookup_drop with (i := 0). *)
-  (*     by rewrite Nat.add_0_r. } *)
-  (*   simpl. by iDestruct (hn_interp_ptr_excl with "[$] [$]") as "?". *)
-  (* Qed.     *)
 
   Lemma queue_interp_dangle_neq_pfl' (hq: HistQueue) h t br fl (ptr: loc):
     queue_interp hq h t br fl -∗

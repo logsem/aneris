@@ -324,12 +324,10 @@ Section WFAdequacy.
     unshelve esplit. 
   Qed. 
 
-  (* TODO: use this def above *)
   Definition never_stuck_ea (etr: extrace heap_lang) '(TraceCtx i (TpoolCtx K τ)) :=
     ∃ N, i ≤ N ∧ is_Some (etr S!! N)
       ∧ ∀ j, N ≤ j → from_option (not_stuck_tid τ) True (etr S!! j).
 
-  (* TODO: rename *)
   Lemma simple_om_simulation_adequacy_terminate_multiple_waitfree_impl extr
     (MOD_INIT : wfs_is_init_st s' _ m SPEC (trfirst extr))
     (VALID : extrace_valid extr)
@@ -484,7 +482,6 @@ Section WFAdequacy.
     by apply simple_om_simulation_adequacy_terminate_multiple_waitfree_impl.
   Qed.
 
-  (* TODO: rename *)
   Lemma obls_terminates_impl_multiple_waitfree
     (extr : extrace heap_lang)
     (ETR0: valid_init_tpool m (trfirst extr).1)
@@ -520,7 +517,6 @@ Proof using.
   apply main_returns_reduction; try done. 
   red. intros i K a ci FAIR ITH MAIN CALL _.
 
-  (* set (tpc := ).  *)
   opose proof * (obls_terminates_impl_multiple_waitfree (TraceCtx i (TpoolCtx K τ))) as ADEQ.
   3: by apply MOD_INIT. 
   all: eauto.
@@ -549,8 +545,6 @@ Proof using.
     clear PROGRESS.
         
     pose proof DOM as EE. eapply from_locale_trace in EE; eauto.
-    (* 2: { eapply locales_of_cfg_Some. eapply expr_at_in_locales. *)
-    (*      erewrite <- surjective_pairing. eauto. } *)
     rewrite LAST /= in EE. destruct EE as [e EE].
     
     destruct (decide (nval_at (TpoolCtx K τ) c)) as [NVAL | VAL]. 
@@ -579,4 +573,4 @@ Proof using.
   eapply ref_call_progress_last in PROGRESS; eauto. 
 Qed.
 
-(* Print Assumptions wfree_is_wait_free. *)
+(** Print Assumptions wfree_is_wait_free. *)

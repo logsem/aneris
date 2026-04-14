@@ -13,13 +13,8 @@ From lawyer.nonblocking.tokens Require Import tokens_ra.
 Close Scope Z. 
 
 
-(* Class SimpleQueueTokensPre Σ := SQTPre { *)
-(*   sqt_pre_init: ⊢ |==> ∃ (SQT: SimpleQueueTokens Σ), @dequeue_token _ SQT ∗ @read_head_token _ SQT; *)
-(* }. *)
-
 Section InitQueue.
 
-  (* TODO: move *)
   Lemma list_to_imap_ext {A: Type} (l: list A) (a: A):
     list_to_imap (l ++ [a]) = <[ length l := a ]> (list_to_imap l).
   Proof using.
@@ -41,8 +36,7 @@ Section InitQueue.
     iStartProof.
     iMod (own_alloc ((● (to_agree <$> (list_to_imap hq): gmapUR nat (agreeR HistNode))) ⋅ ◯ _)) as "(%γ & AUTH & FRAG)".
     { apply auth_both_valid_2.      
-      { (* TODO: make a lemma *)
-        red. intros k.
+      { red. intros k.
         destruct lookup eqn:LL; [| done].
         apply lookup_fmap_Some in LL. 
         destruct LL as (a&<-&?). 
@@ -118,7 +112,6 @@ Section InitQueue.
   Context `{QueuePreG Σ, heap1GS Σ, invGS_gen HasNoLc Σ}.
   Context (PE: val -> iProp Σ) {PE_PERS: forall v, Persistent (PE v)}. 
 
-  (* TODO: move/upstream *)
   Lemma bi_exist_pair {A B: Type} (P: A -> B -> iProp Σ):
     (∃ (a: A) (b: B), P a b) ⊣⊢ ∃ (ab: A * B), P ab.1 ab.2.
   Proof using.
@@ -127,8 +120,6 @@ Section InitQueue.
     - iIntros "(%ab&?)". destruct ab. iFrame.
   Qed.
 
-  (* TODO: a better way would be to relax restrictions
-     on initial nodes pointed by pfl and ph *)
   Definition is_init_queue_cfg sq (ph pfl: loc) (v: val) (c: cfg heap_lang): Prop :=
     let '(SQ H T BR FL OHV) := sq in
     NoDup [H; T; BR; FL; OHV; ph; ph +ₗ 1; pfl; pfl +ₗ 1] /\
@@ -147,7 +138,6 @@ Section InitQueue.
     OHV ↦ v ∗ 
     hn_interp (ph, dummy_node) ∗ hn_interp (pfl, (v, ph)).
 
-  (* TODO: move *)
   Local Lemma heap_ptrs_helper (h: gmap loc (option val)) (ptrs: list loc)
     (vals: list val)
     (ND: NoDup ptrs)
@@ -209,7 +199,6 @@ Section InitQueue.
     iMod rop_init as "(%γ_r & RAUTH & RFRAG)".
     iMod rop_token_init as "(%γ_rtok & RTOK)". 
     iMod read_hist_init as "(%RHIST & HIST & #RP0)".
-    (* iMod sqt_pre_init as "(%SQT & DTOK & ETOK)". *)
 
     iMod (auths_exacts_init [1; 1; 0; 0]) as "(%MES & AUTHS & EXS)".
     iDestruct (big_sepL2_length with "AUTHS") as %ME_LEN. simpl in ME_LEN.

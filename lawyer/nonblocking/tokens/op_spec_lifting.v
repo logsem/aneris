@@ -10,80 +10,6 @@ From lawyer Require Import action_model sub_action_em program_logic.
 From iris.algebra Require Import auth gmap gset excl excl_auth csum mono_nat.
 From heap_lang Require Import sswp_logic lang locales_helpers_hl.
 
-(* TODO: reorganize imports *)
-
-(* (* TODO: move *) *)
-(* Lemma no_forks_fill_item e Ki *)
-(*   (NOFORKS: no_forks (fill_item Ki e)): *)
-(*   no_forks e.  *)
-(* Proof using. destruct Ki; simpl; set_solver. Qed.  *)
-
-(* Lemma no_forks_fill e K *)
-(*   (NOFORKS: no_forks (fill K e)): *)
-(*   no_forks e.  *)
-(* Proof using. *)
-(*   revert NOFORKS. pattern K. apply rev_ind; clear K. *)
-(*   { done. } *)
-(*   simpl. intros. *)
-(*   rewrite -calls.fill_app /= in NOFORKS. *)
-(*   apply H. eapply no_forks_fill_item; eauto. *)
-(* Qed. *)
-
-(* Lemma no_forks_fill_item_replace e e' Ki *)
-(*   (NOFORKS: no_forks (fill_item Ki e)) *)
-(*   (NOFORKS': no_forks e'): *)
-(*   no_forks (fill_item Ki e'). *)
-(* Proof using. destruct Ki; simpl; set_solver. Qed.  *)
-
-(* Lemma no_forks_fill_replace e e' K *)
-(*   (NOFORKS: no_forks (fill K e)) *)
-(*   (NOFORKS': no_forks e'): *)
-(*   no_forks (fill K e'). *)
-(* Proof using. *)
-(*   revert NOFORKS. pattern K. apply rev_ind; clear K. *)
-(*   { done. } *)
-(*   simpl. intros. *)
-(*   rewrite -calls.fill_app /= in NOFORKS. rewrite -calls.fill_app /=. *)
-(*   eapply no_forks_fill_item_replace; eauto. *)
-(*   apply H. eapply no_forks_fill_item; eauto. *)
-(* Qed. *)
-
-(* Lemma no_forks_subst s v e *)
-(*   (NOFORKS: no_forks e) *)
-(*   (NOFORKS': val_nf v): *)
-(*   no_forks (subst s v e).  *)
-(* Proof using. *)
-(*   induction e; try set_solver. *)
-(*   - simpl. destruct decide; done. *)
-(*   - simpl. destruct decide; try done. *)
-(*     apply IHe. eauto. *)
-(* Qed. *)
-
-(* (* TODO: move *) *)
-(* Lemma no_forks_prim_step e σ e' σ' efs *)
-(*   (PSTEP: prim_step e σ e' σ' efs) *)
-(*   (NOFORKS: no_forks e): *)
-(*   efs = [] /\ no_forks e'. *)
-(* Proof using. *)
-(*   inversion PSTEP. simpl in *. subst. *)
-(*   pose proof NOFORKS as NOFORKS'%no_forks_fill. *)
-(*   inversion H1; subst; eauto. *)
-(*   14: by inversion NOFORKS'. *)
-(*   all: try by (split; [done | ]; eapply no_forks_fill_replace; eauto; simpl in *; tauto).  *)
-(*   - split; [done | ]. *)
-(*     inversion NOFORKS'. simpl in H.  *)
-(*     destruct x, f; simpl; eapply no_forks_fill_replace; eauto. *)
-(*     all: apply no_forks_subst; try done. *)
-(*     by apply no_forks_subst.  *)
-(*   - split; [done | eapply no_forks_fill_replace; eauto]. *)
-(*     simpl in NOFORKS'. *)
-(*     by inv_unop_eval H.  *)
-(*   - split; [done | eapply no_forks_fill_replace; eauto]. *)
-(*     by inv_binop_eval H.  *)
-(*   - split; [done | eapply no_forks_fill_replace; eauto]. *)
-(*     simpl in NOFORKS'. simpl. tauto.  *)
-
-
 Close Scope Z. 
 
 Section SpecLifting.
@@ -93,7 +19,6 @@ Section SpecLifting.
 
   Context (m: val). 
 
-  (* TODO: ct_interp_tok doesn't need an entire trace_ctx *)
   Context (ic: @trace_ctx heap_lang).
   Let τ := tpctx_tid $ tctx_tpctx ic.   
 
@@ -102,7 +27,6 @@ Section SpecLifting.
   Lemma lift_call E e
     (NVAL: to_val e = None)
     (Q: val -> iProp Σ)
-    (* (NOFORKS: no_forks e) *)
     :
     (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ _ PWT) si_add_none in
      WP e @ CannotFork; s ; τ ; E {{ v, method_tok m ∗ Q v }}) -∗
@@ -225,12 +149,6 @@ Section SpecLifting.
       However, the two triples would operate with different LRs (since state interpretations are different), and it's not clear how to convert between the two.
       Therefore, we'd only use this lifting lemma for stronger specs that ignore the input predicate P and ensure, via pure Q, that the result is a ground value (for which we can manually establish LR).
    *)
-  (* Lemma lift_spec `{Hinv : @IEMGS heap_lang M LG EM Σ} E (a: val) *)
-  (*   (P: iProp Σ) (Q: val -> iProp Σ): *)
-  (*   (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) si_add_none in *)
-  (*    □ (method_tok m -∗ P -∗ WP (App m a) @ s ; τ ; E {{ v, method_tok m ∗ Q v }} )) ⊢ *)
-  (*   (let _ := IEMGS_into_Looping (@pwt_Hinv _ _ PWT) (@ct_interp_tok ic _ m _ PWT) in *)
-  (*    □ (ct_frag None -∗ P -∗ WP (App m a) @ s ; τ ; E {{ v, ct_frag None ∗ Q v }} )). *)
 
   Lemma lift_spec `{Hinv : @IEMGS heap_lang M LG EM Σ} E (a: val)
     (P: iProp Σ) (Q: val -> iProp Σ):

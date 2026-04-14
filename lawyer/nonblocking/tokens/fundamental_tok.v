@@ -1,11 +1,7 @@
-(* From iris.program_logic Require Import lifting ectx_lifting. *)
-(* From iris.program_logic Require Export weakestpre. *)
-
 From iris.proofmode Require Import proofmode coq_tactics.
 From lawyer.nonblocking Require Import op_eval_helpers.
 From lawyer.nonblocking.logrel Require Export persistent_pred substitutions valid_client stuck_utils.
 From lawyer.nonblocking.tokens Require Export logrel_tok.
-(* From lawyer.nonblocking Require Export pwp.  *)
 From iris.base_logic Require Import invariants.
 From iris.prelude Require Import options.
 From heap_lang Require Import heap_lang_defs sswp_logic tactics. 
@@ -13,7 +9,6 @@ From heap_lang Require Import heap_lang_defs sswp_logic tactics.
 
 Section typed_interp.
   Context {Σ: gFunctors}
-    (* {iG: irisG heap_lang LoopingModel Σ} *)
     {hG: heap1GS Σ}
     {invG: invGS_gen HasNoLc Σ}
   .
@@ -41,10 +36,6 @@ Section typed_interp.
 
   Local Notation logrel' := (logrel tok si_add τ).
 
-  (* Goal Inhabited (trillium.program_logic.language.state heap_lang). *)
-  (*   apply _. *)
-  (*   Show Proof. *)
-
   Existing Instance state_inhabited.
 
   Ltac solve_stuck_case := unshelve stuck_utils.solve_stuck_case; apply _. 
@@ -64,8 +55,6 @@ Section typed_interp.
 
   Lemma wp_app_val_val f a:
     pers_pred_car interp' f -∗ ▷ pers_pred_car interp' a -∗
-    (* tok -∗ *)
-    (* pwp MaybeStuck ⊤ τ (App (Val f) (Val a)) (fun v => pers_pred_car interp' v ∗ tok). *)
     interp_expr' (App (Val f) (Val a)). 
   Proof using All.
     iIntros "Hv1 Hv2 T". rewrite /interp_expr. 
@@ -101,16 +90,11 @@ Section typed_interp.
     (NOx : ∀ s : string, x = BNamed s → s ∉ dom vs'):
   □ (∀ (vs0 : gmap string val),
            interp_env' vs0 -∗
-           (* tok -∗ *)
-           (* pwp MaybeStuck ⊤ τ0 (subst_env vs0 f) (fun v => pers_pred_car interp' v ∗ tok) *)
            interp_expr' (subst_env vs0 f)
     ) -∗
     interp_env' vs' -∗
   □ ∀ (v : val),
       ▷ pers_pred_car interp' v -∗
-      (* tok -∗ *)
-      (* pwp MaybeStuck ⊤ τ0 (App (Val (RecV b x (subst_env vs' f))) (Val v)) *)
-      (*     (fun v => pers_pred_car interp' v ∗ tok). *)
       interp_expr' (App (Val (RecV b x (subst_env vs' f))) (Val v)). 
   Proof using All.
     iIntros "#IH #Henv".
@@ -387,53 +371,6 @@ Section typed_interp.
       by iApply wp_app_val_val.
   Qed.
 
-  (* Lemma pwp_fork s E τ e Φ: *)
-  (*   (∀ τ', pwp s ⊤ τ' e (fun _ => ⌜ True ⌝)) -∗ *)
-  (*   Φ (LitV $ LitUnit) -∗ *)
-  (*   pwp s E τ (Fork e) Φ. *)
-  (* Proof using. *)
-  (*   rewrite /pwp wp_unfold /wp_pre. *)
-  (*   iIntros "FORK POST". simpl. *)
-  (*   iIntros (extr atr K tp1 tp2 σ1 Hvalid Hζ Hextr) "Hσ". *)
-  (*   (* iMod "Hsswp" as "foo". *) *)
-  (*   iSimpl in "Hσ". *)
-  (*   iApply fupd_mask_intro; [set_solver| ]. iIntros "CLOS'". *)
-  (*   iSplit. *)
-  (*   { iPureIntro. destruct s; [| done]. *)
-  (*     red. do 3 eexists. econstructor. *)
-  (*     3: eapply ForkS. *)
-  (*     all: erewrite ectx_fill_emp; reflexivity. } *)
-  (*   iIntros (e2 σ2 efs Hstep). *)
-  (*   (* iDestruct ("Hsswp" with "[//]") as "Hsswp". *) *)
-  (*   iApply (step_fupdN_le 1); [| done| ]. *)
-  (*   { pose proof (trace_length_at_least extr). done. } *)
-  (*   do 6 iModIntro. iMod "CLOS'" as "_". *)
-  (*   iModIntro. iExists tt, tt. *)
-
-  (*   inversion Hstep. subst. simpl in *. *)
-  (*   opose proof * (srav_helper (Fork e)). *)
-  (*   { solve_no_fill_item. } *)
-  (*   { apply H. } *)
-  (*   { simpl. by eapply val_head_stuck. } *)
-  (*   subst. simpl in *. subst. *)
-  (*   inversion H1. subst. *)
-  (*   rewrite Hextr. simpl. iFrame. *)
-  (*   iSplitL "POST". *)
-  (*   - by iApply wp_value. *)
-  (*   - iSplitL; [| done]. iApply "FORK". *)
-  (* Qed. *)
-
-  (* Lemma logrel_fork e : logrel e -∗ logrel (Fork e). *)
-  (* Proof using All. *)
-  (*   iIntros "#IH !#" (vs τ) "#Henv TOK"; rewrite /interp_expr /=. *)
-  (*   rewrite subst_env_arg1; [| done]. *)
-  (*   iApply pwp_fork. *)
-  (*   2: by rewrite {2}interp_unfold. *)
-  (*   iIntros (?). *)
-  (*   iApply (wp_wand with "[TOK]"); [by iApply "IH"| ]. *)
-  (*   by iIntros.  *)
-  (* Qed. *)
-
   Lemma logrel_if e0 e1 e2 : logrel' e0 -∗ logrel' e1 -∗ logrel' e2 -∗ logrel' (If e0 e1 e2).
   Proof using All.
     iIntros "#IH0 #IH1 #IH2 !#" (vs) "#Henv TOK"; rewrite /interp_expr /=.
@@ -528,7 +465,6 @@ Section typed_interp.
         rewrite LAST /= in V end;
     solve_head_stuck. 
 
-  (* Ltac solve_stuck_case_with_freed := *)
   Ltac solve_stuck_case_with_freed' :=
     iApply ectx_lifting.wp_lift_head_stuck;
       [done | apply srav_helper; solve_no_fill_item | solve_head_stuck_with_freed]. 
@@ -742,9 +678,7 @@ Section typed_interp.
     - iApply logrel_injr. by iApply H.
     - destruct H2 as (?&?&?).
       iApply logrel_case; [iApply H | iApply H0 | iApply H1]; tauto. 
-    - 
-      (* iApply logrel_fork. by iApply H. *)
-      done. 
+    - done. 
     - destruct H1 as (?&?).
       iApply logrel_alloc; [iApply H | iApply H0]; tauto. 
     - iApply logrel_free. by iApply H. 
@@ -770,8 +704,6 @@ Section typed_interp.
       iRight. iExists _. iSplit; [done| ].
       by iApply H.
   Qed.
-
-  (* Print Assumptions fundamental. *)
 
   Lemma ground_lit_interp l:
     is_ground_lit l -> ⊢ interp' (LitV l).

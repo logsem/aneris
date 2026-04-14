@@ -196,7 +196,7 @@ Section ListMapSpec.
 
   Require lawyer.nonblocking.om_wfree_inst. 
 
-  Lemma list_map_spec' τ π (* q *) (l: val heap_lang)
+  Lemma list_map_spec' τ π (l: val heap_lang)
     f fl P Q
     (LIST: is_hl_list P l)
     :
@@ -289,8 +289,7 @@ Section ListMapSpec.
   (** ******************** unsafe specs ****************)
 
   Lemma list_map_spec'_unsafe τ π  (l: val heap_lang)
-    f fl (* P Q *)
-    (* (LIST: is_hl_list P l) *)
+    f fl
     :
     cp_mul π d (hl_map_fuel fl l) -∗
     th_phase_frag τ π (1/2)%Qp -∗
@@ -309,7 +308,6 @@ Section ListMapSpec.
     iDestruct (cp_mul_split with "CPS") as "[CPS' CPS]".
 
     wp_bind (App _ f)%E.
-    (* remember ((K + F) * hl_list_size l) as U. (** to avoid unfolding *) *)
     pure_step.
     pure_step. iApply wp_value.
     pure_step. 
@@ -390,24 +388,6 @@ Section ListMapSpec.
     iIntros "% (? & POST)". iApply "POST". iFrame.
   Qed.
 
-  (* Lemma list_map_spec_unc_unsafe τ π q l *)
-  (*   f F : *)
-  (*   {{{ cp_mul π d (hl_map_unc_fuel F l) ∗ th_phase_frag τ π q ∗  *)
-  (*       wait_free_method_gen MaybeStuck f d (fun _ => F) (fun v => True) (fun v => True ) }}} *)
-  (*     hl_list_map (f, l)%V @ MaybeStuck ; τ ; ⊤ *)
-  (*   {{{ l', RET l'; th_phase_frag τ π q }}}. *)
-  (* Proof using. *)
-  (*   iIntros (Φ) "(CPS & PH & %LIST & #SPEC) POST". *)
-  (*   rewrite /hl_list_map. *)
-  (*   pure_step_cases.  *)
-  (*   wp_bind (Snd _)%E. do 2 pure_step_cases.  *)
-  (*   wp_bind (Fst _)%E. do 2 pure_step_cases. *)
-  (*   iApply (list_map_spec_unsafe with "[-POST]"). *)
-  (*   2: done.  *)
-  (*   iFrame "#∗". iSplit; [| done]. *)
-  (*   iApply (cp_mul_weaken with "[$]"); [done| lia]. *)
-  (* Qed. *)
-
 End ListMapSpec.
 
 
@@ -431,71 +411,10 @@ Section ListMapWFree.
 
   Definition hlm_arg_restr := is_hl_list (fun _ => (True: Prop)). 
 
-  (* Lemma hlm_spec: *)
-  (* forall {M} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ} *)
-  (*   (f: val heap_lang) (F_inner: nat), *)
-  (*   (let _: heap1GS Σ := iem_phys HeapLangEM EM in hlm_mod_inv) ⊢ *)
-  (*     wait_free_method_gen NotStuck hl_list_map d_wfr0 *)
-  (*     (from_option (hl_map_unc_fuel F_inner) 0 ∘ hl_snd_opt) *)
-  (*     (ho_arg_restr NotStuck f hlm_arg_restr (fun _ => F_inner)) *)
-  (*     (fun _ => emp). *)
-  (* Proof using. *)
-  (*   simpl. intros. *)
-  (*   rewrite /wait_free_method_gen. *)
-  (*   iIntros "#INV". iIntros "**". *)
-  (*   iIntros "!>" (?) "(CPS & PH & #LIST) POST". *)
-
-  (*   rewrite /ho_arg_restr. iDestruct "LIST" as "(% & (-> & %LIST) & #WFS)". *)
-  (*   simpl.  *)
-
-  (*   iApply (list_map_spec_unc with "[-POST]"). *)
-  (*   { iFrame. iSplit; [iPureIntro; by apply LIST| ]. *)
-  (*     rewrite /wait_free_method_gen. *)
-  (*     iIntros "**". iIntros "!> % (CPS & PH & _) POST". *)
-  (*     iApply ("WFS" with "[-POST]").  *)
-  (*     { iFrame. } *)
-  (*     iIntros "!> % PH". iApply ("POST" with "[$PH]"). *)
-  (*     Unshelve. 2: exact (fun _ => True). done. } *)
-  (*   iIntros "!> % (?&?)". iApply "POST". *)
-  (*   iFrame.  *)
-  (* Qed. *)
-       
-  (* Lemma hlm_spec_unsafe: *)
-  (* forall {M} {EM: ExecutionModel heap_lang M} {Σ} {OHE: OM_HL_Env OP_HL_WF EM Σ} *)
-  (*   (f: val heap_lang) (F_inner: nat), *)
-  (*   (let _: heap1GS Σ := iem_phys HeapLangEM EM in hlm_mod_inv) ⊢ *)
-  (*     wait_free_method_gen MaybeStuck hl_list_map d_wfr0 *)
-  (*     (from_option (hl_map_unc_fuel F_inner) 0 ∘ hl_snd_opt) *)
-  (*     (fun _ => True) *)
-  (*     (fun _ => emp). *)
-  (* Proof using. *)
-  (*   simpl. intros. *)
-  (*   rewrite /wait_free_method_gen. *)
-  (*   iIntros "#INV". iIntros "**". *)
-  (*   iIntros "!>" (?) "(CPS & PH & #LIST) POST". *)
-
-  (*   iApply (list_map_spec_unc_unsafe with "[-POST]"). *)
-  (*   { iFrame. iSplit; [iPureIntro; by apply LIST| ]. *)
-  (*     rewrite /wait_free_method_gen. *)
-  (*     iIntros "**". iIntros "!> % (CPS & PH & _) POST". *)
-  (*     iApply ("WFS" with "[-POST]").  *)
-  (*     { iFrame. } *)
-  (*     iIntros "!> % PH". iApply ("POST" with "[$PH]"). *)
-  (*     Unshelve. 2: exact (fun _ => True). done. } *)
-  (*   iIntros "!> % (?&?)". iApply "POST". *)
-  (*   iFrame.  *)
-  (* Qed. *)
-       
   Lemma hlm_phys_spec
    {Σ} {hG: heap1GS Σ} {iG: invGS_gen HasNoLc Σ}:
     hlm_mod_inv ⊢ persistent_pred.pers_pred_car interp hl_list_map.
   Proof using. iIntros "_". iApply list_map_phys_spec. Qed.
-
-  (* Definition hlm_WF_HO_spec: WaitFreeSpecHO NotStuck hl_list_map hlm_arg_restr := {| *)
-  (*   wfsho_init_mod Σ _ _ := hlm_init_mod; *)
-  (*   wfsho_spec := @hlm_spec; *)
-  (*   wfsho_safety_spec Σ _ _ := hlm_phys_spec; *)
-  (* |}. *)
 
   (** ************** proving usual WaitFreeSpec for a fixed function argument **)
   
@@ -603,42 +522,4 @@ Section ListMapWFree.
     iApply wfs_safety_spec. by iFrame.
   Qed.
 
-  (* TODO: not usable with the current adequacy theorem *)
-  (* Program Definition hlm_WF_fix_spec_safe f (WFf: WaitFreeSpec NotStuck any_arg f) F *)
-  (*   (* TODO: try to lift this restriction *) *)
-  (*   (F_FUEL: wfs_F _ _ _ WFf = fun _ => F) *)
-  (*   : *)
-  (*   WaitFreeSpec NotStuck hlm_arg_restr (λ: "x", hl_list_map_cur f "x")%V := {| *)
-  (*   wfs_is_init_st := wfs_is_init_st _ _ _ WFf; *)
-  (*   wfs_mod_inv Σ _ _ := (hlm_mod_inv ∗ wfs_mod_inv _ _ _ WFf)%I; *)
-  (*   wfs_F := S ∘ (hl_map_fuel F); *)
-  (* |}. *)
-  (* Next Obligation. *)
-  (*   intros. simpl. *)
-  (*   iIntros "INIT". *)
-  (*   iMod (wfs_init_mod _ _ _ WFf with "[$]") as "foo"; [done| ]. *)
-  (*   iFrame "#∗". done. *)
-  (* Qed. *)
-  (* Next Obligation. *)
-  (*   intros. simpl. *)
-  (*   iIntros "(#INVl & #INVf)". *)
-  (*   rewrite /wait_free_method_gen. iIntros (**). *)
-  (*   iIntros (Φ) "!> (CP & PH & ?) POST". *)
-  (*   iApply (hlm_spec_fix with "[] [-POST]").  *)
-  (*   { iFrame "#∗". *)
-  (*     rewrite /wait_free_method_gen. iIntros (**). *)
-  (*     iIntros (Ψ) "!> (CP & PH & _) POST". *)
-  (*     iApply (wfs_spec _ _ _ WFf with "[$] [-POST]"). *)
-  (*     { iFrame. rewrite F_FUEL. iApply "CP". } *)
-  (*     iNext. iIntros "% PH". iApply "POST". by iFrame. } *)
-  (*   { iFrame. } *)
-  (*   iNext. iIntros "% (PH & _)". iApply "POST". by iFrame. *)
-  (* Qed.  *)
-  (* Final Obligation. *)
-  (*   intros. simpl. *)
-  (*   iIntros "(#INVl & #INVf)". *)
-  (*   iApply hlm_fix_phys_spec. iFrame "#∗". *)
-  (*   iApply wfs_safety_spec. by iFrame. *)
-  (* Qed. *)
-  
 End ListMapWFree.

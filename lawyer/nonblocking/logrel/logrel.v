@@ -13,7 +13,6 @@ Definition logN : namespace := nroot .@ "logN".
 (** interp : is a unary logical relation. *)
 Section logrel.
   Context {Σ: gFunctors}
-    (* {iG: irisG heap_lang LoopingModel Σ} *)
     {invG: invGS_gen HasNoLc Σ}
     {hG: heap1GS Σ}. 
   Notation D := (persistent_predO (val heap_lang) (iPropI Σ)).

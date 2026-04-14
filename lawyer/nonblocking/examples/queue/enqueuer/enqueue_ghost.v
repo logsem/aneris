@@ -15,13 +15,11 @@ Section EnqueueViewshifts.
   Context {SQT: SimpleQueueTokens Σ}.
   Context {q_sq: SimpleQueue}. 
 
-  (* TODO: move *)
   Definition is_LL_into_alt (hq: HistQueue) (pt: loc) := 
     (forall (i: nat) (nd nd': HistNode),
         hq !! i = Some nd -> hq !! (S i) = Some nd' -> nd.2.2 = nd'.1) /\
     from_option (fun nd => nd.2.2 = pt) True (last hq).
 
-  (* TODO: move *)
   Lemma is_LL_into_equiv hq pt:
     is_LL_into hq pt <-> is_LL_into_alt hq pt.
   Proof using.
@@ -52,7 +50,6 @@ Section EnqueueViewshifts.
       ospecialize (NEXT 0 _ _ _ _ ); eauto.
   Qed.
   
-  (* TODO: move *)
   Lemma is_LL_into_ext l p1 v p2
     (LL: is_LL_into l p1):
   is_LL_into (l ++ [(p1, (v, p2))]) p2.
@@ -75,7 +72,6 @@ Section EnqueueViewshifts.
       by rewrite H in FIN.
   Qed.
 
-  (* TODO: move *)
   Lemma hq_auth_extend hq nd:
     hq_auth hq ==∗ hq_auth (hq ++ [nd]).
   Proof using.

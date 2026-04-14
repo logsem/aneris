@@ -104,7 +104,6 @@ Section WptpGen.
     wptp_from_gen t0 (e :: efs) (Φ :: Φs) ⊣⊢ W e (locale_of t0 e) Φ ∗ wptp_from_gen (t0 ++ [e]) efs Φs.
   Proof using. done. Qed. 
 
-  (* TODO: do we need anything stronger (e.g. matching indices for e and Φ) ? *)
   Lemma wptp_from_gen_take_2 t efs Φs τ
     (IN: τ ∈ locales_of_list_from t efs):
     let WPS := wptp_from_gen t efs Φs in
@@ -116,7 +115,6 @@ Section WptpGen.
 
     pose proof IN as [e X]%locales_of_list_from_locale_from'.
     apply from_locale_from_lookup in X. apply proj1 in X.
-    (* rewrite Nat.sub_0_r /= in X. *)
     pose proof X as (t1 & t2 & -> & LEN)%elem_of_list_split_length. 
 
     iDestruct (wptp_gen_split_1 with "[$]") as %(?&?&<-&?&?).
@@ -143,12 +141,9 @@ Section WptpGen.
          by rewrite -EQ. }
     rewrite /locale_of. rewrite length_app.
 
-    (* lia.  *)
     rewrite -LEN. by apply Nat.le_add_sub.     
   Qed.
 
-  (* TODO: try to unify with wptp_from_gen_take_2 *)
-  (* TODO: do we need anything stronger (e.g. matching indices for e and Φ) ? *)
   Lemma wptp_from_gen_take_1 t efs Φs e
     (IN: e ∈ efs):
     let WPS := wptp_from_gen t efs Φs in
@@ -171,22 +166,6 @@ Section WptpGen.
     iApply wptp_from_gen_app. iFrame.
   Qed.
 
-  (* EQUIV : locales_equiv t0 t0' *)
-
-  (* Lemma wptp_from_gen_locales_equiv_1_impl t0 t0' efs efs' Φs *)
-  (*   (EQUIV: locales_equiv_from t0 t0' efs efs'): *)
-  (*   wptp_from_gen t0 efs Φs -∗ wptp_from_gen t0' efs' Φs. *)
-  (* Proof using. *)
-  (*   iIntros "WPS".  *)
-  (*   (* rewrite /wptp_from_gen. *) *)
-  (*   (* iApply big_sepL2_proper_2. *) *)
-  (*   (* 4: by iFrame.  *) *)
-  (*   clear -EQUIV. *)
-  (*   Unset Printing Notations. *)
-    
-  (*   Disable Notation locales_equiv.  *)
-  (*   eapply EQUIV.  *)
-        
   Lemma wptp_from_gen_locales_equiv_1 t0 t0' efs Φs
     (EQUIV: locales_equiv t0 t0'):
     wptp_from_gen t0 efs Φs ⊣⊢ wptp_from_gen t0' efs Φs.
@@ -203,7 +182,6 @@ Section WptpGen.
          rewrite !prefixes_from_app.
          eapply Forall2_app; try done.
          simpl. constructor; try done.
-         (* TODO: specific to heap_lang, can it be generalized? *)
          rewrite /locale_of.
          eapply adequacy_utils.locales_equiv_from_length; eauto. }
     rewrite /locale_of.
@@ -225,8 +203,8 @@ End WptpGen.
     (□ ∀ τ Φ e, ⌜ τ ∈ locales_of_list_from t efs /\ τ ∉ τs ⌝ -∗ W1 e τ Φ -∗ W2 e τ Φ) -∗
     ∃ (M: gmap (locale heap_lang) (expr * (val → iPropI Σ))),
     ⌜ dom M = τs ⌝ ∗
-    ([∗ map] τ ↦ '(e, Φ) ∈ M, (* ⌜ Φ ∈ Φs ⌝ ∗  *)⌜ from_locale_from t efs τ = Some e ⌝ ∗ W1 e τ Φ) ∗
-    (([∗ map] τ ↦ '(e, Φ) ∈ M, (* ⌜ Φ ∈ Φs ⌝ ∗  *)⌜ from_locale_from t efs τ = Some e ⌝ ∗ W2 e τ Φ) -∗ wptp_from_gen W2 t efs Φs).
+    ([∗ map] τ ↦ '(e, Φ) ∈ M, ⌜ from_locale_from t efs τ = Some e ⌝ ∗ W1 e τ Φ) ∗
+    (([∗ map] τ ↦ '(e, Φ) ∈ M, ⌜ from_locale_from t efs τ = Some e ⌝ ∗ W2 e τ Φ) -∗ wptp_from_gen W2 t efs Φs).
   Proof using.
      iInduction efs as [|e efs] "IH" forall (Φs τs t IN). 
      { simpl. iIntros "**".

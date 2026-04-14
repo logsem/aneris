@@ -7,9 +7,6 @@ Section XX.
 
   Notation "'Tid'" := (locale Λ). 
 
-  (* TODO: unify with existing locales_of_list_from_locale_from, 
-     remove restriction for Λ *)
-
   Lemma locales_of_list_from_locale_from' tp0 tp1 ζ:
     ζ ∈ locales_of_list_from tp0 tp1 (Λ := Λ) ->
     is_Some (from_locale_from tp0 tp1 ζ).
@@ -73,7 +70,6 @@ Section XX.
 End XX.
 
 
-(* TODO: move to trillium *)
 Lemma prefixes_lookup_orig {A: Type}: 
   forall (ll0 l: list A) i p a,
   prefixes_from ll0 l !! i = Some (p, a) ->
@@ -88,7 +84,6 @@ Proof using.
 Qed.
 
 
-(* TODO: move, remove exec_traces import? *)
 Global Instance locale_enabled_dec {Λ: language} `{EqDecision (locale Λ)}
   τ (c: cfg Λ):
   Decision (locale_enabled τ c).
