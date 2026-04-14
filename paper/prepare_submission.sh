@@ -9,13 +9,13 @@ PAPER_BRANCH=main
 TRILLIUM_GIT_URL=git@github.com:logsem/trillium.git
 TRILLIUM_BRANCH=forks_bit
 LAWYER_GIT_URL=git@github.com:logsem/aneris.git
-LAWYER_BRANCH=no_admits
+LAWYER_BRANCH=ecoop_artifact
 README_FILE=README_wfree.md
 
 # LAWYER_OOPSLA26_PATH=lawyer_oopsla26
 
 WORKING_DIR_NAME=submission
-# VM_SHARED_DIR=~/research/lawyer-artifact/vm_shared
+VM_SHARED_DIR=~/research/lawyer-upd/vm_shared
 COMMITS_LOG=commits.log
 
 cleanup_current_dir () {
@@ -82,8 +82,8 @@ zip -r wfree_suppl.zip trillium lawyer README.md paper-appendix.pdf
 
 ## 4) the artifact is pretty much the content of working dir (plus the actual VM) 
 
-# ## 5) move the sources to VM's shared folder
-# cp -f lawyer_suppl.zip $VM_SHARED_DIR
+## 5) move the sources to VM's shared folder
+cp -f wfree_suppl.zip $VM_SHARED_DIR
 
 echo "Submission material is built in $WORKING_DIR"
 cat $WORKING_DIR/$COMMITS_LOG
