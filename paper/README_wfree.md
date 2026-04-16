@@ -1,3 +1,5 @@
+**NB: this README might be outdated. The most recent one is in the pdf provided with the artifact.**
+
 # Supplementary material for the wait-freedom paper
 
 This document describes the Rocq formalization for the "Verifying wait-freedom for concurrent higher-order programs" paper.
