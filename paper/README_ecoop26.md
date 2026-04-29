@@ -14,6 +14,7 @@ The mechanization includes all the results on wait-freedom presented in the pape
   - possibly-stuck wait-freedom of list mapping function (Figure 6) specialized to `incr`;
   - restricted wait-freedom of a single-producer single-consumer queue (Figure 7).
 
+The mechanization uses the Rocq version 9.0.0.
 The detailed correspondence between the Rocq mechanization and the definitions from paper is provided below.
 
 ---
