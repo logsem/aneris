@@ -77,7 +77,7 @@ cp paper.pdf $WORKING_DIR/paper-appendix.pdf
 
 ## 3) complete supplementary material
 cd $WORKING_DIR
-zip -r wfree_suppl.zip trillium lawyer paper-appendix.pdf README_.md
+zip -r wfree_suppl.zip trillium lawyer paper-appendix.pdf README.md
 
 ## 4) the artifact is pretty much the content of working dir (plus the actual VM) 
 
